@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "ralle",
+  "version": "${version}",
+  "name": "Raid Alliance Logistics Liaison Equipment",
+  "description": "A client-side Wynncraft chat and Raid LFG mod for the Kingdom of Foxes alliance.",
+  "authors": ["Kingdom of Foxes"],
+  "contact": {
+    "sources": "https://github.com/KingdomFoxes/RALLE",
+    "issues": "https://github.com/KingdomFoxes/RALLE/issues"
+  },
+  "license": "GPL-3.0-only",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["org.kingdomfoxes.ralle.RalleClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*",
+    "owo": ">=0.13.0"
+  },
+  "suggests": {
+    "wynntils": "*"
+  }
+}
