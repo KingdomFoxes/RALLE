@@ -21,13 +21,20 @@ platform ports. It must not depend on a concrete settings screen.
 
 ## Foundation invariants
 
-- No feature is enabled or registered by this skeleton.
+- No chat or Raid LFG behavior is enabled by this foundation.
 - Initialization performs no network requests and changes no game behavior.
 - owo-lib is contained behind `SettingsScreenFactory`; future settings register
   through `SettingsRegistry` rather than constructing owo components directly.
 - Feature IDs and setting/category IDs are validated and unique.
 - Registries are sealed after bootstrap to catch accidental late mutation.
 - Minecraft-specific hooks should use supported APIs before mixins.
+
+## Local settings
+
+`/ralle settings` opens the owo-lib adapter over RALLE-owned category and setting
+models. Values are stored in `config/ralle.properties`; invalid or obsolete
+values fall back to their declared defaults. The current settings are inert
+until their corresponding chat and Raid LFG vertical slices consume them.
 
 The eventual Fox FastAPI service is a separate repository and remains the sole
 authority for LFG state. No backend implementation belongs in this client.
