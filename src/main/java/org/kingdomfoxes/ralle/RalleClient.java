@@ -8,6 +8,7 @@ import org.kingdomfoxes.ralle.api.feature.FeatureRegistry;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.settings.RalleSettings;
 import org.kingdomfoxes.ralle.ui.owo.OwoSettingsScreenFactory;
+import org.kingdomfoxes.ralle.ui.owo.RaidLfgScreen;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
@@ -31,6 +32,10 @@ public final class RalleClient implements ClientModInitializer {
                 literal("ralle").then(literal("settings").executes(command -> {
                     var client = Minecraft.getInstance();
                     client.schedule(() -> client.setScreen(context().settingsScreens().create(client.screen)));
+                    return 1;
+                })).then(literal("lfg").executes(command -> {
+                    var client = Minecraft.getInstance();
+                    client.schedule(() -> client.setScreen(new RaidLfgScreen(client.screen)));
                     return 1;
                 }))
         ));
