@@ -17,16 +17,19 @@ final class HeaderAccentComponent extends BaseUIComponent {
 
     @Override
     public void draw(OwoUIGraphics graphics, int mouseX, int mouseY, float partialTicks, float delta) {
-        int diagonalRun = Math.max(0, width - BOTTOM_INSET - 1);
-        int denominator = Math.max(1, height - 1);
+        int rightEdge = x + width - 1;
+        int drawableHeight = Math.max(1, height - 2);
+        int diagonalRun = Math.max(0, width - BOTTOM_INSET - 2);
+        int denominator = Math.max(1, drawableHeight - 1);
 
-        for (int row = 0; row < height; row++) {
-            int whiteStart = x + width - (row * diagonalRun / denominator);
-            int orangeWidth = Math.min(ACCENT_THICKNESS, row + 1);
+        for (int row = 0; row < drawableHeight; row++) {
+            int diagonalOffset = 1 + (row * diagonalRun + denominator - 1) / denominator;
+            int whiteStart = rightEdge - diagonalOffset;
+            int orangeWidth = ACCENT_THICKNESS;
             int orangeStart = Math.max(x, whiteStart - orangeWidth);
 
-            graphics.fill(orangeStart, y + row, whiteStart, y + row + 1, ORANGE);
-            graphics.fill(whiteStart, y + row, x + width, y + row + 1, WHITE);
+            graphics.fill(orangeStart, y + row + 1, whiteStart, y + row + 2, ORANGE);
+            graphics.fill(whiteStart, y + row + 1, rightEdge, y + row + 2, WHITE);
         }
     }
 }
