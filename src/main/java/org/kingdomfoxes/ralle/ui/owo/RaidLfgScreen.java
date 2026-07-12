@@ -46,11 +46,6 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private static final Color REGION_GOOD = Color.ofRgb(0x00FF55);
     private static final Color REGION_MODERATE = Color.ofRgb(0xFFFF00);
     private static final Color REGION_POOR = Color.ofRgb(0xFF3333);
-    private static final int CREATE_BUTTON_COLOR = 0xFF238636;
-    private static final int CREATE_BUTTON_HOVERED_COLOR = 0xFF2EA043;
-    private static final int CREATE_BUTTON_DISABLED_COLOR = 0xFF39543F;
-    private static final int CREATE_BUTTON_BORDER_COLOR = 0xFF0B0D0C;
-
     private final Screen parent;
     private final List<FakeRaidLobby> lobbies = FakeRaidLobbies.all();
     private StatusFilter statusFilter = StatusFilter.OPEN;
@@ -91,13 +86,16 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var gridHost = UIContainers.verticalFlow(Sizing.fixed(GRID_WIDTH), Sizing.content());
         var create = UIComponents.button(Component.literal("+"), ignored -> {});
         create.sizing(Sizing.fixed(30), Sizing.fixed(20));
-        create.renderer(createButtonRenderer());
+        create.renderer(RalleButtonRenderers.primary());
         create.tooltip(Component.literal("Create party (prototype only)"));
 
         var statusButton = UIComponents.button(statusLabel(), ignored -> {});
         var raidButton = UIComponents.button(raidLabel(), ignored -> {});
         var regionButton = UIComponents.button(regionLabel(), ignored -> {});
 
+        statusButton.renderer(RalleButtonRenderers.selectable(() -> statusFilter != StatusFilter.OPEN));
+        raidButton.renderer(RalleButtonRenderers.selectable(() -> raidFilter != RaidFilter.ALL));
+        regionButton.renderer(RalleButtonRenderers.selectable(() -> regionFilter != RegionFilter.ALL));
         statusButton.horizontalSizing(Sizing.fixed(176));
         raidButton.horizontalSizing(Sizing.fixed(176));
         regionButton.horizontalSizing(Sizing.fixed(176));
@@ -121,6 +119,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         footer.child(UIComponents.label(Component.literal("Use the filters to stress-test the grid."))
                 .color(MUTED));
         var close = UIComponents.button(Component.translatable("gui.done"), ignored -> onClose());
+        close.renderer(RalleButtonRenderers.neutral());
         close.horizontalSizing(Sizing.fixed(92)).margins(Insets.left(16));
         footer.child(close);
         panel.child(footer);
@@ -148,21 +147,6 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         header.child(UIComponents.spacer());
         header.child(new HeaderAccentComponent(50, HEADER_HEIGHT));
         return header;
-    }
-
-    private ButtonComponent.Renderer createButtonRenderer() {
-        return (graphics, button, delta) -> {
-            int x = button.getX();
-            int y = button.getY();
-            int width = button.getWidth();
-            int height = button.getHeight();
-            int fill = button.active()
-                    ? button.isHovered() ? CREATE_BUTTON_HOVERED_COLOR : CREATE_BUTTON_COLOR
-                    : CREATE_BUTTON_DISABLED_COLOR;
-
-            graphics.fill(x, y, x + width, y + height, CREATE_BUTTON_BORDER_COLOR);
-            graphics.fill(x + 1, y + 1, x + width - 1, y + height - 1, fill);
-        };
     }
 
     private void openStatusDropdown(FlowLayout root, ButtonComponent trigger, FlowLayout gridHost) {
@@ -260,6 +244,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
         var action = UIComponents.button(actionText(lobby), ignored -> {});
         action.horizontalSizing(Sizing.fill(100));
+        action.renderer(RalleButtonRenderers.primary());
         action.active = !lobby.locked() && lobby.status() == FakeRaidLobby.Status.OPEN && lobby.members().size() < 4;
         action.tooltip(Component.literal("Prototype only - roster mutations are not connected yet"));
         card.child(action);
