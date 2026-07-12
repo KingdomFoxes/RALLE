@@ -16,6 +16,8 @@ import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FontDescription;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.kingdomfoxes.ralle.lfg.client.FakeRaidLobbies;
@@ -31,6 +33,11 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private static final int PANEL_WIDTH = 620;
     private static final int GRID_WIDTH = 584;
     private static final int CARD_WIDTH = 286;
+    private static final int HEADER_HEIGHT = 41;
+    private static final Identifier FOX_EMBLEM = Identifier.fromNamespaceAndPath("ralle", "textures/gui/fox_overlay.png");
+    private static final FontDescription KARLA_BOLD = new FontDescription.Resource(
+            Identifier.fromNamespaceAndPath("ralle", "karla_bold")
+    );
     private static final Color MUTED = Color.ofRgb(0xA9B0BE);
     private static final Color ACCENT = Color.ofRgb(0xF2B84B);
     private static final Color OPEN = Color.ofRgb(0x67D391);
@@ -72,7 +79,9 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                 .verticalAlignment(VerticalAlignment.CENTER);
 
         var panel = UIContainers.verticalFlow(Sizing.fixed(PANEL_WIDTH), Sizing.fill(92));
-        panel.gap(8).padding(Insets.of(12)).surface(Surface.DARK_PANEL);
+        panel.gap(8).padding(Insets.of(12)).surface(
+                Surface.flat(0xFF041330).and(Surface.outline(0xFFFFFFFF))
+        );
 
         panel.child(header());
 
@@ -120,22 +129,24 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private FlowLayout header() {
-        var header = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
-        header.horizontalAlignment(HorizontalAlignment.CENTER)
-                .surface(Surface.PANEL).padding(Insets.of(10));
+        var header = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(HEADER_HEIGHT));
+        header.verticalAlignment(VerticalAlignment.CENTER)
+                .surface(Surface.flat(0xFF041330).and(Surface.outline(0xFFFFFFFF)));
 
         var identity = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
-        identity.verticalAlignment(VerticalAlignment.CENTER);
-        identity.child(UIComponents.item(new ItemStack(Items.COMPASS))
-                .setTooltipFromStack(true).showOverlay(false).margins(Insets.right(8)));
+        identity.verticalAlignment(VerticalAlignment.CENTER).margins(Insets.left(10));
 
-        var labels = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
-        labels.gap(3);
-        labels.child(UIComponents.label(Component.literal("Raid Party Finder")).shadow(true).color(ACCENT));
-        labels.child(UIComponents.label(Component.literal("Kingdom of Foxes Alliance")).color(MUTED));
-        identity.child(labels);
+        var emblem = UIComponents.texture(FOX_EMBLEM, 0, 0, 159, 232, 159, 232).blend(true);
+        emblem.sizing(Sizing.fixed(19), Sizing.fixed(28)).margins(Insets.right(10));
+        identity.child(emblem);
+
+        var title = Component.literal("ALLY GRAID FINDER")
+                .withStyle(style -> style.withFont(KARLA_BOLD));
+        identity.child(UIComponents.label(title).lineHeight(16).shadow(false).color(Color.WHITE));
 
         header.child(identity);
+        header.child(UIComponents.spacer());
+        header.child(new HeaderAccentComponent(50, HEADER_HEIGHT));
         return header;
     }
 
