@@ -36,6 +36,9 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private static final Color OPEN = Color.ofRgb(0x67D391);
     private static final Color LOCKED = Color.ofRgb(0xFFCA65);
     private static final Color IN_RAID = Color.ofRgb(0x72B7FF);
+    private static final Color REGION_GOOD = Color.ofRgb(0x00FF55);
+    private static final Color REGION_MODERATE = Color.ofRgb(0xFFFF00);
+    private static final Color REGION_POOR = Color.ofRgb(0xFF3333);
     private static final int CREATE_BUTTON_COLOR = 0xFF238636;
     private static final int CREATE_BUTTON_HOVERED_COLOR = 0xFF2EA043;
     private static final int CREATE_BUTTON_DISABLED_COLOR = 0xFF39543F;
@@ -46,9 +49,15 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private StatusFilter statusFilter = StatusFilter.OPEN;
     private RaidFilter raidFilter = RaidFilter.ALL;
     private RegionFilter regionFilter = RegionFilter.ALL;
+    private final FakeRaidLobby.Region currentRegion;
 
     public RaidLfgScreen(Screen parent) {
+        this(parent, FakeRaidLobby.Region.EU);
+    }
+
+    public RaidLfgScreen(Screen parent, FakeRaidLobby.Region currentRegion) {
         this.parent = parent;
+        this.currentRegion = currentRegion;
     }
 
     @Override
@@ -216,11 +225,18 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
         var title = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
         title.verticalAlignment(VerticalAlignment.CENTER);
-        title.child(UIComponents.item(new ItemStack(raidIcon(lobby.raid())))
+        var raidDetails = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+        raidDetails.verticalAlignment(VerticalAlignment.CENTER);
+        raidDetails.child(UIComponents.item(new ItemStack(raidIcon(lobby.raid())))
                 .showOverlay(false).margins(Insets.right(6)));
-        title.child(UIComponents.label(Component.literal(lobby.raid())).shadow(true).color(ACCENT));
-        title.child(UIComponents.label(Component.literal("  " + lobby.region())).color(MUTED));
-        title.child(UIComponents.label(Component.literal("  " + statusText(lobby))).color(statusColor(lobby)));
+        raidDetails.child(UIComponents.label(Component.literal(lobby.raid())).shadow(true).color(ACCENT));
+        raidDetails.child(UIComponents.label(Component.literal("  " + lobby.region()))
+                .color(regionColor(lobby.region())));
+        title.child(raidDetails);
+        var titleSpacer = UIComponents.spacer();
+        titleSpacer.verticalSizing(Sizing.fixed(0));
+        title.child(titleSpacer);
+        title.child(UIComponents.label(Component.literal(statusText(lobby))).color(statusColor(lobby)));
         card.child(title);
 
         card.child(UIComponents.label(Component.literal(lobby.note())).color(MUTED).maxWidth(CARD_WIDTH - 18));
@@ -276,6 +292,16 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private Color statusColor(FakeRaidLobby lobby) {
         if (lobby.locked()) return LOCKED;
         return lobby.status() == FakeRaidLobby.Status.IN_RAID ? IN_RAID : OPEN;
+    }
+
+    private Color regionColor(FakeRaidLobby.Region lobbyRegion) {
+        if (lobbyRegion == currentRegion) return REGION_GOOD;
+
+        return switch (currentRegion) {
+            case EU -> lobbyRegion == FakeRaidLobby.Region.NA ? REGION_MODERATE : REGION_POOR;
+            case NA -> lobbyRegion == FakeRaidLobby.Region.EU ? REGION_MODERATE : REGION_POOR;
+            case AS -> lobbyRegion == FakeRaidLobby.Region.EU ? REGION_MODERATE : REGION_POOR;
+        };
     }
 
     private Component actionText(FakeRaidLobby lobby) {
