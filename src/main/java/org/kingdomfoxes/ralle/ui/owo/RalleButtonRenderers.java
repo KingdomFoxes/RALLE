@@ -27,6 +27,32 @@ final class RalleButtonRenderers {
         return renderer(Palette.PRIMARY, () -> false);
     }
 
+    static ButtonComponent.Renderer refresh() {
+        var background = neutral();
+        return (graphics, button, delta) -> {
+            background.draw(graphics, button, delta);
+
+            int left = button.getX() + (button.getWidth() - 11) / 2;
+            int top = button.getY() + (button.getHeight() - 11) / 2;
+            int color = button.active() ? 0xFFFFFFFF : 0xFF8D96A5;
+
+            // Open circular arc with a downward arrowhead at the lower-left, matching the reference.
+            graphics.fill(left + 3, top + 1, left + 8, top + 2, color);
+            graphics.fill(left + 2, top + 2, left + 3, top + 3, color);
+            graphics.fill(left + 8, top + 2, left + 9, top + 3, color);
+            graphics.fill(left + 1, top + 3, left + 2, top + 6, color);
+            graphics.fill(left + 9, top + 3, left + 10, top + 8, color);
+            graphics.fill(left + 8, top + 8, left + 9, top + 9, color);
+            graphics.fill(left + 6, top + 9, left + 8, top + 10, color);
+
+            // Solid left-pointing arrowhead, offset one pixel left from the arc.
+            graphics.fill(left - 1, top + 5, left + 5, top + 6, color);
+            graphics.fill(left, top + 6, left + 5, top + 7, color);
+            graphics.fill(left + 1, top + 7, left + 4, top + 8, color);
+            graphics.fill(left + 2, top + 8, left + 3, top + 9, color);
+        };
+    }
+
     private static ButtonComponent.Renderer renderer(Palette palette, BooleanSupplier selected) {
         return (graphics, button, delta) -> {
             int x = button.getX();

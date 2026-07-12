@@ -52,6 +52,8 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private RaidFilter raidFilter = RaidFilter.ALL;
     private RegionFilter regionFilter = RegionFilter.ALL;
     private final FakeRaidLobby.Region currentRegion;
+    private FlowLayout gridHost;
+    private boolean refreshGridNextTick;
 
     public RaidLfgScreen(Screen parent) {
         this(parent, FakeRaidLobby.Region.EU);
@@ -83,7 +85,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var filters = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
         filters.gap(6).padding(Insets.left(4)).verticalAlignment(VerticalAlignment.CENTER);
 
-        var gridHost = UIContainers.verticalFlow(Sizing.fixed(GRID_WIDTH), Sizing.content());
+        this.gridHost = UIContainers.verticalFlow(Sizing.fixed(GRID_WIDTH), Sizing.content());
         var create = UIComponents.button(Component.literal("+"), ignored -> {});
         create.sizing(Sizing.fixed(30), Sizing.fixed(20));
         create.renderer(RalleButtonRenderers.primary());
@@ -96,19 +98,24 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         statusButton.renderer(RalleButtonRenderers.selectable(() -> statusFilter != StatusFilter.OPEN));
         raidButton.renderer(RalleButtonRenderers.selectable(() -> raidFilter != RaidFilter.ALL));
         regionButton.renderer(RalleButtonRenderers.selectable(() -> regionFilter != RegionFilter.ALL));
-        statusButton.horizontalSizing(Sizing.fixed(176));
-        raidButton.horizontalSizing(Sizing.fixed(176));
-        regionButton.horizontalSizing(Sizing.fixed(176));
+        statusButton.horizontalSizing(Sizing.fixed(164));
+        raidButton.horizontalSizing(Sizing.fixed(164));
+        regionButton.horizontalSizing(Sizing.fixed(164));
 
-        statusButton.onPress(button -> openStatusDropdown(root, button, gridHost));
-        raidButton.onPress(button -> openRaidDropdown(root, button, gridHost));
-        regionButton.onPress(button -> openRegionDropdown(root, button, gridHost));
+        statusButton.onPress(button -> openStatusDropdown(root, button, this.gridHost));
+        raidButton.onPress(button -> openRaidDropdown(root, button, this.gridHost));
+        regionButton.onPress(button -> openRegionDropdown(root, button, this.gridHost));
 
-        filters.child(create).child(statusButton).child(raidButton).child(regionButton);
+        var refresh = UIComponents.button(Component.empty(), ignored -> refreshGrid());
+        refresh.sizing(Sizing.fixed(30), Sizing.fixed(20));
+        refresh.renderer(RalleButtonRenderers.refresh());
+        refresh.tooltip(Component.literal("Refresh available parties"));
+
+        filters.child(create).child(statusButton).child(raidButton).child(regionButton).child(refresh);
         panel.child(filters);
 
-        rebuildGrid(gridHost);
-        var scroll = UIContainers.verticalScroll(Sizing.fixed(GRID_WIDTH + 8), Sizing.fill(100), gridHost);
+        rebuildGrid(this.gridHost);
+        var scroll = UIContainers.verticalScroll(Sizing.fixed(GRID_WIDTH + 8), Sizing.fill(100), this.gridHost);
         scroll.scrollbarThiccness(4).scrollStep(36);
         panel.child(scroll);
 
@@ -125,6 +132,22 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         panel.child(footer);
 
         root.child(panel);
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        if (refreshGridNextTick && gridHost != null) {
+            refreshGridNextTick = false;
+            rebuildGrid(gridHost);
+        }
+    }
+
+    private void refreshGrid() {
+        if (gridHost == null || refreshGridNextTick) return;
+
+        gridHost.clearChildren();
+        refreshGridNextTick = true;
     }
 
     private FlowLayout header() {
@@ -309,7 +332,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private net.minecraft.world.item.Item raidIcon(String raid) {
         return switch (raid) {
             case "Dailies" -> Items.BUNDLE;
-            case "NOTG" -> Items.ROTTEN_FLESH;
+            case "NOTG" -> Items.SALMON;
             case "NOL" -> Items.OAK_SAPLING;
             case "TCC" -> Items.CLAY_BALL;
             case "TNA" -> Items.ENDER_PEARL;
