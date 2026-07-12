@@ -224,7 +224,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         raidDetails.verticalAlignment(VerticalAlignment.CENTER);
         raidDetails.child(UIComponents.item(new ItemStack(raidIcon(lobby.raid())))
                 .showOverlay(false).margins(Insets.right(6)));
-        raidDetails.child(UIComponents.label(Component.literal(lobby.raid())).shadow(true).color(ACCENT));
+        raidDetails.child(UIComponents.label(Component.literal(raidName(lobby.raid()))).shadow(true).color(ACCENT));
         raidDetails.child(UIComponents.label(Component.literal("  " + lobby.region()))
                 .color(regionColor(lobby.region())));
         title.child(raidDetails);
@@ -310,11 +310,22 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         return switch (raid) {
             case "Dailies" -> Items.BUNDLE;
             case "NOTG" -> Items.ROTTEN_FLESH;
-            case "NOL" -> Items.AMETHYST_SHARD;
-            case "TCC" -> Items.IRON_GOLEM_SPAWN_EGG;
-            case "TNA" -> Items.ECHO_SHARD;
-            case "TWP" -> Items.PRISMARINE_CRYSTALS;
+            case "NOL" -> Items.OAK_SAPLING;
+            case "TCC" -> Items.CLAY_BALL;
+            case "TNA" -> Items.ENDER_PEARL;
+            case "TWP" -> Items.FIRE_CHARGE;
             default -> Items.NETHER_STAR;
+        };
+    }
+
+    private String raidName(String raid) {
+        return switch (raid) {
+            case "NOTG" -> "Nest of the Grootslangs";
+            case "NOL" -> "Orphion's Nexus of Light";
+            case "TCC" -> "The Canyon Colossus";
+            case "TNA" -> "The Nameless Anomaly";
+            case "TWP" -> "The Wartorn Palace";
+            default -> raid;
         };
     }
 
@@ -334,10 +345,20 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private enum RaidFilter {
-        ALL("All"), DAILIES("Dailies"), NOTG("NOTG"), NOL("NOL"), TCC("TCC"), TNA("TNA"), TWP("TWP");
+        ALL("All", null),
+        DAILIES("Dailies", "Dailies"),
+        NOTG("Nest of the Grootslangs", "NOTG"),
+        NOL("Orphion's Nexus of Light", "NOL"),
+        TCC("The Canyon Colossus", "TCC"),
+        TNA("The Nameless Anomaly", "TNA"),
+        TWP("The Wartorn Palace", "TWP");
         private final String label;
-        RaidFilter(String label) { this.label = label; }
-        boolean matches(FakeRaidLobby lobby) { return this == ALL || label.equals(lobby.raid()); }
+        private final String raidId;
+        RaidFilter(String label, String raidId) {
+            this.label = label;
+            this.raidId = raidId;
+        }
+        boolean matches(FakeRaidLobby lobby) { return this == ALL || raidId.equals(lobby.raid()); }
     }
 
     private enum RegionFilter {
