@@ -1,0 +1,108 @@
+<owo-ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/wisp-forest/owo-lib/1.19.4/owo-ui.xsd">
+    <components>
+        <flow-layout direction="vertical">
+            <children>
+                <flow-layout direction="vertical" id="lfg-panel">
+                    <children>
+                        <flow-layout direction="vertical" id="header-slot">
+                            <children/>
+                            <sizing>
+                                <horizontal method="fill">100</horizontal>
+                                <vertical method="content"/>
+                            </sizing>
+                        </flow-layout>
+                        <flow-layout direction="horizontal" id="filters">
+                            <children>
+                                <button id="create-button">
+                                    <text>+</text>
+                                    <sizing>
+                                        <horizontal method="fixed">30</horizontal>
+                                        <vertical method="fixed">20</vertical>
+                                    </sizing>
+                                </button>
+                                <button id="status-filter">
+                                    <sizing><horizontal method="fixed">164</horizontal></sizing>
+                                </button>
+                                <button id="raid-filter">
+                                    <sizing><horizontal method="fixed">164</horizontal></sizing>
+                                </button>
+                                <button id="region-filter">
+                                    <sizing><horizontal method="fixed">164</horizontal></sizing>
+                                </button>
+                                <button id="refresh-button">
+                                    <sizing>
+                                        <horizontal method="fixed">30</horizontal>
+                                        <vertical method="fixed">20</vertical>
+                                    </sizing>
+                                </button>
+                            </children>
+                            <gap>6</gap>
+                            <padding><left>4</left></padding>
+                            <vertical-alignment>center</vertical-alignment>
+                            <sizing>
+                                <horizontal method="fill">100</horizontal>
+                                <vertical method="content"/>
+                            </sizing>
+                        </flow-layout>
+                        <scroll direction="vertical">
+                            <flow-layout direction="vertical" id="lobby-grid-host">
+                                <children/>
+                                <sizing>
+                                    <horizontal method="fixed">584</horizontal>
+                                    <vertical method="content"/>
+                                </sizing>
+                            </flow-layout>
+                            <scrollbar-thiccness>4</scrollbar-thiccness>
+                            <scroll-step>36</scroll-step>
+                            <sizing>
+                                <horizontal method="fixed">592</horizontal>
+                                <vertical method="fill">100</vertical>
+                            </sizing>
+                        </scroll>
+                        <flow-layout direction="horizontal" id="footer">
+                            <children>
+                                <label>
+                                    <text>● Live preview · fake party data</text>
+                                    <color>#67D391</color>
+                                    <margins><right>8</right></margins>
+                                </label>
+                                <label>
+                                    <text>Use the filters to stress-test the grid.</text>
+                                    <color>#A9B0BE</color>
+                                </label>
+                                <button id="close-button">
+                                    <text translate="true">gui.done</text>
+                                    <margins><left>16</left></margins>
+                                    <sizing><horizontal method="fixed">92</horizontal></sizing>
+                                </button>
+                            </children>
+                            <vertical-alignment>center</vertical-alignment>
+                            <sizing>
+                                <horizontal method="fill">100</horizontal>
+                                <vertical method="content"/>
+                            </sizing>
+                        </flow-layout>
+                    </children>
+                    <gap>8</gap>
+                    <padding><all>12</all></padding>
+                    <surface>
+                        <flat>#041330</flat>
+                        <outline>#FFFFFF</outline>
+                    </surface>
+                    <sizing>
+                        <horizontal method="fixed">620</horizontal>
+                        <vertical method="fill">92</vertical>
+                    </sizing>
+                </flow-layout>
+            </children>
+            <surface><vanilla-translucent/></surface>
+            <horizontal-alignment>center</horizontal-alignment>
+            <vertical-alignment>center</vertical-alignment>
+            <sizing>
+                <horizontal method="fill">100</horizontal>
+                <vertical method="fill">100</vertical>
+            </sizing>
+        </flow-layout>
+    </components>
+</owo-ui>

@@ -1,6 +1,6 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
-import io.wispforest.owo.ui.base.BaseOwoScreen;
+import io.wispforest.owo.ui.base.BaseUIModelScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.DropdownComponent;
 import io.wispforest.owo.ui.component.UIComponents;
@@ -10,7 +10,6 @@ import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.Color;
 import io.wispforest.owo.ui.core.HorizontalAlignment;
 import io.wispforest.owo.ui.core.Insets;
-import io.wispforest.owo.ui.core.OwoUIAdapter;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.VerticalAlignment;
@@ -29,8 +28,8 @@ import java.util.Locale;
 /**
  * An intentionally disconnected owo-lib prototype for evaluating the Raid LFG browser layout.
  */
-public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
-    private static final int PANEL_WIDTH = 620;
+public final class RaidLfgScreen extends BaseUIModelScreen<FlowLayout> {
+    private static final Identifier UI_MODEL = Identifier.fromNamespaceAndPath("ralle", "raid_lfg");
     private static final int GRID_WIDTH = 584;
     private static final int CARD_WIDTH = 286;
     private static final int HEADER_HEIGHT = 41;
@@ -63,78 +62,45 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     public RaidLfgScreen(Screen parent, FakeRaidLobby.Region currentRegion) {
+        super(FlowLayout.class, UI_MODEL);
         this.parent = parent;
         this.currentRegion = currentRegion;
     }
 
     @Override
-    protected OwoUIAdapter<FlowLayout> createAdapter() {
-        return OwoUIAdapter.create(this, UIContainers::verticalFlow);
-    }
-
-    @Override
     protected void build(FlowLayout root) {
-        root.surface(Surface.VANILLA_TRANSLUCENT)
-                .horizontalAlignment(HorizontalAlignment.CENTER)
-                .verticalAlignment(VerticalAlignment.CENTER);
+        component(FlowLayout.class, "header-slot").child(header());
+        this.gridHost = component(FlowLayout.class, "lobby-grid-host");
 
-        var panel = UIContainers.verticalFlow(Sizing.fixed(PANEL_WIDTH), Sizing.fill(92));
-        panel.gap(8).padding(Insets.of(12)).surface(
-                Surface.flat(0xFF041330).and(Surface.outline(0xFFFFFFFF))
-        );
-
-        panel.child(header());
-
-        var filters = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
-        filters.gap(6).padding(Insets.left(4)).verticalAlignment(VerticalAlignment.CENTER);
-
-        this.gridHost = UIContainers.verticalFlow(Sizing.fixed(GRID_WIDTH), Sizing.content());
-        var create = UIComponents.button(Component.literal("+"), ignored -> {});
-        create.sizing(Sizing.fixed(30), Sizing.fixed(20));
+        var create = component(ButtonComponent.class, "create-button");
         create.renderer(RalleButtonRenderers.primary());
         create.tooltip(Component.literal("Create party (prototype only)"));
 
-        var statusButton = UIComponents.button(statusLabel(), ignored -> {});
-        var raidButton = UIComponents.button(raidLabel(), ignored -> {});
-        var regionButton = UIComponents.button(regionLabel(), ignored -> {});
+        var statusButton = component(ButtonComponent.class, "status-filter");
+        var raidButton = component(ButtonComponent.class, "raid-filter");
+        var regionButton = component(ButtonComponent.class, "region-filter");
+        statusButton.setMessage(statusLabel());
+        raidButton.setMessage(raidLabel());
+        regionButton.setMessage(regionLabel());
 
         statusButton.renderer(RalleButtonRenderers.selectable(() -> statusFilter != StatusFilter.OPEN));
         raidButton.renderer(RalleButtonRenderers.selectable(() -> raidFilter != RaidFilter.ALL));
         regionButton.renderer(RalleButtonRenderers.selectable(() -> regionFilter != RegionFilter.ALL));
-        statusButton.horizontalSizing(Sizing.fixed(164));
-        raidButton.horizontalSizing(Sizing.fixed(164));
-        regionButton.horizontalSizing(Sizing.fixed(164));
-
         statusButton.onPress(button -> openStatusDropdown(root, button, this.gridHost));
         raidButton.onPress(button -> openRaidDropdown(root, button, this.gridHost));
         regionButton.onPress(button -> openRegionDropdown(root, button, this.gridHost));
 
-        var refresh = UIComponents.button(Component.empty(), ignored -> refreshGrid());
-        refresh.sizing(Sizing.fixed(30), Sizing.fixed(20));
+        var refresh = component(ButtonComponent.class, "refresh-button");
+        refresh.onPress(ignored -> refreshGrid());
         refresh.renderer(RalleButtonRenderers.refresh());
         refresh.tooltip(Component.literal("Refresh available parties"));
 
-        filters.child(create).child(statusButton).child(raidButton).child(regionButton).child(refresh);
-        panel.child(filters);
-
         rebuildGrid(this.gridHost);
-        var scroll = UIContainers.verticalScroll(Sizing.fixed(GRID_WIDTH + 8), Sizing.fill(100), this.gridHost);
-        scroll.scrollbarThiccness(4).scrollStep(36);
-        panel.child(scroll);
 
-        var footer = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
-        footer.verticalAlignment(VerticalAlignment.CENTER);
-        footer.child(UIComponents.label(Component.literal("● Live preview · fake party data"))
-                .color(OPEN).margins(Insets.right(8)));
-        footer.child(UIComponents.label(Component.literal("Use the filters to stress-test the grid."))
-                .color(MUTED));
-        var close = UIComponents.button(karlaUi(Component.translatable("gui.done")), ignored -> onClose());
+        var close = component(ButtonComponent.class, "close-button");
+        close.setMessage(karlaUi(Component.translatable("gui.done")));
+        close.onPress(ignored -> onClose());
         close.renderer(RalleButtonRenderers.neutral());
-        close.horizontalSizing(Sizing.fixed(92)).margins(Insets.left(16));
-        footer.child(close);
-        panel.child(footer);
-
-        root.child(panel);
     }
 
     @Override
