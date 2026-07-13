@@ -34,12 +34,12 @@ public final class SettingsRegistry {
 
         var settingIds = new HashSet<String>();
         categories.values().stream()
-                .flatMap(registeredCategory -> registeredCategory.settings().stream())
-                .map(Setting::id)
+                .flatMap(registeredCategory -> registeredCategory.entries().stream())
+                .map(SettingsEntry::id)
                 .forEach(settingIds::add);
-        for (var setting : category.settings()) {
-            if (!settingIds.add(setting.id())) {
-                throw new IllegalArgumentException("Duplicate setting id: " + setting.id());
+        for (var entry : category.entries()) {
+            if (!settingIds.add(entry.id())) {
+                throw new IllegalArgumentException("Duplicate settings entry id: " + entry.id());
             }
         }
 
@@ -50,10 +50,31 @@ public final class SettingsRegistry {
         return List.copyOf(categories.values());
     }
 
+    public <S extends Setting<?>> S setting(String id, Class<S> type) {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(type, "type");
+
+        return categories.values().stream()
+                .flatMap(category -> category.entries().stream())
+                .filter(Setting.class::isInstance)
+                .map(entry -> (Setting<?>) entry)
+                .filter(setting -> setting.id().equals(id))
+                .findFirst()
+                .map(setting -> {
+                    if (!type.isInstance(setting)) {
+                        throw new IllegalArgumentException("Setting " + id + " is not a " + type.getSimpleName());
+                    }
+                    return type.cast(setting);
+                })
+                .orElseThrow(() -> new IllegalArgumentException("Unknown setting: " + id));
+    }
+
     public void seal() {
         load();
         categories.values().stream()
-                .flatMap(category -> category.settings().stream())
+                .flatMap(category -> category.entries().stream())
+                .filter(Setting.class::isInstance)
+                .map(entry -> (Setting<?>) entry)
                 .forEach(setting -> setting.onChanged(ignored -> save()));
         sealed = true;
     }
@@ -70,7 +91,8 @@ public final class SettingsRegistry {
         }
 
         for (var category : categories.values()) {
-            for (var setting : category.settings()) {
+            for (var entry : category.entries()) {
+                if (!(entry instanceof Setting<?> setting)) continue;
                 var value = properties.getProperty(category.id() + "." + setting.id());
                 if (value == null) continue;
                 try {
@@ -86,7 +108,8 @@ public final class SettingsRegistry {
     private void save() {
         var properties = new Properties();
         for (var category : categories.values()) {
-            for (var setting : category.settings()) {
+            for (var entry : category.entries()) {
+                if (!(entry instanceof Setting<?> setting)) continue;
                 properties.setProperty(category.id() + "." + setting.id(), setting.serialize());
             }
         }

@@ -2,10 +2,13 @@ package org.kingdomfoxes.ralle;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import org.kingdomfoxes.ralle.api.feature.FeatureRegistry;
+import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
+import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.kingdomfoxes.ralle.settings.RalleSettings;
 import org.kingdomfoxes.ralle.ui.owo.OwoSettingsScreenFactory;
 import org.kingdomfoxes.ralle.ui.owo.RaidLfgScreen;
@@ -20,13 +23,23 @@ public final class RalleClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         var features = new FeatureRegistry();
-        var settings = new SettingsRegistry(FabricLoader.getInstance().getConfigDir().resolve("ralle.properties"));
+        var configDirectory = FabricLoader.getInstance().getConfigDir();
+        var settings = new SettingsRegistry(configDirectory.resolve("ralle.properties"));
+        var placements = new HudPlacementRegistry(configDirectory.resolve("ralle-hud-layout.properties"));
 
         RalleSettings.register(settings);
+        placements.register(new HudPlacementRegistry.ElementDefinition(
+                ChatLayoutService.CHAT_ELEMENT_ID,
+                ChatLayoutService.MINIMUM_WIDTH,
+                ChatLayoutService.MINIMUM_HEIGHT
+        ));
         features.seal();
         settings.seal();
+        placements.seal();
 
-        context = new RalleContext(features, settings, new OwoSettingsScreenFactory(settings));
+        var chatLayout = new ChatLayoutService(Minecraft.getInstance(), settings, placements);
+        context = new RalleContext(features, settings, new OwoSettingsScreenFactory(settings, chatLayout), chatLayout);
+        ClientTickEvents.END_CLIENT_TICK.register(client -> chatLayout.tick());
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
                 literal("ralle").then(literal("settings").executes(command -> {

@@ -1,6 +1,7 @@
 package org.kingdomfoxes.ralle.settings;
 
 import net.minecraft.network.chat.Component;
+import org.kingdomfoxes.ralle.api.settings.ActionEntry;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsCategory;
@@ -18,6 +19,7 @@ public final class RalleSettings {
                 Component.translatable("ralle.settings.category.chat.description"),
                 List.of(
                         toggle("chat-enabled"),
+                        action("edit-chat-layout"),
                         toggle("compact-chat"),
                         toggle("stack-empty-lines"),
                         toggle("message-direction-enabled"),
@@ -42,6 +44,10 @@ public final class RalleSettings {
 
     private static BooleanSetting toggle(String id) {
         return new BooleanSetting(id, title(id), description(id));
+    }
+
+    private static ActionEntry action(String id) {
+        return new ActionEntry(id, title(id), description(id));
     }
 
     private static ChoiceSetting choice(String id, String defaultValue, String... choices) {

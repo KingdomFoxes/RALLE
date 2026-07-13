@@ -6,7 +6,7 @@ import org.kingdomfoxes.ralle.api.feature.IdentifierRules;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-public abstract class Setting<T> {
+public abstract class Setting<T> implements SettingsEntry {
     private final String id;
     private final Component title;
     private final Component description;

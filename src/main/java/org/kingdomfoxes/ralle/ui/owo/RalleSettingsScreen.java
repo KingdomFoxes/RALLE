@@ -15,9 +15,11 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
-import org.kingdomfoxes.ralle.api.settings.Setting;
+import org.kingdomfoxes.ralle.api.settings.ActionEntry;
+import org.kingdomfoxes.ralle.api.settings.SettingsEntry;
 import org.kingdomfoxes.ralle.api.settings.SettingsCategory;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
+import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 
 import java.util.Locale;
 
@@ -28,11 +30,13 @@ public final class RalleSettingsScreen extends BaseUIModelScreen<FlowLayout> {
 
     private final Screen parent;
     private final SettingsRegistry settings;
+    private final ChatLayoutService chatLayout;
 
-    RalleSettingsScreen(Screen parent, SettingsRegistry settings) {
+    RalleSettingsScreen(Screen parent, SettingsRegistry settings, ChatLayoutService chatLayout) {
         super(FlowLayout.class, UI_MODEL);
         this.parent = parent;
         this.settings = settings;
+        this.chatLayout = chatLayout;
     }
 
     @Override
@@ -56,9 +60,9 @@ public final class RalleSettingsScreen extends BaseUIModelScreen<FlowLayout> {
             var categoryPanel = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
             categoryPanel.gap(5).padding(Insets.of(10)).surface(Surface.PANEL);
 
-            for (var setting : category.settings()) {
-                if (!categoryMatches && !matches(setting, query)) continue;
-                categoryPanel.child(settingRow(setting));
+            for (var entry : category.entries()) {
+                if (!categoryMatches && !matches(entry, query)) continue;
+                categoryPanel.child(entryRow(entry));
                 visibleSettings++;
             }
 
@@ -78,15 +82,15 @@ public final class RalleSettingsScreen extends BaseUIModelScreen<FlowLayout> {
         }
     }
 
-    private FlowLayout settingRow(Setting<?> setting) {
+    private FlowLayout entryRow(SettingsEntry entry) {
         var row = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
         row.gap(2).padding(Insets.vertical(3));
 
-        if (setting instanceof BooleanSetting booleanSetting) {
+        if (entry instanceof BooleanSetting booleanSetting) {
             row.child(UIComponents.checkbox(booleanSetting.title())
                     .checked(booleanSetting.value())
                     .onChanged(booleanSetting::set));
-        } else if (setting instanceof ChoiceSetting choiceSetting) {
+        } else if (entry instanceof ChoiceSetting choiceSetting) {
             var button = UIComponents.button(choiceLabel(choiceSetting), ignored -> {});
             button.onPress(pressed -> {
                 choiceSetting.set(choiceSetting.nextValue());
@@ -94,12 +98,24 @@ public final class RalleSettingsScreen extends BaseUIModelScreen<FlowLayout> {
             });
             button.horizontalSizing(Sizing.fill(100));
             row.child(button);
+        } else if (entry instanceof ActionEntry actionEntry) {
+            var button = UIComponents.button(actionEntry.title(), ignored -> openAction(actionEntry));
+            button.horizontalSizing(Sizing.fill(100));
+            row.child(button);
         }
 
-        row.child(UIComponents.label(setting.description())
+        row.child(UIComponents.label(entry.description())
                 .color(DESCRIPTION_COLOR)
                 .maxWidth(CONTENT_WIDTH - 20));
         return row;
+    }
+
+    private void openAction(ActionEntry action) {
+        if ("edit-chat-layout".equals(action.id())) {
+            minecraft.setScreen(new ChatLayoutEditorScreen(this, chatLayout));
+            return;
+        }
+        throw new IllegalArgumentException("Unknown settings action: " + action.id());
     }
 
     private Component choiceLabel(ChoiceSetting setting) {
@@ -117,7 +133,7 @@ public final class RalleSettingsScreen extends BaseUIModelScreen<FlowLayout> {
                 || contains(category.description().getString(), query);
     }
 
-    private boolean matches(Setting<?> setting, String query) {
+    private boolean matches(SettingsEntry setting, String query) {
         return query.isEmpty()
                 || contains(setting.id(), query)
                 || contains(setting.title().getString(), query)

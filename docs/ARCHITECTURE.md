@@ -12,8 +12,13 @@ platform ports. It must not depend on a concrete settings screen.
 
 - `api.feature`: feature lifecycle and registration contracts.
 - `api.settings`: UI-independent categories and entries owned by RALLE.
+- `api.hud`: normalized, resolution-independent HUD element placement and local
+  persistence owned by RALLE.
 - `ui.owo`: the owo-lib adapter that renders the settings registry.
-- `chat`: future Minecraft chat integration and Wynntils compatibility boundary.
+- `chat`: Minecraft chat integration and Wynntils compatibility boundary. The
+  current hook only applies the opted-in chat rectangle and leaves message
+  content and ordinary vanilla rendering behavior untouched. Local chat
+  customization is available in singleplayer and on any multiplayer server.
 - `lfg`: future protocol, authentication, live connection, lobby domain, and
   party-automation boundary. It must remain inert until explicitly enabled.
 - `platform`: future Fabric/Minecraft adapters such as commands, keybinds,
@@ -36,11 +41,18 @@ models. Values are stored in `config/ralle.properties`; invalid or obsolete
 values fall back to their declared defaults. The current settings are inert
 until their corresponding chat and Raid LFG vertical slices consume them.
 
+Custom HUD rectangles are stored separately in
+`config/ralle-hud-layout.properties` as normalized coordinates and dimensions.
+The registry currently exposes only the v1 chat box. Removing its custom entry
+restores the live vanilla chat position and dimensions rather than copying a
+snapshot of the vanilla options.
+
 ## UI model development
 
-RALLE's settings and Raid LFG screen skeletons are owo UI models in
+RALLE's settings, chat-layout editor, and Raid LFG screen skeletons are owo UI models in
 `src/main/resources/assets/ralle/owo_ui`. Java code binds interactions and
-populates dynamic settings rows, lobby cards, and custom-rendered components.
+populates dynamic settings rows, the draggable chat rectangle, lobby cards,
+and custom-rendered components.
 
 In a development client, open either screen and press Ctrl+F5. Choose its XML
 file as the hot-reload source. After saving XML changes, close and reopen the

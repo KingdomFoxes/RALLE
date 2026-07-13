@@ -5,12 +5,14 @@
   "ralle.settings.choice": "%s: %s",
 
   "ralle.settings.category.chat": "Chat",
-  "ralle.settings.category.chat.description": "Wynncraft-only chat layout and rendering options.",
+  "ralle.settings.category.chat.description": "Local chat layout and rendering options for any world or server.",
   "ralle.settings.category.raid-lfg": "Raid LFG",
   "ralle.settings.category.raid-lfg.description": "Alliance Raid LFG access and local notifications.",
 
   "ralle.settings.option.chat-enabled": "Enable Chat Customization",
-  "ralle.settings.option.chat-enabled.description": "Allows RALLE's chat options to operate while connected to Wynncraft.",
+  "ralle.settings.option.chat-enabled.description": "Allows RALLE's local chat options to operate in singleplayer or on any server.",
+  "ralle.settings.option.edit-chat-layout": "Edit Chat Layout",
+  "ralle.settings.option.edit-chat-layout.description": "Opens the HUD layout editor for moving, resizing, or restoring the single chat box.",
   "ralle.settings.option.compact-chat": "Compact Chat",
   "ralle.settings.option.compact-chat.description": "Collapses consecutive identical messages and displays a repetition count.",
   "ralle.settings.option.stack-empty-lines": "Stack Empty Lines",
@@ -38,5 +40,8 @@
   "ralle.settings.value.right": "Right",
   "ralle.settings.value.none": "None",
   "ralle.settings.value.vanilla": "Vanilla",
-  "ralle.settings.value.full": "Full"
+  "ralle.settings.value.full": "Full",
+
+  "ralle.chat-layout.bounds": "Position: %s, %s   Size: %s x %s",
+  "ralle.chat-layout.reset": "Restore Vanilla Layout"
 }

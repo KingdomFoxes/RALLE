@@ -244,7 +244,7 @@ public final class RaidLfgScreen extends BaseUIModelScreen<FlowLayout> {
             } else {
                 expandedLobbies.add(lobby.raid());
             }
-            refreshGrid();
+            rebuildGrid(gridHost);
             return true;
         });
         card.child(summary);
@@ -276,7 +276,7 @@ public final class RaidLfgScreen extends BaseUIModelScreen<FlowLayout> {
         var action = UIComponents.button(actionText(lobby), ignored -> {
             if (!expanded) {
                 expandedLobbies.add(lobby.raid());
-                refreshGrid();
+                rebuildGrid(gridHost);
             }
         });
         action.sizing(Sizing.fixed(52), Sizing.fixed(20));

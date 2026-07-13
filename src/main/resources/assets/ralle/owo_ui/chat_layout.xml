@@ -1,0 +1,36 @@
+<owo-ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/wisp-forest/owo-lib/1.19.4/owo-ui.xsd">
+    <components>
+        <flow-layout direction="vertical">
+            <children>
+                <spacer percent="100"/>
+                <flow-layout direction="horizontal">
+                    <children>
+                        <button id="reset-button">
+                            <text translate="true">ralle.chat-layout.reset</text>
+                            <sizing><horizontal method="fixed">150</horizontal></sizing>
+                        </button>
+                        <button id="done-button">
+                            <text translate="true">gui.done</text>
+                            <sizing><horizontal method="fixed">120</horizontal></sizing>
+                        </button>
+                    </children>
+                    <gap>8</gap>
+                    <padding><all>8</all></padding>
+                    <surface><panel dark="true"/></surface>
+                    <sizing>
+                        <horizontal method="content"/>
+                        <vertical method="content"/>
+                    </sizing>
+                </flow-layout>
+            </children>
+            <surface><vanilla-translucent/></surface>
+            <horizontal-alignment>center</horizontal-alignment>
+            <vertical-alignment>top</vertical-alignment>
+            <sizing>
+                <horizontal method="fill">100</horizontal>
+                <vertical method="fill">100</vertical>
+            </sizing>
+        </flow-layout>
+    </components>
+</owo-ui>
