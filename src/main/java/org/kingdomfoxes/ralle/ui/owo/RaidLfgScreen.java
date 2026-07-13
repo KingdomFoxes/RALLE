@@ -8,6 +8,7 @@ import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.container.GridLayout;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.Color;
+import io.wispforest.owo.ui.core.CursorStyle;
 import io.wispforest.owo.ui.core.HorizontalAlignment;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.Sizing;
@@ -23,8 +24,10 @@ import org.kingdomfoxes.ralle.lfg.client.FakeRaidLobbies;
 import org.kingdomfoxes.ralle.lfg.client.FakeRaidLobby;
 import org.kingdomfoxes.ralle.lfg.client.GuildTerritoryColors;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * An intentionally disconnected owo-lib prototype for evaluating the Raid LFG browser layout.
@@ -44,13 +47,12 @@ public final class RaidLfgScreen extends BaseUIModelScreen<FlowLayout> {
     private static final Color MUTED = Color.ofRgb(0xA9B0BE);
     private static final Color ACCENT = Color.ofRgb(0xF2B84B);
     private static final Color OPEN = Color.ofRgb(0x67D391);
-    private static final Color LOCKED = Color.ofRgb(0xFFCA65);
-    private static final Color IN_RAID = Color.ofRgb(0x72B7FF);
     private static final Color REGION_GOOD = Color.ofRgb(0x00FF55);
     private static final Color REGION_MODERATE = Color.ofRgb(0xFFFF00);
     private static final Color REGION_POOR = Color.ofRgb(0xFF3333);
     private final Screen parent;
     private final List<FakeRaidLobby> lobbies = FakeRaidLobbies.all();
+    private final Set<String> expandedLobbies = new HashSet<>();
     private StatusFilter statusFilter = StatusFilter.OPEN;
     private RaidFilter raidFilter = RaidFilter.ALL;
     private RegionFilter regionFilter = RegionFilter.ALL;
@@ -211,23 +213,52 @@ public final class RaidLfgScreen extends BaseUIModelScreen<FlowLayout> {
                 .surface(Surface.flat(0xD91A1E27).and(Surface.outline(0xFF3B4354)));
         card.margins(Insets.of(3));
 
-        var title = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
-        title.verticalAlignment(VerticalAlignment.CENTER);
+        boolean expanded = expandedLobbies.contains(lobby.raid());
+        var summary = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(20));
+        summary.verticalAlignment(VerticalAlignment.CENTER)
+                .cursorStyle(CursorStyle.HAND)
+                .tooltip(Component.literal(expanded ? "Click to hide party details" : "Click to show party details"));
+
         var raidDetails = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
         raidDetails.verticalAlignment(VerticalAlignment.CENTER);
         raidDetails.child(UIComponents.item(new ItemStack(raidIcon(lobby.raid())))
                 .showOverlay(false).margins(Insets.right(6)));
         raidDetails.child(UIComponents.label(karlaUi(Component.literal(raidName(lobby.raid())))).shadow(true).color(ACCENT));
-        raidDetails.child(UIComponents.label(karlaUi(Component.literal("  " + lobby.region())))
-                .color(regionColor(lobby.region())));
-        title.child(raidDetails);
-        var titleSpacer = UIComponents.spacer();
-        titleSpacer.verticalSizing(Sizing.fixed(0));
-        title.child(titleSpacer);
-        title.child(UIComponents.label(karlaUi(Component.literal(statusText(lobby)))).color(statusColor(lobby)));
-        card.child(title);
+        summary.child(raidDetails);
 
-        card.child(UIComponents.label(karlaUi(Component.literal(lobby.note()))).color(MUTED).maxWidth(CARD_WIDTH - 18));
+        var summarySpacer = UIComponents.spacer();
+        summarySpacer.verticalSizing(Sizing.fixed(0));
+        summary.child(summarySpacer);
+        summary.child(UIComponents.label(karlaUi(Component.literal(lobby.members().size() + "/4"))).color(OPEN)
+                .margins(Insets.right(6)));
+
+        if (!expanded) {
+            summary.child(joinButton(lobby, false));
+        }
+
+        summary.child(UIComponents.label(Component.literal(expanded ? " \u25BC" : " \u25B6"))
+                .color(MUTED).margins(Insets.left(6)));
+        summary.mouseDown().subscribe((click, doubled) -> {
+            if (expanded) {
+                expandedLobbies.remove(lobby.raid());
+            } else {
+                expandedLobbies.add(lobby.raid());
+            }
+            refreshGrid();
+            return true;
+        });
+        card.child(summary);
+
+        if (!expanded) return card;
+
+        var details = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+        details.child(UIComponents.label(karlaUi(Component.literal("[" + lobby.region().name() + "]")))
+                .color(regionColor(lobby.region())));
+        if (!lobby.note().isBlank()) {
+            details.child(UIComponents.label(karlaUi(Component.literal(" " + lobby.note())))
+                    .color(MUTED).maxWidth(CARD_WIDTH - 54));
+        }
+        card.child(details);
 
         var roster = UIContainers.grid(Sizing.fill(100), Sizing.content(), 2, 2);
         for (int slot = 0; slot < 4; slot++) {
@@ -235,13 +266,26 @@ public final class RaidLfgScreen extends BaseUIModelScreen<FlowLayout> {
         }
         card.child(roster);
 
-        var action = UIComponents.button(actionText(lobby), ignored -> {});
+        var action = joinButton(lobby, true);
         action.horizontalSizing(Sizing.fill(100));
-        action.renderer(RalleButtonRenderers.primary());
-        action.active = !lobby.locked() && lobby.status() == FakeRaidLobby.Status.OPEN && lobby.members().size() < 4;
-        action.tooltip(Component.literal("Prototype only - roster mutations are not connected yet"));
         card.child(action);
         return card;
+    }
+
+    private ButtonComponent joinButton(FakeRaidLobby lobby, boolean expanded) {
+        var action = UIComponents.button(actionText(lobby), ignored -> {
+            if (!expanded) {
+                expandedLobbies.add(lobby.raid());
+                refreshGrid();
+            }
+        });
+        action.sizing(Sizing.fixed(52), Sizing.fixed(20));
+        action.renderer(RalleButtonRenderers.primary());
+        action.active = !lobby.locked() && lobby.status() == FakeRaidLobby.Status.OPEN && lobby.members().size() < 4;
+        action.tooltip(Component.literal(expanded
+                ? "Prototype only - roster mutations are not connected yet"
+                : "Expand and review the roster before joining"));
+        return action;
     }
 
     private FlowLayout rosterSlot(FakeRaidLobby lobby, int slot) {
@@ -295,16 +339,6 @@ public final class RaidLfgScreen extends BaseUIModelScreen<FlowLayout> {
         return component.copy().withStyle(style -> style.withFont(KARLA_BOLD_UI));
     }
 
-    private String statusText(FakeRaidLobby lobby) {
-        if (lobby.locked()) return "LOCKED";
-        return lobby.status() == FakeRaidLobby.Status.IN_RAID ? "IN RAID" : lobby.members().size() + "/4";
-    }
-
-    private Color statusColor(FakeRaidLobby lobby) {
-        if (lobby.locked()) return LOCKED;
-        return lobby.status() == FakeRaidLobby.Status.IN_RAID ? IN_RAID : OPEN;
-    }
-
     private Color regionColor(FakeRaidLobby.Region lobbyRegion) {
         if (lobbyRegion == currentRegion) return REGION_GOOD;
 
@@ -318,7 +352,7 @@ public final class RaidLfgScreen extends BaseUIModelScreen<FlowLayout> {
     private Component actionText(FakeRaidLobby lobby) {
         if (lobby.locked()) return karlaUi(Component.literal("Locked"));
         if (lobby.status() == FakeRaidLobby.Status.IN_RAID) return karlaUi(Component.literal("In Raid"));
-        return karlaUi(Component.literal("Join Party"));
+        return karlaUi(Component.literal("Join"));
     }
 
     private net.minecraft.world.item.Item raidIcon(String raid) {
