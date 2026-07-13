@@ -21,6 +21,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.kingdomfoxes.ralle.lfg.client.FakeRaidLobbies;
 import org.kingdomfoxes.ralle.lfg.client.FakeRaidLobby;
+import org.kingdomfoxes.ralle.lfg.client.GuildTerritoryColors;
 
 import java.util.List;
 import java.util.Locale;
@@ -255,12 +256,20 @@ public final class RaidLfgScreen extends BaseUIModelScreen<FlowLayout> {
         }
 
         var member = lobby.members().get(slot);
-        row.child(new PlayerFaceComponent(member.uuid(), member.ign(), 16).margins(Insets.right(4)));
+        var playerHead = new PlayerFaceComponent(
+                member.uuid(),
+                member.ign(),
+                16,
+                GuildTerritoryColors.forPrefix(member.guild())
+        );
+        playerHead.tooltip(karlaUi(Component.literal("[" + member.guild() + "]")));
+        playerHead.margins(Insets.right(4));
+        row.child(playerHead);
         var memberLabel = Component.empty();
         if (member.host()) {
             memberLabel.append(Component.literal("★ "));
         }
-        memberLabel.append(karlaUi(Component.literal(member.ign() + " [" + member.guild() + "]")));
+        memberLabel.append(karlaUi(Component.literal(member.ign())));
         row.child(UIComponents.label(memberLabel)
                 .color(member.host() ? ACCENT : Color.WHITE));
         return row;

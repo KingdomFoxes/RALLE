@@ -18,10 +18,12 @@ import java.util.concurrent.ConcurrentMap;
 final class PlayerFaceComponent extends BaseUIComponent {
     private static final ConcurrentMap<UUID, CompletableFuture<PlayerSkin>> SKINS = new ConcurrentHashMap<>();
 
+    private final int borderColor;
     private volatile PlayerSkin skin;
 
-    PlayerFaceComponent(String uuid, String name, int size) {
-        this.sizing(Sizing.fixed(size));
+    PlayerFaceComponent(String uuid, String name, int faceSize, int borderColor) {
+        this.sizing(Sizing.fixed(faceSize + 2));
+        this.borderColor = borderColor;
         var profileId = UUID.fromString(uuid);
         this.skin = DefaultPlayerSkin.get(profileId);
         SKINS.computeIfAbsent(profileId, ignored -> loadSkin(profileId, name))
@@ -30,7 +32,8 @@ final class PlayerFaceComponent extends BaseUIComponent {
 
     @Override
     public void draw(OwoUIGraphics graphics, int mouseX, int mouseY, float partialTicks, float delta) {
-        PlayerFaceRenderer.draw(graphics, skin, x, y, width);
+        graphics.fill(x, y, x + width, y + height, borderColor);
+        PlayerFaceRenderer.draw(graphics, skin, x + 1, y + 1, width - 2);
     }
 
     private static CompletableFuture<PlayerSkin> loadSkin(UUID profileId, String name) {
