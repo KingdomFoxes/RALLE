@@ -38,6 +38,9 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private static final FontDescription KARLA_BOLD = new FontDescription.Resource(
             Identifier.fromNamespaceAndPath("ralle", "karla_bold")
     );
+    private static final FontDescription KARLA_BOLD_UI = new FontDescription.Resource(
+            Identifier.fromNamespaceAndPath("ralle", "karla_bold_ui")
+    );
     private static final Color MUTED = Color.ofRgb(0xA9B0BE);
     private static final Color ACCENT = Color.ofRgb(0xF2B84B);
     private static final Color OPEN = Color.ofRgb(0x67D391);
@@ -125,7 +128,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                 .color(OPEN).margins(Insets.right(8)));
         footer.child(UIComponents.label(Component.literal("Use the filters to stress-test the grid."))
                 .color(MUTED));
-        var close = UIComponents.button(Component.translatable("gui.done"), ignored -> onClose());
+        var close = UIComponents.button(karlaUi(Component.translatable("gui.done")), ignored -> onClose());
         close.renderer(RalleButtonRenderers.neutral());
         close.horizontalSizing(Sizing.fixed(92)).margins(Insets.left(16));
         footer.child(close);
@@ -176,7 +179,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         DropdownComponent.openContextMenu(this, root, FlowLayout::child,
                 trigger.x(), trigger.y() + trigger.height(), menu -> {
                     for (var option : StatusFilter.values()) {
-                        menu.button(Component.literal(option.label), dropdown -> {
+                        menu.button(karlaUi(Component.literal(option.label)), dropdown -> {
                             statusFilter = option;
                             trigger.setMessage(statusLabel());
                             rebuildGrid(gridHost);
@@ -190,7 +193,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         DropdownComponent.openContextMenu(this, root, FlowLayout::child,
                 trigger.x(), trigger.y() + trigger.height(), menu -> {
                     for (var option : RaidFilter.values()) {
-                        menu.button(Component.literal(option.label), dropdown -> {
+                        menu.button(karlaUi(Component.literal(option.label)), dropdown -> {
                             raidFilter = option;
                             trigger.setMessage(raidLabel());
                             rebuildGrid(gridHost);
@@ -204,7 +207,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         DropdownComponent.openContextMenu(this, root, FlowLayout::child,
                 trigger.x(), trigger.y() + trigger.height(), menu -> {
                     for (var option : RegionFilter.values()) {
-                        menu.button(Component.literal(option.label), dropdown -> {
+                        menu.button(karlaUi(Component.literal(option.label)), dropdown -> {
                             regionFilter = option;
                             trigger.setMessage(regionLabel());
                             rebuildGrid(gridHost);
@@ -221,7 +224,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             var empty = UIContainers.verticalFlow(Sizing.fixed(GRID_WIDTH), Sizing.fixed(100));
             empty.horizontalAlignment(HorizontalAlignment.CENTER).verticalAlignment(VerticalAlignment.CENTER)
                     .surface(Surface.PANEL);
-            empty.child(UIComponents.label(Component.literal("No parties match these filters.")).color(MUTED));
+            empty.child(UIComponents.label(karlaUi(Component.literal("No parties match these filters."))).color(MUTED));
             gridHost.child(empty);
             return;
         }
@@ -247,17 +250,17 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         raidDetails.verticalAlignment(VerticalAlignment.CENTER);
         raidDetails.child(UIComponents.item(new ItemStack(raidIcon(lobby.raid())))
                 .showOverlay(false).margins(Insets.right(6)));
-        raidDetails.child(UIComponents.label(Component.literal(raidName(lobby.raid()))).shadow(true).color(ACCENT));
-        raidDetails.child(UIComponents.label(Component.literal("  " + lobby.region()))
+        raidDetails.child(UIComponents.label(karlaUi(Component.literal(raidName(lobby.raid())))).shadow(true).color(ACCENT));
+        raidDetails.child(UIComponents.label(karlaUi(Component.literal("  " + lobby.region())))
                 .color(regionColor(lobby.region())));
         title.child(raidDetails);
         var titleSpacer = UIComponents.spacer();
         titleSpacer.verticalSizing(Sizing.fixed(0));
         title.child(titleSpacer);
-        title.child(UIComponents.label(Component.literal(statusText(lobby))).color(statusColor(lobby)));
+        title.child(UIComponents.label(karlaUi(Component.literal(statusText(lobby)))).color(statusColor(lobby)));
         card.child(title);
 
-        card.child(UIComponents.label(Component.literal(lobby.note())).color(MUTED).maxWidth(CARD_WIDTH - 18));
+        card.child(UIComponents.label(karlaUi(Component.literal(lobby.note()))).color(MUTED).maxWidth(CARD_WIDTH - 18));
 
         var roster = UIContainers.grid(Sizing.fill(100), Sizing.content(), 2, 2);
         for (int slot = 0; slot < 4; slot++) {
@@ -281,14 +284,18 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         if (slot >= lobby.members().size()) {
             row.child(UIComponents.item(new ItemStack(Items.GRAY_STAINED_GLASS_PANE))
                     .showOverlay(false).margins(Insets.right(4)));
-            row.child(UIComponents.label(Component.literal("Open slot")).color(MUTED));
+            row.child(UIComponents.label(karlaUi(Component.literal("Open slot"))).color(MUTED));
             return row;
         }
 
         var member = lobby.members().get(slot);
         row.child(new PlayerFaceComponent(member.uuid(), member.ign(), 16).margins(Insets.right(4)));
-        var text = member.host() ? "★ " + member.ign() : member.ign();
-        row.child(UIComponents.label(Component.literal(text + " [" + member.guild() + "]"))
+        var memberLabel = Component.empty();
+        if (member.host()) {
+            memberLabel.append(Component.literal("★ "));
+        }
+        memberLabel.append(karlaUi(Component.literal(member.ign() + " [" + member.guild() + "]")));
+        row.child(UIComponents.label(memberLabel)
                 .color(member.host() ? ACCENT : Color.WHITE));
         return row;
     }
@@ -299,9 +306,19 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                 && regionFilter.matches(lobby);
     }
 
-    private Component statusLabel() { return Component.literal("Status: " + statusFilter.label + " ▾"); }
-    private Component raidLabel() { return Component.literal("Raid: " + raidFilter.label + " ▾"); }
-    private Component regionLabel() { return Component.literal("Region: " + regionFilter.label + " ▾"); }
+    private Component statusLabel() { return filterLabel("Status: " + statusFilter.label); }
+    private Component raidLabel() { return filterLabel("Raid: " + raidFilter.label); }
+    private Component regionLabel() { return filterLabel("Region: " + regionFilter.label); }
+
+    private Component filterLabel(String text) {
+        return Component.empty()
+                .append(karlaUi(Component.literal(text + " ")))
+                .append(Component.literal("▾"));
+    }
+
+    private Component karlaUi(Component component) {
+        return component.copy().withStyle(style -> style.withFont(KARLA_BOLD_UI));
+    }
 
     private String statusText(FakeRaidLobby lobby) {
         if (lobby.locked()) return "LOCKED";
@@ -324,9 +341,9 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private Component actionText(FakeRaidLobby lobby) {
-        if (lobby.locked()) return Component.literal("Locked");
-        if (lobby.status() == FakeRaidLobby.Status.IN_RAID) return Component.literal("In Raid");
-        return Component.literal("Join Party");
+        if (lobby.locked()) return karlaUi(Component.literal("Locked"));
+        if (lobby.status() == FakeRaidLobby.Status.IN_RAID) return karlaUi(Component.literal("In Raid"));
+        return karlaUi(Component.literal("Join Party"));
     }
 
     private net.minecraft.world.item.Item raidIcon(String raid) {
