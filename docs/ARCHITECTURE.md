@@ -19,9 +19,12 @@ platform ports. It must not depend on a concrete settings screen.
   opted-in display projection implements the 45-second compact-chat window and
   consecutive blank-line stacking without replacing vanilla source messages or
   signatures. Narrow graphics transforms implement message direction,
-  horizontal alignment, and shadow style while retaining vanilla chat scale,
-  opacity, spacing, timing, scrolling, and interaction metadata. Local chat
-  customization is available in singleplayer and on any multiplayer server.
+  horizontal alignment, and four shadow styles while retaining vanilla chat
+  scale, opacity, spacing, timing, scrolling, and interaction metadata. The
+  wrapped Full shadow is composed from visual-only translucent glyph passes;
+  semantic clickable-text capture receives only the original text pass. Local
+  chat customization is available in singleplayer and on any multiplayer
+  server.
 - `lfg`: future protocol, authentication, live connection, lobby domain, and
   party-automation boundary. It must remain inert until explicitly enabled.
 - `platform`: future Fabric/Minecraft adapters such as commands, keybinds,

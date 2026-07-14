@@ -2,6 +2,7 @@ package org.kingdomfoxes.ralle.chat.mixin;
 
 import net.minecraft.client.GuiMessage;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.ActiveTextCollector;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.util.Mth;
 import org.kingdomfoxes.ralle.RalleClient;
@@ -12,6 +13,7 @@ import org.kingdomfoxes.ralle.chat.ChatRenderLayout;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
@@ -30,6 +32,29 @@ abstract class ChatComponentMixin {
     @Shadow private boolean newMessageSinceScroll;
 
     private boolean ralle$refreshingMessages;
+    @Unique private boolean ralle$capturingClickableText;
+
+    @Inject(method = "captureClickableText", at = @At("HEAD"), require = 0)
+    private void ralle$startClickableTextCapture(
+            ActiveTextCollector output,
+            int canvasHeight,
+            int guiTick,
+            boolean focused,
+            CallbackInfo callback
+    ) {
+        ralle$capturingClickableText = true;
+    }
+
+    @Inject(method = "captureClickableText", at = @At("TAIL"), require = 0)
+    private void ralle$finishClickableTextCapture(
+            ActiveTextCollector output,
+            int canvasHeight,
+            int guiTick,
+            boolean focused,
+            CallbackInfo callback
+    ) {
+        ralle$capturingClickableText = false;
+    }
 
     @Inject(method = "getWidth", at = @At("RETURN"), cancellable = true, require = 0)
     private void ralle$useCustomWidth(CallbackInfoReturnable<Integer> callback) {
@@ -88,7 +113,8 @@ abstract class ChatComponentMixin {
                 minecraft.font,
                 ralle$renderContentWidth(),
                 behavior.horizontalAlignment(),
-                behavior.textShadow()
+                behavior.textShadow(),
+                !ralle$capturingClickableText
         );
     }
 

@@ -27,7 +27,7 @@ public final class RalleSettings {
                         toggle("horizontal-alignment-enabled"),
                         choice("horizontal-alignment", "left", "left", "right"),
                         toggle("text-shadow-enabled"),
-                        choice("text-shadow", "vanilla", "none", "vanilla", "full")
+                        choice("text-shadow", "vanilla", "none", "vanilla", "full", "wrapped-full")
                 )
         ));
 

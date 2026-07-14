@@ -59,9 +59,15 @@ public final class ChatBehaviorService {
 
     public TextShadow textShadow() {
         if (!chatEnabled.value() || !textShadowEnabled.value()) return TextShadow.VANILLA;
-        return switch (textShadow.value()) {
+        return parseTextShadow(textShadow.value());
+    }
+
+    static TextShadow parseTextShadow(String value) {
+        return switch (value) {
             case "none" -> TextShadow.NONE;
-            case "full" -> TextShadow.FULL;
+            // "full" was the original persisted value for RALLE's opaque offset shadow.
+            case "full" -> TextShadow.PARTIAL_FULL;
+            case "wrapped-full" -> TextShadow.FULL;
             default -> TextShadow.VANILLA;
         };
     }
@@ -91,6 +97,7 @@ public final class ChatBehaviorService {
     public enum TextShadow {
         NONE,
         VANILLA,
+        PARTIAL_FULL,
         FULL
     }
 

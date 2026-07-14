@@ -28,7 +28,7 @@
   "ralle.settings.option.text-shadow-enabled": "Custom Text Shadow",
   "ralle.settings.option.text-shadow-enabled.description": "Enables RALLE's selected chat text shadow style.",
   "ralle.settings.option.text-shadow": "Text Shadow",
-  "ralle.settings.option.text-shadow.description": "Chooses no shadow, Minecraft's vanilla shadow, or a full shadow.",
+  "ralle.settings.option.text-shadow.description": "Chooses no shadow, Minecraft's vanilla shadow, an opaque offset shadow, or a soft shadow wrapped around the text.",
   "ralle.settings.option.raid-lfg-enabled": "Enable Raid LFG",
   "ralle.settings.option.raid-lfg-enabled.description": "Allows RALLE to authenticate and connect to the Kingdom Foxes Raid LFG service after joining Wynncraft.",
   "ralle.settings.option.notification-sounds": "Notification Sounds",
@@ -40,7 +40,8 @@
   "ralle.settings.value.right": "Right",
   "ralle.settings.value.none": "None",
   "ralle.settings.value.vanilla": "Vanilla",
-  "ralle.settings.value.full": "Full",
+  "ralle.settings.value.full": "Partial-full",
+  "ralle.settings.value.wrapped-full": "Full",
 
   "ralle.chat-layout.bounds": "%s, %s   %s × %s",
   "ralle.chat-layout.free-move": "Free move",
