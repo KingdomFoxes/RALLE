@@ -14,7 +14,7 @@
   "ralle.settings.option.edit-chat-layout": "Edit Chat Layout",
   "ralle.settings.option.edit-chat-layout.description": "Opens the HUD layout editor for moving, resizing, or restoring the single chat box.",
   "ralle.settings.option.compact-chat": "Compact Chat",
-  "ralle.settings.option.compact-chat.description": "Collapses consecutive identical messages and displays a repetition count.",
+  "ralle.settings.option.compact-chat.description": "Collapses identical messages received within 45 seconds and displays a repetition count.",
   "ralle.settings.option.stack-empty-lines": "Stack Empty Lines",
   "ralle.settings.option.stack-empty-lines.description": "Collapses consecutive blank chat lines into one line.",
   "ralle.settings.option.message-direction-enabled": "Custom Message Direction",

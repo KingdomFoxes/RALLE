@@ -16,8 +16,11 @@ platform ports. It must not depend on a concrete settings screen.
   persistence owned by RALLE.
 - `ui.owo`: the owo-lib adapter that renders the settings registry.
 - `chat`: Minecraft chat integration and Wynntils compatibility boundary. The
-  current hook only applies the opted-in chat rectangle and leaves message
-  content and ordinary vanilla rendering behavior untouched. Local chat
+  opted-in display projection implements the 45-second compact-chat window and
+  consecutive blank-line stacking without replacing vanilla source messages or
+  signatures. Narrow graphics transforms implement message direction,
+  horizontal alignment, and shadow style while retaining vanilla chat scale,
+  opacity, spacing, timing, scrolling, and interaction metadata. Local chat
   customization is available in singleplayer and on any multiplayer server.
 - `lfg`: future protocol, authentication, live connection, lobby domain, and
   party-automation boundary. It must remain inert until explicitly enabled.
@@ -38,8 +41,9 @@ platform ports. It must not depend on a concrete settings screen.
 
 `/ralle settings` opens the owo-lib adapter over RALLE-owned category and setting
 models. Values are stored in `config/ralle.properties`; invalid or obsolete
-values fall back to their declared defaults. The current settings are inert
-until their corresponding chat and Raid LFG vertical slices consume them.
+values fall back to their declared defaults. Chat settings are consumed by the
+local chat integration; Raid LFG settings remain inert until that vertical
+slice is connected.
 
 Custom HUD rectangles are stored separately in
 `config/ralle-hud-layout.properties` as normalized coordinates and dimensions.

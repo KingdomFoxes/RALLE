@@ -8,6 +8,7 @@ import net.minecraft.client.Minecraft;
 import org.kingdomfoxes.ralle.api.feature.FeatureRegistry;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
+import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.kingdomfoxes.ralle.settings.RalleSettings;
 import org.kingdomfoxes.ralle.ui.owo.OwoSettingsScreenFactory;
@@ -38,8 +39,12 @@ public final class RalleClient implements ClientModInitializer {
         placements.seal();
 
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), settings, placements);
-        context = new RalleContext(features, settings, new OwoSettingsScreenFactory(settings, chatLayout), chatLayout);
-        ClientTickEvents.END_CLIENT_TICK.register(client -> chatLayout.tick());
+        var chatBehavior = new ChatBehaviorService(Minecraft.getInstance(), settings);
+        context = new RalleContext(features, settings, new OwoSettingsScreenFactory(settings, chatLayout), chatLayout, chatBehavior);
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            chatLayout.tick();
+            chatBehavior.tick();
+        });
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
                 literal("ralle").then(literal("settings").executes(command -> {
