@@ -1,18 +1,19 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
-import io.wispforest.owo.ui.base.BaseUIModelScreen;
-import io.wispforest.owo.ui.component.ButtonComponent;
+import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.component.TextBoxComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.Color;
+import io.wispforest.owo.ui.core.HorizontalAlignment;
 import io.wispforest.owo.ui.core.Insets;
+import io.wispforest.owo.ui.core.OwoUIAdapter;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.Surface;
+import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
 import org.kingdomfoxes.ralle.api.settings.ActionEntry;
@@ -20,11 +21,11 @@ import org.kingdomfoxes.ralle.api.settings.SettingsEntry;
 import org.kingdomfoxes.ralle.api.settings.SettingsCategory;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Locale;
 
-public final class RalleSettingsScreen extends BaseUIModelScreen<FlowLayout> {
-    private static final Identifier UI_MODEL = Identifier.fromNamespaceAndPath("ralle", "settings");
+public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private static final int CONTENT_WIDTH = 410;
     private static final Color DESCRIPTION_COLOR = Color.ofRgb(0xA0A0A0);
 
@@ -33,21 +34,45 @@ public final class RalleSettingsScreen extends BaseUIModelScreen<FlowLayout> {
     private final ChatLayoutService chatLayout;
 
     RalleSettingsScreen(Screen parent, SettingsRegistry settings, ChatLayoutService chatLayout) {
-        super(FlowLayout.class, UI_MODEL);
         this.parent = parent;
         this.settings = settings;
         this.chatLayout = chatLayout;
     }
 
     @Override
-    protected void build(FlowLayout root) {
-        var search = component(TextBoxComponent.class, "search-field");
-        search.setHint(Component.translatable("ralle.settings.search"));
-        var entries = component(FlowLayout.class, "settings-entries");
-        rebuildEntries(entries, "");
+    protected @NotNull OwoUIAdapter<FlowLayout> createAdapter() {
+        return OwoUIAdapter.create(this, UIContainers::verticalFlow);
+    }
 
-        component(ButtonComponent.class, "done-button").onPress(button -> onClose());
+    @Override
+    protected void build(FlowLayout root) {
+        root.surface(Surface.VANILLA_TRANSLUCENT)
+                .horizontalAlignment(HorizontalAlignment.CENTER)
+                .verticalAlignment(VerticalAlignment.CENTER);
+
+        var panel = UIContainers.verticalFlow(Sizing.fixed(442), Sizing.fill(90));
+        panel.gap(8)
+                .padding(Insets.of(14))
+                .surface(Surface.DARK_PANEL)
+                .horizontalAlignment(HorizontalAlignment.CENTER);
+        panel.child(UIComponents.label(Component.translatable("ralle.settings.title")).shadow(true));
+
+        TextBoxComponent search = UIComponents.textBox(Sizing.fixed(CONTENT_WIDTH));
+        search.setHint(Component.translatable("ralle.settings.search"));
+        panel.child(search);
+
+        var entries = UIContainers.verticalFlow(Sizing.fixed(CONTENT_WIDTH), Sizing.content());
+        entries.gap(10);
+        rebuildEntries(entries, "");
+        var scroll = UIContainers.verticalScroll(Sizing.fixed(418), Sizing.fill(100), entries);
+        scroll.scrollbarThiccness(4).scrollStep(24);
+        panel.child(scroll);
+
+        var done = UIComponents.button(Component.translatable("gui.done"), button -> onClose());
+        done.horizontalSizing(Sizing.fixed(120));
+        panel.child(done);
         search.onChanged().subscribe(query -> rebuildEntries(entries, query));
+        root.child(panel);
     }
 
     private void rebuildEntries(FlowLayout entries, String rawQuery) {

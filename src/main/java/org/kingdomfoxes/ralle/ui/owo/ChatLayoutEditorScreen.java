@@ -1,19 +1,26 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
-import io.wispforest.owo.ui.base.BaseUIModelScreen;
+import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.CheckboxComponent;
+import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.UIContainers;
+import io.wispforest.owo.ui.core.HorizontalAlignment;
+import io.wispforest.owo.ui.core.Insets;
+import io.wispforest.owo.ui.core.OwoUIAdapter;
+import io.wispforest.owo.ui.core.Sizing;
+import io.wispforest.owo.ui.core.Surface;
+import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
+import org.jetbrains.annotations.NotNull;
 
-public final class ChatLayoutEditorScreen extends BaseUIModelScreen<FlowLayout> {
-    private static final Identifier UI_MODEL = Identifier.fromNamespaceAndPath("ralle", "chat_layout");
+public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
     static final int GRID_SIZE = 10;
     private static final int SNAP_DISTANCE = 4;
     private static final int RESIZE_MARGIN = 6;
@@ -48,9 +55,13 @@ public final class ChatLayoutEditorScreen extends BaseUIModelScreen<FlowLayout> 
     private boolean showPositionInfo;
 
     ChatLayoutEditorScreen(Screen parent, ChatLayoutService chatLayout) {
-        super(FlowLayout.class, UI_MODEL);
         this.parent = parent;
         this.chatLayout = chatLayout;
+    }
+
+    @Override
+    protected @NotNull OwoUIAdapter<FlowLayout> createAdapter() {
+        return OwoUIAdapter.create(this, UIContainers::verticalFlow);
     }
 
     @Override
@@ -59,33 +70,60 @@ public final class ChatLayoutEditorScreen extends BaseUIModelScreen<FlowLayout> 
         initialBounds = bounds;
         initialHadCustomBounds = chatLayout.hasCustomEditorBounds();
 
-        controlsPanel = component(FlowLayout.class, "controls-panel");
-        controlsPanel.surface(RalleSurfaces.FRAMED_NAVY);
+        root.surface(Surface.VANILLA_TRANSLUCENT)
+                .horizontalAlignment(HorizontalAlignment.CENTER)
+                .verticalAlignment(VerticalAlignment.TOP);
+        root.child(UIComponents.spacer());
 
-        freeMoveCheckbox = checkbox("free-move", true, checked -> setSnapToGrid(!checked));
-        snapGridCheckbox = checkbox("snap-grid", false, this::setSnapToGrid);
-        checkbox("alignment-guides", false, checked -> {
+        controlsPanel = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
+        controlsPanel.gap(4).padding(Insets.of(8)).surface(RalleSurfaces.FRAMED_NAVY);
+
+        var toggles = UIContainers.horizontalFlow(Sizing.fixed(300), Sizing.content());
+        var movementColumn = checkboxColumn(84);
+        var gridColumn = checkboxColumn(94);
+        var displayColumn = checkboxColumn(122);
+
+        freeMoveCheckbox = checkbox(movementColumn, "free-move", true, checked -> setSnapToGrid(!checked));
+        snapGridCheckbox = checkbox(gridColumn, "snap-grid", false, this::setSnapToGrid);
+        checkbox(displayColumn, "alignment-guides", false, checked -> {
             alignmentGuides = checked;
             if (!checked) clearAlignmentGuides();
         });
-        checkbox("show-all", false, checked -> showAll = checked);
-        checkbox("show-grid", false, checked -> showGrid = checked);
-        checkbox("position-info", false, checked -> showPositionInfo = checked);
+        checkbox(movementColumn, "show-all", false, checked -> showAll = checked);
+        checkbox(gridColumn, "show-grid", false, checked -> showGrid = checked);
+        checkbox(displayColumn, "position-info", false, checked -> showPositionInfo = checked);
+        toggles.child(movementColumn).child(gridColumn).child(displayColumn);
+        controlsPanel.child(toggles);
 
-        var resetButton = component(ButtonComponent.class, "reset-button");
+        var buttons = UIContainers.horizontalFlow(Sizing.fixed(300), Sizing.content());
+        buttons.gap(8);
+        var resetButton = UIComponents.button(Component.translatable("ralle.chat-layout.reset"), button -> resetSessionChanges());
+        resetButton.horizontalSizing(Sizing.fixed(146));
         resetButton.renderer(RalleButtonRenderers.neutral());
-        resetButton.onPress(button -> resetSessionChanges());
 
-        var doneButton = component(ButtonComponent.class, "done-button");
+        var doneButton = UIComponents.button(Component.translatable("gui.done"), button -> onClose());
+        doneButton.horizontalSizing(Sizing.fixed(146));
         doneButton.renderer(RalleButtonRenderers.primary());
-        doneButton.onPress(button -> onClose());
+        buttons.child(resetButton).child(doneButton);
+        controlsPanel.child(buttons);
+        root.child(controlsPanel);
     }
 
-    private CheckboxComponent checkbox(String id, boolean checked, java.util.function.Consumer<Boolean> changed) {
-        var checkbox = component(CheckboxComponent.class, id);
+    private FlowLayout checkboxColumn(int width) {
+        return UIContainers.verticalFlow(Sizing.fixed(width), Sizing.content()).gap(4);
+    }
+
+    private CheckboxComponent checkbox(
+            FlowLayout parent,
+            String id,
+            boolean checked,
+            java.util.function.Consumer<Boolean> changed
+    ) {
+        var checkbox = UIComponents.checkbox(Component.translatable("ralle.chat-layout." + id));
         checkbox.checked(checked);
         checkbox.tooltip(Component.translatable("ralle.chat-layout." + id + ".description"));
         checkbox.onChanged(changed);
+        parent.child(checkbox);
         return checkbox;
     }
 

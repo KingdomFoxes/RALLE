@@ -47,19 +47,18 @@ The registry currently exposes only the v1 chat box. Removing its custom entry
 restores the live vanilla chat position and dimensions rather than copying a
 snapshot of the vanilla options.
 
-## UI model development
+## Programmatic UI development
 
-RALLE's settings, chat-layout editor, and Raid LFG screen skeletons are owo UI models in
-`src/main/resources/assets/ralle/owo_ui`. Java code binds interactions and
-populates dynamic settings rows, the draggable chat rectangle, lobby cards,
-and custom-rendered components.
+RALLE's settings, chat-layout editor, and Raid LFG screens build their owo
+component trees directly in Java. RALLE does not ship XML UI models or use
+owo's UI-model hot-reload workflow. Shared surfaces, button renderers, fonts,
+and other presentation primitives remain RALLE-owned so screen construction
+does not leak into settings, chat, or LFG domain logic.
 
-In a development client, open either screen and press Ctrl+F5. Choose its XML
-file as the hot-reload source. After saving XML changes, close and reopen the
-RALLE screen to load the updated model without rebuilding or restarting the
-game. owo stores these development-only file associations under the run
-directory's `config/owo_ui_hot_reload_locations.json5`; release builds continue
-to load the packaged XML assets.
+This is an intentional architecture decision: UI changes use the normal Java
+compile-and-run development loop. New screens should compose shared RALLE
+presentation primitives and keep dynamic state and interactions separate from
+the component-tree construction where practical.
 
 The eventual Fox FastAPI service is a separate repository and remains the sole
 authority for LFG state. No backend implementation belongs in this client.
