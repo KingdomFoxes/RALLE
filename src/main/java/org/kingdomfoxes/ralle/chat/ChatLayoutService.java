@@ -7,6 +7,7 @@ import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 
+import java.util.Map;
 import java.util.Optional;
 
 public final class ChatLayoutService {
@@ -40,6 +41,16 @@ public final class ChatLayoutService {
     public void saveEditorBounds(Rectangle rectangle, int viewportWidth, int viewportHeight) {
         placements.setPixels(CHAT_ELEMENT_ID, rectangle, viewportWidth, viewportHeight);
         rescaleChat();
+    }
+
+    public boolean hasCustomEditorBounds() {
+        return placements.customBounds(CHAT_ELEMENT_ID).isPresent();
+    }
+
+    public Map<String, Rectangle> otherEditorBounds(int viewportWidth, int viewportHeight) {
+        var allBounds = new java.util.LinkedHashMap<>(placements.resolveAllCustom(viewportWidth, viewportHeight));
+        allBounds.remove(CHAT_ELEMENT_ID);
+        return Map.copyOf(allBounds);
     }
 
     public Rectangle resetEditorBounds(int viewportWidth, int viewportHeight) {

@@ -48,4 +48,20 @@ class ChatLayoutEditorScreenTest {
 
         assertEquals(new Rectangle(180, 80, 120, 45), resized);
     }
+
+    @Test
+    void snapToGridUsesTheClosestElementEdge() {
+        var snapped = ChatLayoutEditorScreen.snapAxis(123, 84, 500, true, true);
+
+        assertEquals(120, snapped.start());
+        assertEquals(120, snapped.guide());
+    }
+
+    @Test
+    void alignmentGuidesSnapElementCentersToTheScreenCenter() {
+        var snapped = ChatLayoutEditorScreen.snapAxis(187, 120, 500, false, true);
+
+        assertEquals(190, snapped.start());
+        assertEquals(250, snapped.guide());
+    }
 }

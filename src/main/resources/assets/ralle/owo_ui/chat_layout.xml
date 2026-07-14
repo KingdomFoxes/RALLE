@@ -4,20 +4,69 @@
         <flow-layout direction="vertical">
             <children>
                 <spacer percent="100"/>
-                <flow-layout direction="horizontal">
+                <flow-layout direction="vertical" id="controls-panel">
                     <children>
-                        <button id="reset-button">
-                            <text translate="true">ralle.chat-layout.reset</text>
-                            <sizing><horizontal method="fixed">150</horizontal></sizing>
-                        </button>
-                        <button id="done-button">
-                            <text translate="true">gui.done</text>
-                            <sizing><horizontal method="fixed">120</horizontal></sizing>
-                        </button>
+                        <flow-layout direction="horizontal">
+                            <children>
+                                <flow-layout direction="vertical">
+                                    <children>
+                                        <checkbox id="free-move"><text translate="true">ralle.chat-layout.free-move</text></checkbox>
+                                        <checkbox id="show-all"><text translate="true">ralle.chat-layout.show-all</text></checkbox>
+                                    </children>
+                                    <gap>4</gap>
+                                    <sizing>
+                                        <horizontal method="fixed">84</horizontal>
+                                        <vertical method="content"/>
+                                    </sizing>
+                                </flow-layout>
+                                <flow-layout direction="vertical">
+                                    <children>
+                                        <checkbox id="snap-grid"><text translate="true">ralle.chat-layout.snap-grid</text></checkbox>
+                                        <checkbox id="show-grid"><text translate="true">ralle.chat-layout.show-grid</text></checkbox>
+                                    </children>
+                                    <gap>4</gap>
+                                    <sizing>
+                                        <horizontal method="fixed">94</horizontal>
+                                        <vertical method="content"/>
+                                    </sizing>
+                                </flow-layout>
+                                <flow-layout direction="vertical">
+                                    <children>
+                                        <checkbox id="alignment-guides"><text translate="true">ralle.chat-layout.alignment-guides</text></checkbox>
+                                        <checkbox id="position-info"><text translate="true">ralle.chat-layout.position-info</text></checkbox>
+                                    </children>
+                                    <gap>4</gap>
+                                    <sizing>
+                                        <horizontal method="fixed">122</horizontal>
+                                        <vertical method="content"/>
+                                    </sizing>
+                                </flow-layout>
+                            </children>
+                            <sizing>
+                                <horizontal method="fixed">300</horizontal>
+                                <vertical method="content"/>
+                            </sizing>
+                        </flow-layout>
+                        <flow-layout direction="horizontal">
+                            <children>
+                                <button id="reset-button">
+                                    <text translate="true">ralle.chat-layout.reset</text>
+                                    <sizing><horizontal method="fixed">146</horizontal></sizing>
+                                </button>
+                                <button id="done-button">
+                                    <text translate="true">gui.done</text>
+                                    <sizing><horizontal method="fixed">146</horizontal></sizing>
+                                </button>
+                            </children>
+                            <gap>8</gap>
+                            <sizing>
+                                <horizontal method="fixed">300</horizontal>
+                                <vertical method="content"/>
+                            </sizing>
+                        </flow-layout>
                     </children>
-                    <gap>8</gap>
+                    <gap>4</gap>
                     <padding><all>8</all></padding>
-                    <surface><panel dark="true"/></surface>
                     <sizing>
                         <horizontal method="content"/>
                         <vertical method="content"/>

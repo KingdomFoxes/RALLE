@@ -42,6 +42,18 @@
   "ralle.settings.value.vanilla": "Vanilla",
   "ralle.settings.value.full": "Full",
 
-  "ralle.chat-layout.bounds": "Position: %s, %s   Size: %s x %s",
-  "ralle.chat-layout.reset": "Restore Vanilla Layout"
+  "ralle.chat-layout.bounds": "%s, %s   %s × %s",
+  "ralle.chat-layout.free-move": "Free move",
+  "ralle.chat-layout.snap-grid": "Snap to grid",
+  "ralle.chat-layout.alignment-guides": "Alignment guides",
+  "ralle.chat-layout.show-all": "Show all",
+  "ralle.chat-layout.show-grid": "Show grid",
+  "ralle.chat-layout.position-info": "Position info",
+  "ralle.chat-layout.free-move.description": "Move and resize HUD elements one pixel at a time.",
+  "ralle.chat-layout.snap-grid.description": "Magnetically snaps HUD element edges and centers to the screen grid.",
+  "ralle.chat-layout.alignment-guides.description": "Snaps to screen edges and centers and shows red alignment guides.",
+  "ralle.chat-layout.show-all.description": "Previews every registered RALLE HUD element while editing.",
+  "ralle.chat-layout.show-grid.description": "Shows the 10-pixel placement grid across the screen.",
+  "ralle.chat-layout.position-info.description": "Shows compact coordinates and dimensions inside the selected element.",
+  "ralle.chat-layout.reset": "Reset Changes"
 }

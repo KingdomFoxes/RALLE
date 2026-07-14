@@ -86,10 +86,6 @@
                     </children>
                     <gap>8</gap>
                     <padding><all>12</all></padding>
-                    <surface>
-                        <flat>#041330</flat>
-                        <outline>#FFFFFF</outline>
-                    </surface>
                     <sizing>
                         <horizontal method="fixed">620</horizontal>
                         <vertical method="fill">92</vertical>

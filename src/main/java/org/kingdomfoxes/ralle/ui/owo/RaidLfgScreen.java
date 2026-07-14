@@ -72,6 +72,7 @@ public final class RaidLfgScreen extends BaseUIModelScreen<FlowLayout> {
 
     @Override
     protected void build(FlowLayout root) {
+        component(FlowLayout.class, "lfg-panel").surface(RalleSurfaces.FRAMED_NAVY);
         component(FlowLayout.class, "header-slot").child(header());
         this.gridHost = component(FlowLayout.class, "lobby-grid-host");
 
@@ -124,8 +125,7 @@ public final class RaidLfgScreen extends BaseUIModelScreen<FlowLayout> {
 
     private FlowLayout header() {
         var header = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(HEADER_HEIGHT));
-        header.verticalAlignment(VerticalAlignment.CENTER)
-                .surface(Surface.flat(0xFF041330).and(Surface.outline(0xFFFFFFFF)));
+        header.verticalAlignment(VerticalAlignment.CENTER).surface(RalleSurfaces.FRAMED_NAVY);
 
         var identity = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
         identity.verticalAlignment(VerticalAlignment.CENTER).margins(Insets.left(10));

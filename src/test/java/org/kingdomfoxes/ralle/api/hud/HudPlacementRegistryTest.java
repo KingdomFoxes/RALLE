@@ -50,6 +50,17 @@ class HudPlacementRegistryTest {
         assertTrue(registry.customBounds("chat").isEmpty());
     }
 
+    @Test
+    void resolvesAllCustomBoundsForEditorPreviews() {
+        var registry = registry(temporaryDirectory.resolve("layout.properties"));
+        registry.setPixels("chat", new Rectangle(40, 50, 200, 100), 800, 600);
+
+        assertEquals(
+                new Rectangle(40, 50, 200, 100),
+                registry.resolveAllCustom(800, 600).get("chat")
+        );
+    }
+
     private HudPlacementRegistry registry(Path path) {
         var registry = new HudPlacementRegistry(path);
         registry.register(new ElementDefinition("chat", 120, 45));

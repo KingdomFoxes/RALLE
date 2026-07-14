@@ -55,6 +55,15 @@ public final class HudPlacementRegistry {
         return customBounds(id).map(bounds -> bounds.toPixels(viewportWidth, viewportHeight, definition));
     }
 
+    public Map<String, Rectangle> resolveAllCustom(int viewportWidth, int viewportHeight) {
+        var resolved = new LinkedHashMap<String, Rectangle>();
+        for (var definition : definitions.values()) {
+            resolveCustom(definition.id(), viewportWidth, viewportHeight)
+                    .ifPresent(bounds -> resolved.put(definition.id(), bounds));
+        }
+        return Map.copyOf(resolved);
+    }
+
     public Rectangle resolve(String id, int viewportWidth, int viewportHeight, Rectangle fallback) {
         var definition = definition(id);
         return resolveCustom(id, viewportWidth, viewportHeight)
