@@ -5,6 +5,9 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "ChatComponentMixin",
+    "ChatScreenMixin",
+    "GameRendererAccessor",
+    "GuiRendererMixin",
     "GuiTextRenderStateMixin",
     "RenderingTextCollectorMixin"
   ],

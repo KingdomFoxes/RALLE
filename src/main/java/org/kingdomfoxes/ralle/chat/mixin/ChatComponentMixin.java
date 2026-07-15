@@ -14,6 +14,8 @@ import org.kingdomfoxes.ralle.chat.ChatMessageProjector;
 import org.kingdomfoxes.ralle.chat.ChatRenderLayout;
 import org.kingdomfoxes.ralle.chat.render.FullShadowFrameCollector;
 import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
+import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotSnapshot;
+import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotSource;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -28,7 +30,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.List;
 
 @Mixin(ChatComponent.class)
-abstract class ChatComponentMixin {
+abstract class ChatComponentMixin implements ChatScreenshotSource {
     @Shadow @Final private Minecraft minecraft;
     @Shadow @Final private List<GuiMessage> allMessages;
     @Shadow @Final private List<GuiMessage.Line> trimmedMessages;
@@ -92,6 +94,7 @@ abstract class ChatComponentMixin {
             boolean changeCursorOnInsertions,
             CallbackInfo callback
     ) {
+        RalleClient.context().chatScreenshots().renderOutline(graphics);
         ralle$fullShadowCollector = null;
     }
 
@@ -180,6 +183,25 @@ abstract class ChatComponentMixin {
         );
     }
 
+    @Inject(
+            method = "render(Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;IIZ)V",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/gui/components/ChatComponent;forEachLine(Lnet/minecraft/client/gui/components/ChatComponent$AlphaCalculator;Lnet/minecraft/client/gui/components/ChatComponent$LineConsumer;)I",
+                    ordinal = 1
+            ),
+            require = 0
+    )
+    private void ralle$drawScreenshotFillBehindText(
+            ChatComponent.ChatGraphicsAccess graphics,
+            int canvasHeight,
+            int guiTick,
+            boolean focused,
+            CallbackInfo callback
+    ) {
+        RalleClient.context().chatScreenshots().renderLocalFill(graphics);
+    }
+
     @ModifyArg(
             method = "forEachLine",
             at = @At(
@@ -212,11 +234,14 @@ abstract class ChatComponentMixin {
 
     @Inject(method = "addMessageToDisplayQueue", at = @At("HEAD"), cancellable = true, require = 0)
     private void ralle$deferProjectedMessageDisplay(GuiMessage message, CallbackInfo callback) {
+        if (RalleClient.context().chatScreenshots().stabilizesIncomingMessages()) {
+            callback.cancel();
+            return;
+        }
         if (!RalleClient.context().chatBehavior().projectionEnabled()) return;
 
-        if (!ralle$refreshingMessages
-                && ((ChatComponent) (Object) this).isChatFocused()
-                && chatScrollbarPos > 0) {
+        if (!ralle$refreshingMessages && ((ChatComponent) (Object) this).isChatFocused()
+                && (chatScrollbarPos > 0 || RalleClient.context().chatScreenshots().stabilizesIncomingMessages())) {
             int addedLineCount = message.splitLines(minecraft.font, ralle$contentWidth()).size();
             for (int line = 0; line < addedLineCount; line++) {
                 newMessageSinceScroll = true;
@@ -232,7 +257,8 @@ abstract class ChatComponentMixin {
             require = 0
     )
     private void ralle$refreshAfterMessageAdded(CallbackInfo callback) {
-        if (RalleClient.context().chatBehavior().projectionEnabled()) {
+        if (RalleClient.context().chatBehavior().projectionEnabled()
+                && !RalleClient.context().chatScreenshots().stabilizesIncomingMessages()) {
             ralle$refreshProjectedMessages();
         }
     }
@@ -281,5 +307,59 @@ abstract class ChatComponentMixin {
         return RalleClient.context().chatLayout().activeCustomBounds()
                 .map(bounds -> bounds.width())
                 .orElseGet(() -> ChatComponent.getWidth(minecraft.options.chatWidth().get()));
+    }
+
+    @Override
+    public ChatScreenshotSnapshot ralle$freezeScreenshotMessages() {
+        var lines = new java.util.ArrayList<ChatScreenshotSnapshot.FrozenLine>(trimmedMessages.size());
+        int messageIndex = -1;
+        for (GuiMessage.Line line : trimmedMessages) {
+            if (line.endOfEntry()) messageIndex++;
+            if (messageIndex < 0) messageIndex = 0;
+            lines.add(new ChatScreenshotSnapshot.FrozenLine(line.content(), messageIndex));
+        }
+
+        double scale = Math.max(0.01, minecraft.options.chatScale().get());
+        int lineHeight = (int) (9 * (minecraft.options.chatLineSpacing().get() + 1.0));
+        int baselineFromTop = lineHeight - (int) Math.round(
+                8.0 * (minecraft.options.chatLineSpacing().get() + 1.0)
+                        - 4.0 * minecraft.options.chatLineSpacing().get()
+        );
+        int linesPerPage = Math.max(1, ((ChatComponent) (Object) this).getLinesPerPage());
+        var customBounds = RalleClient.context().chatLayout().activeCustomBounds();
+        int viewportLeft = customBounds.map(bounds -> bounds.x()).orElse(0);
+        int canvasHeight = customBounds
+                .map(RalleClient.context().chatLayout()::customRenderCanvasHeight)
+                .orElse(minecraft.getWindow().getGuiScaledHeight());
+        int localBottom = Mth.floor((canvasHeight - 40) / scale);
+        int viewportBottom = Mth.floor(localBottom * scale);
+        int viewportTop = viewportBottom - Mth.ceil(linesPerPage * lineHeight * scale);
+        int viewportRight = viewportLeft + ralle$visualWidth();
+        return new ChatScreenshotSnapshot(
+                lines,
+                chatScrollbarPos,
+                linesPerPage,
+                lineHeight,
+                baselineFromTop,
+                scale,
+                minecraft.options.chatOpacity().get().floatValue() * 0.9F + 0.1F,
+                viewportLeft,
+                viewportTop,
+                viewportRight,
+                viewportBottom,
+                RalleClient.context().chatBehavior().messageDirection(),
+                RalleClient.context().chatBehavior().horizontalAlignment(),
+                RalleClient.context().chatBehavior().textShadow()
+        );
+    }
+
+    @Override
+    public int ralle$screenshotScroll() {
+        return chatScrollbarPos;
+    }
+
+    @Override
+    public void ralle$selectionAutoscroll(int amount) {
+        ((ChatComponent) (Object) this).scrollChat(amount);
     }
 }

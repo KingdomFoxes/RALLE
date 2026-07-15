@@ -11,6 +11,8 @@ import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
+import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotService;
+import org.kingdomfoxes.ralle.chat.screenshot.TransparentChatCapture;
 import org.kingdomfoxes.ralle.settings.RalleSettings;
 import org.kingdomfoxes.ralle.ui.owo.OwoSettingsScreenFactory;
 import org.kingdomfoxes.ralle.ui.owo.RaidLfgScreen;
@@ -43,10 +45,23 @@ public final class RalleClient implements ClientModInitializer {
 
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), settings, placements);
         var chatBehavior = new ChatBehaviorService(Minecraft.getInstance(), settings);
-        context = new RalleContext(features, settings, new OwoSettingsScreenFactory(settings, chatLayout), chatLayout, chatBehavior);
+        var chatScreenshots = new ChatScreenshotService(
+                Minecraft.getInstance(),
+                settings,
+                new TransparentChatCapture(Minecraft.getInstance())
+        );
+        context = new RalleContext(
+                features,
+                settings,
+                new OwoSettingsScreenFactory(settings, chatLayout),
+                chatLayout,
+                chatBehavior,
+                chatScreenshots
+        );
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             chatLayout.tick();
             chatBehavior.tick();
+            chatScreenshots.tick();
         });
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(

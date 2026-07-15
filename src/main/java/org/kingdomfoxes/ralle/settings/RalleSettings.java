@@ -20,6 +20,8 @@ public final class RalleSettings {
                 List.of(
                         toggle("chat-enabled"),
                         action("edit-chat-layout"),
+                        toggle("chat-screenshot-enabled"),
+                        toggle("chat-screenshot-smooth-expansion"),
                         toggle("compact-chat"),
                         toggle("stack-empty-lines"),
                         toggle("message-direction-enabled"),

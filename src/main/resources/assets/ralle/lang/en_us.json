@@ -13,6 +13,10 @@
   "ralle.settings.option.chat-enabled.description": "Allows RALLE's local chat options to operate in singleplayer or on any server.",
   "ralle.settings.option.edit-chat-layout": "Edit Chat Layout",
   "ralle.settings.option.edit-chat-layout.description": "Opens the HUD layout editor for moving, resizing, or restoring the single chat box.",
+  "ralle.settings.option.chat-screenshot-enabled": "Enable Chat Screenshotting",
+  "ralle.settings.option.chat-screenshot-enabled.description": "While chat is open, hold either Ctrl key and left-drag across messages to prepare a transparent chat image. Ctrl+C or double-click copies it.",
+  "ralle.settings.option.chat-screenshot-smooth-expansion": "Smooth Selection Expansion",
+  "ralle.settings.option.chat-screenshot-smooth-expansion.description": "Animates screenshot selection height changes over 120 milliseconds instead of snapping immediately.",
   "ralle.settings.option.compact-chat": "Compact Chat",
   "ralle.settings.option.compact-chat.description": "Collapses identical messages received within 45 seconds and displays a repetition count.",
   "ralle.settings.option.stack-empty-lines": "Stack Empty Lines",
@@ -56,5 +60,6 @@
   "ralle.chat-layout.show-all.description": "Previews every registered RALLE HUD element while editing.",
   "ralle.chat-layout.show-grid.description": "Shows the 10-pixel placement grid across the screen.",
   "ralle.chat-layout.position-info.description": "Shows compact coordinates and dimensions inside the selected element.",
-  "ralle.chat-layout.reset": "Reset Changes"
+  "ralle.chat-layout.reset": "Reset Changes",
+  "ralle.chat-screenshot.copy-failed": "RALLE could not copy the chat image: %s. The selection was kept; check clipboard access and try again."
 }
