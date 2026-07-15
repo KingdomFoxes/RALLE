@@ -4,7 +4,9 @@
   "package": "org.kingdomfoxes.ralle.chat.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "ChatComponentMixin"
+    "ChatComponentMixin",
+    "GuiTextRenderStateMixin",
+    "RenderingTextCollectorMixin"
   ],
   "injectors": {
     "defaultRequire": 0

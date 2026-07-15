@@ -11,10 +11,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -55,7 +53,7 @@ class ChatGraphicsTransformTest {
     }
 
     @Test
-    void wrappedFullRendersSixteenSoftNonInteractivePassesBeforeTheOriginalText() {
+    void wrappedFullBatchesSixteenSoftLayersBeforeTheOriginalText() {
         var hover = new HoverEvent.ShowText(Component.literal("Details"));
         var original = Style.EMPTY
                 .withColor(0xABCDEF)
@@ -74,30 +72,18 @@ class ChatGraphicsTransformTest {
         );
 
         assertFalse(hovered, "Only the final real-text pass may determine interaction state");
-        assertEquals(17, graphics.messages.size());
+        assertEquals(2, graphics.messages.size());
 
-        var expectedOffsets = Set.of(
-                new Offset(-1.0F, -0.5F), new Offset(-1.0F, 0.0F), new Offset(-1.0F, 0.5F),
-                new Offset(-0.5F, -1.0F), new Offset(-0.5F, 0.0F), new Offset(-0.5F, 1.0F),
-                new Offset(0.0F, -1.0F), new Offset(0.0F, -0.5F),
-                new Offset(0.0F, 0.5F), new Offset(0.0F, 1.0F),
-                new Offset(0.5F, -1.0F), new Offset(0.5F, 0.0F), new Offset(0.5F, 1.0F),
-                new Offset(1.0F, -0.5F), new Offset(1.0F, 0.0F), new Offset(1.0F, 0.5F)
-        );
-        var actualOffsets = graphics.messages.subList(0, 16).stream()
-                .map(message -> new Offset(message.x(), message.y()))
-                .collect(Collectors.toSet());
-        assertEquals(expectedOffsets, actualOffsets);
-
-        for (var shadowPass : graphics.messages.subList(0, 16)) {
-            assertEquals(0.25F, shadowPass.opacity());
-            assertEquals(0x000000, shadowPass.style().getColor().getValue());
-            assertEquals(Style.NO_SHADOW, shadowPass.style().getShadowColor());
-            assertTrue(shadowPass.style().isBold());
-            assertNull(shadowPass.style().getHoverEvent());
-            assertNull(shadowPass.style().getClickEvent());
-            assertNull(shadowPass.style().getInsertion());
-        }
+        var shadowPass = graphics.messages.getFirst();
+        assertTrue(shadowPass.content() instanceof BatchedFullShadowSequence);
+        assertEquals(16, BatchedFullShadowSequence.layerCount());
+        assertEquals(0.25F, shadowPass.opacity());
+        assertEquals(0x000000, shadowPass.style().getColor().getValue());
+        assertEquals(Style.NO_SHADOW, shadowPass.style().getShadowColor());
+        assertTrue(shadowPass.style().isBold());
+        assertNull(shadowPass.style().getHoverEvent());
+        assertNull(shadowPass.style().getClickEvent());
+        assertNull(shadowPass.style().getInsertion());
 
         var mainPass = graphics.messages.getLast();
         assertEquals(new Offset(0.0F, 0.0F), new Offset(mainPass.x(), mainPass.y()));
@@ -165,7 +151,7 @@ class ChatGraphicsTransformTest {
 
         @Override
         public boolean handleMessage(int y, float opacity, FormattedCharSequence content) {
-            messages.add(new MessageCall(pose.m20(), pose.m21(), opacity, firstStyle(content)));
+            messages.add(new MessageCall(pose.m20(), pose.m21(), opacity, content, firstStyle(content)));
             return messages.size() == 1;
         }
 
@@ -180,7 +166,13 @@ class ChatGraphicsTransformTest {
         }
     }
 
-    private record MessageCall(float x, float y, float opacity, Style style) {}
+    private record MessageCall(
+            float x,
+            float y,
+            float opacity,
+            FormattedCharSequence content,
+            Style style
+    ) {}
 
     private record Offset(float x, float y) {}
 }

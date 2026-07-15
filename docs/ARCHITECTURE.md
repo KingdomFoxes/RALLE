@@ -21,10 +21,15 @@ platform ports. It must not depend on a concrete settings screen.
   signatures. Narrow graphics transforms implement message direction,
   horizontal alignment, and four shadow styles while retaining vanilla chat
   scale, opacity, spacing, timing, scrolling, and interaction metadata. The
-  wrapped Full shadow is composed from visual-only translucent glyph passes;
-  semantic clickable-text capture receives only the original text pass. Local
-  chat customization is available in singleplayer and on any multiplayer
-  server.
+  wrapped Full shadow collects every visible line into one fixed-resolution 2x
+  offscreen glyph mask, composites the sixteen half-pixel halo samples in one
+  GPU quad, and then draws the original text once. Its mask removes interaction
+  metadata while retaining glyph styling, and clickable-text capture bypasses
+  visual collection entirely. Target, projection, and output overrides are
+  restored after preparation. If the compositor becomes unavailable, a
+  session-stable batched glyph fallback preserves the visual effect without
+  affecting other chat modes or Raid LFG. Local chat customization is available
+  in singleplayer and on any multiplayer server.
 - `lfg`: future protocol, authentication, live connection, lobby domain, and
   party-automation boundary. It must remain inert until explicitly enabled.
 - `platform`: future Fabric/Minecraft adapters such as commands, keybinds,

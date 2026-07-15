@@ -6,9 +6,8 @@ import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.util.FormattedCharSequence;
 import org.joml.Matrix3x2f;
+import org.kingdomfoxes.ralle.chat.render.FullShadowFrameCollector;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -18,7 +17,6 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
     private static final int WRAPPED_FULL_TEXT_COLOR = 0x000000;
     private static final float WRAPPED_FULL_OPACITY_SCALE = 0.25F;
     private static final float MIN_WRAPPED_FULL_PASS_OPACITY = 3.0F / 255.0F;
-    private static final List<ShadowOffset> WRAPPED_FULL_OFFSETS = createWrappedFullOffsets();
 
     private final ChatComponent.ChatGraphicsAccess delegate;
     private final Font font;
@@ -26,6 +24,7 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
     private final ChatBehaviorService.HorizontalAlignment alignment;
     private final ChatBehaviorService.TextShadow shadow;
     private final boolean renderVisualShadowPasses;
+    private final FullShadowFrameCollector fullShadowCollector;
     private int lastMessageOffset;
 
     private ChatGraphicsTransform(
@@ -34,7 +33,8 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
             int contentWidth,
             ChatBehaviorService.HorizontalAlignment alignment,
             ChatBehaviorService.TextShadow shadow,
-            boolean renderVisualShadowPasses
+            boolean renderVisualShadowPasses,
+            FullShadowFrameCollector fullShadowCollector
     ) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         this.font = Objects.requireNonNull(font, "font");
@@ -42,6 +42,7 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
         this.alignment = Objects.requireNonNull(alignment, "alignment");
         this.shadow = Objects.requireNonNull(shadow, "shadow");
         this.renderVisualShadowPasses = renderVisualShadowPasses;
+        this.fullShadowCollector = fullShadowCollector;
     }
 
     public static ChatComponent.ChatGraphicsAccess wrap(
@@ -51,7 +52,7 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
             ChatBehaviorService.HorizontalAlignment alignment,
             ChatBehaviorService.TextShadow shadow
     ) {
-        return wrap(delegate, font, contentWidth, alignment, shadow, true);
+        return wrap(delegate, font, contentWidth, alignment, shadow, true, null);
     }
 
     public static ChatComponent.ChatGraphicsAccess wrap(
@@ -61,6 +62,18 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
             ChatBehaviorService.HorizontalAlignment alignment,
             ChatBehaviorService.TextShadow shadow,
             boolean renderVisualShadowPasses
+    ) {
+        return wrap(delegate, font, contentWidth, alignment, shadow, renderVisualShadowPasses, null);
+    }
+
+    public static ChatComponent.ChatGraphicsAccess wrap(
+            ChatComponent.ChatGraphicsAccess delegate,
+            Font font,
+            int contentWidth,
+            ChatBehaviorService.HorizontalAlignment alignment,
+            ChatBehaviorService.TextShadow shadow,
+            boolean renderVisualShadowPasses,
+            FullShadowFrameCollector fullShadowCollector
     ) {
         if (alignment == ChatBehaviorService.HorizontalAlignment.LEFT
                 && shadow == ChatBehaviorService.TextShadow.VANILLA) {
@@ -72,7 +85,8 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
                 contentWidth,
                 alignment,
                 shadow,
-                renderVisualShadowPasses
+                renderVisualShadowPasses,
+                fullShadowCollector
         );
     }
 
@@ -115,14 +129,7 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
             float shadowOpacity = opacity * WRAPPED_FULL_OPACITY_SCALE;
             if (shadowOpacity > MIN_WRAPPED_FULL_PASS_OPACITY) {
                 var shadowContent = transform(content, ChatGraphicsTransform::wrappedFullShadowStyle);
-                for (var offset : WRAPPED_FULL_OFFSETS) {
-                    graphics.updatePose(matrix -> matrix.translate(offset.x(), offset.y()));
-                    try {
-                        graphics.handleMessage(y, shadowOpacity, shadowContent);
-                    } finally {
-                        graphics.updatePose(matrix -> matrix.translate(-offset.x(), -offset.y()));
-                    }
-                }
+                graphics.handleMessage(y, shadowOpacity, new BatchedFullShadowSequence(shadowContent));
             }
         }
         return graphics.handleMessage(y, opacity, mainContent);
@@ -135,17 +142,6 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
         return output -> sequence.accept((index, style, codePoint) ->
                 output.accept(index, styleTransform.apply(style), codePoint)
         );
-    }
-
-    private static List<ShadowOffset> createWrappedFullOffsets() {
-        var offsets = new ArrayList<ShadowOffset>(16);
-        for (int x = -2; x <= 2; x++) {
-            for (int y = -2; y <= 2; y++) {
-                if (x * x == y * y) continue;
-                offsets.add(new ShadowOffset(x / 2.0F, y / 2.0F));
-            }
-        }
-        return List.copyOf(offsets);
     }
 
     @Override
@@ -161,11 +157,31 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
     @Override
     public boolean handleMessage(int y, float opacity, FormattedCharSequence content) {
         lastMessageOffset = ChatRenderLayout.horizontalOffset(alignment, contentWidth, font.width(content));
-        if (lastMessageOffset == 0) return renderMessage(y, opacity, content);
+
+        if (shadow == ChatBehaviorService.TextShadow.FULL
+                && renderVisualShadowPasses
+                && fullShadowCollector != null
+                && fullShadowCollector.record(content, lastMessageOffset, y, opacity)) {
+            return renderMainText(y, opacity, content);
+        }
+
+        return renderAtCurrentOffset(() -> renderMessage(y, opacity, content));
+    }
+
+    private boolean renderMainText(int y, float opacity, FormattedCharSequence content) {
+        return renderAtCurrentOffset(() -> delegate.handleMessage(
+                y,
+                opacity,
+                applyShadow(content, ChatBehaviorService.TextShadow.FULL)
+        ));
+    }
+
+    private boolean renderAtCurrentOffset(java.util.function.BooleanSupplier renderer) {
+        if (lastMessageOffset == 0) return renderer.getAsBoolean();
 
         delegate.updatePose(matrix -> matrix.translate(lastMessageOffset, 0));
         try {
-            return renderMessage(y, opacity, content);
+            return renderer.getAsBoolean();
         } finally {
             delegate.updatePose(matrix -> matrix.translate(-lastMessageOffset, 0));
         }
@@ -198,6 +214,4 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
             delegate.updatePose(matrix -> matrix.translate(-offset, 0));
         }
     }
-
-    private record ShadowOffset(float x, float y) {}
 }

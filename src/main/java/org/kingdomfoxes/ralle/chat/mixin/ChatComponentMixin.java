@@ -3,6 +3,8 @@ package org.kingdomfoxes.ralle.chat.mixin;
 import net.minecraft.client.GuiMessage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ActiveTextCollector;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.util.Mth;
 import org.kingdomfoxes.ralle.RalleClient;
@@ -10,6 +12,8 @@ import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatGraphicsTransform;
 import org.kingdomfoxes.ralle.chat.ChatMessageProjector;
 import org.kingdomfoxes.ralle.chat.ChatRenderLayout;
+import org.kingdomfoxes.ralle.chat.render.FullShadowFrameCollector;
+import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -33,6 +37,63 @@ abstract class ChatComponentMixin {
 
     private boolean ralle$refreshingMessages;
     @Unique private boolean ralle$capturingClickableText;
+    @Unique private FullShadowFrameCollector ralle$fullShadowCollector;
+
+    @Inject(
+            method = "render(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/gui/Font;IIIZZ)V",
+            at = @At("HEAD"),
+            require = 0
+    )
+    private void ralle$startFullShadowFrame(
+            GuiGraphics graphics,
+            Font font,
+            int guiTick,
+            int mouseX,
+            int mouseY,
+            boolean focused,
+            boolean changeCursorOnInsertions,
+            CallbackInfo callback
+    ) {
+        ralle$fullShadowCollector = null;
+        var behavior = RalleClient.context().chatBehavior();
+        if (behavior.textShadow() != ChatBehaviorService.TextShadow.FULL
+                || !FullShadowRenderingStrategy.compositorAvailable()) {
+            return;
+        }
+
+        double scale = Math.max(0.01, minecraft.options.chatScale().get());
+        int canvasHeight = RalleClient.context().chatLayout().activeCustomBounds()
+                .map(RalleClient.context().chatLayout()::customRenderCanvasHeight)
+                .orElse(graphics.guiHeight());
+        int localBottom = Mth.floor((canvasHeight - 40) / scale);
+        int lineHeight = (int) (9 * (minecraft.options.chatLineSpacing().get() + 1.0));
+        int localHeight = Math.max(1, ((ChatComponent) (Object) this).getLinesPerPage() * lineHeight);
+        ralle$fullShadowCollector = new FullShadowFrameCollector(
+                graphics,
+                font,
+                ralle$renderContentWidth(),
+                localBottom - localHeight,
+                localBottom
+        );
+    }
+
+    @Inject(
+            method = "render(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/gui/Font;IIIZZ)V",
+            at = @At("RETURN"),
+            require = 0
+    )
+    private void ralle$finishFullShadowFrame(
+            GuiGraphics graphics,
+            Font font,
+            int guiTick,
+            int mouseX,
+            int mouseY,
+            boolean focused,
+            boolean changeCursorOnInsertions,
+            CallbackInfo callback
+    ) {
+        ralle$fullShadowCollector = null;
+    }
 
     @Inject(method = "captureClickableText", at = @At("HEAD"), require = 0)
     private void ralle$startClickableTextCapture(
@@ -114,7 +175,8 @@ abstract class ChatComponentMixin {
                 ralle$renderContentWidth(),
                 behavior.horizontalAlignment(),
                 behavior.textShadow(),
-                !ralle$capturingClickableText
+                !ralle$capturingClickableText,
+                ralle$capturingClickableText ? null : ralle$fullShadowCollector
         );
     }
 

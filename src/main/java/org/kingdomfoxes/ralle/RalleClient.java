@@ -10,6 +10,7 @@ import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
+import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
 import org.kingdomfoxes.ralle.settings.RalleSettings;
 import org.kingdomfoxes.ralle.ui.owo.OwoSettingsScreenFactory;
 import org.kingdomfoxes.ralle.ui.owo.RaidLfgScreen;
@@ -23,6 +24,8 @@ public final class RalleClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        FullShadowRenderingStrategy.registerCompositor();
+
         var features = new FeatureRegistry();
         var configDirectory = FabricLoader.getInstance().getConfigDir();
         var settings = new SettingsRegistry(configDirectory.resolve("ralle.properties"));
