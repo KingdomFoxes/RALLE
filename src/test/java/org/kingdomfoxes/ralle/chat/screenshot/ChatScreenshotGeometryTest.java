@@ -37,8 +37,18 @@ class ChatScreenshotGeometryTest {
         var snapshot = snapshot(ChatBehaviorService.MessageDirection.BOTTOM_UP);
         var range = ChatScreenshotGeometry.selectedLines(snapshot, 2, 1);
 
-        assertEquals(new ChatScreenshotGeometry.Rectangle(10, 0, 110, 30),
+        assertEquals(new ChatScreenshotGeometry.Rectangle(10, 0, 110, 32),
                 ChatScreenshotGeometry.visibleBounds(snapshot, 0, range));
+    }
+
+    @Test
+    void selectionBoundsAddTwoLogicalPixelsPerSideWithoutEscapingTheViewport() {
+        var snapshot = snapshot(ChatBehaviorService.MessageDirection.TOP_DOWN);
+
+        assertEquals(new ChatScreenshotGeometry.Rectangle(10, 8, 110, 32),
+                ChatScreenshotGeometry.visibleBounds(snapshot, 0, new ChatScreenshotGeometry.LineRange(1, 2)));
+        assertEquals(24, ChatScreenshotGeometry.captureVisualHeight(2, 10, 1.0));
+        assertEquals(14, ChatScreenshotGeometry.captureVisualHeight(2, 5, 1.0));
     }
 
     @Test

@@ -15,22 +15,30 @@ import org.kingdomfoxes.ralle.chat.ChatRenderLayout;
 import org.kingdomfoxes.ralle.chat.mixin.GameRendererAccessor;
 import org.kingdomfoxes.ralle.chat.render.FullShadowFrameCollector;
 
-import java.awt.image.BufferedImage;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 /** Re-renders frozen chat lines into a transparent GPU target and transfers the result locally. */
 public final class TransparentChatCapture implements ChatScreenshotCapture {
     private static final int PARTIAL_FULL_SHADOW = 0xFF000000;
+    private static final Executor CLIPBOARD_EXECUTOR = Executors.newSingleThreadExecutor(task -> {
+        Thread thread = new Thread(task, "RALLE image clipboard");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private final Minecraft minecraft;
-    private final PngImageClipboard clipboard;
+    private final PlatformImageClipboard clipboard;
+    private final Executor clipboardExecutor;
 
     public TransparentChatCapture(Minecraft minecraft) {
-        this(minecraft, new PngImageClipboard());
+        this(minecraft, PlatformImageClipboard.systemDefault(), CLIPBOARD_EXECUTOR);
     }
 
-    TransparentChatCapture(Minecraft minecraft, PngImageClipboard clipboard) {
+    TransparentChatCapture(Minecraft minecraft, PlatformImageClipboard clipboard, Executor clipboardExecutor) {
         this.minecraft = minecraft;
         this.clipboard = clipboard;
+        this.clipboardExecutor = clipboardExecutor;
     }
 
     @Override
@@ -39,7 +47,9 @@ public final class TransparentChatCapture implements ChatScreenshotCapture {
             TextureTarget target = null;
             try {
                 int density = Math.max(1, minecraft.getWindow().getGuiScale());
-                int visualHeight = Math.max(1, (int) Math.ceil(request.lines().size() * request.lineHeight() * request.chatScale()));
+                int visualHeight = ChatScreenshotGeometry.captureVisualHeight(
+                        request.lines().size(), request.lineHeight(), request.chatScale()
+                );
                 int pixelWidth = Math.max(1, request.visualWidth() * density);
                 int pixelHeight = Math.max(1, visualHeight * density);
                 target = new TextureTarget("RALLE transparent chat capture", pixelWidth, pixelHeight, false);
@@ -52,6 +62,7 @@ public final class TransparentChatCapture implements ChatScreenshotCapture {
                 float projectionCompensationY = minecraft.getWindow().getGuiScaledHeight() / (float) visualHeight;
                 graphics.pose().scale(projectionCompensationX, projectionCompensationY);
                 graphics.pose().scale((float) request.chatScale(), (float) request.chatScale());
+                graphics.pose().translate(0.0F, (float) (ChatScreenshotTokens.VERTICAL_PADDING / request.chatScale()));
                 renderLines(graphics, request);
 
                 TextureTarget finalTarget = target;
@@ -131,8 +142,8 @@ public final class TransparentChatCapture implements ChatScreenshotCapture {
                             image.setPixelABGR(x, height - y - 1, abgr);
                         }
                     }
-                    clipboard.copy(toStraightAlphaImage(image));
-                    completion.succeeded();
+                    byte[] rgba = toStraightAlphaRgba(image);
+                    clipboardExecutor.execute(() -> publish(width, height, rgba, completion));
                 }
             } catch (Throwable error) {
                 completion.failed(error);
@@ -142,8 +153,17 @@ public final class TransparentChatCapture implements ChatScreenshotCapture {
         }, 0);
     }
 
-    static BufferedImage toStraightAlphaImage(NativeImage source) {
-        BufferedImage image = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_ARGB);
+    private void publish(int width, int height, byte[] rgba, Completion completion) {
+        try {
+            clipboard.publish(new ClipboardImage(PngEncoder.encode(width, height, rgba), width, height, rgba));
+            completion.succeeded();
+        } catch (Throwable error) {
+            completion.failed(error);
+        }
+    }
+
+    static byte[] toStraightAlphaRgba(NativeImage source) {
+        byte[] rgba = new byte[Math.multiplyExact(Math.multiplyExact(source.getWidth(), source.getHeight()), 4)];
         for (int y = 0; y < source.getHeight(); y++) {
             for (int x = 0; x < source.getWidth(); x++) {
                 int argb = source.getPixel(x, y);
@@ -154,10 +174,14 @@ public final class TransparentChatCapture implements ChatScreenshotCapture {
                     int blue = Math.min(255, (argb & 0xFF) * 255 / alpha);
                     argb = alpha << 24 | red << 16 | green << 8 | blue;
                 }
-                image.setRGB(x, y, argb);
+                int offset = (x + y * source.getWidth()) * 4;
+                rgba[offset] = (byte) (argb >>> 16);
+                rgba[offset + 1] = (byte) (argb >>> 8);
+                rgba[offset + 2] = (byte) argb;
+                rgba[offset + 3] = (byte) alpha;
             }
         }
-        return image;
+        return rgba;
     }
 
     private static FormattedCharSequence transform(FormattedCharSequence sequence, java.util.function.UnaryOperator<Style> transform) {

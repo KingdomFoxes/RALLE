@@ -58,7 +58,17 @@ public final class ChatScreenshotGeometry {
         top = Math.max(snapshot.viewportTop(), top);
         bottom = Math.min(snapshot.viewportBottom(), bottom);
         if (bottom <= top) return new Rectangle(snapshot.viewportLeft(), snapshot.viewportTop(), snapshot.viewportRight(), snapshot.viewportTop());
+        top = Math.max(snapshot.viewportTop(), top - ChatScreenshotTokens.VERTICAL_PADDING);
+        bottom = Math.min(snapshot.viewportBottom(), bottom + ChatScreenshotTokens.VERTICAL_PADDING);
         return new Rectangle(snapshot.viewportLeft(), top, snapshot.viewportRight(), bottom);
+    }
+
+    public static int captureVisualHeight(int lineCount, int lineHeight, double chatScale) {
+        if (lineCount < 1 || lineHeight < 1 || chatScale <= 0) throw new IllegalArgumentException("Invalid capture dimensions");
+        return Math.addExact(
+                (int) Math.ceil(lineCount * lineHeight * chatScale),
+                ChatScreenshotTokens.VERTICAL_PADDING * 2
+        );
     }
 
     public static double cubicEaseOut(double progress) {

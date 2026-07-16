@@ -11,6 +11,7 @@ import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotGeometry.LineRange;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotGeometry.Rectangle;
 
 import java.util.ArrayList;
+import java.util.OptionalInt;
 
 public final class ChatScreenshotService {
     public enum State { IDLE, DRAGGING, PREVIEW, COPYING }
@@ -34,9 +35,8 @@ public final class ChatScreenshotService {
     private Rectangle animationFrom;
     private Rectangle targetBounds;
     private long animationStarted;
-    private int edgeDirection;
-    private long edgeEnteredAt;
-    private long lastEdgeScrollAt;
+    private final ChatSelectionAutoscroll autoscroll = new ChatSelectionAutoscroll();
+    private long copyGeneration;
 
     public ChatScreenshotService(Minecraft minecraft, SettingsRegistry settings, ChatScreenshotCapture capture) {
         this.minecraft = minecraft;
@@ -106,7 +106,7 @@ public final class ChatScreenshotService {
     }
 
     private void stopOrFinalize() {
-        resetEdgeAutoscroll();
+        autoscroll.reset();
         if (!leftHeld && !controlHeld) {
             state = State.PREVIEW;
             targetBounds = calculateBounds();
@@ -124,18 +124,20 @@ public final class ChatScreenshotService {
 
     public void cancel() {
         boolean wasActive = active();
+        copyGeneration++;
         state = State.IDLE;
         source = null;
         snapshot = null;
         targetBounds = null;
         animationFrom = null;
-        resetEdgeAutoscroll();
+        autoscroll.reset();
         if (wasActive && minecraft.gui != null) minecraft.gui.getChat().rescaleChat();
     }
 
     public boolean copyPreview() {
         if (state != State.PREVIEW) return false;
         state = State.COPYING;
+        long generation = ++copyGeneration;
         LineRange range = selectedRange();
         var lines = new ArrayList<net.minecraft.util.FormattedCharSequence>(range.count());
         if (snapshot.direction() == ChatBehaviorService.MessageDirection.TOP_DOWN) {
@@ -153,9 +155,14 @@ public final class ChatScreenshotService {
                 snapshot.alignment(),
                 snapshot.shadow()
         ), new ChatScreenshotCapture.Completion() {
-            @Override public void succeeded() { minecraft.execute(ChatScreenshotService.this::cancel); }
+            @Override public void succeeded() {
+                minecraft.execute(() -> {
+                    if (generation == copyGeneration && state == State.COPYING) cancel();
+                });
+            }
             @Override public void failed(Throwable error) {
                 minecraft.execute(() -> {
+                    if (generation != copyGeneration || state != State.COPYING) return;
                     state = State.PREVIEW;
                     if (minecraft.gui != null) {
                         minecraft.gui.getChat().addMessage(Component.translatable("ralle.chat-screenshot.copy-failed", safeMessage(error)));
@@ -172,37 +179,26 @@ public final class ChatScreenshotService {
             return;
         }
         if (state != State.DRAGGING || !controlHeld || !leftHeld || snapshot == null) {
-            resetEdgeAutoscroll();
+            autoscroll.reset();
             return;
         }
 
-        int direction = edgeDirection(pointerY);
         long now = now();
-        if (direction == 0) {
-            resetEdgeAutoscroll();
-            return;
-        }
-        if (direction != edgeDirection) {
-            edgeDirection = direction;
-            edgeEnteredAt = now;
-            lastEdgeScrollAt = now;
-            return;
-        }
-        if (now - edgeEnteredAt < ChatScreenshotTokens.EDGE_DELAY_MILLIS
-                || now - lastEdgeScrollAt < ChatScreenshotTokens.EDGE_REPEAT_MILLIS) return;
+        OptionalInt nextAmount = autoscroll.nextAmount(snapshot, pointerX, pointerY, now);
+        if (nextAmount.isEmpty()) return;
 
-        int amount = direction;
+        int amount = nextAmount.getAsInt();
         int maximumSnapshotScroll = Math.max(0, snapshot.lines().size() - snapshot.linesPerPage());
         int desiredSnapshotScroll = snapshotScroll + amount;
         if (desiredSnapshotScroll < 0 || desiredSnapshotScroll > maximumSnapshotScroll) return;
         int before = source.ralle$screenshotScroll();
         source.ralle$selectionAutoscroll(amount);
         int after = source.ralle$screenshotScroll();
-        lastEdgeScrollAt = now;
         if (after != before) {
             snapshotScroll += after - before;
             snapshotScroll = Math.max(0, Math.min(snapshotScroll, maximumSnapshotScroll));
-            updateRangeAtPointer();
+            var hit = autoscroll.clampedHitPoint(snapshot, pointerX);
+            updateRangeAtPointer(hit.x(), hit.y());
         }
     }
 
@@ -226,7 +222,11 @@ public final class ChatScreenshotService {
     }
 
     private void updateRangeAtPointer() {
-        var message = ChatScreenshotGeometry.messageAt(snapshot, snapshotScroll, pointerX, pointerY);
+        updateRangeAtPointer(pointerX, pointerY);
+    }
+
+    private void updateRangeAtPointer(double x, double y) {
+        var message = ChatScreenshotGeometry.messageAt(snapshot, snapshotScroll, x, y);
         if (message.isEmpty() || message.getAsInt() == currentMessage) return;
         Rectangle before = currentBounds();
         currentMessage = message.getAsInt();
@@ -251,20 +251,6 @@ public final class ChatScreenshotService {
         int top = interpolate(animationFrom.top(), targetBounds.top(), eased);
         int bottom = interpolate(animationFrom.bottom(), targetBounds.bottom(), eased);
         return new Rectangle(targetBounds.left(), top, targetBounds.right(), bottom);
-    }
-
-    private int edgeDirection(double y) {
-        boolean top = y >= snapshot.viewportTop() && y < snapshot.viewportTop() + ChatScreenshotTokens.EDGE_BAND;
-        boolean bottom = y <= snapshot.viewportBottom() && y > snapshot.viewportBottom() - ChatScreenshotTokens.EDGE_BAND;
-        if (!top && !bottom) return 0;
-        if (snapshot.direction() == ChatBehaviorService.MessageDirection.TOP_DOWN) return top ? -1 : 1;
-        return top ? 1 : -1;
-    }
-
-    private void resetEdgeAutoscroll() {
-        edgeDirection = 0;
-        edgeEnteredAt = 0;
-        lastEdgeScrollAt = 0;
     }
 
     private static void drawSolid(GuiGraphics graphics, Rectangle bounds) {
