@@ -63,5 +63,6 @@
   "ralle.chat-layout.show-grid.description": "Shows the 10-pixel placement grid across the screen.",
   "ralle.chat-layout.position-info.description": "Shows compact coordinates and dimensions inside the selected element.",
   "ralle.chat-layout.reset": "Reset Changes",
+  "ralle.chat-screenshot.copied": "Copied screenshot",
   "ralle.chat-screenshot.copy-failed": "RALLE could not copy the chat image: %s. The selection was kept; check clipboard access and try again."
 }

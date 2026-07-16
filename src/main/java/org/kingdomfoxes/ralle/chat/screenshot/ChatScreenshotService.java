@@ -4,6 +4,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FontDescription;
+import net.minecraft.resources.Identifier;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
@@ -15,7 +17,11 @@ import java.util.ArrayList;
 import java.util.OptionalInt;
 
 public final class ChatScreenshotService {
-    public enum State { IDLE, DRAGGING, PREVIEW, COPYING }
+    public enum State { IDLE, DRAGGING, PREVIEW, COPYING, COPIED_FADING }
+
+    private static final FontDescription CONFIRMATION_FONT = new FontDescription.Resource(
+            Identifier.fromNamespaceAndPath("ralle", "karla_bold_ui_small")
+    );
 
     private final Minecraft minecraft;
     private final BooleanSetting chatEnabled;
@@ -24,7 +30,7 @@ public final class ChatScreenshotService {
     private final ChatScreenshotCapture capture;
     private final ChatSelectionSoundFeedback soundFeedback;
 
-    private State state = State.IDLE;
+    private final ChatScreenshotLifecycle lifecycle = new ChatScreenshotLifecycle();
     private ChatScreenshotSource source;
     private ChatScreenshotSnapshot snapshot;
     private int snapshotScroll;
@@ -59,15 +65,15 @@ public final class ChatScreenshotService {
     }
 
     public State state() {
-        return state;
+        return lifecycle.state();
     }
 
     public boolean active() {
-        return state != State.IDLE;
+        return lifecycle.active();
     }
 
     public boolean stabilizesIncomingMessages() {
-        return state == State.DRAGGING || state == State.PREVIEW || state == State.COPYING;
+        return lifecycle.stabilizesIncomingMessages();
     }
 
     public boolean begin(ChatScreenshotSource source, double x, double y) {
@@ -87,7 +93,7 @@ public final class ChatScreenshotService {
         this.leftHeld = true;
         this.pointerX = x;
         this.pointerY = y;
-        this.state = State.DRAGGING;
+        this.lifecycle.beginDragging();
         this.targetBounds = calculateBounds();
         this.animationFrom = targetBounds;
         this.animationStarted = now();
@@ -98,18 +104,18 @@ public final class ChatScreenshotService {
     public void drag(double x, double y) {
         pointerX = x;
         pointerY = y;
-        if (state != State.DRAGGING || !controlHeld || !leftHeld) return;
+        if (state() != State.DRAGGING || !controlHeld || !leftHeld) return;
         updateRangeAtPointer();
     }
 
     public void releaseLeft() {
-        if (state != State.DRAGGING) return;
+        if (state() != State.DRAGGING) return;
         leftHeld = false;
         stopOrFinalize();
     }
 
     public void releaseControl(boolean anyControlStillDown) {
-        if (state != State.DRAGGING) return;
+        if (state() != State.DRAGGING) return;
         controlHeld = anyControlStillDown;
         if (!controlHeld) stopOrFinalize();
     }
@@ -117,14 +123,14 @@ public final class ChatScreenshotService {
     private void stopOrFinalize() {
         autoscroll.reset();
         if (!leftHeld && !controlHeld) {
-            state = State.PREVIEW;
+            lifecycle.showPreview();
             targetBounds = calculateBounds();
             animationFrom = targetBounds;
         }
     }
 
     public boolean previewContains(double x, double y) {
-        return state == State.PREVIEW && targetBounds != null && targetBounds.contains(x, y);
+        return state() == State.PREVIEW && targetBounds != null && targetBounds.contains(x, y);
     }
 
     public void cancelForManualScroll() {
@@ -134,7 +140,7 @@ public final class ChatScreenshotService {
     public void cancel() {
         boolean wasActive = active();
         copyGeneration++;
-        state = State.IDLE;
+        lifecycle.cancel();
         source = null;
         snapshot = null;
         targetBounds = null;
@@ -145,8 +151,8 @@ public final class ChatScreenshotService {
     }
 
     public boolean copyPreview() {
-        if (state != State.PREVIEW) return false;
-        state = State.COPYING;
+        if (state() != State.PREVIEW) return false;
+        lifecycle.beginCopying();
         long generation = ++copyGeneration;
         LineRange range = selectedRange();
         var lines = new ArrayList<net.minecraft.util.FormattedCharSequence>(range.count());
@@ -167,16 +173,16 @@ public final class ChatScreenshotService {
         ), new ChatScreenshotCapture.Completion() {
             @Override public void succeeded() {
                 minecraft.execute(() -> {
-                    if (generation == copyGeneration && state == State.COPYING) {
+                    if (generation == copyGeneration && state() == State.COPYING) {
                         soundFeedback.copySucceeded();
-                        cancel();
+                        lifecycle.copySucceeded(now());
                     }
                 });
             }
             @Override public void failed(Throwable error) {
                 minecraft.execute(() -> {
-                    if (generation != copyGeneration || state != State.COPYING) return;
-                    state = State.PREVIEW;
+                    if (generation != copyGeneration || state() != State.COPYING) return;
+                    lifecycle.copyFailed();
                     if (minecraft.gui != null) {
                         minecraft.gui.getChat().addMessage(Component.translatable("ralle.chat-screenshot.copy-failed", safeMessage(error)));
                     }
@@ -192,7 +198,11 @@ public final class ChatScreenshotService {
             cancel();
             return;
         }
-        if (state != State.DRAGGING || !controlHeld || !leftHeld || snapshot == null) {
+        if (lifecycle.copiedFadeFinished(now())) {
+            cancel();
+            return;
+        }
+        if (state() != State.DRAGGING || !controlHeld || !leftHeld || snapshot == null) {
             autoscroll.reset();
             return;
         }
@@ -223,15 +233,25 @@ public final class ChatScreenshotService {
         int right = Math.max(left + 1, (int) Math.ceil(snapshot.visualWidth() / snapshot.chatScale()) - 4);
         int top = (int) Math.floor(bounds.top() / snapshot.chatScale());
         int bottom = (int) Math.ceil(bounds.bottom() / snapshot.chatScale());
-        graphics.fill(left, top, right, bottom, ChatScreenshotTokens.SELECTION_FILL);
+        float opacity = lifecycle.overlayOpacity(now());
+        if (opacity <= 0.0F) return;
+        graphics.fill(left, top, right, bottom,
+                ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.SELECTION_FILL, opacity));
     }
 
     public void renderOutline(GuiGraphics graphics) {
         Rectangle bounds = currentBounds();
         if (bounds == null || bounds.height() == 0) return;
+        long now = now();
+        float opacity = lifecycle.overlayOpacity(now);
+        if (opacity <= 0.0F) return;
+        int outlineColor = ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.SELECTION_GOLD, opacity);
         graphics.enableScissor(snapshot.viewportLeft(), snapshot.viewportTop(), snapshot.viewportRight(), snapshot.viewportBottom());
-        if (state == State.DRAGGING) drawSolid(graphics, bounds);
-        else drawDashed(graphics, bounds, (int) ((now() / 60L) % (ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP)));
+        if (state() == State.DRAGGING) drawSolid(graphics, bounds, outlineColor);
+        else drawDashed(graphics, bounds,
+                (int) ((now / 60L) % (ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP)),
+                outlineColor);
+        if (state() == State.COPIED_FADING) drawCopiedConfirmation(graphics, bounds, opacity);
         graphics.disableScissor();
     }
 
@@ -260,7 +280,7 @@ public final class ChatScreenshotService {
 
     private Rectangle currentBounds() {
         if (targetBounds == null) return null;
-        if (state != State.DRAGGING || !smoothExpansion.value() || animationFrom == null) return targetBounds;
+        if (state() != State.DRAGGING || !smoothExpansion.value() || animationFrom == null) return targetBounds;
         double progress = (now() - animationStarted) / (double) ChatScreenshotTokens.EXPANSION_MILLIS;
         double eased = ChatScreenshotGeometry.cubicEaseOut(progress);
         int top = interpolate(animationFrom.top(), targetBounds.top(), eased);
@@ -268,33 +288,78 @@ public final class ChatScreenshotService {
         return new Rectangle(targetBounds.left(), top, targetBounds.right(), bottom);
     }
 
-    private static void drawSolid(GuiGraphics graphics, Rectangle bounds) {
-        int color = ChatScreenshotTokens.SELECTION_GOLD;
+    private static void drawSolid(GuiGraphics graphics, Rectangle bounds, int color) {
         graphics.fill(bounds.left(), bounds.top(), bounds.right(), bounds.top() + 1, color);
         graphics.fill(bounds.left(), bounds.bottom() - 1, bounds.right(), bounds.bottom(), color);
         graphics.fill(bounds.left(), bounds.top(), bounds.left() + 1, bounds.bottom(), color);
         graphics.fill(bounds.right() - 1, bounds.top(), bounds.right(), bounds.bottom(), color);
     }
 
-    private static void drawDashed(GuiGraphics graphics, Rectangle bounds, int phase) {
+    private static void drawDashed(GuiGraphics graphics, Rectangle bounds, int phase, int color) {
         int width = bounds.width();
         int height = bounds.height();
         for (int x = -phase; x < width; x += ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP) {
             int start = Math.max(0, x);
             int end = Math.min(width, x + ChatScreenshotTokens.DASH_LENGTH);
             if (end > start) {
-                graphics.fill(bounds.left() + start, bounds.top(), bounds.left() + end, bounds.top() + 1, ChatScreenshotTokens.SELECTION_GOLD);
-                graphics.fill(bounds.left() + start, bounds.bottom() - 1, bounds.left() + end, bounds.bottom(), ChatScreenshotTokens.SELECTION_GOLD);
+                graphics.fill(bounds.left() + start, bounds.top(), bounds.left() + end, bounds.top() + 1, color);
+                graphics.fill(bounds.left() + start, bounds.bottom() - 1, bounds.left() + end, bounds.bottom(), color);
             }
         }
         for (int y = -phase; y < height; y += ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP) {
             int start = Math.max(0, y);
             int end = Math.min(height, y + ChatScreenshotTokens.DASH_LENGTH);
             if (end > start) {
-                graphics.fill(bounds.left(), bounds.top() + start, bounds.left() + 1, bounds.top() + end, ChatScreenshotTokens.SELECTION_GOLD);
-                graphics.fill(bounds.right() - 1, bounds.top() + start, bounds.right(), bounds.top() + end, ChatScreenshotTokens.SELECTION_GOLD);
+                graphics.fill(bounds.left(), bounds.top() + start, bounds.left() + 1, bounds.top() + end, color);
+                graphics.fill(bounds.right() - 1, bounds.top() + start, bounds.right(), bounds.top() + end, color);
             }
         }
+    }
+
+    private void drawCopiedConfirmation(GuiGraphics graphics, Rectangle selection, float opacity) {
+        Component label = Component.translatable("ralle.chat-screenshot.copied")
+                .withStyle(style -> style.withFont(CONFIRMATION_FONT));
+        int textWidth = minecraft.font.width(label);
+        int textHeight = minecraft.font.lineHeight;
+        int faceWidth = textWidth + ChatScreenshotTokens.CONFIRMATION_HORIZONTAL_PADDING * 2
+                + ChatScreenshotTokens.OUTLINE_WIDTH * 2;
+        int faceHeight = textHeight + ChatScreenshotTokens.CONFIRMATION_VERTICAL_PADDING * 2
+                + ChatScreenshotTokens.OUTLINE_WIDTH * 2;
+        int outerWidth = faceWidth + ChatScreenshotTokens.CONFIRMATION_DEPTH;
+        int outerHeight = faceHeight + ChatScreenshotTokens.CONFIRMATION_DEPTH;
+
+        int left = centeredPosition(selection.left(), selection.right(), outerWidth,
+                snapshot.viewportLeft(), snapshot.viewportRight());
+        int top = centeredPosition(selection.top(), selection.bottom(), outerHeight,
+                snapshot.viewportTop(), snapshot.viewportBottom());
+        int faceRight = left + faceWidth;
+        int faceBottom = top + faceHeight;
+
+        graphics.fill(left, top, left + outerWidth, top + outerHeight,
+                ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.CONFIRMATION_DEPTH_COLOR, opacity));
+        graphics.fill(left, top, faceRight, faceBottom,
+                ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.CONFIRMATION_FILL, opacity));
+
+        int gold = ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.SELECTION_GOLD, opacity);
+        int highlight = ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.CONFIRMATION_HIGHLIGHT, opacity);
+        graphics.fill(left, top, faceRight, top + 1, highlight);
+        graphics.fill(left, top, left + 1, faceBottom, highlight);
+        graphics.fill(left, faceBottom - 1, faceRight, faceBottom, gold);
+        graphics.fill(faceRight - 1, top, faceRight, faceBottom, gold);
+
+        int textX = left + ChatScreenshotTokens.OUTLINE_WIDTH
+                + ChatScreenshotTokens.CONFIRMATION_HORIZONTAL_PADDING;
+        int textY = top + ChatScreenshotTokens.OUTLINE_WIDTH
+                + ChatScreenshotTokens.CONFIRMATION_VERTICAL_PADDING;
+        graphics.drawString(minecraft.font, label, textX, textY,
+                ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.CONFIRMATION_TEXT, opacity), false);
+    }
+
+    private static int centeredPosition(int contentStart, int contentEnd, int size, int viewportStart, int viewportEnd) {
+        int centered = contentStart + (contentEnd - contentStart - size) / 2;
+        int viewportSize = viewportEnd - viewportStart;
+        if (size > viewportSize) return centered;
+        return Math.max(viewportStart, Math.min(centered, viewportEnd - size));
     }
 
     private static int interpolate(int from, int to, double progress) {
