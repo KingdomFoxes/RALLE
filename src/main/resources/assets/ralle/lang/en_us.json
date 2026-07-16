@@ -15,6 +15,8 @@
   "ralle.settings.option.edit-chat-layout.description": "Opens the HUD layout editor for moving, resizing, or restoring the single chat box.",
   "ralle.settings.option.chat-screenshot-enabled": "Enable Chat Screenshotting",
   "ralle.settings.option.chat-screenshot-enabled.description": "While chat is open, hold either Ctrl key and left-drag across messages to prepare a transparent chat image. Ctrl+C or double-click copies it.",
+  "ralle.settings.option.chat-selection-sounds": "Chat Selection Sounds",
+  "ralle.settings.option.chat-selection-sounds.description": "Plays restrained xylophone feedback as the selected message count changes and after a chat image is copied successfully.",
   "ralle.settings.option.chat-screenshot-smooth-expansion": "Smooth Selection Expansion",
   "ralle.settings.option.chat-screenshot-smooth-expansion.description": "Animates screenshot selection height changes over 120 milliseconds instead of snapping immediately.",
   "ralle.settings.option.compact-chat": "Compact Chat",

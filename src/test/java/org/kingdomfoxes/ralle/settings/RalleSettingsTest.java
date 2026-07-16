@@ -32,6 +32,7 @@ class RalleSettingsTest {
         RalleSettings.register(registry);
 
         assertEquals(false, registry.setting("chat-screenshot-enabled", BooleanSetting.class).value());
+        assertEquals(false, registry.setting("chat-selection-sounds", BooleanSetting.class).value());
         assertEquals(false, registry.setting("chat-screenshot-smooth-expansion", BooleanSetting.class).value());
     }
 }

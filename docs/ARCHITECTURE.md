@@ -30,6 +30,11 @@ platform ports. It must not depend on a concrete settings screen.
   session-stable batched glyph fallback preserves the visual effect without
   affecting other chat modes or Raid LFG. Local chat customization is available
   in singleplayer and on any multiplayer server.
+- `sound`: client-only registered UI sound events and playback adapters. Chat
+  selection injects this narrow port, while its Minecraft implementation owns
+  parent-setting gates, count-to-cue mapping, rate limiting, and coalescing.
+  Packaged RALLE sounds use original processed-xylophone assets and perform no
+  network activity.
 - `lfg`: future protocol, authentication, live connection, lobby domain, and
   party-automation boundary. It must remain inert until explicitly enabled.
 - `platform`: future Fabric/Minecraft adapters such as commands, keybinds,

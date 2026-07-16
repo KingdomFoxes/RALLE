@@ -9,6 +9,7 @@ import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotGeometry.LineRange;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotGeometry.Rectangle;
+import org.kingdomfoxes.ralle.sound.ChatSelectionSoundPlayer;
 
 import java.util.ArrayList;
 import java.util.OptionalInt;
@@ -21,6 +22,7 @@ public final class ChatScreenshotService {
     private final BooleanSetting screenshotEnabled;
     private final BooleanSetting smoothExpansion;
     private final ChatScreenshotCapture capture;
+    private final ChatSelectionSoundFeedback soundFeedback;
 
     private State state = State.IDLE;
     private ChatScreenshotSource source;
@@ -38,12 +40,18 @@ public final class ChatScreenshotService {
     private final ChatSelectionAutoscroll autoscroll = new ChatSelectionAutoscroll();
     private long copyGeneration;
 
-    public ChatScreenshotService(Minecraft minecraft, SettingsRegistry settings, ChatScreenshotCapture capture) {
+    public ChatScreenshotService(
+            Minecraft minecraft,
+            SettingsRegistry settings,
+            ChatScreenshotCapture capture,
+            ChatSelectionSoundPlayer soundPlayer
+    ) {
         this.minecraft = minecraft;
         this.chatEnabled = settings.setting("chat-enabled", BooleanSetting.class);
         this.screenshotEnabled = settings.setting("chat-screenshot-enabled", BooleanSetting.class);
         this.smoothExpansion = settings.setting("chat-screenshot-smooth-expansion", BooleanSetting.class);
         this.capture = capture;
+        this.soundFeedback = new ChatSelectionSoundFeedback(soundPlayer);
     }
 
     public boolean enabled() {
@@ -83,6 +91,7 @@ public final class ChatScreenshotService {
         this.targetBounds = calculateBounds();
         this.animationFrom = targetBounds;
         this.animationStarted = now();
+        soundFeedback.selectionChanged(anchorMessage, currentMessage);
         return true;
     }
 
@@ -131,6 +140,7 @@ public final class ChatScreenshotService {
         targetBounds = null;
         animationFrom = null;
         autoscroll.reset();
+        soundFeedback.reset();
         if (wasActive && minecraft.gui != null) minecraft.gui.getChat().rescaleChat();
     }
 
@@ -157,7 +167,10 @@ public final class ChatScreenshotService {
         ), new ChatScreenshotCapture.Completion() {
             @Override public void succeeded() {
                 minecraft.execute(() -> {
-                    if (generation == copyGeneration && state == State.COPYING) cancel();
+                    if (generation == copyGeneration && state == State.COPYING) {
+                        soundFeedback.copySucceeded();
+                        cancel();
+                    }
                 });
             }
             @Override public void failed(Throwable error) {
@@ -174,6 +187,7 @@ public final class ChatScreenshotService {
     }
 
     public void tick() {
+        soundFeedback.tick();
         if (!enabled()) {
             cancel();
             return;
@@ -233,6 +247,7 @@ public final class ChatScreenshotService {
         animationFrom = before == null ? calculateBounds() : before;
         targetBounds = calculateBounds();
         animationStarted = now();
+        soundFeedback.selectionChanged(anchorMessage, currentMessage);
     }
 
     private Rectangle calculateBounds() {

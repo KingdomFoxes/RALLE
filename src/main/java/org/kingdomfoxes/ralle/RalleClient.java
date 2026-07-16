@@ -14,6 +14,8 @@ import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotService;
 import org.kingdomfoxes.ralle.chat.screenshot.TransparentChatCapture;
 import org.kingdomfoxes.ralle.settings.RalleSettings;
+import org.kingdomfoxes.ralle.sound.MinecraftChatSelectionSoundPlayer;
+import org.kingdomfoxes.ralle.sound.RalleSoundEvents;
 import org.kingdomfoxes.ralle.ui.owo.OwoSettingsScreenFactory;
 import org.kingdomfoxes.ralle.ui.owo.RaidLfgScreen;
 
@@ -27,6 +29,7 @@ public final class RalleClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         FullShadowRenderingStrategy.registerCompositor();
+        RalleSoundEvents.register();
 
         var features = new FeatureRegistry();
         var configDirectory = FabricLoader.getInstance().getConfigDir();
@@ -48,7 +51,8 @@ public final class RalleClient implements ClientModInitializer {
         var chatScreenshots = new ChatScreenshotService(
                 Minecraft.getInstance(),
                 settings,
-                new TransparentChatCapture(Minecraft.getInstance())
+                new TransparentChatCapture(Minecraft.getInstance()),
+                new MinecraftChatSelectionSoundPlayer(Minecraft.getInstance(), settings)
         );
         context = new RalleContext(
                 features,

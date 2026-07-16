@@ -9,7 +9,8 @@ single chat box; placements are normalized across resolution and GUI-scale
 changes and apply in singleplayer or on any server while chat customization is
 enabled. Compact chat, empty-line stacking, message direction, horizontal text
 alignment, and text-shadow modes are implemented as independently disabled
-local options.
+local options. Transparent chat screenshot selection also supports separately
+disabled processed-xylophone count and successful-copy feedback.
 `/ralle lfg` opens a disconnected owo-lib browser prototype populated with
 fixed fake lobby data for layout evaluation. Live Raid LFG is not implemented
 yet, and every feature defaults off.

@@ -1,0 +1,35 @@
+{
+  "ui.xylophone.d5": {
+    "sounds": [{ "name": "ralle:ui/xylophone/d5" }]
+  },
+  "ui.xylophone.e5": {
+    "sounds": [{ "name": "ralle:ui/xylophone/e5" }]
+  },
+  "ui.xylophone.f_sharp_5": {
+    "sounds": [{ "name": "ralle:ui/xylophone/f_sharp_5" }]
+  },
+  "ui.xylophone.g5": {
+    "sounds": [{ "name": "ralle:ui/xylophone/g5" }]
+  },
+  "ui.xylophone.a5": {
+    "sounds": [{ "name": "ralle:ui/xylophone/a5" }]
+  },
+  "ui.xylophone.b5": {
+    "sounds": [{ "name": "ralle:ui/xylophone/b5" }]
+  },
+  "ui.xylophone.c_sharp_6": {
+    "sounds": [{ "name": "ralle:ui/xylophone/c_sharp_6" }]
+  },
+  "ui.xylophone.d6": {
+    "sounds": [{ "name": "ralle:ui/xylophone/d6" }]
+  },
+  "ui.xylophone.e6": {
+    "sounds": [{ "name": "ralle:ui/xylophone/e6" }]
+  },
+  "ui.xylophone.f_sharp_6": {
+    "sounds": [{ "name": "ralle:ui/xylophone/f_sharp_6" }]
+  },
+  "ui.chat_copy_success": {
+    "sounds": [{ "name": "ralle:ui/xylophone/chat_copy_success" }]
+  }
+}
