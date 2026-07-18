@@ -1,23 +1,28 @@
 package org.kingdomfoxes.ralle.api.settings;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
+import java.util.Optional;
 import java.util.Properties;
-import java.util.HashSet;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public final class SettingsRegistry {
     private static final Logger LOGGER = LoggerFactory.getLogger(SettingsRegistry.class);
     private final Map<String, SettingsCategory> categories = new LinkedHashMap<>();
+    private final Map<String, List<String>> dependencies = new LinkedHashMap<>();
     private final Path storagePath;
     private boolean sealed;
 
@@ -32,30 +37,74 @@ public final class SettingsRegistry {
             throw new IllegalArgumentException("Duplicate settings category id: " + category.id());
         }
 
-        var settingIds = new HashSet<String>();
-        categories.values().stream()
-                .flatMap(registeredCategory -> registeredCategory.entries().stream())
-                .map(SettingsEntry::id)
-                .forEach(settingIds::add);
-        for (var entry : category.entries()) {
-            if (!settingIds.add(entry.id())) {
-                throw new IllegalArgumentException("Duplicate settings entry id: " + entry.id());
+        var entryIds = new HashSet<String>();
+        entries().stream().map(SettingsEntry::id).forEach(entryIds::add);
+        var subcategoryIds = new HashSet<String>();
+        for (var subcategory : category.subcategories()) {
+            if (!subcategoryIds.add(subcategory.id())) {
+                throw new IllegalArgumentException(
+                        "Duplicate settings subcategory id in " + category.id() + ": " + subcategory.id()
+                );
+            }
+            for (var entry : subcategory.entries()) {
+                if (!entryIds.add(entry.id())) {
+                    throw new IllegalArgumentException("Duplicate settings entry id: " + entry.id());
+                }
             }
         }
-
         categories.put(category.id(), category);
+    }
+
+    /** Declares that an entry is available only while the referenced boolean setting is enabled. */
+    public void requireEnabled(String entryId, String requiredBooleanSettingId) {
+        requireOpen();
+        Objects.requireNonNull(entryId, "entryId");
+        Objects.requireNonNull(requiredBooleanSettingId, "requiredBooleanSettingId");
+        dependencies.computeIfAbsent(entryId, ignored -> new ArrayList<>()).add(requiredBooleanSettingId);
     }
 
     public Collection<SettingsCategory> categories() {
         return List.copyOf(categories.values());
     }
 
+    public List<SettingsEntry> entries() {
+        return categories.values().stream()
+                .flatMap(category -> category.subcategories().stream())
+                .flatMap(subcategory -> subcategory.entries().stream())
+                .toList();
+    }
+
+    public Optional<SettingsEntry> entry(String id) {
+        Objects.requireNonNull(id, "id");
+        return entries().stream().filter(entry -> entry.id().equals(id)).findFirst();
+    }
+
+    public List<String> dependencies(String entryId) {
+        return List.copyOf(dependencies.getOrDefault(entryId, List.of()));
+    }
+
+    public List<BooleanSetting> unmetDependencies(String entryId) {
+        var unmet = new LinkedHashMap<String, BooleanSetting>();
+        collectUnmetDependencies(entryId, unmet);
+        return List.copyOf(unmet.values());
+    }
+
+    public boolean available(String entryId) {
+        return unmetDependencies(entryId).isEmpty();
+    }
+
+    private void collectUnmetDependencies(String entryId, Map<String, BooleanSetting> unmet) {
+        for (var dependencyId : dependencies(entryId)) {
+            var dependency = setting(dependencyId, BooleanSetting.class);
+            if (!dependency.value()) unmet.putIfAbsent(dependencyId, dependency);
+            collectUnmetDependencies(dependencyId, unmet);
+        }
+    }
+
     public <S extends Setting<?>> S setting(String id, Class<S> type) {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(type, "type");
-
-        return categories.values().stream()
-                .flatMap(category -> category.entries().stream())
+        return entries().stream()
                 .filter(Setting.class::isInstance)
                 .map(entry -> (Setting<?>) entry)
                 .filter(setting -> setting.id().equals(id))
@@ -70,9 +119,10 @@ public final class SettingsRegistry {
     }
 
     public void seal() {
+        requireOpen();
+        validateDependencies();
         load();
-        categories.values().stream()
-                .flatMap(category -> category.entries().stream())
+        entries().stream()
                 .filter(Setting.class::isInstance)
                 .map(entry -> (Setting<?>) entry)
                 .forEach(setting -> setting.onChanged(ignored -> save()));
@@ -81,7 +131,6 @@ public final class SettingsRegistry {
 
     private void load() {
         if (!Files.exists(storagePath)) return;
-
         var properties = new Properties();
         try (Reader reader = Files.newBufferedReader(storagePath)) {
             properties.load(reader);
@@ -90,30 +139,21 @@ public final class SettingsRegistry {
             return;
         }
 
-        for (var category : categories.values()) {
-            for (var entry : category.entries()) {
-                if (!(entry instanceof Setting<?> setting)) continue;
-                var value = properties.getProperty(category.id() + "." + setting.id());
-                if (value == null) continue;
-                try {
-                    setting.load(value);
-                } catch (IllegalArgumentException exception) {
-                    // Invalid or obsolete values safely fall back to the declared default.
-                    LOGGER.warn("Ignoring invalid RALLE setting {}.{}={}", category.id(), setting.id(), value);
-                }
+        forEachSetting((category, setting) -> {
+            var value = properties.getProperty(category.id() + "." + setting.id());
+            if (value == null) return;
+            try {
+                setting.load(value);
+            } catch (IllegalArgumentException exception) {
+                LOGGER.warn("Ignoring invalid RALLE setting {}.{}={}", category.id(), setting.id(), value);
             }
-        }
+        });
     }
 
     private void save() {
         var properties = new Properties();
-        for (var category : categories.values()) {
-            for (var entry : category.entries()) {
-                if (!(entry instanceof Setting<?> setting)) continue;
-                properties.setProperty(category.id() + "." + setting.id(), setting.serialize());
-            }
-        }
-
+        forEachSetting((category, setting) ->
+                properties.setProperty(category.id() + "." + setting.id(), setting.serialize()));
         try {
             Files.createDirectories(storagePath.getParent());
             try (Writer writer = Files.newBufferedWriter(storagePath)) {
@@ -122,6 +162,54 @@ public final class SettingsRegistry {
         } catch (IOException exception) {
             LOGGER.error("Could not save RALLE settings to {}", storagePath, exception);
         }
+    }
+
+    private void forEachSetting(java.util.function.BiConsumer<SettingsCategory, Setting<?>> consumer) {
+        for (var category : categories.values()) {
+            for (var subcategory : category.subcategories()) {
+                for (var entry : subcategory.entries()) {
+                    if (entry instanceof Setting<?> setting) consumer.accept(category, setting);
+                }
+            }
+        }
+    }
+
+    private void validateDependencies() {
+        var entryIds = entries().stream().map(SettingsEntry::id).collect(java.util.stream.Collectors.toSet());
+        for (var dependency : dependencies.entrySet()) {
+            if (!entryIds.contains(dependency.getKey())) {
+                throw new IllegalArgumentException("Unknown dependent settings entry: " + dependency.getKey());
+            }
+            for (var requiredId : dependency.getValue()) {
+                if (!entryIds.contains(requiredId)) {
+                    throw new IllegalArgumentException("Unknown required setting: " + requiredId);
+                }
+                setting(requiredId, BooleanSetting.class);
+            }
+        }
+        var visiting = new HashSet<String>();
+        var visited = new HashSet<String>();
+        for (var id : entryIds) visitDependency(id, visiting, visited, new ArrayDeque<>());
+    }
+
+    private void visitDependency(
+            String id,
+            HashSet<String> visiting,
+            HashSet<String> visited,
+            ArrayDeque<String> path
+    ) {
+        if (visited.contains(id)) return;
+        if (!visiting.add(id)) {
+            path.addLast(id);
+            throw new IllegalArgumentException("Settings dependency cycle: " + String.join(" -> ", path));
+        }
+        path.addLast(id);
+        for (var dependency : dependencies.getOrDefault(id, List.of())) {
+            visitDependency(dependency, visiting, visited, path);
+        }
+        path.removeLast();
+        visiting.remove(id);
+        visited.add(id);
     }
 
     private void requireOpen() {

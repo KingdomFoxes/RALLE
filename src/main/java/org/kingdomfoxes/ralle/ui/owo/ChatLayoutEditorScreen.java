@@ -97,11 +97,14 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
 
         var buttons = UIContainers.horizontalFlow(Sizing.fixed(300), Sizing.content());
         buttons.gap(8);
-        var resetButton = UIComponents.button(Component.translatable("ralle.chat-layout.reset"), button -> resetSessionChanges());
+        var resetButton = UIComponents.button(
+                RalleTypography.body(Component.translatable("ralle.chat-layout.reset")),
+                button -> resetSessionChanges()
+        );
         resetButton.horizontalSizing(Sizing.fixed(146));
         resetButton.renderer(RalleButtonRenderers.neutral());
 
-        var doneButton = UIComponents.button(Component.translatable("gui.done"), button -> onClose());
+        var doneButton = UIComponents.button(RalleTypography.body(Component.translatable("gui.done")), button -> onClose());
         doneButton.horizontalSizing(Sizing.fixed(146));
         doneButton.renderer(RalleButtonRenderers.primary());
         buttons.child(resetButton).child(doneButton);
@@ -119,9 +122,9 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
             boolean checked,
             java.util.function.Consumer<Boolean> changed
     ) {
-        var checkbox = UIComponents.checkbox(Component.translatable("ralle.chat-layout." + id));
+        var checkbox = UIComponents.checkbox(RalleTypography.body(Component.translatable("ralle.chat-layout." + id)));
         checkbox.checked(checked);
-        checkbox.tooltip(Component.translatable("ralle.chat-layout." + id + ".description"));
+        checkbox.tooltip(RalleTypography.body(Component.translatable("ralle.chat-layout." + id + ".description")));
         checkbox.onChanged(changed);
         parent.child(checkbox);
         return checkbox;
@@ -158,13 +161,13 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
             if (showPositionInfo) {
                 graphics.drawCenteredString(
                         font,
-                        Component.translatable(
+                        RalleTypography.body(Component.translatable(
                                 "ralle.chat-layout.bounds",
                                 bounds.x(),
                                 bounds.y(),
                                 bounds.width(),
                                 bounds.height()
-                        ),
+                        )),
                         bounds.x() + bounds.width() / 2,
                         bounds.y() + Math.max(4, bounds.height() / 2 - 4),
                         0xFFFFFFFF
@@ -196,7 +199,7 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
             );
             graphics.drawCenteredString(
                     font,
-                    Component.literal(entry.getKey()),
+                    RalleTypography.body(Component.literal(entry.getKey())),
                     otherBounds.x() + otherBounds.width() / 2,
                     otherBounds.y() + Math.max(4, otherBounds.height() / 2 - 4),
                     0xFFA9B0BE

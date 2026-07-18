@@ -18,6 +18,9 @@ import org.kingdomfoxes.ralle.sound.MinecraftChatSelectionSoundPlayer;
 import org.kingdomfoxes.ralle.sound.RalleSoundEvents;
 import org.kingdomfoxes.ralle.ui.owo.OwoSettingsScreenFactory;
 import org.kingdomfoxes.ralle.ui.owo.RaidLfgScreen;
+import org.kingdomfoxes.ralle.ui.owo.RalleTypography;
+import org.kingdomfoxes.ralle.ui.owo.SettingsNavigationState;
+import org.kingdomfoxes.ralle.lfg.client.RaidLfgKeybind;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
@@ -45,8 +48,11 @@ public final class RalleClient implements ClientModInitializer {
         features.seal();
         settings.seal();
         placements.seal();
+        RalleTypography.bind(settings);
 
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), settings, placements);
+        var navigation = new SettingsNavigationState(configDirectory.resolve("ralle-settings-ui.properties"), settings);
+        var lfgKeybind = new RaidLfgKeybind(Minecraft.getInstance(), settings);
         var chatBehavior = new ChatBehaviorService(Minecraft.getInstance(), settings);
         var chatScreenshots = new ChatScreenshotService(
                 Minecraft.getInstance(),
@@ -57,7 +63,7 @@ public final class RalleClient implements ClientModInitializer {
         context = new RalleContext(
                 features,
                 settings,
-                new OwoSettingsScreenFactory(settings, chatLayout),
+                new OwoSettingsScreenFactory(settings, chatLayout, navigation),
                 chatLayout,
                 chatBehavior,
                 chatScreenshots
@@ -66,6 +72,7 @@ public final class RalleClient implements ClientModInitializer {
             chatLayout.tick();
             chatBehavior.tick();
             chatScreenshots.tick();
+            lfgKeybind.tick();
         });
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(

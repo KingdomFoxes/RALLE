@@ -17,8 +17,6 @@ import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.FontDescription;
-import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.kingdomfoxes.ralle.lfg.client.FakeRaidLobbies;
@@ -37,17 +35,6 @@ import java.util.Set;
 public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private static final int GRID_WIDTH = 584;
     private static final int CARD_WIDTH = 286;
-    private static final int HEADER_HEIGHT = 41;
-    private static final Identifier FOX_EMBLEM = Identifier.fromNamespaceAndPath("ralle", "textures/gui/fox_overlay.png");
-    private static final FontDescription KARLA_BOLD = new FontDescription.Resource(
-            Identifier.fromNamespaceAndPath("ralle", "karla_bold")
-    );
-    private static final FontDescription KARLA_BOLD_UI = new FontDescription.Resource(
-            Identifier.fromNamespaceAndPath("ralle", "karla_bold_ui")
-    );
-    private static final Color MUTED = Color.ofRgb(0xA9B0BE);
-    private static final Color ACCENT = Color.ofRgb(0xF2B84B);
-    private static final Color OPEN = Color.ofRgb(0x67D391);
     private static final Color REGION_GOOD = Color.ofRgb(0x00FF55);
     private static final Color REGION_MODERATE = Color.ofRgb(0xFFFF00);
     private static final Color REGION_POOR = Color.ofRgb(0xFF3333);
@@ -83,15 +70,15 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
         var panel = UIContainers.verticalFlow(Sizing.fixed(620), Sizing.fill(92));
         panel.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
-        panel.child(header());
+        panel.child(RalleHeader.create(Component.literal("ALLY GRAID FINDER")));
 
         var filters = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
         filters.gap(6).padding(Insets.left(4)).verticalAlignment(VerticalAlignment.CENTER);
 
-        var create = UIComponents.button(Component.literal("+"), ignored -> {});
+        var create = UIComponents.button(RalleTheme.ui(Component.literal("+")), ignored -> {});
         create.sizing(Sizing.fixed(30), Sizing.fixed(20));
         create.renderer(RalleButtonRenderers.primary());
-        create.tooltip(Component.literal("Create party (prototype only)"));
+        create.tooltip(RalleTheme.ui(Component.literal("Create party (prototype only)")));
 
         var statusButton = UIComponents.button(statusLabel(), ignored -> {});
         var raidButton = UIComponents.button(raidLabel(), ignored -> {});
@@ -110,7 +97,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var refresh = UIComponents.button(Component.empty(), ignored -> refreshGrid());
         refresh.sizing(Sizing.fixed(30), Sizing.fixed(20));
         refresh.renderer(RalleButtonRenderers.refresh());
-        refresh.tooltip(Component.literal("Refresh available parties"));
+        refresh.tooltip(RalleTheme.ui(Component.literal("Refresh available parties")));
         filters.child(create).child(statusButton).child(raidButton).child(regionButton).child(refresh);
         panel.child(filters);
 
@@ -122,10 +109,10 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
         var footer = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
         footer.verticalAlignment(VerticalAlignment.CENTER);
-        footer.child(UIComponents.label(Component.literal("● Live preview · fake party data"))
-                .color(OPEN).margins(Insets.right(8)));
-        footer.child(UIComponents.label(Component.literal("Use the filters to stress-test the grid."))
-                .color(MUTED));
+        footer.child(UIComponents.label(RalleTheme.ui(Component.literal("● Live preview · fake party data")))
+                .color(RalleTheme.POSITIVE).margins(Insets.right(8)));
+        footer.child(UIComponents.label(RalleTheme.ui(Component.literal("Use the filters to stress-test the grid.")))
+                .color(RalleTheme.MUTED));
 
         var close = UIComponents.button(karlaUi(Component.translatable("gui.done")), ignored -> onClose());
         close.horizontalSizing(Sizing.fixed(92)).margins(Insets.left(16));
@@ -149,27 +136,6 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
         gridHost.clearChildren();
         refreshGridNextTick = true;
-    }
-
-    private FlowLayout header() {
-        var header = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(HEADER_HEIGHT));
-        header.verticalAlignment(VerticalAlignment.CENTER).surface(RalleSurfaces.FRAMED_NAVY);
-
-        var identity = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
-        identity.verticalAlignment(VerticalAlignment.CENTER).margins(Insets.left(10));
-
-        var emblem = UIComponents.texture(FOX_EMBLEM, 0, 0, 159, 232, 159, 232).blend(true);
-        emblem.sizing(Sizing.fixed(19), Sizing.fixed(28)).margins(Insets.right(10));
-        identity.child(emblem);
-
-        var title = Component.literal("ALLY GRAID FINDER")
-                .withStyle(style -> style.withFont(KARLA_BOLD));
-        identity.child(UIComponents.label(title).lineHeight(16).shadow(false).color(Color.WHITE));
-
-        header.child(identity);
-        header.child(UIComponents.spacer());
-        header.child(new HeaderAccentComponent(50, HEADER_HEIGHT));
-        return header;
     }
 
     private void openStatusDropdown(FlowLayout root, ButtonComponent trigger, FlowLayout gridHost) {
@@ -221,7 +187,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             var empty = UIContainers.verticalFlow(Sizing.fixed(GRID_WIDTH), Sizing.fixed(100));
             empty.horizontalAlignment(HorizontalAlignment.CENTER).verticalAlignment(VerticalAlignment.CENTER)
                     .surface(Surface.PANEL);
-            empty.child(UIComponents.label(karlaUi(Component.literal("No parties match these filters."))).color(MUTED));
+            empty.child(UIComponents.label(karlaUi(Component.literal("No parties match these filters."))).color(RalleTheme.MUTED));
             gridHost.child(empty);
             return;
         }
@@ -245,19 +211,19 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var summary = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(20));
         summary.verticalAlignment(VerticalAlignment.CENTER)
                 .cursorStyle(CursorStyle.HAND)
-                .tooltip(Component.literal(expanded ? "Click to hide party details" : "Click to show party details"));
+                .tooltip(RalleTheme.ui(Component.literal(expanded ? "Click to hide party details" : "Click to show party details")));
 
         var raidDetails = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
         raidDetails.verticalAlignment(VerticalAlignment.CENTER);
         raidDetails.child(UIComponents.item(new ItemStack(raidIcon(lobby.raid())))
                 .showOverlay(false).margins(Insets.right(6)));
-        raidDetails.child(UIComponents.label(karlaUi(Component.literal(raidName(lobby.raid())))).shadow(true).color(ACCENT));
+        raidDetails.child(UIComponents.label(karlaUi(Component.literal(raidName(lobby.raid())))).shadow(true).color(RalleTheme.ACCENT));
         summary.child(raidDetails);
 
         var summarySpacer = UIComponents.spacer();
         summarySpacer.verticalSizing(Sizing.fixed(0));
         summary.child(summarySpacer);
-        summary.child(UIComponents.label(karlaUi(Component.literal(lobby.members().size() + "/4"))).color(OPEN)
+        summary.child(UIComponents.label(karlaUi(Component.literal(lobby.members().size() + "/4"))).color(RalleTheme.POSITIVE)
                 .margins(Insets.right(6)));
 
         if (!expanded) {
@@ -265,7 +231,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         }
 
         summary.child(UIComponents.label(Component.literal(expanded ? " \u25BC" : " \u25B6"))
-                .color(MUTED).margins(Insets.left(6)));
+                .color(RalleTheme.MUTED).margins(Insets.left(6)));
         summary.mouseDown().subscribe((click, doubled) -> {
             if (expanded) {
                 expandedLobbies.remove(lobby.raid());
@@ -284,7 +250,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                 .color(regionColor(lobby.region())));
         if (!lobby.note().isBlank()) {
             details.child(UIComponents.label(karlaUi(Component.literal(" " + lobby.note())))
-                    .color(MUTED).maxWidth(CARD_WIDTH - 54));
+                    .color(RalleTheme.MUTED).maxWidth(CARD_WIDTH - 54));
         }
         card.child(details);
 
@@ -310,9 +276,9 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         action.sizing(Sizing.fixed(52), Sizing.fixed(20));
         action.renderer(RalleButtonRenderers.primary());
         action.active = !lobby.locked() && lobby.status() == FakeRaidLobby.Status.OPEN && lobby.members().size() < 4;
-        action.tooltip(Component.literal(expanded
+        action.tooltip(RalleTheme.ui(Component.literal(expanded
                 ? "Prototype only - roster mutations are not connected yet"
-                : "Expand and review the roster before joining"));
+                : "Expand and review the roster before joining")));
         return action;
     }
 
@@ -323,7 +289,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         if (slot >= lobby.members().size()) {
             row.child(UIComponents.item(new ItemStack(Items.GRAY_STAINED_GLASS_PANE))
                     .showOverlay(false).margins(Insets.right(4)));
-            row.child(UIComponents.label(karlaUi(Component.literal("Open slot"))).color(MUTED));
+            row.child(UIComponents.label(karlaUi(Component.literal("Open slot"))).color(RalleTheme.MUTED));
             return row;
         }
 
@@ -343,7 +309,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         }
         memberLabel.append(karlaUi(Component.literal(member.ign())));
         row.child(UIComponents.label(memberLabel)
-                .color(member.host() ? ACCENT : Color.WHITE));
+                .color(member.host() ? RalleTheme.ACCENT : Color.WHITE));
         return row;
     }
 
@@ -364,7 +330,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private Component karlaUi(Component component) {
-        return component.copy().withStyle(style -> style.withFont(KARLA_BOLD_UI));
+        return RalleTheme.ui(component);
     }
 
     private Color regionColor(FakeRaidLobby.Region lobbyRegion) {

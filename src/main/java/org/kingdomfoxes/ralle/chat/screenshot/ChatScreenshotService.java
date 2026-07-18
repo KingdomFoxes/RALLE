@@ -4,24 +4,19 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.FontDescription;
-import net.minecraft.resources.Identifier;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotGeometry.LineRange;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotGeometry.Rectangle;
 import org.kingdomfoxes.ralle.sound.ChatSelectionSoundPlayer;
+import org.kingdomfoxes.ralle.ui.owo.RalleTypography;
 
 import java.util.ArrayList;
 import java.util.OptionalInt;
 
 public final class ChatScreenshotService {
     public enum State { IDLE, DRAGGING, PREVIEW, COPYING, COPIED_FADING }
-
-    private static final FontDescription CONFIRMATION_FONT = new FontDescription.Resource(
-            Identifier.fromNamespaceAndPath("ralle", "karla_bold_ui_small")
-    );
 
     private final Minecraft minecraft;
     private final BooleanSetting chatEnabled;
@@ -317,8 +312,7 @@ public final class ChatScreenshotService {
     }
 
     private void drawCopiedConfirmation(GuiGraphics graphics, Rectangle selection, float opacity) {
-        Component label = Component.translatable("ralle.chat-screenshot.copied")
-                .withStyle(style -> style.withFont(CONFIRMATION_FONT));
+        Component label = RalleTypography.compactBody(Component.translatable("ralle.chat-screenshot.copied"));
         int textWidth = minecraft.font.width(label);
         int textHeight = minecraft.font.lineHeight;
         int faceWidth = textWidth + ChatScreenshotTokens.CONFIRMATION_HORIZONTAL_PADDING * 2

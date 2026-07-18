@@ -27,6 +27,17 @@ final class RalleButtonRenderers {
         return renderer(Palette.PRIMARY, () -> false);
     }
 
+    static ButtonComponent.Renderer navigation(BooleanSupplier selected) {
+        return (graphics, button, delta) -> {
+            int x = button.getX();
+            int y = button.getY();
+            int right = x + button.getWidth();
+            int bottom = y + button.getHeight();
+            if (button.isHovered()) graphics.fill(x, y, right, bottom, 0xA6263A5A);
+            if (selected.getAsBoolean()) graphics.fill(x, y + 2, x + 2, bottom - 2, 0xFFF2B84B);
+        };
+    }
+
     static ButtonComponent.Renderer refresh() {
         var background = neutral();
         return (graphics, button, delta) -> {
