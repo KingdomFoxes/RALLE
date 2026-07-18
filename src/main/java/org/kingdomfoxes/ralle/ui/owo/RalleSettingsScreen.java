@@ -200,18 +200,19 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         document.clearChildren();
         scroll.scrollToImmediately(0);
         int textWidth = documentTextWidth();
-        document.child(UIComponents.label(RalleTheme.ui(Component.literal("Raid Alliance Logistics Liaison Equipment")))
-                .lineHeight(RalleTheme.BODY_LINE_HEIGHT).color(RalleTheme.ACCENT).shadow(false).maxWidth(textWidth));
         var version = FabricLoader.getInstance().getModContainer("ralle")
                 .map(container -> container.getMetadata().getVersion().getFriendlyString()).orElse("development");
-        document.child(UIComponents.label(RalleTheme.ui(Component.literal("Version " + version)))
-                .lineHeight(RalleTheme.BODY_LINE_HEIGHT).color(RalleTheme.MUTED).maxWidth(textWidth));
+        var identity = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+        identity.verticalAlignment(VerticalAlignment.CENTER);
+        identity.child(UIComponents.label(RalleTheme.ui(Component.literal("R.A.L.L.E.")))
+                .lineHeight(RalleTheme.BODY_LINE_HEIGHT).color(RalleTheme.ACCENT).shadow(false));
+        identity.child(UIComponents.label(RalleTheme.ui(Component.literal("Version " + version)))
+                .lineHeight(RalleTheme.BODY_LINE_HEIGHT).color(RalleTheme.MUTED).margins(Insets.left(6)));
+        document.child(identity);
         document.child(UIComponents.label(RalleTheme.ui(Component.translatable("ralle.settings.about.description")))
                 .lineHeight(RalleTheme.BODY_LINE_HEIGHT).color(RalleTheme.TEXT).maxWidth(textWidth));
         document.child(UIComponents.label(RalleTheme.ui(Component.translatable("ralle.settings.about.disabled-notice")))
                 .lineHeight(RalleTheme.BODY_LINE_HEIGHT).color(RalleTheme.ACCENT).maxWidth(textWidth));
-        document.child(new SettingsSectionDivider(Component.translatable("ralle.settings.subcategory.interface")));
-        document.child(entryRow(settings.setting(RalleSettings.INTERFACE_FONT_ID, ChoiceSetting.class)));
         var links = width < 540
                 ? UIContainers.verticalFlow(Sizing.fill(100), Sizing.content())
                 : UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
@@ -226,6 +227,8 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         issues.renderer(RalleButtonRenderers.neutral());
         links.child(source).child(issues);
         document.child(links);
+        document.child(new SettingsSectionDivider(Component.translatable("ralle.settings.subcategory.interface")));
+        document.child(entryRow(settings.setting(RalleSettings.INTERFACE_FONT_ID, ChoiceSetting.class)));
         document.child(fixedSpacer(SettingsScreenLayout.MINIMUM_DOCUMENT_BOTTOM_SPACE));
     }
 
@@ -241,8 +244,6 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                 ? requestedSubcategory : category.subcategories().getFirst().id();
         clearDocumentState();
         document.clearChildren();
-        document.child(UIComponents.label(RalleTheme.ui(category.title()))
-                .lineHeight(RalleTheme.BODY_LINE_HEIGHT).color(RalleTheme.ACCENT).maxWidth(documentTextWidth()));
         for (var subcategory : category.subcategories()) {
             var section = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
             section.gap(6).margins(Insets.top(6));
@@ -308,6 +309,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         }
         button.id("setting-control-" + entry.id());
         button.sizing(Sizing.fixed(126), Sizing.fixed(20));
+        button.margins(Insets.top(10));
         button.active = available;
         if (!available) button.tooltip(RalleTheme.ui(Component.translatable("ralle.settings.unavailable")));
         return button;
