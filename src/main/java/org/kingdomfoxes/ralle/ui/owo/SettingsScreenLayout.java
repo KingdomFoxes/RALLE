@@ -11,6 +11,7 @@ final class SettingsScreenLayout {
     static final int SIDEBAR_PADDING = 6;
     static final int SEARCH_HEIGHT = 20;
     static final int SIDEBAR_GAP = 5;
+    static final int NAVIGATION_ROW_GAP = 3;
     static final int ACTIVE_MARKER = 10;
     static final int MINIMUM_DOCUMENT_BOTTOM_SPACE = 24;
     private static final int MAX_PANEL_WIDTH = 620;

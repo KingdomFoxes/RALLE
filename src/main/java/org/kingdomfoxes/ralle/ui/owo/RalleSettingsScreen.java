@@ -33,6 +33,7 @@ import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.kingdomfoxes.ralle.settings.RalleSettings;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -108,7 +109,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         searchBox.onChanged().subscribe(this::searchChanged);
         sidebar.child(searchBox);
         sidebarNavigation = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
-        sidebarNavigation.gap(3);
+        sidebarNavigation.gap(0);
         var sidebarScroll = new RalleScrollContainer(
                 Sizing.fill(100), Sizing.fixed(geometry.navigationHeight()), sidebarNavigation
         );
@@ -136,7 +137,8 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     private void rebuildSidebar() {
         sidebarNavigation.clearChildren();
-        sidebarNavigation.child(navigationButton(
+        var entries = new ArrayList<NavigationEntry>();
+        entries.add(new NavigationEntry(
                 Component.translatable("ralle.settings.about"),
                 selectedCategory == null && query.isEmpty(),
                 false,
@@ -144,36 +146,57 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         ));
         for (var category : navigableCategories()) {
             boolean selected = category.id().equals(selectedCategory);
-            sidebarNavigation.child(navigationButton(
+            entries.add(new NavigationEntry(
                     category.title(), selected && query.isEmpty(), false, ignored -> selectCategory(category)
             ));
             if (!selected || !query.isEmpty()) continue;
             for (var subcategory : category.subcategories()) {
-                var label = Component.literal("| ").append(subcategory.title());
-                sidebarNavigation.child(navigationButton(
-                        label,
+                entries.add(new NavigationEntry(
+                        subcategory.title(),
                         subcategory.id().equals(selectedSubcategory),
                         true,
                         ignored -> jumpTo(subcategory)
                 ));
             }
         }
+        var shapes = SettingsNavigationRailGeometry.shapes(entries.stream()
+                .map(entry -> entry.subcategory()
+                        ? SettingsNavigationRailGeometry.Level.SUBCATEGORY
+                        : SettingsNavigationRailGeometry.Level.CATEGORY)
+                .toList());
+        for (int index = 0; index < entries.size(); index++) {
+            sidebarNavigation.child(navigationRow(entries.get(index), shapes.get(index), index + 1 < entries.size()));
+        }
     }
 
-    private ButtonComponent navigationButton(
+    private UIComponent navigationRow(
+            NavigationEntry entry,
+            SettingsNavigationRailGeometry.Shape shape,
+            boolean gapAfter
+    ) {
+        int visualHeight = entry.subcategory() ? 18 : 20;
+        int rowHeight = visualHeight + (gapAfter ? SettingsScreenLayout.NAVIGATION_ROW_GAP : 0);
+        int color = entry.selected() ? 0xFFF2B84B : entry.subcategory() ? 0xFFA9B0BE : 0xFFFFFFFF;
+        var row = new SettingsNavigationRailComponent(
+                Sizing.fill(100), Sizing.fixed(rowHeight), shape, visualHeight
+        );
+        var button = new NavigationButtonComponent(
+                entry.label().copy().withColor(color), entry.subcategory(), ignored -> {}
+        );
+        button.sizing(Sizing.fill(100), Sizing.fixed(visualHeight));
+        button.margins(Insets.left(entry.subcategory() ? 8 : 0));
+        button.textShadow(false).renderer(RalleButtonRenderers.navigation());
+        button.onPress(entry.pressed());
+        row.child(button);
+        return row;
+    }
+
+    private record NavigationEntry(
             Component label,
             boolean selected,
             boolean subcategory,
             java.util.function.Consumer<ButtonComponent> pressed
-    ) {
-        int color = selected ? 0xFFF2B84B : subcategory ? 0xFFA9B0BE : 0xFFFFFFFF;
-        var button = new NavigationButtonComponent(label.copy().withColor(color), ignored -> {});
-        button.sizing(Sizing.fill(100), Sizing.fixed(subcategory ? 18 : 20));
-        button.margins(Insets.left(subcategory ? 8 : 0));
-        button.textShadow(false).renderer(RalleButtonRenderers.navigation(() -> selected));
-        button.onPress(pressed);
-        return button;
-    }
+    ) {}
 
     private void selectAbout() {
         if (!query.isEmpty()) searchBox.text("");
@@ -267,6 +290,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                 ? UIContainers.verticalFlow(Sizing.fill(100), Sizing.content())
                 : UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
         row.gap(4).padding(Insets.of(5)).surface(RalleSurfaces.NAVY_ROW);
+        if (!stacked) row.verticalAlignment(VerticalAlignment.CENTER);
 
         var copy = UIContainers.verticalFlow(stacked ? Sizing.fill(100) : Sizing.fill(67), Sizing.content());
         copy.gap(2);
@@ -309,7 +333,6 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         }
         button.id("setting-control-" + entry.id());
         button.sizing(Sizing.fixed(126), Sizing.fixed(20));
-        button.margins(Insets.top(10));
         button.active = available;
         if (!available) button.tooltip(RalleTheme.ui(Component.translatable("ralle.settings.unavailable")));
         return button;
