@@ -28,4 +28,16 @@ public final class GuildTerritoryColors {
         if (prefix == null) return UNKNOWN_GUILD;
         return BY_PREFIX.getOrDefault(prefix.toLowerCase(Locale.ROOT), UNKNOWN_GUILD);
     }
+
+    public static int parse(String color) {
+        if (color == null) return UNKNOWN_GUILD;
+        var value = color.strip();
+        if (value.startsWith("#")) value = value.substring(1);
+        if (value.length() != 6) return UNKNOWN_GUILD;
+        try {
+            return 0xFF000000 | Integer.parseInt(value, 16);
+        } catch (NumberFormatException ignored) {
+            return UNKNOWN_GUILD;
+        }
+    }
 }

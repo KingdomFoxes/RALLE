@@ -8,7 +8,7 @@ import net.minecraft.network.chat.Component;
 
 import java.util.function.Consumer;
 
-/** Left-aligned, Minecraft-font button used by the unboxed settings navigation list. */
+/** Left-aligned button used by the unboxed settings navigation list. */
 final class NavigationButtonComponent extends ButtonComponent {
     private static final Component REMOVED_SUBCATEGORY_PREFIX = Component.literal("| ");
     private final boolean subcategory;

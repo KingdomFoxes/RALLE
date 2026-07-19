@@ -3,6 +3,7 @@ package org.kingdomfoxes.ralle;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import org.kingdomfoxes.ralle.api.feature.FeatureRegistry;
@@ -21,6 +22,10 @@ import org.kingdomfoxes.ralle.ui.owo.RaidLfgScreen;
 import org.kingdomfoxes.ralle.ui.owo.RalleTypography;
 import org.kingdomfoxes.ralle.ui.owo.SettingsNavigationState;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgKeybind;
+import org.kingdomfoxes.ralle.lfg.client.HttpLfgGateway;
+import org.kingdomfoxes.ralle.lfg.client.MinecraftRaidLfgEnvironment;
+import org.kingdomfoxes.ralle.lfg.client.MinecraftSessionProofAdapter;
+import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
@@ -52,7 +57,13 @@ public final class RalleClient implements ClientModInitializer {
 
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), settings, placements);
         var navigation = new SettingsNavigationState(configDirectory.resolve("ralle-settings-ui.properties"), settings);
-        var lfgKeybind = new RaidLfgKeybind(Minecraft.getInstance(), settings);
+        var minecraft = Minecraft.getInstance();
+        var raidLfg = new RaidLfgService(
+                new HttpLfgGateway(),
+                new MinecraftRaidLfgEnvironment(minecraft, settings),
+                new MinecraftSessionProofAdapter(minecraft)
+        );
+        var lfgKeybind = new RaidLfgKeybind(minecraft, settings, raidLfg);
         var chatBehavior = new ChatBehaviorService(Minecraft.getInstance(), settings);
         var chatScreenshots = new ChatScreenshotService(
                 Minecraft.getInstance(),
@@ -66,13 +77,17 @@ public final class RalleClient implements ClientModInitializer {
                 new OwoSettingsScreenFactory(settings, chatLayout, navigation),
                 chatLayout,
                 chatBehavior,
-                chatScreenshots
+                chatScreenshots,
+                raidLfg
         );
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> raidLfg.connectionChanged());
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> raidLfg.connectionChanged());
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             chatLayout.tick();
             chatBehavior.tick();
             chatScreenshots.tick();
             lfgKeybind.tick();
+            raidLfg.tick();
         });
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
@@ -82,7 +97,7 @@ public final class RalleClient implements ClientModInitializer {
                     return 1;
                 })).then(literal("lfg").executes(command -> {
                     var client = Minecraft.getInstance();
-                    client.schedule(() -> client.setScreen(new RaidLfgScreen(client.screen)));
+                    client.schedule(() -> client.setScreen(new RaidLfgScreen(client.screen, context().raidLfg())));
                     return 1;
                 }))
         ));

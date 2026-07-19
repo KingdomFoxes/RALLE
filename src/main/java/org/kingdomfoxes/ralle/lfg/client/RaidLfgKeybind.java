@@ -19,10 +19,12 @@ public final class RaidLfgKeybind {
     private final BooleanSetting enabled;
     private final KeybindSetting setting;
     private final KeyMapping mapping;
+    private final RaidLfgService service;
     private String appliedValue;
 
-    public RaidLfgKeybind(Minecraft minecraft, SettingsRegistry settings) {
+    public RaidLfgKeybind(Minecraft minecraft, SettingsRegistry settings, RaidLfgService service) {
         this.minecraft = minecraft;
+        this.service = service;
         this.enabled = settings.setting("raid-lfg-enabled", BooleanSetting.class);
         this.setting = settings.setting("raid-lfg-keybind", KeybindSetting.class);
         this.mapping = KeyBindingHelper.registerKeyBinding(new KeyMapping(
@@ -37,7 +39,7 @@ public final class RaidLfgKeybind {
     public void tick() {
         if (!setting.value().equals(appliedValue)) applySetting();
         while (mapping.consumeClick()) {
-            if (enabled.value()) minecraft.setScreen(new RaidLfgScreen(minecraft.screen));
+            if (enabled.value()) minecraft.setScreen(new RaidLfgScreen(minecraft.screen, service));
         }
     }
 

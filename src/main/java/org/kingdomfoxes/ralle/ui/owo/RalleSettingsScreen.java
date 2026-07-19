@@ -18,6 +18,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 import org.kingdomfoxes.ralle.api.settings.ActionEntry;
@@ -117,11 +118,11 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         sidebar.child(sidebarScroll);
 
         document = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
-        document.gap(8).padding(Insets.of(8));
+        document.gap(8).padding(Insets.of(SettingsScreenLayout.DOCUMENT_PADDING));
         scroll = new RalleScrollContainer(
                 Sizing.fixed(geometry.documentWidth()), Sizing.fixed(geometry.bodyHeight()), document
         );
-        scroll.scrollbarThiccness(4).scrollStep(24).surface(RalleSurfaces.NAVY_PANEL);
+        scroll.wheelStep(24).scrollbarThiccness(4).surface(RalleSurfaces.NAVY_PANEL);
         body.child(sidebar).child(scroll);
         panel.child(body);
         root.child(panel);
@@ -180,12 +181,20 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         var row = new SettingsNavigationRailComponent(
                 Sizing.fill(100), Sizing.fixed(rowHeight), shape, visualHeight
         );
+        int buttonLeftMargin = entry.subcategory() ? 8 : 0;
         var button = new NavigationButtonComponent(
-                entry.label().copy().withColor(color), entry.subcategory(), ignored -> {}
+                RalleTheme.ui(entry.label()).copy().withColor(color), entry.subcategory(), ignored -> {}
         );
         button.sizing(Sizing.fill(100), Sizing.fixed(visualHeight));
-        button.margins(Insets.left(entry.subcategory() ? 8 : 0));
-        button.textShadow(false).renderer(RalleButtonRenderers.navigation());
+        button.margins(Insets.left(buttonLeftMargin));
+        button.textShadow(false).renderer(RalleButtonRenderers.navigation(
+                SettingsNavigationRailGeometry.highlightLeftInset(
+                        entry.subcategory()
+                                ? SettingsNavigationRailGeometry.Level.SUBCATEGORY
+                                : SettingsNavigationRailGeometry.Level.CATEGORY,
+                        buttonLeftMargin
+                )
+        ));
         button.onPress(entry.pressed());
         row.child(button);
         return row;
@@ -269,7 +278,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         document.clearChildren();
         for (var subcategory : category.subcategories()) {
             var section = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
-            section.gap(6).margins(Insets.top(6));
+            section.gap(6).margins(Insets.top(SettingsScreenLayout.SECTION_TOP_MARGIN));
             var divider = new SettingsSectionDivider(subcategory.title());
             section.child(divider);
             for (var entry : subcategory.entries()) section.child(entryRow(entry));
@@ -298,13 +307,14 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                 .color(available ? RalleTheme.TEXT : RalleTheme.DISABLED));
         copy.child(UIComponents.label(RalleTheme.ui(entry.description())).lineHeight(RalleTheme.BODY_LINE_HEIGHT)
                 .color(available ? RalleTheme.MUTED : RalleTheme.DISABLED)
-                .maxWidth(stacked ? Math.max(150, scroll.width() - 30) : Math.max(120, scroll.width() * 2 / 3 - 24)));
+                .maxWidth(SettingsScreenLayout.descriptionWidth(geometry.documentWidth(), stacked)));
         if (!available) {
             var unmet = settings.unmetDependencies(entry.id()).stream()
                     .map(setting -> setting.title().getString()).toList();
             copy.child(UIComponents.label(RalleTheme.ui(Component.translatable("ralle.settings.requires", String.join(", ", unmet))))
                     .lineHeight(RalleTheme.BODY_LINE_HEIGHT)
-                    .color(RalleTheme.ACCENT).maxWidth(Math.max(120, scroll.width() - 30)));
+                    .color(RalleTheme.ACCENT)
+                    .maxWidth(SettingsScreenLayout.dependencyDescriptionWidth(geometry.documentWidth())));
         }
         row.child(copy);
         row.child(control(entry, available));
@@ -352,6 +362,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                             setting.set(choice);
                             root.removeChild(dropdown);
                             if (RalleSettings.INTERFACE_FONT_ID.equals(setting.id())) {
+                                refreshSearchHintTypography();
                                 rebuildSidebar();
                                 if (!query.isEmpty()) renderSearchResults();
                                 else if (selectedCategory == null) renderAbout();
@@ -390,6 +401,19 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         return super.keyPressed(event);
     }
 
+    @Override
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
+        if (capturingKeybind != null) {
+            var key = InputConstants.Type.MOUSE.getOrCreate(event.button());
+            capturingKeybind.set(key.getName());
+            if (capturingButton != null) capturingButton.setMessage(keybindLabel(capturingKeybind));
+            capturingKeybind = null;
+            capturingButton = null;
+            return true;
+        }
+        return super.mouseClicked(event, doubled);
+    }
+
     private void openAction(ActionEntry action) {
         if (!"edit-chat-layout".equals(action.id())) throw new IllegalArgumentException("Unknown settings action: " + action.id());
         persistNavigation();
@@ -405,7 +429,11 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     private void jumpToId(String id) {
         var section = sectionComponents.get(id);
-        if (section != null) scroll.scrollToImmediately(section);
+        if (section == null) return;
+        int anchorOffset = section.y() - document.y();
+        scroll.scrollToOffsetImmediately(SettingsScreenLayout.jumpScrollOffset(
+                anchorOffset, scroll.maximumOffset()
+        ));
     }
 
     private void searchChanged(String rawQuery) {
@@ -465,15 +493,14 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             scroll.scrollToImmediately(pendingScrollProgress);
             pendingScrollProgress = null;
         }
-        String active = selectedSubcategory;
-        if (scroll.atMaximum()) {
-            active = sectionComponents.keySet().stream().reduce((first, second) -> second).orElse(active);
-        } else {
-            int marker = scroll.y() + SettingsScreenLayout.ACTIVE_MARKER;
-            for (var section : sectionComponents.entrySet()) {
-                if (section.getValue().y() <= marker) active = section.getKey();
-            }
-        }
+        var sectionIds = new ArrayList<>(sectionComponents.keySet());
+        var anchorOffsets = sectionComponents.values().stream()
+                .map(section -> section.y() - document.y())
+                .toList();
+        int activeIndex = SettingsScreenLayout.activeSection(
+                anchorOffsets, (int) Math.round(scroll.offset()), scroll.maximumOffset()
+        );
+        String active = activeIndex < 0 ? selectedSubcategory : sectionIds.get(activeIndex);
         if (!active.equals(selectedSubcategory)) {
             selectedSubcategory = active;
             rebuildSidebar();
@@ -530,7 +557,11 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private Component choiceLabel(ChoiceSetting setting) {
-        return RalleTheme.ui(Component.empty().append(Component.translatable("ralle.settings.value." + setting.value())).append(" ▾"));
+        return RalleTheme.dropdownLabel(Component.translatable("ralle.settings.value." + setting.value()));
+    }
+
+    private void refreshSearchHintTypography() {
+        searchBox.setHint(RalleTheme.ui(Component.translatable("ralle.settings.search")));
     }
 
     private Component keybindLabel(KeybindSetting setting) {

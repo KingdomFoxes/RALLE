@@ -27,13 +27,20 @@ final class RalleButtonRenderers {
         return renderer(Palette.PRIMARY, () -> false);
     }
 
-    static ButtonComponent.Renderer navigation() {
+    static ButtonComponent.Renderer destructive() {
+        return renderer(Palette.DESTRUCTIVE, () -> false);
+    }
+
+    static ButtonComponent.Renderer navigation(int leftInset) {
         return (graphics, button, delta) -> {
             int x = button.getX();
             int y = button.getY();
             int right = x + button.getWidth();
             int bottom = y + button.getHeight();
-            if (button.isHovered()) graphics.fill(x, y, right, bottom, 0xA6263A5A);
+            int highlightLeft = Math.clamp(x + leftInset, x, right);
+            if (button.isHovered() && highlightLeft < right) {
+                graphics.fill(highlightLeft, y, right, bottom, 0xA6263A5A);
+            }
         };
     }
 
@@ -94,7 +101,8 @@ final class RalleButtonRenderers {
     private enum Palette {
         NEUTRAL(0xFF263A5A, 0xFF324D77, TOP_LEFT_HIGHLIGHT),
         PRIMARY(0xFF238636, 0xFF2EA043, 0xFF53B564),
-        SELECTED(0xFFB8832F, 0xFFD39B3D, 0xFFE2B45F);
+        SELECTED(0xFFB8832F, 0xFFD39B3D, 0xFFE2B45F),
+        DESTRUCTIVE(0xFF9F2D36, 0xFFC13B46, 0xFFE26973);
 
         private final int normal;
         private final int hovered;

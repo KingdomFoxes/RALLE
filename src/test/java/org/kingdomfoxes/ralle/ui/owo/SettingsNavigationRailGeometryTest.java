@@ -13,6 +13,18 @@ import static org.kingdomfoxes.ralle.ui.owo.SettingsNavigationRailGeometry.Shape
 
 class SettingsNavigationRailGeometryTest {
     @Test
+    void subcategoryHighlightBeginsAfterTheGoldRail() {
+        int buttonLeftMargin = 8;
+        int inset = SettingsNavigationRailGeometry.highlightLeftInset(SUBCATEGORY, buttonLeftMargin);
+        assertEquals(9, inset);
+        assertEquals(
+                SettingsNavigationRailGeometry.SUBCATEGORY_LANE_X + SettingsNavigationRailGeometry.THICKNESS,
+                buttonLeftMargin + inset
+        );
+        assertEquals(0, SettingsNavigationRailGeometry.highlightLeftInset(CATEGORY, 0));
+    }
+
+    @Test
     void collapsedNavigationStaysInTheCategoryLaneWithoutABottomCap() {
         assertEquals(
                 List.of(
@@ -76,7 +88,7 @@ class SettingsNavigationRailGeometryTest {
         assertEquals(
                 List.of(
                         new SettingsNavigationRailGeometry.Segment(15, 0, 2, 18),
-                        new SettingsNavigationRailGeometry.Segment(15, 16, 105, 2)
+                        new SettingsNavigationRailGeometry.Segment(15, 16, 97, 2)
                 ),
                 SettingsNavigationRailGeometry.segments(END_SUBCATEGORIES, 120, 18, 18)
         );

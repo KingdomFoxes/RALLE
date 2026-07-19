@@ -8,8 +8,15 @@ final class SettingsNavigationRailGeometry {
     static final int THICKNESS = 2;
     static final int CATEGORY_LANE_X = 0;
     static final int SUBCATEGORY_LANE_X = 15;
+    static final int END_CAP_RIGHT_INSET = 8;
 
     private SettingsNavigationRailGeometry() {}
+
+    static int highlightLeftInset(Level level, int buttonLeftMargin) {
+        return level == Level.SUBCATEGORY
+                ? Math.max(0, SUBCATEGORY_LANE_X + THICKNESS - buttonLeftMargin)
+                : 0;
+    }
 
     static List<Shape> shapes(List<Level> levels) {
         var shapes = new ArrayList<Shape>(levels.size());
@@ -50,7 +57,11 @@ final class SettingsNavigationRailGeometry {
             }
             case END_SUBCATEGORIES -> {
                 segments.add(vertical(SUBCATEGORY_LANE_X, 0, visualHeight));
-                segments.add(horizontal(SUBCATEGORY_LANE_X, rowWidth, turnY));
+                segments.add(horizontal(
+                        SUBCATEGORY_LANE_X,
+                        Math.max(SUBCATEGORY_LANE_X + THICKNESS, rowWidth - END_CAP_RIGHT_INSET),
+                        turnY
+                ));
             }
         }
         return List.copyOf(segments);

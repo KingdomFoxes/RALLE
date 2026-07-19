@@ -12,7 +12,9 @@ final class SettingsScreenLayout {
     static final int SEARCH_HEIGHT = 20;
     static final int SIDEBAR_GAP = 5;
     static final int NAVIGATION_ROW_GAP = 3;
-    static final int ACTIVE_MARKER = 10;
+    static final int DOCUMENT_PADDING = 8;
+    static final int SECTION_TOP_MARGIN = 6;
+    static final int ACTIVE_MARKER = DOCUMENT_PADDING + SECTION_TOP_MARGIN;
     static final int MINIMUM_DOCUMENT_BOTTOM_SPACE = 24;
     private static final int MAX_PANEL_WIDTH = 620;
 
@@ -34,6 +36,20 @@ final class SettingsScreenLayout {
     static int trailingDocumentSpace(int viewportHeight, int contentAfterFinalAnchor) {
         return Math.max(MINIMUM_DOCUMENT_BOTTOM_SPACE,
                 viewportHeight - ACTIVE_MARKER - contentAfterFinalAnchor + MINIMUM_DOCUMENT_BOTTOM_SPACE);
+    }
+
+    static int descriptionWidth(int documentWidth, boolean stacked) {
+        return stacked
+                ? Math.max(150, documentWidth - 30)
+                : Math.max(120, documentWidth * 2 / 3 - 24);
+    }
+
+    static int dependencyDescriptionWidth(int documentWidth) {
+        return Math.max(120, documentWidth - 30);
+    }
+
+    static int jumpScrollOffset(int anchorOffset, int maxScroll) {
+        return Math.clamp(anchorOffset - ACTIVE_MARKER, 0, Math.max(0, maxScroll));
     }
 
     static int activeSection(List<Integer> anchorOffsets, int scrollOffset, int maxScroll) {

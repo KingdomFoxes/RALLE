@@ -6,6 +6,7 @@ import org.kingdomfoxes.ralle.api.settings.SettingsScreenFactory;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotService;
+import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 
 public record RalleContext(
         FeatureRegistry features,
@@ -13,6 +14,7 @@ public record RalleContext(
         SettingsScreenFactory settingsScreens,
         ChatLayoutService chatLayout,
         ChatBehaviorService chatBehavior,
-        ChatScreenshotService chatScreenshots
+        ChatScreenshotService chatScreenshots,
+        RaidLfgService raidLfg
 ) {
 }

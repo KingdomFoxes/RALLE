@@ -6,7 +6,7 @@ import io.wispforest.owo.ui.core.Sizing;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 
-/** Minecraft-font section title centered inside a one-pixel separator. */
+/** Interface-font section title centered inside a one-pixel separator. */
 final class SettingsSectionDivider extends BaseUIComponent {
     private static final int HEIGHT = 17;
     private static final int TITLE_GAP = 5;
@@ -15,7 +15,7 @@ final class SettingsSectionDivider extends BaseUIComponent {
     private final Component title;
 
     SettingsSectionDivider(Component title) {
-        this.title = title.copy();
+        this.title = RalleTheme.ui(title);
         sizing(Sizing.fill(100), Sizing.fixed(HEIGHT));
     }
 

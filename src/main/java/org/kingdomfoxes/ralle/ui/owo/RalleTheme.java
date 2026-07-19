@@ -20,4 +20,11 @@ final class RalleTheme {
     static Component ui(Component component) {
         return RalleTypography.body(component);
     }
+
+    /** Keeps the dropdown glyph in Minecraft's default font even when body copy uses Karla. */
+    static Component dropdownLabel(Component component) {
+        return Component.empty()
+                .append(ui(component))
+                .append(Component.literal(" ▾"));
+    }
 }

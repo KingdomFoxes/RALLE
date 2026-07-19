@@ -35,10 +35,11 @@ platform ports. It must not depend on a concrete settings screen.
   parent-setting gates, count-to-cue mapping, rate limiting, and coalescing.
   Packaged RALLE sounds use original processed-xylophone assets and perform no
   network activity.
-- `lfg`: future protocol, authentication, live connection, lobby domain, and
-  party-automation boundary. It must remain inert until explicitly enabled.
-- `platform`: future Fabric/Minecraft adapters such as commands, keybinds,
-  connection lifecycle, local persistence, and clickable chat notifications.
+- `lfg`: strict Fox protocol, authentication, live connection, immutable lobby
+  projection, and Raid LFG orchestration. It remains inert until explicitly
+  enabled and connected to Wynncraft.
+- `platform`: Fabric/Minecraft adapters such as commands, keybinds, connection
+  lifecycle, local persistence, and future clickable chat notifications.
 
 ## Foundation invariants
 
@@ -55,8 +56,8 @@ platform ports. It must not depend on a concrete settings screen.
 `/ralle settings` opens the owo-lib adapter over RALLE-owned category and setting
 models. Values are stored in `config/ralle.properties`; invalid or obsolete
 values fall back to their declared defaults. Chat settings are consumed by the
-local chat integration; Raid LFG settings remain inert until that vertical
-slice is connected.
+local chat integration. The Raid LFG opt-in gates the persistent Fox client
+service, while its shortcut remains unbound until configured.
 
 Custom HUD rectangles are stored separately in
 `config/ralle-hud-layout.properties` as normalized coordinates and dimensions.
@@ -79,3 +80,32 @@ the component-tree construction where practical.
 
 The eventual Fox FastAPI service is a separate repository and remains the sole
 authority for LFG state. No backend implementation belongs in this client.
+
+## Raid LFG client protocol
+
+`RaidLfgService` is a persistent client service owned by `RalleContext`; opening or closing the
+browser does not own authentication or live synchronization. Networking starts only when the
+`raid-lfg-enabled` setting is true and the active server hostname is `wynncraft.com` or one of its
+subdomains. Disconnecting, disabling the setting, or changing servers closes the WebSocket and
+clears the in-memory bearer credential and lobby projection.
+
+The packaged protocol-v1 base URL is `https://kingdomfoxes.com/api/ralle/v1`. Private development
+may override it with the `ralle.lfg.baseUrl` JVM property. Insecure HTTP and WebSocket transports
+are accepted only when that override resolves to a loopback hostname; this is intentionally not a
+player setting.
+
+Authentication uses `POST /auth/challenge`, Minecraft's session `joinServer` proof, then
+`POST /auth/complete`. The issued bearer credential is never persisted. `GET /lobbies` provides a
+complete authorized snapshot; create, join, leave, and disband use `POST /lobbies...` with a fresh
+UUID `Idempotency-Key` per player action. A failed transport attempt is retried once with the same
+key. The `WS /live` connection sends the bearer credential in its `Authorization` header and must
+deliver a complete `snapshot` frame before any `lobby.upsert` or `lobby.remove` frame.
+
+Protocol JSON is decoded explicitly. Missing fields, unknown fields and enums, non-canonical UUIDs,
+invalid timestamps, unexpected frame types, and protocol-version mismatches make LFG unavailable
+without affecting local chat features. Global revisions are monotonic but may contain gaps because
+private events can be invisible to a viewer. Successful REST mutations update the immutable store
+immediately; a WebSocket event at the same revision is ignored.
+
+The only persisted LFG values remain the opt-in setting and unbound keybind. Credentials, snapshots,
+pending actions, backend overrides, and connection state are memory-only.
