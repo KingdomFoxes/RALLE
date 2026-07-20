@@ -85,14 +85,19 @@ authority for LFG state. No backend implementation belongs in this client.
 
 `RaidLfgService` is a persistent client service owned by `RalleContext`; opening or closing the
 browser does not own authentication or live synchronization. Networking starts only when the
-`raid-lfg-enabled` setting is true and the active server hostname is `wynncraft.com` or one of its
-subdomains. Disconnecting, disabling the setting, or changing servers closes the WebSocket and
-clears the in-memory bearer credential and lobby projection.
+`raid-lfg-enabled` setting is true and the active server hostname is `wynncraft.com`,
+`wynncraft.net`, or one of their subdomains. Both domains are required because the normal
+`play.wynncraft.net` entry connection may transfer the client to a regional `.com` host.
+Disconnecting, disabling the setting, or changing servers closes the WebSocket and clears the
+in-memory bearer credential and lobby projection.
 
-The packaged protocol-v1 base URL is `https://kingdomfoxes.com/api/ralle/v1`. Private development
-may override it with the `ralle.lfg.baseUrl` JVM property. Insecure HTTP and WebSocket transports
-are accepted only when that override resolves to a loopback hostname; this is intentionally not a
-player setting.
+During private feature development, the packaged protocol-v1 base URL is
+`http://127.0.0.1:8001/api/ralle/v1`, matching the single-worker local Uvicorn service. The intended
+production URL remains `https://kingdomfoxes.com/api/ralle/v1` as a named constant for the release
+switch. Either build may override its default with the `ralle.lfg.baseUrl` JVM property. Insecure
+HTTP and WebSocket transports are accepted only for loopback hosts; this is intentionally not a
+player setting. The JDK gateway is pinned to HTTP/1.1 so local requests do not attempt an `h2c`
+upgrade that Uvicorn does not support.
 
 Authentication uses `POST /auth/challenge`, Minecraft's session `joinServer` proof, then
 `POST /auth/complete`. The issued bearer credential is never persisted. `GET /lobbies` provides a

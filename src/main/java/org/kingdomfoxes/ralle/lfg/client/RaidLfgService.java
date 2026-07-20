@@ -3,6 +3,8 @@ package org.kingdomfoxes.ralle.lfg.client;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocolException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashSet;
 import java.util.Locale;
@@ -16,6 +18,7 @@ import java.util.regex.Pattern;
 
 /** Persistent owner of authentication, connection lifecycle, live state, and mutations. */
 public final class RaidLfgService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RaidLfgService.class);
     public enum LifecycleState {
         DISABLED, NOT_ON_WYNNCRAFT, AUTHENTICATING, SYNCING, ONLINE, RECONNECTING,
         INELIGIBLE, OUTDATED, UNAVAILABLE
@@ -279,6 +282,7 @@ public final class RaidLfgService {
                 }
             }
         } else if (cause instanceof LfgProtocolException) {
+            LOGGER.error("Fox returned incompatible Raid LFG data: {}", cause.getMessage(), cause);
             terminalUnavailable("Fox returned incompatible Raid LFG data.");
         } else if (cause instanceof TerminalException terminal) {
             if ("CLIENT_VERSION_MISMATCH".equals(terminal.code)) terminalState(LifecycleState.OUTDATED, terminal.getMessage());
@@ -369,7 +373,12 @@ public final class RaidLfgService {
     }
 
     static boolean isWynncraft(String host) {
-        return host.equals("wynncraft.com") || host.endsWith(".wynncraft.com");
+        return isDomainOrSubdomain(host, "wynncraft.com")
+                || isDomainOrSubdomain(host, "wynncraft.net");
+    }
+
+    private static boolean isDomainOrSubdomain(String host, String domain) {
+        return host.equals(domain) || host.endsWith("." + domain);
     }
 
     private static String pendingKey(UUID lobbyId, String action) {

@@ -90,8 +90,13 @@ class RaidLfgServiceTest {
     void hostnameMatchingDoesNotAcceptLookalikes() {
         assertTrue(RaidLfgService.isWynncraft("wynncraft.com"));
         assertTrue(RaidLfgService.isWynncraft("play.wynncraft.com"));
+        assertTrue(RaidLfgService.isWynncraft("wynncraft.net"));
+        assertTrue(RaidLfgService.isWynncraft("play.wynncraft.net"));
+        assertTrue(RaidLfgService.isWynncraft("eu.wynncraft.com"));
         assertFalse(RaidLfgService.isWynncraft("wynncraft.com.example.org"));
+        assertFalse(RaidLfgService.isWynncraft("wynncraft.net.example.org"));
         assertFalse(RaidLfgService.isWynncraft("notwynncraft.com"));
+        assertFalse(RaidLfgService.isWynncraft("notwynncraft.net"));
     }
 
     private static RaidLfgService service(FakeGateway gateway, MutableEnvironment env) {

@@ -24,6 +24,11 @@ class HttpLfgGatewayTest {
     }
 
     @Test
+    void packagedDevelopmentBuildTargetsLocalFoxServer() {
+        assertEquals("http://127.0.0.1:8001/api/ralle/v1", HttpLfgGateway.DEFAULT_BASE_URL);
+    }
+
+    @Test
     void mutationRetriesOneTransportFailureWithSameBearerAndIdempotencyKey() throws Exception {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         var calls = new AtomicInteger();
