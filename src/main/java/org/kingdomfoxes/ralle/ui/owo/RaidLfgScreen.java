@@ -263,29 +263,38 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private ButtonComponent collapsedAction(LfgProtocol.Lobby lobby) {
-        var button = UIComponents.button(RalleTheme.ui(Component.literal("Join")), ignored -> {
-            expandedLobbies.add(lobby.lobbyId());
-            rebuildGrid();
+        var action = collapsedActionFor(lobby, viewerId());
+        var button = UIComponents.button(RalleTheme.ui(Component.literal(action.label())), ignored -> {
+            if (action.requiresConfirmation()) {
+                openDisbandConfirmation(lobby);
+            } else {
+                expandedLobbies.add(lobby.lobbyId());
+                rebuildGrid();
+            }
         });
-        button.sizing(Sizing.fixed(52), Sizing.fixed(20));
-        button.renderer(RalleButtonRenderers.primary());
-        button.active = service.lifecycle() == RaidLfgService.LifecycleState.ONLINE;
-        button.tooltip(RalleTheme.ui(Component.literal("Expand and review the roster before joining")));
+        button.sizing(Sizing.fixed(action.destructive() ? 64 : 52), Sizing.fixed(20));
+        button.renderer(action.destructive() ? RalleButtonRenderers.destructive() : RalleButtonRenderers.primary());
+        button.active = service.lifecycle() == RaidLfgService.LifecycleState.ONLINE
+                && !service.pending(lobby.lobbyId(), action.kind().protocolAction);
+        button.tooltip(RalleTheme.ui(Component.literal(action.destructive()
+                ? "Disband this party"
+                : "Expand and review the roster before joining")));
         return button;
     }
 
     private ButtonComponent expandedAction(LfgProtocol.Lobby lobby) {
-        var viewer = service.store().state().viewer();
-        var viewerId = viewer == null ? null : viewer.minecraftUuid();
-        boolean host = viewerId != null && lobby.hostedBy(viewerId);
+        var viewerId = viewerId();
+        var action = expandedActionFor(lobby, viewerId);
         boolean member = viewerId != null && lobby.contains(viewerId);
-        String action = host ? "disband" : member ? "leave" : "join";
-        boolean allowed = host || lobby.capabilities() != null && (member ? lobby.capabilities().leave() : lobby.capabilities().join());
-        String label = host ? "Disband" : member ? "Leave Lobby" : disabledJoinLabel(lobby);
-        var button = UIComponents.button(RalleTheme.ui(Component.literal(label)), ignored -> performAction(lobby, action));
+        boolean allowed = action.kind() == CardActionKind.DISBAND
+                || lobby.capabilities() != null && (member ? lobby.capabilities().leave() : lobby.capabilities().join());
+        var button = UIComponents.button(RalleTheme.ui(Component.literal(action.label())), ignored -> {
+            if (action.requiresConfirmation()) openDisbandConfirmation(lobby);
+            else performAction(lobby, action.kind().protocolAction);
+        });
         button.sizing(Sizing.fixed(72), Sizing.fixed(20));
-        button.renderer(host || member ? RalleButtonRenderers.destructive() : RalleButtonRenderers.primary());
-        button.active = allowed && !service.pending(lobby.lobbyId(), action);
+        button.renderer(action.destructive() ? RalleButtonRenderers.destructive() : RalleButtonRenderers.primary());
+        button.active = allowed && !service.pending(lobby.lobbyId(), action.kind().protocolAction);
         if (!allowed && lobby.capabilities() != null) {
             var reason = lobby.capabilities().reason(member ? "leave" : "join");
             if (reason != null) button.tooltip(RalleTheme.ui(Component.literal(capabilityReason(reason))));
@@ -319,8 +328,57 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var label = Component.empty();
         if (member.role() == LfgProtocol.MemberRole.HOST) label.append(Component.literal("★ "));
         label.append(RalleTheme.ui(Component.literal(member.ign())));
-        row.child(UIComponents.label(label).color(member.role() == LfgProtocol.MemberRole.HOST ? RalleTheme.ACCENT : Color.WHITE));
+        row.child(UIComponents.label(label).color(Color.WHITE));
         return row;
+    }
+
+    private void openDisbandConfirmation(LfgProtocol.Lobby lobby) {
+        if (root == null || service.lifecycle() != RaidLfgService.LifecycleState.ONLINE) return;
+        var content = UIContainers.verticalFlow(Sizing.fixed(300), Sizing.content());
+        content.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
+        content.child(UIComponents.label(RalleTheme.ui(Component.literal("DISBAND PARTY"))).color(RalleTheme.ACCENT));
+        content.child(UIComponents.label(RalleTheme.ui(Component.literal(
+                "Disband this party? The listing will be removed for everyone."))).color(RalleTheme.MUTED).maxWidth(276));
+
+        var controls = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content()).gap(8);
+        var overlayHolder = new OverlayContainer<?>[1];
+        var confirm = UIComponents.button(RalleTheme.ui(Component.literal("Disband")), ignored -> {
+            overlayHolder[0].remove();
+            performAction(lobby, CardActionKind.DISBAND.protocolAction);
+        });
+        confirm.horizontalSizing(Sizing.fill(50));
+        confirm.renderer(RalleButtonRenderers.destructive());
+        var cancel = UIComponents.button(RalleTheme.ui(Component.literal("Cancel")), ignored -> overlayHolder[0].remove());
+        cancel.horizontalSizing(Sizing.fill(50));
+        cancel.renderer(RalleButtonRenderers.neutral());
+        controls.child(confirm).child(cancel);
+        content.child(controls);
+
+        var overlay = UIContainers.overlay(content).closeOnClick(false);
+        overlayHolder[0] = overlay;
+        root.child(overlay);
+    }
+
+    private UUID viewerId() {
+        var viewer = service.store().state().viewer();
+        return viewer == null ? null : viewer.minecraftUuid();
+    }
+
+    static CardAction collapsedActionFor(LfgProtocol.Lobby lobby, UUID viewerId) {
+        if (viewerId != null && lobby.hostedBy(viewerId)) {
+            return new CardAction(CardActionKind.DISBAND, "Disband", true, true);
+        }
+        return new CardAction(CardActionKind.REVIEW_JOIN, "Join", false, false);
+    }
+
+    static CardAction expandedActionFor(LfgProtocol.Lobby lobby, UUID viewerId) {
+        if (viewerId != null && lobby.hostedBy(viewerId)) {
+            return new CardAction(CardActionKind.DISBAND, "Disband", true, true);
+        }
+        if (viewerId != null && lobby.contains(viewerId)) {
+            return new CardAction(CardActionKind.LEAVE, "Leave Lobby", true, false);
+        }
+        return new CardAction(CardActionKind.JOIN, disabledJoinLabel(lobby), false, false);
     }
 
     private void openCreateModal() {
@@ -492,6 +550,18 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     @Override public void onClose() { minecraft.setScreen(parent); }
+
+    record CardAction(CardActionKind kind, String label, boolean destructive, boolean requiresConfirmation) {}
+
+    enum CardActionKind {
+        REVIEW_JOIN("join"), JOIN("join"), LEAVE("leave"), DISBAND("disband");
+
+        private final String protocolAction;
+
+        CardActionKind(String protocolAction) {
+            this.protocolAction = protocolAction;
+        }
+    }
 
     private enum StatusFilter {
         OPEN("Open"), IN_RAID("In Raid"), ALL("All");
