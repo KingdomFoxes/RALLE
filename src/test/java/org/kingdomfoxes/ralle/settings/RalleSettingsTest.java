@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class RalleSettingsTest {
     @TempDir
@@ -36,6 +37,15 @@ class RalleSettingsTest {
         assertEquals(false, registry.setting("chat-screenshot-enabled", BooleanSetting.class).value());
         assertEquals(false, registry.setting("chat-selection-sounds", BooleanSetting.class).value());
         assertEquals(false, registry.setting("chat-screenshot-smooth-expansion", BooleanSetting.class).value());
+    }
+
+    @Test
+    void chatScrollbarToggleIsDisabledByDefaultAndRequiresChatCustomization() {
+        var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
+        RalleSettings.register(registry);
+
+        assertFalse(registry.setting("hide-chat-scrollbar", BooleanSetting.class).value());
+        assertEquals(List.of("chat-enabled"), registry.dependencies("hide-chat-scrollbar"));
     }
 
     @Test

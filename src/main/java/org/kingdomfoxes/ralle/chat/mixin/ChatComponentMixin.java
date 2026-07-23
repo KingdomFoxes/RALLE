@@ -12,6 +12,7 @@ import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatGraphicsTransform;
 import org.kingdomfoxes.ralle.chat.ChatMessageProjector;
 import org.kingdomfoxes.ralle.chat.ChatRenderLayout;
+import org.kingdomfoxes.ralle.chat.ChatScrollbarGraphics;
 import org.kingdomfoxes.ralle.chat.render.FullShadowFrameCollector;
 import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotSnapshot;
@@ -172,15 +173,17 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
     )
     private ChatComponent.ChatGraphicsAccess ralle$transformChatGraphics(ChatComponent.ChatGraphicsAccess graphics) {
         var behavior = RalleClient.context().chatBehavior();
-        return ChatGraphicsTransform.wrap(
+        int contentWidth = ralle$renderContentWidth();
+        var transformed = ChatGraphicsTransform.wrap(
                 graphics,
                 minecraft.font,
-                ralle$renderContentWidth(),
+                contentWidth,
                 behavior.horizontalAlignment(),
                 behavior.textShadow(),
                 !ralle$capturingClickableText,
                 ralle$capturingClickableText ? null : ralle$fullShadowCollector
         );
+        return ChatScrollbarGraphics.wrap(transformed, contentWidth, behavior.hideChatScrollbar());
     }
 
     @Inject(

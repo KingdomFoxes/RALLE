@@ -31,6 +31,7 @@ public final class RalleSettings {
                 List.of(
                         subcategory("general", toggle("chat-enabled"), action("edit-chat-layout")),
                         subcategory("appearance",
+                                toggle("hide-chat-scrollbar"),
                                 toggle("message-direction-enabled"),
                                 choice("message-direction", "bottom-up", "bottom-up", "top-down"),
                                 toggle("horizontal-alignment-enabled"),
@@ -59,7 +60,7 @@ public final class RalleSettings {
         ));
 
         requireChat(registry,
-                "edit-chat-layout", "message-direction-enabled", "horizontal-alignment-enabled",
+                "edit-chat-layout", "hide-chat-scrollbar", "message-direction-enabled", "horizontal-alignment-enabled",
                 "text-shadow-enabled", "compact-chat", "stack-empty-lines", "chat-screenshot-enabled"
         );
         registry.requireEnabled("message-direction", "message-direction-enabled");

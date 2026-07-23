@@ -40,6 +40,8 @@
   "ralle.settings.option.chat-enabled.description": "Allows RALLE's local chat options to operate in singleplayer or on any server.",
   "ralle.settings.option.edit-chat-layout": "Edit Chat Layout",
   "ralle.settings.option.edit-chat-layout.description": "Opens the HUD layout editor for moving, resizing, or restoring the single chat box.",
+  "ralle.settings.option.hide-chat-scrollbar": "Hide Chat Scrollbar",
+  "ralle.settings.option.hide-chat-scrollbar.description": "Hides Minecraft's scrollbar while chat is open. Mouse-wheel scrolling still works.",
   "ralle.settings.option.chat-screenshot-enabled": "Enable Chat Screenshotting",
   "ralle.settings.option.chat-screenshot-enabled.description": "While chat is open, hold either Ctrl key and left-drag across messages to prepare a transparent chat image. Ctrl+C or double-click copies it.",
   "ralle.settings.option.chat-selection-sounds": "Chat Selection Sounds",

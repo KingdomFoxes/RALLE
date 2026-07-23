@@ -11,6 +11,7 @@ public final class ChatBehaviorService {
 
     private final Minecraft minecraft;
     private final BooleanSetting chatEnabled;
+    private final BooleanSetting hideChatScrollbar;
     private final BooleanSetting compactChat;
     private final BooleanSetting stackEmptyLines;
     private final BooleanSetting messageDirectionEnabled;
@@ -24,6 +25,7 @@ public final class ChatBehaviorService {
     public ChatBehaviorService(Minecraft minecraft, SettingsRegistry settings) {
         this.minecraft = minecraft;
         this.chatEnabled = settings.setting("chat-enabled", BooleanSetting.class);
+        this.hideChatScrollbar = settings.setting("hide-chat-scrollbar", BooleanSetting.class);
         this.compactChat = settings.setting("compact-chat", BooleanSetting.class);
         this.stackEmptyLines = settings.setting("stack-empty-lines", BooleanSetting.class);
         this.messageDirectionEnabled = settings.setting("message-direction-enabled", BooleanSetting.class);
@@ -37,6 +39,10 @@ public final class ChatBehaviorService {
 
     public boolean projectionEnabled() {
         return compactChatEnabled() || stackEmptyLinesEnabled();
+    }
+
+    public boolean hideChatScrollbar() {
+        return chatEnabled.value() && hideChatScrollbar.value();
     }
 
     public boolean compactChatEnabled() {
