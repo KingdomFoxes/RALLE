@@ -69,6 +69,15 @@ class HttpLfgGatewayTest {
                 () -> new HttpLfgGateway(HttpClient.newHttpClient(), "http://example.org/api/ralle/v1"));
     }
 
+    @Test
+    void genericMissingEndpointBecomesVisibleHostActionError() {
+        var error = HttpLfgGateway.httpError(404, "{\"detail\":\"Not Found\"}");
+
+        assertEquals("HTTP_404", error.code());
+        assertEquals("This action is unavailable on the connected Fox backend (HTTP 404).", error.message());
+        assertFalse(error.retryable());
+    }
+
     private static String mutationJson() {
         return """
                 {"protocol_version":1,"revision":1,"lobby":{

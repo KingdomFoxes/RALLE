@@ -99,6 +99,60 @@ class RaidLfgServiceTest {
         assertFalse(RaidLfgService.isWynncraft("notwynncraft.net"));
     }
 
+    @Test
+    void acceptedKickRunsOneBoundedCommandAndLiveEffectsAreDeduplicated() {
+        var gateway = new FakeGateway();
+        gateway.kickResult = new LfgProtocol.Mutation(1, 2, hostedLobby(false));
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var notifications = new java.util.ArrayList<LfgProtocol.PartyPingFrame>();
+        var commands = new java.util.ArrayList<String>();
+        var service = new RaidLfgService(
+                gateway, env, ignored -> CompletableFuture.completedFuture(null),
+                () -> 0L, () -> 0.5, notifications::add, commands::add);
+
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshotWithLobby()));
+        service.kick(hostedLobby(true).lobbyId(),
+                UUID.fromString("00000000-0000-0000-0000-000000000002"), "Player02").join();
+        assertEquals(List.of("Player02"), commands);
+
+        var command = new LfgProtocol.PartyKickCommandFrame(
+                1, UUID.fromString("00000000-0000-0000-0000-000000000020"),
+                hostedLobby(false).lobbyId(),
+                UUID.fromString("00000000-0000-0000-0000-000000000003"),
+                "Player03", Instant.EPOCH);
+        gateway.listener.onFrame(command);
+        gateway.listener.onFrame(command);
+        assertEquals(List.of("Player02", "Player03"), commands);
+
+        var ping = new LfgProtocol.PartyPingFrame(
+                1, UUID.fromString("00000000-0000-0000-0000-000000000021"),
+                hostedLobby(false).lobbyId(), PLAYER, "Player01", Instant.EPOCH);
+        gateway.listener.onFrame(ping);
+        assertEquals(List.of(ping), notifications);
+        assertEquals(ping.lobbyId(), service.focusLobbyId());
+    }
+
+    @Test
+    void acceptedLockRoundTripUpdatesAuthoritativeLobbyState() {
+        var gateway = new FakeGateway();
+        gateway.lockResult = new LfgProtocol.Mutation(1, 2, lockedHostedLobby());
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var service = service(gateway, env);
+
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshotWithLobby()));
+        var mutation = service.setLocked(hostedLobby(true).lobbyId(), true).join();
+
+        assertTrue(gateway.requestedLocked);
+        assertTrue(mutation.lobby().locked());
+        assertTrue(service.store().state().lobbyList().getFirst().locked());
+    }
+
     private static RaidLfgService service(FakeGateway gateway, MutableEnvironment env) {
         return new RaidLfgService(gateway, env, ignored -> CompletableFuture.completedFuture(null),
                 () -> 0L, () -> 0.5);
@@ -109,6 +163,40 @@ class RaidLfgServiceTest {
         var player = new LfgProtocol.PlayerIdentity(PLAYER, "Player01", guild);
         return new LfgProtocol.Snapshot(1, 1, player,
                 new LfgProtocol.ViewerCapabilities(true, true, Map.of()), List.of());
+    }
+
+    private static LfgProtocol.Snapshot snapshotWithLobby() {
+        var base = snapshot();
+        return new LfgProtocol.Snapshot(1, 1, base.viewer(), base.capabilities(),
+                List.of(hostedLobby(true)));
+    }
+
+    private static LfgProtocol.Lobby hostedLobby(boolean includeMember) {
+        var guild = new LfgProtocol.GuildIdentity(GUILD, "Fox", "FOX", "#FF8200");
+        var host = new LfgProtocol.Member(PLAYER, "Player01", guild,
+                LfgProtocol.MemberRole.HOST, LfgProtocol.MemberSource.RALLE, Instant.EPOCH, null);
+        var members = new java.util.ArrayList<LfgProtocol.Member>();
+        members.add(host);
+        if (includeMember) {
+            members.add(new LfgProtocol.Member(
+                    UUID.fromString("00000000-0000-0000-0000-000000000002"), "Player02", guild,
+                    LfgProtocol.MemberRole.MEMBER, LfgProtocol.MemberSource.RALLE, Instant.EPOCH, null));
+        }
+        return new LfgProtocol.Lobby(
+                UUID.fromString("00000000-0000-0000-0000-000000000010"),
+                LfgProtocol.RaidType.TNA, LfgProtocol.Region.EU, null,
+                LfgProtocol.Visibility.PUBLIC, LfgProtocol.LobbyStatus.OPEN, false,
+                PLAYER, GUILD, Instant.EPOCH, Instant.EPOCH, includeMember ? 1 : 2, 4,
+                members, new LfgProtocol.LobbyCapabilities(false, false, Map.of()));
+    }
+
+    private static LfgProtocol.Lobby lockedHostedLobby() {
+        var lobby = hostedLobby(true);
+        return new LfgProtocol.Lobby(
+                lobby.lobbyId(), lobby.raidType(), lobby.region(), lobby.note(), lobby.visibility(),
+                lobby.status(), true, lobby.hostMinecraftUuid(), lobby.hostGuildUuid(),
+                lobby.createdAt(), lobby.lastActivityAt(), 2, lobby.capacity(),
+                lobby.members(), lobby.capabilities());
     }
 
     private static final class MutableEnvironment implements RaidLfgEnvironment {
@@ -126,6 +214,9 @@ class RaidLfgServiceTest {
         int challengeCalls;
         int completeCalls;
         CompletableFuture<LfgProtocol.Challenge> challengeFuture;
+        LfgProtocol.Mutation kickResult;
+        LfgProtocol.Mutation lockResult;
+        boolean requestedLocked;
         LiveListener listener;
 
         @Override public CompletableFuture<LfgProtocol.Status> status() {
@@ -147,6 +238,14 @@ class RaidLfgServiceTest {
         @Override public CompletableFuture<LfgProtocol.Mutation> join(String bearerToken, UUID lobbyId, UUID idempotencyKey) { return unsupported(); }
         @Override public CompletableFuture<LfgProtocol.Mutation> leave(String bearerToken, UUID lobbyId, UUID idempotencyKey) { return unsupported(); }
         @Override public CompletableFuture<LfgProtocol.Mutation> disband(String bearerToken, UUID lobbyId, UUID idempotencyKey) { return unsupported(); }
+        @Override public CompletableFuture<LfgProtocol.Mutation> kick(String bearerToken, UUID lobbyId, UUID targetId, UUID idempotencyKey) {
+            return kickResult == null ? unsupported() : CompletableFuture.completedFuture(kickResult);
+        }
+        @Override public CompletableFuture<LfgProtocol.Mutation> setLocked(String bearerToken, UUID lobbyId, boolean locked, UUID idempotencyKey) {
+            requestedLocked = locked;
+            return lockResult == null ? unsupported() : CompletableFuture.completedFuture(lockResult);
+        }
+        @Override public CompletableFuture<LfgProtocol.Mutation> ping(String bearerToken, UUID lobbyId, UUID idempotencyKey) { return unsupported(); }
         @Override public CompletableFuture<LiveConnection> connectLive(String bearerToken, LiveListener listener) {
             this.listener = listener;
             return CompletableFuture.completedFuture(() -> {});

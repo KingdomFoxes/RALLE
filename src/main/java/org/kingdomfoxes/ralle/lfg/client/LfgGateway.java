@@ -16,6 +16,11 @@ public interface LfgGateway {
     CompletableFuture<LfgProtocol.Mutation> join(String bearerToken, UUID lobbyId, UUID idempotencyKey);
     CompletableFuture<LfgProtocol.Mutation> leave(String bearerToken, UUID lobbyId, UUID idempotencyKey);
     CompletableFuture<LfgProtocol.Mutation> disband(String bearerToken, UUID lobbyId, UUID idempotencyKey);
+    CompletableFuture<LfgProtocol.Mutation> kick(String bearerToken, UUID lobbyId, UUID targetId,
+                                                 UUID idempotencyKey);
+    CompletableFuture<LfgProtocol.Mutation> setLocked(String bearerToken, UUID lobbyId, boolean locked,
+                                                      UUID idempotencyKey);
+    CompletableFuture<LfgProtocol.Mutation> ping(String bearerToken, UUID lobbyId, UUID idempotencyKey);
     CompletableFuture<LiveConnection> connectLive(String bearerToken, LiveListener listener);
 
     interface LiveConnection extends AutoCloseable {

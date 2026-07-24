@@ -86,6 +86,23 @@ public final class HttpLfgGateway implements LfgGateway {
         return mutation("/lobbies/" + lobbyId + "/disband", token, key);
     }
 
+    @Override
+    public CompletableFuture<LfgProtocol.Mutation> kick(String token, UUID lobbyId, UUID targetId, UUID key) {
+        return post("/lobbies/" + lobbyId + "/kick", token, key, StrictLfgJson.kickRequest(targetId),
+                StrictLfgJson::decodeMutation, true);
+    }
+
+    @Override
+    public CompletableFuture<LfgProtocol.Mutation> setLocked(String token, UUID lobbyId, boolean locked, UUID key) {
+        return post("/lobbies/" + lobbyId + "/lock", token, key, StrictLfgJson.lockRequest(locked),
+                StrictLfgJson::decodeMutation, true);
+    }
+
+    @Override
+    public CompletableFuture<LfgProtocol.Mutation> ping(String token, UUID lobbyId, UUID key) {
+        return mutation("/lobbies/" + lobbyId + "/ping", token, key);
+    }
+
     private CompletableFuture<LfgProtocol.Mutation> mutation(String path, String token, UUID key) {
         return post(path, token, key, "{}", StrictLfgJson::decodeMutation, true);
     }
@@ -172,11 +189,22 @@ public final class HttpLfgGateway implements LfgGateway {
                             return CompletableFuture.completedFuture(decoder.apply(response.body()));
                         }
                         return CompletableFuture.<T>failedFuture(new LfgGatewayException(
-                                response.statusCode(), StrictLfgJson.decodeError(response.body())));
+                                response.statusCode(), httpError(response.statusCode(), response.body())));
                     } catch (RuntimeException exception) {
                         return CompletableFuture.<T>failedFuture(exception);
                     }
                 }).thenCompose(Function.identity());
+    }
+
+    static LfgProtocol.Error httpError(int status, String body) {
+        try {
+            return StrictLfgJson.decodeError(body);
+        } catch (RuntimeException ignored) {
+            String message = status == 404
+                    ? "This action is unavailable on the connected Fox backend (HTTP 404)."
+                    : "Fox Raid LFG rejected the request (HTTP " + status + ").";
+            return new LfgProtocol.Error("HTTP_" + status, message, status >= 500, null, null);
+        }
     }
 
     private URI resolve(String path) {

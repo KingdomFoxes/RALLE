@@ -65,6 +65,30 @@ class RaidLfgScreenTest {
         assertFalse(action.requiresConfirmation());
     }
 
+    @Test
+    void lockedCollapsedCardHidesJoinButKeepsMemberAndHostActions() {
+        var locked = lockedLobby();
+        assertFalse(RaidLfgScreen.collapsedActionVisible(
+                locked, UUID.fromString("00000000-0000-0000-0000-000000000099")));
+        assertTrue(RaidLfgScreen.collapsedActionVisible(locked, HOST));
+        assertTrue(RaidLfgScreen.collapsedActionVisible(locked, MEMBER));
+        assertEquals("Locked", RaidLfgScreen.expandedActionFor(
+                locked, UUID.fromString("00000000-0000-0000-0000-000000000099")).label());
+    }
+
+    @Test
+    void kickConnectorStopsAtFacingBoxEdges() {
+        var vertical = RaidLfgScreen.connectorBetween(
+                new RaidLfgScreen.SelectionBox(10, 100, 100, 20),
+                new RaidLfgScreen.SelectionBox(10, 20, 100, 40));
+        assertEquals(new RaidLfgScreen.ConnectorLine(60, 100, 60, 60), vertical);
+
+        var diagonal = RaidLfgScreen.connectorBetween(
+                new RaidLfgScreen.SelectionBox(10, 100, 100, 20),
+                new RaidLfgScreen.SelectionBox(200, 20, 100, 40));
+        assertEquals(new RaidLfgScreen.ConnectorLine(87, 100, 200, 58), diagonal);
+    }
+
     private static LfgProtocol.Lobby lobby() {
         var guild = new LfgProtocol.GuildIdentity(GUILD, "Kingdom of Foxes", "FOX", "#FF8200");
         var host = new LfgProtocol.Member(HOST, "Host", guild, LfgProtocol.MemberRole.HOST,
@@ -85,5 +109,14 @@ class RaidLfgScreenTest {
                 LfgProtocol.RaidType.TNA, LfgProtocol.Region.EU, null, LfgProtocol.Visibility.PUBLIC,
                 LfgProtocol.LobbyStatus.OPEN, false, HOST, GUILD, Instant.EPOCH, Instant.EPOCH,
                 2, 4, List.of(host, member), new LfgProtocol.LobbyCapabilities(false, true, Map.of()));
+    }
+
+    private static LfgProtocol.Lobby lockedLobby() {
+        var lobby = lobbyWithMember();
+        return new LfgProtocol.Lobby(
+                lobby.lobbyId(), lobby.raidType(), lobby.region(), lobby.note(), lobby.visibility(),
+                lobby.status(), true, lobby.hostMinecraftUuid(), lobby.hostGuildUuid(),
+                lobby.createdAt(), lobby.lastActivityAt(), lobby.revision(), lobby.capacity(),
+                lobby.members(), lobby.capabilities());
     }
 }

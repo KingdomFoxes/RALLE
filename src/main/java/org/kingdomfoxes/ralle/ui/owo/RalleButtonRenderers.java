@@ -24,6 +24,10 @@ final class RalleButtonRenderers {
         return renderer(Palette.NEUTRAL, selected);
     }
 
+    static ButtonComponent.Renderer warning(BooleanSupplier active) {
+        return renderer(Palette.NEUTRAL, active);
+    }
+
     static ButtonComponent.Renderer primary() {
         return renderer(Palette.PRIMARY, () -> false);
     }

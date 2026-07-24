@@ -11,9 +11,10 @@ enabled. Compact chat, empty-line stacking, message direction, horizontal text
 alignment, and text-shadow modes are implemented as independently disabled
 local options. Transparent chat screenshot selection also supports separately
 disabled processed-xylophone count and successful-copy feedback.
-`/ralle lfg` opens a disconnected owo-lib browser prototype populated with
-fixed fake lobby data for layout evaluation. Live Raid LFG is not implemented
-yet, and every feature defaults off.
+`/ralle lfg` opens the live, authenticated owo-lib Raid LFG browser when the
+feature is explicitly enabled on Wynncraft. Hosts can disband, kick with a
+hold-to-confirm roster interaction, lock or reopen joining, and ping current
+party members. Every feature still defaults off.
 
 ## Development
 

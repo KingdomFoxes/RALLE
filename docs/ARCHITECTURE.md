@@ -101,10 +101,19 @@ upgrade that Uvicorn does not support.
 
 Authentication uses `POST /auth/challenge`, Minecraft's session `joinServer` proof, then
 `POST /auth/complete`. The issued bearer credential is never persisted. `GET /lobbies` provides a
-complete authorized snapshot; create, join, leave, and disband use `POST /lobbies...` with a fresh
+complete authorized snapshot; create, join, leave, disband, kick, lock/unlock, and ping use
+`POST /lobbies...` with a fresh
 UUID `Idempotency-Key` per player action. A failed transport attempt is retried once with the same
 key. The `WS /live` connection sends the bearer credential in its `Authorization` header and must
 deliver a complete `snapshot` frame before any `lobby.upsert` or `lobby.remove` frame.
+
+Kick, lock/unlock, and ping remain Fox-authoritative host actions. An accepted kick removes the
+member, applies a 120-second rejoin block, and causes exactly one bounded `/party kick <IGN>`
+command on the host client. Recipient-scoped `party.ping` and Discord-originated
+`party.kick-command` frames are ephemeral, are never replayed after reconnect, and do not advance
+the immutable lobby projection. Ping is limited to once per 30 seconds per lobby and is delivered
+to current members other than the host; linked Discord members are notified through the same
+FastAPI-owned outbox flow.
 
 Protocol JSON is decoded explicitly. Missing fields, unknown fields and enums, non-canonical UUIDs,
 invalid timestamps, unexpected frame types, and protocol-version mismatches make LFG unavailable

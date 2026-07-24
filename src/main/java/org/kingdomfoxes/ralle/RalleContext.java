@@ -7,6 +7,7 @@ import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotService;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
+import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
 
 public record RalleContext(
         FeatureRegistry features,
@@ -15,6 +16,7 @@ public record RalleContext(
         ChatLayoutService chatLayout,
         ChatBehaviorService chatBehavior,
         ChatScreenshotService chatScreenshots,
-        RaidLfgService raidLfg
+        RaidLfgService raidLfg,
+        LfgSoundPlayer lfgSounds
 ) {
 }

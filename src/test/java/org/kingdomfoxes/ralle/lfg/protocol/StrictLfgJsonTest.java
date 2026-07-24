@@ -48,6 +48,22 @@ class StrictLfgJsonTest {
         assertInstanceOf(LfgProtocol.RemoveFrame.class, remove);
         var expiring = StrictLfgJson.decodeLiveFrame("{\"type\":\"session.expiring\",\"protocol_version\":1,\"expires_at\":\"2026-07-19T20:15:00Z\"}");
         assertInstanceOf(LfgProtocol.SessionExpiringFrame.class, expiring);
+        var ping = StrictLfgJson.decodeLiveFrame("""
+                {"type":"party.ping","protocol_version":1,
+                 "event_id":"00000000-0000-0000-0000-000000000020",
+                 "lobby_id":"00000000-0000-0000-0000-000000000010",
+                 "host_minecraft_uuid":"00000000-0000-0000-0000-000000000001",
+                 "host_ign":"Player01","occurred_at":"2026-07-19T20:02:00Z"}
+                """);
+        assertInstanceOf(LfgProtocol.PartyPingFrame.class, ping);
+        var command = StrictLfgJson.decodeLiveFrame("""
+                {"type":"party.kick-command","protocol_version":1,
+                 "event_id":"00000000-0000-0000-0000-000000000021",
+                 "lobby_id":"00000000-0000-0000-0000-000000000010",
+                 "target_minecraft_uuid":"00000000-0000-0000-0000-000000000002",
+                 "target_ign":"Player02","occurred_at":"2026-07-19T20:02:00Z"}
+                """);
+        assertInstanceOf(LfgProtocol.PartyKickCommandFrame.class, command);
     }
 
     @Test
@@ -58,6 +74,22 @@ class StrictLfgJsonTest {
         assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeSnapshot(snapshot().replace("00000000-0000-0000-0000-000000000010", "not-a-uuid")));
         assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeSnapshot(snapshot().replace("\"capacity\":4", "\"capacity\":5")));
         assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeLiveFrame("{\"type\":\"future.frame\"}"));
+    }
+
+    @Test
+    void encodesStrictHostActionBodies() {
+        assertEquals(
+                "{\"target_minecraft_uuid\":\"00000000-0000-0000-0000-000000000002\"}",
+                StrictLfgJson.kickRequest(
+                        java.util.UUID.fromString("00000000-0000-0000-0000-000000000002")));
+        assertEquals("{\"locked\":true}", StrictLfgJson.lockRequest(true));
+        assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeLiveFrame("""
+                {"type":"party.kick-command","protocol_version":1,
+                 "event_id":"00000000-0000-0000-0000-000000000021",
+                 "lobby_id":"00000000-0000-0000-0000-000000000010",
+                 "target_minecraft_uuid":"00000000-0000-0000-0000-000000000002",
+                 "target_ign":"bad command","occurred_at":"2026-07-19T20:02:00Z"}
+                """));
     }
 
     @Test

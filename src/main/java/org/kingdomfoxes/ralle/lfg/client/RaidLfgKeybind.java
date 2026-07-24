@@ -9,6 +9,7 @@ import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.ui.owo.RaidLfgScreen;
+import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
 
 /** Keeps the persisted, initially-unbound LFG shortcut synchronized with Minecraft input. */
 public final class RaidLfgKeybind {
@@ -20,11 +21,14 @@ public final class RaidLfgKeybind {
     private final KeybindSetting setting;
     private final KeyMapping mapping;
     private final RaidLfgService service;
+    private final LfgSoundPlayer sounds;
     private String appliedValue;
 
-    public RaidLfgKeybind(Minecraft minecraft, SettingsRegistry settings, RaidLfgService service) {
+    public RaidLfgKeybind(Minecraft minecraft, SettingsRegistry settings, RaidLfgService service,
+                          LfgSoundPlayer sounds) {
         this.minecraft = minecraft;
         this.service = service;
+        this.sounds = sounds;
         this.enabled = settings.setting("raid-lfg-enabled", BooleanSetting.class);
         this.setting = settings.setting("raid-lfg-keybind", KeybindSetting.class);
         this.mapping = KeyBindingHelper.registerKeyBinding(new KeyMapping(
@@ -39,7 +43,7 @@ public final class RaidLfgKeybind {
     public void tick() {
         if (!setting.value().equals(appliedValue)) applySetting();
         while (mapping.consumeClick()) {
-            if (enabled.value()) minecraft.setScreen(new RaidLfgScreen(minecraft.screen, service));
+            if (enabled.value()) minecraft.setScreen(new RaidLfgScreen(minecraft.screen, service, sounds));
         }
     }
 

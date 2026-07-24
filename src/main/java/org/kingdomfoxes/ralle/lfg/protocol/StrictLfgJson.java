@@ -75,6 +75,20 @@ public final class StrictLfgJson {
                 fields(object, "lobby.remove", Set.of("type", "protocol_version", "revision", "lobby_id"), Set.of());
                 yield new RemoveFrame(integer(object, "protocol_version"), number(object, "revision"), uuid(object, "lobby_id"));
             }
+            case "party.ping" -> {
+                fields(object, "party.ping", Set.of("type", "protocol_version", "event_id", "lobby_id",
+                        "host_minecraft_uuid", "host_ign", "occurred_at"), Set.of());
+                yield new PartyPingFrame(integer(object, "protocol_version"), uuid(object, "event_id"),
+                        uuid(object, "lobby_id"), uuid(object, "host_minecraft_uuid"),
+                        ign(object, "host_ign"), instant(object, "occurred_at"));
+            }
+            case "party.kick-command" -> {
+                fields(object, "party.kick-command", Set.of("type", "protocol_version", "event_id", "lobby_id",
+                        "target_minecraft_uuid", "target_ign", "occurred_at"), Set.of());
+                yield new PartyKickCommandFrame(integer(object, "protocol_version"), uuid(object, "event_id"),
+                        uuid(object, "lobby_id"), uuid(object, "target_minecraft_uuid"),
+                        ign(object, "target_ign"), instant(object, "occurred_at"));
+            }
             case "session.expiring" -> {
                 fields(object, "session.expiring", Set.of("type", "protocol_version", "expires_at"), Set.of());
                 yield new SessionExpiringFrame(integer(object, "protocol_version"), instant(object, "expires_at"));
@@ -108,6 +122,18 @@ public final class StrictLfgJson {
         object.addProperty("region", region.name());
         if (note == null || note.isBlank()) object.add("note", JsonNull.INSTANCE);
         else object.addProperty("note", note);
+        return object.toString();
+    }
+
+    public static String kickRequest(UUID targetId) {
+        var object = new JsonObject();
+        object.addProperty("target_minecraft_uuid", targetId.toString());
+        return object.toString();
+    }
+
+    public static String lockRequest(boolean locked) {
+        var object = new JsonObject();
+        object.addProperty("locked", locked);
         return object.toString();
     }
 
@@ -175,7 +201,7 @@ public final class StrictLfgJson {
         fields(object, path, Set.of("minecraft_uuid", "ign", "guild", "role", "source", "joined_at", "discord_user_id"), Set.of());
         var discord = object.get("discord_user_id");
         Long discordId = discord == null || discord.isJsonNull() ? null : longPrimitive(discord, path + ".discord_user_id");
-        return new Member(uuid(object, "minecraft_uuid"), string(object, "ign"),
+        return new Member(uuid(object, "minecraft_uuid"), ign(object, "ign"),
                 guild(child(object, "guild"), path + ".guild"), enumeration(object, "role", MemberRole.class),
                 enumeration(object, "source", MemberSource.class), instant(object, "joined_at"), discordId);
     }
@@ -260,6 +286,12 @@ public final class StrictLfgJson {
         var element = required(object, name);
         if (!element.isJsonPrimitive() || !element.getAsJsonPrimitive().isString()) throw malformed(name + " must be a string");
         return element.getAsString();
+    }
+
+    private static String ign(JsonObject object, String name) {
+        var value = string(object, name);
+        if (!value.matches("[A-Za-z0-9_]{1,16}")) throw malformed(name + " must be a valid Minecraft IGN");
+        return value;
     }
 
     private static String nullableString(JsonObject object, String name) {

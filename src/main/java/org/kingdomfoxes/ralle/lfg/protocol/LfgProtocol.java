@@ -83,11 +83,17 @@ public final class LfgProtocol {
                         Lobby returnedLobby) {}
 
     public sealed interface LiveFrame permits SnapshotFrame, UpsertFrame, RemoveFrame,
-            SessionExpiringFrame, ErrorFrame {}
+            PartyPingFrame, PartyKickCommandFrame, SessionExpiringFrame, ErrorFrame {}
 
     public record SnapshotFrame(Snapshot snapshot) implements LiveFrame {}
     public record UpsertFrame(int protocolVersion, long revision, Lobby lobby) implements LiveFrame {}
     public record RemoveFrame(int protocolVersion, long revision, UUID lobbyId) implements LiveFrame {}
+    public record PartyPingFrame(int protocolVersion, UUID eventId, UUID lobbyId,
+                                 UUID hostMinecraftUuid, String hostIgn,
+                                 Instant occurredAt) implements LiveFrame {}
+    public record PartyKickCommandFrame(int protocolVersion, UUID eventId, UUID lobbyId,
+                                        UUID targetMinecraftUuid, String targetIgn,
+                                        Instant occurredAt) implements LiveFrame {}
     public record SessionExpiringFrame(int protocolVersion, Instant expiresAt) implements LiveFrame {}
     public record ErrorFrame(Error error) implements LiveFrame {}
 }

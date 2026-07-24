@@ -18,6 +18,7 @@ import io.wispforest.owo.ui.core.OwoUIAdapter;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.VerticalAlignment;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ClickEvent;
@@ -29,8 +30,11 @@ import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.lfg.client.RaidRegionDetector;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
+import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.net.URI;
 import java.util.Locale;
 import java.util.Set;
@@ -42,14 +46,24 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private static final int GRID_WIDTH = 584;
     private static final int CARD_WIDTH = 286;
     private static final int COMPACT_JOIN_CONTROL_WIDTH = 42;
+    private static final int HOST_CONTROL_GAP = 3;
+    private static final int HOST_CONTROL_CONTENT_WIDTH = CARD_WIDTH - 18;
+    private static final int HOST_CONTROL_LEFT_WIDTH = (HOST_CONTROL_CONTENT_WIDTH - HOST_CONTROL_GAP) / 2;
+    private static final int HOST_CONTROL_RIGHT_WIDTH =
+            HOST_CONTROL_CONTENT_WIDTH - HOST_CONTROL_GAP - HOST_CONTROL_LEFT_WIDTH;
+    private static final int KICK_CONNECTOR_THICKNESS = 2;
+    private static final int KICK_OUTLINE_THICKNESS = 3;
     private static final Color REGION_GOOD = Color.ofRgb(0x00FF55);
     private static final Color REGION_MODERATE = Color.ofRgb(0xFFFF00);
     private static final Color REGION_POOR = Color.ofRgb(0xFF3333);
 
     private final Screen parent;
     private final RaidLfgService service;
+    private final LfgSoundPlayer sounds;
     private final JoinCountdownState joinCountdown;
+    private final KickTargetingState kickTargeting;
     private final Set<UUID> expandedLobbies = new HashSet<>();
+    private final Map<UUID, FlowLayout> kickRows = new HashMap<>();
     private StatusFilter statusFilter = StatusFilter.OPEN;
     private RaidFilter raidFilter = RaidFilter.ALL;
     private RegionFilter regionFilter = RegionFilter.ALL;
@@ -68,20 +82,35 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private long renderedRevision = Long.MIN_VALUE;
     private RaidLfgService.LifecycleState renderedLifecycle;
     private int renderedCountdownSeconds = -1;
+    private int renderedPingSeconds = -1;
+    private UUID kickLobbyId;
+    private ButtonComponent kickButton;
+    private ButtonComponent lockButton;
 
     public RaidLfgScreen(Screen parent, RaidLfgService service) {
-        this(parent, service, RaidRegionDetector.UNAVAILABLE);
+        this(parent, service, LfgSoundPlayer.SILENT);
+    }
+
+    public RaidLfgScreen(Screen parent, RaidLfgService service, LfgSoundPlayer sounds) {
+        this(parent, service, RaidRegionDetector.UNAVAILABLE, System::nanoTime, sounds);
     }
 
     public RaidLfgScreen(Screen parent, RaidLfgService service, RaidRegionDetector regionDetector) {
-        this(parent, service, regionDetector, System::nanoTime);
+        this(parent, service, regionDetector, System::nanoTime, LfgSoundPlayer.SILENT);
     }
 
     RaidLfgScreen(Screen parent, RaidLfgService service, RaidRegionDetector regionDetector, LongSupplier nanoTime) {
+        this(parent, service, regionDetector, nanoTime, LfgSoundPlayer.SILENT);
+    }
+
+    RaidLfgScreen(Screen parent, RaidLfgService service, RaidRegionDetector regionDetector,
+                  LongSupplier nanoTime, LfgSoundPlayer sounds) {
         this.parent = parent;
         this.service = service;
+        this.sounds = sounds;
         this.currentRegion = regionDetector.detect().orElse(LfgProtocol.Region.EU);
         this.joinCountdown = new JoinCountdownState(nanoTime);
+        this.kickTargeting = new KickTargetingState(nanoTime);
     }
 
     @Override
@@ -162,6 +191,8 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             refreshFromService(false);
         }
         tickJoinCountdown();
+        tickKickTargeting();
+        tickPingCooldown();
     }
 
     private void refreshFromService(boolean force) {
@@ -187,20 +218,28 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         refreshButton.active = online;
         createButton.active = online && state.capabilities() != null && state.capabilities().create() && !service.pendingCreate();
         footerStatus.text(RalleTheme.ui(Component.literal(statusText(lifecycle))));
-        footerStatus.color(online ? RalleTheme.POSITIVE : lifecycle == RaidLfgService.LifecycleState.OUTDATED
+        boolean onlineError = online && !"Live".equals(service.statusMessage());
+        footerStatus.color(onlineError ? Color.ofRgb(0xFF6B6B)
+                : online ? RalleTheme.POSITIVE : lifecycle == RaidLfgService.LifecycleState.OUTDATED
                 || lifecycle == RaidLfgService.LifecycleState.INELIGIBLE ? RalleTheme.ACCENT : RalleTheme.MUTED);
         rebuildGrid();
     }
 
     private void rebuildGrid() {
         cancelUnavailableJoinCountdown();
+        kickRows.clear();
+        kickButton = null;
+        lockButton = null;
+        renderedPingSeconds = -1;
         gridHost.clearChildren();
         if (service.lifecycle() != RaidLfgService.LifecycleState.ONLINE) {
+            validateKickTargeting();
             gridHost.child(statePanel(service.statusMessage()));
             return;
         }
         var visible = service.store().state().lobbyList().stream().filter(this::matchesFilters).toList();
         if (visible.isEmpty()) {
+            validateKickTargeting();
             gridHost.child(statePanel("No parties match these filters."));
             return;
         }
@@ -213,6 +252,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             if (visible.get(i).lobbyId().equals(scrollTarget)) scrollTargetComponent = card;
         }
         gridHost.child(grid);
+        validateKickTargeting();
     }
 
     private FlowLayout statePanel(String message) {
@@ -247,10 +287,16 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         summary.child(spacer);
         summary.child(UIComponents.label(RalleTheme.ui(Component.literal(lobby.members().size() + "/" + lobby.capacity())))
                 .color(RalleTheme.POSITIVE).margins(Insets.right(6)));
+        if (lobby.locked()) {
+            summary.child(UIComponents.label(RalleTheme.ui(Component.literal("LOCKED")))
+                    .color(RalleTheme.ACCENT).margins(Insets.right(3)));
+        }
         if (!expanded) {
-            summary.child(joinCountdown.activeFor(lobby.lobbyId())
-                    ? joinCountdownControls(true)
-                    : collapsedAction(lobby));
+            if (joinCountdown.activeFor(lobby.lobbyId())) {
+                summary.child(joinCountdownControls(true));
+            } else if (collapsedActionVisible(lobby)) {
+                summary.child(collapsedAction(lobby));
+            }
         }
         summary.child(UIComponents.label(Component.literal(expanded ? " ▼" : " ▶")).color(RalleTheme.MUTED).margins(Insets.left(6)));
         summary.mouseDown().subscribe((click, doubled) -> {
@@ -271,7 +317,9 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var roster = UIContainers.grid(Sizing.fill(100), Sizing.content(), 2, 2);
         for (int slot = 0; slot < lobby.capacity(); slot++) roster.child(rosterSlot(lobby, slot), slot / 2, slot % 2);
         card.child(roster);
-        if (joinCountdown.activeFor(lobby.lobbyId())) {
+        if (lobby.hostedBy(viewerId())) {
+            card.child(hostControls(lobby));
+        } else if (joinCountdown.activeFor(lobby.lobbyId())) {
             card.child(joinCountdownControls(false));
         } else {
             var action = expandedAction(lobby);
@@ -294,7 +342,9 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         });
         button.sizing(Sizing.fixed(action.kind() == CardActionKind.DISBAND ? 64 : 52), Sizing.fixed(20));
         button.renderer(action.destructive() ? RalleButtonRenderers.destructive() : RalleButtonRenderers.primary());
-        button.active = service.lifecycle() == RaidLfgService.LifecycleState.ONLINE
+        boolean allowed = action.kind() != CardActionKind.JOIN || joinAvailable(lobby);
+        button.active = allowed
+                && service.lifecycle() == RaidLfgService.LifecycleState.ONLINE
                 && !service.pending(lobby.lobbyId(), action.kind().protocolAction)
                 && (action.kind() != CardActionKind.JOIN || !joinCountdown.active());
         button.tooltip(RalleTheme.ui(Component.literal(switch (action.kind()) {
@@ -305,6 +355,64 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                     : "Begin the join countdown";
         })));
         return button;
+    }
+
+    private boolean collapsedActionVisible(LfgProtocol.Lobby lobby) {
+        return collapsedActionVisible(lobby, viewerId());
+    }
+
+    static boolean collapsedActionVisible(LfgProtocol.Lobby lobby, UUID viewerId) {
+        return !lobby.locked() || viewerId != null && lobby.contains(viewerId);
+    }
+
+    private FlowLayout hostControls(LfgProtocol.Lobby lobby) {
+        var controls = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+        controls.gap(3);
+
+        var disband = expandedAction(lobby);
+        disband.horizontalSizing(Sizing.fill(100));
+        controls.child(disband);
+
+        var middle = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(20));
+        middle.gap(HOST_CONTROL_GAP);
+        kickButton = UIComponents.button(RalleTheme.ui(Component.literal("Kick")), ignored -> {
+            if (kickTargeting.holding()) sounds.playKickHoldCancelled();
+            if (kickTargeting.toggle()) kickLobbyId = lobby.lobbyId();
+            else kickLobbyId = null;
+            rebuildGrid();
+        });
+        kickButton.sizing(Sizing.fixed(HOST_CONTROL_LEFT_WIDTH), Sizing.fixed(20));
+        kickButton.renderer(RalleButtonRenderers.warning(kickTargeting::active));
+        kickButton.active = service.lifecycle() == RaidLfgService.LifecycleState.ONLINE
+                && !service.pending(lobby.lobbyId(), "kick");
+        kickButton.tooltip(RalleTheme.ui(Component.literal(
+                kickTargeting.active() ? "Select a member, then hold left mouse for 1.5 seconds"
+                        : "Choose a member to kick")));
+
+        lockButton = UIComponents.button(
+                RalleTheme.ui(Component.literal(lobby.locked() ? "Unlock" : "Lock")),
+                ignored -> performLock(lobby));
+        lockButton.sizing(Sizing.fixed(HOST_CONTROL_RIGHT_WIDTH), Sizing.fixed(20));
+        lockButton.renderer(RalleButtonRenderers.neutral());
+        lockButton.active = service.lifecycle() == RaidLfgService.LifecycleState.ONLINE
+                && !service.pending(lobby.lobbyId(), "lock");
+        lockButton.tooltip(RalleTheme.ui(Component.literal(
+                lobby.locked() ? "Allow new members to join" : "Prevent new members from joining")));
+        middle.child(kickButton).child(lockButton);
+        controls.child(middle);
+
+        int cooldown = service.pingCooldownSeconds(lobby.lobbyId());
+        var ping = UIComponents.button(RalleTheme.ui(Component.literal(
+                cooldown > 0 ? "Ping (" + cooldown + "s)" : "Ping")), ignored -> performPing(lobby));
+        ping.sizing(Sizing.fill(100), Sizing.fixed(20));
+        ping.renderer(RalleButtonRenderers.neutral());
+        ping.active = service.lifecycle() == RaidLfgService.LifecycleState.ONLINE
+                && cooldown == 0 && !service.pending(lobby.lobbyId(), "ping");
+        ping.tooltip(RalleTheme.ui(Component.literal(
+                cooldown > 0 ? "Party ping is on cooldown" : "Notify every current party member")));
+        controls.child(ping);
+        renderedPingSeconds = cooldown;
+        return controls;
     }
 
     private ButtonComponent expandedAction(LfgProtocol.Lobby lobby) {
@@ -429,6 +537,22 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         rebuildGrid();
     }
 
+    private void performLock(LfgProtocol.Lobby lobby) {
+        if (lockButton != null) {
+            lockButton.active = false;
+            lockButton.setMessage(RalleTheme.ui(Component.literal(lobby.locked() ? "Unlocking..." : "Locking...")));
+        }
+        service.setLocked(lobby.lobbyId(), !lobby.locked())
+                .whenComplete((ignored, failure) -> minecraft.execute(() -> refreshFromService(true)));
+    }
+
+    private void performPing(LfgProtocol.Lobby lobby) {
+        if (service.pingCooldownSeconds(lobby.lobbyId()) > 0) return;
+        service.ping(lobby.lobbyId())
+                .whenComplete((ignored, failure) -> minecraft.execute(() -> refreshFromService(true)));
+        rebuildGrid();
+    }
+
     private FlowLayout rosterSlot(LfgProtocol.Lobby lobby, int slot) {
         var row = UIContainers.horizontalFlow(Sizing.fixed(130), Sizing.content());
         row.verticalAlignment(VerticalAlignment.CENTER).padding(Insets.of(2));
@@ -446,8 +570,175 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         if (member.role() == LfgProtocol.MemberRole.HOST) label.append(Component.literal("★ "));
         label.append(RalleTheme.ui(Component.literal(member.ign())));
         row.child(UIComponents.label(label).color(Color.WHITE));
+        if (lobby.hostedBy(viewerId()) && member.role() != LfgProtocol.MemberRole.HOST) {
+            kickRows.put(member.minecraftUuid(), row);
+            row.mouseDown().subscribe((click, doubled) -> {
+                if (click.button() != 0 || !lobby.lobbyId().equals(kickLobbyId)) return false;
+                if (!kickTargeting.press(member.minecraftUuid())) return false;
+                sounds.playKickHoldStart();
+                return true;
+            });
+            row.mouseUp().subscribe(click -> {
+                if (click.button() != 0) return false;
+                if (!kickTargeting.release(member.minecraftUuid())) return false;
+                sounds.playKickHoldCancelled();
+                return true;
+            });
+        }
         return row;
     }
+
+    private void tickKickTargeting() {
+        var targetId = kickTargeting.completedTarget();
+        if (targetId == null || kickLobbyId == null) return;
+        var lobby = lobby(kickLobbyId);
+        var target = lobby == null ? null : lobby.members().stream()
+                .filter(member -> member.minecraftUuid().equals(targetId)
+                        && member.role() != LfgProtocol.MemberRole.HOST)
+                .findFirst().orElse(null);
+        if (lobby == null || target == null || !lobby.hostedBy(viewerId())) {
+            kickTargeting.reset();
+            kickLobbyId = null;
+            rebuildGrid();
+            return;
+        }
+        service.kick(lobby.lobbyId(), target.minecraftUuid(), target.ign())
+                .whenComplete((ignored, failure) -> minecraft.execute(() -> {
+                    if (failure == null) sounds.playKickSucceeded();
+                    kickTargeting.reset();
+                    kickLobbyId = null;
+                    refreshFromService(true);
+                }));
+        rebuildGrid();
+    }
+
+    private void tickPingCooldown() {
+        if (renderedPingSeconds < 0) return;
+        var hostLobby = service.store().state().lobbyList().stream()
+                .filter(candidate -> candidate.hostedBy(viewerId()))
+                .findFirst().orElse(null);
+        int seconds = hostLobby == null ? -1 : service.pingCooldownSeconds(hostLobby.lobbyId());
+        if (seconds != renderedPingSeconds) rebuildGrid();
+    }
+
+    private void validateKickTargeting() {
+        if (!kickTargeting.active()) return;
+        var lobby = lobby(kickLobbyId);
+        if (lobby == null || !lobby.hostedBy(viewerId()) || !expandedLobbies.contains(kickLobbyId)
+                || kickButton == null) {
+            if (kickTargeting.holding()) sounds.playKickHoldCancelled();
+            kickTargeting.reset();
+            kickLobbyId = null;
+            return;
+        }
+        var target = kickTargeting.visualTarget();
+        if (target != null && !kickRows.containsKey(target) && kickTargeting.leave(target)) {
+            sounds.playKickHoldCancelled();
+        }
+    }
+
+    private void updateKickHover(int mouseX, int mouseY) {
+        if (!kickTargeting.active() || kickTargeting.submitted()) return;
+        UUID next = null;
+        for (var entry : kickRows.entrySet()) {
+            if (entry.getValue().isInBoundingBox(mouseX, mouseY)) {
+                next = entry.getKey();
+                break;
+            }
+        }
+        var previous = kickTargeting.hovered();
+        if (previous != null && !previous.equals(next) && kickTargeting.leave(previous)) {
+            sounds.playKickHoldCancelled();
+        }
+        if (next != null && kickTargeting.hover(next)) sounds.playKickTargetHover();
+    }
+
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        updateKickHover(mouseX, mouseY);
+        super.render(graphics, mouseX, mouseY, partialTick);
+        renderKickTargeting(graphics);
+    }
+
+    private void renderKickTargeting(GuiGraphics graphics) {
+        if (!kickTargeting.active() || kickButton == null) return;
+        var target = kickRows.get(kickTargeting.visualTarget());
+        if (target == null) return;
+
+        int color = 0xFFF2B84B;
+        var connector = connectorBetween(
+                new SelectionBox(kickButton.getX(), kickButton.getY(),
+                        kickButton.getWidth(), kickButton.getHeight()),
+                new SelectionBox(target.x(), target.y(), target.width(), target.height()));
+        drawThickLine(graphics, connector.startX(), connector.startY(),
+                connector.endX(), connector.endY(), KICK_CONNECTOR_THICKNESS, color);
+        drawThickOutline(graphics, target.x(), target.y(), target.width(), target.height(),
+                KICK_OUTLINE_THICKNESS, color);
+        drawThickOutline(graphics, kickButton.getX(), kickButton.getY(),
+                kickButton.getWidth(), kickButton.getHeight(), KICK_OUTLINE_THICKNESS, color);
+
+        if (kickTargeting.holding()) {
+            int fillWidth = (int) Math.round(target.width() * kickTargeting.progress());
+            if (fillWidth > 0) {
+                graphics.fill(target.x(), target.y(), target.x() + fillWidth,
+                        target.y() + target.height(), 0x55F2B84B);
+            }
+        }
+    }
+
+    private static void drawThickOutline(GuiGraphics graphics, int x, int y, int width, int height,
+                                         int thickness, int color) {
+        graphics.fill(x, y, x + width, y + thickness, color);
+        graphics.fill(x, y + height - thickness, x + width, y + height, color);
+        graphics.fill(x, y + thickness, x + thickness, y + height - thickness, color);
+        graphics.fill(x + width - thickness, y + thickness, x + width, y + height - thickness, color);
+    }
+
+    static ConnectorLine connectorBetween(SelectionBox start, SelectionBox end) {
+        double startCenterX = start.x() + start.width() / 2d;
+        double startCenterY = start.y() + start.height() / 2d;
+        double endCenterX = end.x() + end.width() / 2d;
+        double endCenterY = end.y() + end.height() / 2d;
+        double dx = endCenterX - startCenterX;
+        double dy = endCenterY - startCenterY;
+        if (dx == 0 && dy == 0) {
+            int x = (int) Math.round(startCenterX);
+            int y = (int) Math.round(startCenterY);
+            return new ConnectorLine(x, y, x, y);
+        }
+
+        double startScale = boundaryScale(start, dx, dy);
+        double endScale = boundaryScale(end, -dx, -dy);
+        return new ConnectorLine(
+                (int) Math.round(startCenterX + dx * startScale),
+                (int) Math.round(startCenterY + dy * startScale),
+                (int) Math.round(endCenterX - dx * endScale),
+                (int) Math.round(endCenterY - dy * endScale));
+    }
+
+    private static double boundaryScale(SelectionBox box, double dx, double dy) {
+        double horizontal = dx == 0 ? Double.POSITIVE_INFINITY : box.width() / 2d / Math.abs(dx);
+        double vertical = dy == 0 ? Double.POSITIVE_INFINITY : box.height() / 2d / Math.abs(dy);
+        return Math.min(horizontal, vertical);
+    }
+
+    private static void drawThickLine(GuiGraphics graphics, int x1, int y1, int x2, int y2,
+                                      int thickness, int color) {
+        int dx = x2 - x1;
+        int dy = y2 - y1;
+        int steps = Math.max(Math.abs(dx), Math.abs(dy));
+        if (steps == 0) steps = 1;
+        int offset = thickness / 2;
+        for (int step = 0; step <= steps; step++) {
+            int x = x1 + Math.round(dx * (step / (float) steps));
+            int y = y1 + Math.round(dy * (step / (float) steps));
+            graphics.fill(x - offset, y - offset, x - offset + thickness, y - offset + thickness, color);
+        }
+    }
+
+    record SelectionBox(int x, int y, int width, int height) {}
+
+    record ConnectorLine(int startX, int startY, int endX, int endY) {}
 
     private void openDisbandConfirmation(LfgProtocol.Lobby lobby) {
         if (root == null || service.lifecycle() != RaidLfgService.LifecycleState.ONLINE) return;
@@ -610,9 +901,11 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         };
     }
 
-    private static String statusText(RaidLfgService.LifecycleState state) {
+    private String statusText(RaidLfgService.LifecycleState state) {
         return switch (state) {
-            case ONLINE -> "● Live · synchronized with Fox";
+            case ONLINE -> "Live".equals(service.statusMessage())
+                    ? "● Live · synchronized with Fox"
+                    : "Host action failed · " + service.statusMessage();
             case AUTHENTICATING -> "Authenticating...";
             case SYNCING -> "Synchronizing...";
             case RECONNECTING -> "Offline · reconnecting";
@@ -672,6 +965,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     public void onClose() {
         joinCountdown.cancel();
+        kickTargeting.reset();
         minecraft.setScreen(parent);
     }
 

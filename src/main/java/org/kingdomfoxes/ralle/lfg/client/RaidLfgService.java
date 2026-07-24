@@ -6,8 +6,11 @@ import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocolException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayDeque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -25,15 +28,23 @@ public final class RaidLfgService {
     }
 
     private static final long[] RECONNECT_SECONDS = {1, 2, 4, 8, 15};
+    private static final long PING_COOLDOWN_MILLIS = 30_000L;
+    private static final int COMMAND_DEDUPLICATION_LIMIT = 128;
     private static final Pattern FORMATTING = Pattern.compile("(?:\\u00a7|&)[0-9A-FK-OR]", Pattern.CASE_INSENSITIVE);
+    private static final Pattern IGN = Pattern.compile("[A-Za-z0-9_]{1,16}");
 
     private final LfgGateway gateway;
     private final RaidLfgEnvironment environment;
     private final MinecraftSessionProof sessionProof;
     private final LongSupplier clockMillis;
     private final DoubleSupplier jitter;
+    private final LfgNotificationSink notifications;
+    private final PartyCommandExecutor partyCommands;
     private final RaidLfgStore store = new RaidLfgStore();
     private final Set<String> pending = new HashSet<>();
+    private final Map<UUID, Long> pingCooldowns = new HashMap<>();
+    private final Set<UUID> processedCommandIds = new HashSet<>();
+    private final ArrayDeque<UUID> processedCommandOrder = new ArrayDeque<>();
 
     private volatile LifecycleState lifecycle = LifecycleState.DISABLED;
     private volatile String statusMessage = "Raid LFG is disabled in settings.";
@@ -49,17 +60,35 @@ public final class RaidLfgService {
 
     public RaidLfgService(LfgGateway gateway, RaidLfgEnvironment environment,
                           MinecraftSessionProof sessionProof) {
-        this(gateway, environment, sessionProof, System::currentTimeMillis, Math::random);
+        this(gateway, environment, sessionProof, System::currentTimeMillis, Math::random,
+                LfgNotificationSink.IGNORE, PartyCommandExecutor.IGNORE);
+    }
+
+    public RaidLfgService(LfgGateway gateway, RaidLfgEnvironment environment,
+                          MinecraftSessionProof sessionProof, LfgNotificationSink notifications,
+                          PartyCommandExecutor partyCommands) {
+        this(gateway, environment, sessionProof, System::currentTimeMillis, Math::random,
+                notifications, partyCommands);
     }
 
     RaidLfgService(LfgGateway gateway, RaidLfgEnvironment environment,
                    MinecraftSessionProof sessionProof, LongSupplier clockMillis,
                    DoubleSupplier jitter) {
+        this(gateway, environment, sessionProof, clockMillis, jitter,
+                LfgNotificationSink.IGNORE, PartyCommandExecutor.IGNORE);
+    }
+
+    RaidLfgService(LfgGateway gateway, RaidLfgEnvironment environment,
+                   MinecraftSessionProof sessionProof, LongSupplier clockMillis,
+                   DoubleSupplier jitter, LfgNotificationSink notifications,
+                   PartyCommandExecutor partyCommands) {
         this.gateway = gateway;
         this.environment = environment;
         this.sessionProof = sessionProof;
         this.clockMillis = clockMillis;
         this.jitter = jitter;
+        this.notifications = notifications;
+        this.partyCommands = partyCommands;
     }
 
     public RaidLfgStore store() { return store; }
@@ -68,6 +97,15 @@ public final class RaidLfgService {
     public String releaseUrl() { return releaseUrl; }
     public UUID focusLobbyId() { return focusLobbyId; }
     public void clearFocus() { focusLobbyId = null; }
+
+    public synchronized int pingCooldownSeconds(UUID lobbyId) {
+        long remaining = pingCooldowns.getOrDefault(lobbyId, 0L) - clockMillis.getAsLong();
+        if (remaining <= 0) {
+            pingCooldowns.remove(lobbyId);
+            return 0;
+        }
+        return (int) Math.ceil(remaining / 1000d);
+    }
 
     public synchronized void connectionChanged() {
         contextKey = "";
@@ -150,6 +188,34 @@ public final class RaidLfgService {
         return mutate("disband", lobbyId, true, token -> gateway.disband(token, lobbyId, UUID.randomUUID()));
     }
 
+    public CompletableFuture<LfgProtocol.Mutation> kick(UUID lobbyId, UUID targetId, String targetIgn) {
+        if (targetIgn == null || !IGN.matcher(targetIgn).matches()) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException("Target IGN is invalid."));
+        }
+        return mutate("kick", lobbyId, false,
+                token -> gateway.kick(token, lobbyId, targetId, UUID.randomUUID()))
+                .thenApply(mutation -> {
+                    partyCommands.kick(targetIgn);
+                    return mutation;
+                });
+    }
+
+    public CompletableFuture<LfgProtocol.Mutation> setLocked(UUID lobbyId, boolean locked) {
+        return mutate("lock", lobbyId, false,
+                token -> gateway.setLocked(token, lobbyId, locked, UUID.randomUUID()));
+    }
+
+    public CompletableFuture<LfgProtocol.Mutation> ping(UUID lobbyId) {
+        return mutate("ping", lobbyId, false,
+                token -> gateway.ping(token, lobbyId, UUID.randomUUID()))
+                .thenApply(mutation -> {
+                    synchronized (this) {
+                        pingCooldowns.put(lobbyId, clockMillis.getAsLong() + PING_COOLDOWN_MILLIS);
+                    }
+                    return mutation;
+                });
+    }
+
     private CompletableFuture<LfgProtocol.Mutation> mutate(String action, UUID lobbyId, boolean removal,
                                                             java.util.function.Function<String, CompletableFuture<LfgProtocol.Mutation>> call) {
         final String key = pendingKey(lobbyId, action);
@@ -162,6 +228,7 @@ public final class RaidLfgService {
         return call.apply(token).thenApply(mutation -> {
             if (removal) store.remove(mutation.revision(), mutation.lobby().lobbyId());
             else store.apply(mutation);
+            statusMessage = "Live";
             return mutation;
         }).whenComplete((ignored, failure) -> {
             synchronized (this) { pending.remove(key); }
@@ -175,6 +242,10 @@ public final class RaidLfgService {
                         focusLobbyId = error.returnedLobby().lobbyId();
                     }
                     if (gatewayFailure.status() == 401) restartAuthentication();
+                } else {
+                    statusMessage = cause.getMessage() == null || cause.getMessage().isBlank()
+                            ? "The host action failed."
+                            : cause.getMessage();
                 }
             }
         });
@@ -252,6 +323,13 @@ public final class RaidLfgService {
         } else if (frame instanceof LfgProtocol.RemoveFrame remove) {
             requireProtocol(remove.protocolVersion());
             store.remove(remove.revision(), remove.lobbyId());
+        } else if (frame instanceof LfgProtocol.PartyPingFrame ping) {
+            requireProtocol(ping.protocolVersion());
+            focusLobbyId = ping.lobbyId();
+            notifications.partyPing(ping);
+        } else if (frame instanceof LfgProtocol.PartyKickCommandFrame command) {
+            requireProtocol(command.protocolVersion());
+            if (rememberCommand(command.eventId())) partyCommands.kick(command.targetIgn());
         } else if (frame instanceof LfgProtocol.SessionExpiringFrame) {
             restartAuthentication();
         } else if (frame instanceof LfgProtocol.ErrorFrame error) {
@@ -330,6 +408,9 @@ public final class RaidLfgService {
         bearerToken = null;
         awaitingSnapshot = false;
         pending.clear();
+        pingCooldowns.clear();
+        processedCommandIds.clear();
+        processedCommandOrder.clear();
         reconnectAttempt = 0;
         focusLobbyId = null;
         store.clear();
@@ -383,6 +464,15 @@ public final class RaidLfgService {
 
     private static String pendingKey(UUID lobbyId, String action) {
         return lobbyId == null ? action : lobbyId + ":" + action;
+    }
+
+    private boolean rememberCommand(UUID eventId) {
+        if (!processedCommandIds.add(eventId)) return false;
+        processedCommandOrder.addLast(eventId);
+        while (processedCommandOrder.size() > COMMAND_DEDUPLICATION_LIMIT) {
+            processedCommandIds.remove(processedCommandOrder.removeFirst());
+        }
+        return true;
     }
 
     private static Throwable unwrap(Throwable failure) {

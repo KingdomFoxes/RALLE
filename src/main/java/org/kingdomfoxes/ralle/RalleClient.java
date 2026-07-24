@@ -16,6 +16,7 @@ import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotService;
 import org.kingdomfoxes.ralle.chat.screenshot.TransparentChatCapture;
 import org.kingdomfoxes.ralle.settings.RalleSettings;
 import org.kingdomfoxes.ralle.sound.MinecraftChatSelectionSoundPlayer;
+import org.kingdomfoxes.ralle.sound.MinecraftLfgSoundPlayer;
 import org.kingdomfoxes.ralle.sound.RalleSoundEvents;
 import org.kingdomfoxes.ralle.ui.owo.OwoSettingsScreenFactory;
 import org.kingdomfoxes.ralle.ui.owo.RaidLfgScreen;
@@ -25,6 +26,8 @@ import org.kingdomfoxes.ralle.lfg.client.RaidLfgKeybind;
 import org.kingdomfoxes.ralle.lfg.client.HttpLfgGateway;
 import org.kingdomfoxes.ralle.lfg.client.MinecraftRaidLfgEnvironment;
 import org.kingdomfoxes.ralle.lfg.client.MinecraftSessionProofAdapter;
+import org.kingdomfoxes.ralle.lfg.client.MinecraftLfgNotificationSink;
+import org.kingdomfoxes.ralle.lfg.client.MinecraftPartyCommandExecutor;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
@@ -58,12 +61,15 @@ public final class RalleClient implements ClientModInitializer {
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), settings, placements);
         var navigation = new SettingsNavigationState(configDirectory.resolve("ralle-settings-ui.properties"), settings);
         var minecraft = Minecraft.getInstance();
+        var lfgSounds = new MinecraftLfgSoundPlayer(minecraft, settings);
         var raidLfg = new RaidLfgService(
                 new HttpLfgGateway(),
                 new MinecraftRaidLfgEnvironment(minecraft, settings),
-                new MinecraftSessionProofAdapter(minecraft)
+                new MinecraftSessionProofAdapter(minecraft),
+                new MinecraftLfgNotificationSink(minecraft, lfgSounds),
+                new MinecraftPartyCommandExecutor(minecraft)
         );
-        var lfgKeybind = new RaidLfgKeybind(minecraft, settings, raidLfg);
+        var lfgKeybind = new RaidLfgKeybind(minecraft, settings, raidLfg, lfgSounds);
         var chatBehavior = new ChatBehaviorService(Minecraft.getInstance(), settings);
         var chatScreenshots = new ChatScreenshotService(
                 Minecraft.getInstance(),
@@ -78,7 +84,8 @@ public final class RalleClient implements ClientModInitializer {
                 chatLayout,
                 chatBehavior,
                 chatScreenshots,
-                raidLfg
+                raidLfg,
+                lfgSounds
         );
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> raidLfg.connectionChanged());
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> raidLfg.connectionChanged());
@@ -97,7 +104,8 @@ public final class RalleClient implements ClientModInitializer {
                     return 1;
                 })).then(literal("lfg").executes(command -> {
                     var client = Minecraft.getInstance();
-                    client.schedule(() -> client.setScreen(new RaidLfgScreen(client.screen, context().raidLfg())));
+                    client.schedule(() -> client.setScreen(new RaidLfgScreen(
+                            client.screen, context().raidLfg(), context().lfgSounds())));
                     return 1;
                 }))
         ));
