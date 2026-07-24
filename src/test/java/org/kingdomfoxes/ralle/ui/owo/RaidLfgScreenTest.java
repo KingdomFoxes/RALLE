@@ -28,10 +28,10 @@ class RaidLfgScreenTest {
     }
 
     @Test
-    void collapsedNonHostActionStillExpandsForRosterReview() {
+    void collapsedNonHostActionStartsJoinCountdown() {
         var action = RaidLfgScreen.collapsedActionFor(lobby(), MEMBER);
 
-        assertEquals(RaidLfgScreen.CardActionKind.REVIEW_JOIN, action.kind());
+        assertEquals(RaidLfgScreen.CardActionKind.JOIN, action.kind());
         assertEquals("Join", action.label());
         assertFalse(action.destructive());
         assertFalse(action.requiresConfirmation());

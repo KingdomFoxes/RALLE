@@ -3,6 +3,7 @@ package org.kingdomfoxes.ralle.ui.owo;
 import io.wispforest.owo.ui.component.ButtonComponent;
 
 import java.util.function.BooleanSupplier;
+import java.util.function.DoubleSupplier;
 
 /**
  * Flat, high-contrast button treatments shared by RALLE-owned screens.
@@ -29,6 +30,31 @@ final class RalleButtonRenderers {
 
     static ButtonComponent.Renderer destructive() {
         return renderer(Palette.DESTRUCTIVE, () -> false);
+    }
+
+    static ButtonComponent.Renderer countdown(DoubleSupplier remainingFraction) {
+        var background = primary();
+        return (graphics, button, delta) -> {
+            background.draw(graphics, button, delta);
+            if (!button.active()) return;
+
+            int faceWidth = Math.max(0, button.getWidth() - 2);
+            int overlayWidth = countdownOverlayWidth(faceWidth, remainingFraction.getAsDouble());
+            if (overlayWidth > 0) {
+                graphics.fill(
+                        button.getX(),
+                        button.getY() + 1,
+                        button.getX() + overlayWidth,
+                        button.getY() + button.getHeight() - 2,
+                        0x553CCB5A
+                );
+            }
+        };
+    }
+
+    static int countdownOverlayWidth(int faceWidth, double remainingFraction) {
+        double elapsedFraction = 1d - Math.clamp(remainingFraction, 0d, 1d);
+        return (int) Math.ceil(Math.max(0, faceWidth) * elapsedFraction);
     }
 
     static ButtonComponent.Renderer navigation(int leftInset) {
