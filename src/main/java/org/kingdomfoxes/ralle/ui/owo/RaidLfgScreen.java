@@ -286,20 +286,24 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var button = UIComponents.button(RalleTheme.ui(Component.literal(action.label())), ignored -> {
             if (action.requiresConfirmation()) {
                 openDisbandConfirmation(lobby);
-            } else {
+            } else if (action.kind() == CardActionKind.JOIN) {
                 startJoinCountdown(lobby);
+            } else {
+                performAction(lobby, action.kind().protocolAction);
             }
         });
-        button.sizing(Sizing.fixed(action.destructive() ? 64 : 52), Sizing.fixed(20));
+        button.sizing(Sizing.fixed(action.kind() == CardActionKind.DISBAND ? 64 : 52), Sizing.fixed(20));
         button.renderer(action.destructive() ? RalleButtonRenderers.destructive() : RalleButtonRenderers.primary());
         button.active = service.lifecycle() == RaidLfgService.LifecycleState.ONLINE
                 && !service.pending(lobby.lobbyId(), action.kind().protocolAction)
                 && (action.kind() != CardActionKind.JOIN || !joinCountdown.active());
-        button.tooltip(RalleTheme.ui(Component.literal(action.destructive()
-                ? "Disband this party"
-                : joinCountdown.active()
+        button.tooltip(RalleTheme.ui(Component.literal(switch (action.kind()) {
+            case DISBAND -> "Disband this party";
+            case LEAVE -> "Leave this party";
+            case JOIN -> joinCountdown.active()
                     ? "Cancel the current join countdown first"
-                    : "Begin the join countdown")));
+                    : "Begin the join countdown";
+        })));
         return button;
     }
 
@@ -481,6 +485,9 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         if (viewerId != null && lobby.hostedBy(viewerId)) {
             return new CardAction(CardActionKind.DISBAND, "Disband", true, true);
         }
+        if (viewerId != null && lobby.contains(viewerId)) {
+            return new CardAction(CardActionKind.LEAVE, "Leave", true, false);
+        }
         return new CardAction(CardActionKind.JOIN, "Join", false, false);
     }
 
@@ -489,7 +496,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             return new CardAction(CardActionKind.DISBAND, "Disband", true, true);
         }
         if (viewerId != null && lobby.contains(viewerId)) {
-            return new CardAction(CardActionKind.LEAVE, "Leave Lobby", true, false);
+            return new CardAction(CardActionKind.LEAVE, "Leave", true, false);
         }
         return new CardAction(CardActionKind.JOIN, disabledJoinLabel(lobby), false, false);
     }

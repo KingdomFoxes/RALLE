@@ -45,6 +45,26 @@ class RaidLfgScreenTest {
         assertTrue(action.requiresConfirmation());
     }
 
+    @Test
+    void collapsedMemberActionIsShortDestructiveLeave() {
+        var action = RaidLfgScreen.collapsedActionFor(lobbyWithMember(), MEMBER);
+
+        assertEquals(RaidLfgScreen.CardActionKind.LEAVE, action.kind());
+        assertEquals("Leave", action.label());
+        assertTrue(action.destructive());
+        assertFalse(action.requiresConfirmation());
+    }
+
+    @Test
+    void expandedMemberActionUsesTheSameShortLeaveLabel() {
+        var action = RaidLfgScreen.expandedActionFor(lobbyWithMember(), MEMBER);
+
+        assertEquals(RaidLfgScreen.CardActionKind.LEAVE, action.kind());
+        assertEquals("Leave", action.label());
+        assertTrue(action.destructive());
+        assertFalse(action.requiresConfirmation());
+    }
+
     private static LfgProtocol.Lobby lobby() {
         var guild = new LfgProtocol.GuildIdentity(GUILD, "Kingdom of Foxes", "FOX", "#FF8200");
         var host = new LfgProtocol.Member(HOST, "Host", guild, LfgProtocol.MemberRole.HOST,
@@ -53,5 +73,17 @@ class RaidLfgScreenTest {
                 LfgProtocol.RaidType.TNA, LfgProtocol.Region.EU, null, LfgProtocol.Visibility.PUBLIC,
                 LfgProtocol.LobbyStatus.OPEN, false, HOST, GUILD, Instant.EPOCH, Instant.EPOCH,
                 1, 4, List.of(host), new LfgProtocol.LobbyCapabilities(true, false, Map.of()));
+    }
+
+    private static LfgProtocol.Lobby lobbyWithMember() {
+        var guild = new LfgProtocol.GuildIdentity(GUILD, "Kingdom of Foxes", "FOX", "#FF8200");
+        var host = new LfgProtocol.Member(HOST, "Host", guild, LfgProtocol.MemberRole.HOST,
+                LfgProtocol.MemberSource.RALLE, Instant.EPOCH, null);
+        var member = new LfgProtocol.Member(MEMBER, "Member", guild, LfgProtocol.MemberRole.MEMBER,
+                LfgProtocol.MemberSource.RALLE, Instant.EPOCH, null);
+        return new LfgProtocol.Lobby(UUID.fromString("00000000-0000-0000-0000-000000000010"),
+                LfgProtocol.RaidType.TNA, LfgProtocol.Region.EU, null, LfgProtocol.Visibility.PUBLIC,
+                LfgProtocol.LobbyStatus.OPEN, false, HOST, GUILD, Instant.EPOCH, Instant.EPOCH,
+                2, 4, List.of(host, member), new LfgProtocol.LobbyCapabilities(false, true, Map.of()));
     }
 }
