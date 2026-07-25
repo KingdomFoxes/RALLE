@@ -53,6 +53,8 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             HOST_CONTROL_CONTENT_WIDTH - HOST_CONTROL_GAP - HOST_CONTROL_LEFT_WIDTH;
     private static final int KICK_CONNECTOR_THICKNESS = 2;
     private static final int KICK_OUTLINE_THICKNESS = 3;
+    private static final int KICK_READY_COLOR = 0xFFF2B84B;
+    private static final int KICK_DANGER_COLOR = 0xFFFF3333;
     private static final Color REGION_GOOD = Color.ofRgb(0x00FF55);
     private static final Color REGION_MODERATE = Color.ofRgb(0xFFFF00);
     private static final Color REGION_POOR = Color.ofRgb(0xFF3333);
@@ -665,25 +667,17 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var target = kickRows.get(kickTargeting.visualTarget());
         if (target == null) return;
 
-        int color = 0xFFF2B84B;
         var connector = connectorBetween(
                 new SelectionBox(kickButton.getX(), kickButton.getY(),
                         kickButton.getWidth(), kickButton.getHeight()),
                 new SelectionBox(target.x(), target.y(), target.width(), target.height()));
         drawThickLine(graphics, connector.startX(), connector.startY(),
-                connector.endX(), connector.endY(), KICK_CONNECTOR_THICKNESS, color);
+                connector.endX(), connector.endY(), KICK_CONNECTOR_THICKNESS, KICK_READY_COLOR);
+        int targetOutlineColor = lerpArgb(KICK_READY_COLOR, KICK_DANGER_COLOR, kickTargeting.progress());
         drawThickOutline(graphics, target.x(), target.y(), target.width(), target.height(),
-                KICK_OUTLINE_THICKNESS, color);
+                KICK_OUTLINE_THICKNESS, targetOutlineColor);
         drawThickOutline(graphics, kickButton.getX(), kickButton.getY(),
-                kickButton.getWidth(), kickButton.getHeight(), KICK_OUTLINE_THICKNESS, color);
-
-        if (kickTargeting.holding()) {
-            int fillWidth = (int) Math.round(target.width() * kickTargeting.progress());
-            if (fillWidth > 0) {
-                graphics.fill(target.x(), target.y(), target.x() + fillWidth,
-                        target.y() + target.height(), 0x55F2B84B);
-            }
-        }
+                kickButton.getWidth(), kickButton.getHeight(), KICK_OUTLINE_THICKNESS, KICK_READY_COLOR);
     }
 
     private static void drawThickOutline(GuiGraphics graphics, int x, int y, int width, int height,
@@ -692,6 +686,19 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         graphics.fill(x, y + height - thickness, x + width, y + height, color);
         graphics.fill(x, y + thickness, x + thickness, y + height - thickness, color);
         graphics.fill(x + width - thickness, y + thickness, x + width, y + height - thickness, color);
+    }
+
+    static int lerpArgb(int from, int to, double progress) {
+        double amount = Math.clamp(progress, 0d, 1d);
+        int alpha = lerpChannel(from >>> 24, to >>> 24, amount);
+        int red = lerpChannel(from >>> 16, to >>> 16, amount);
+        int green = lerpChannel(from >>> 8, to >>> 8, amount);
+        int blue = lerpChannel(from, to, amount);
+        return alpha << 24 | red << 16 | green << 8 | blue;
+    }
+
+    private static int lerpChannel(int from, int to, double progress) {
+        return (int) Math.round((from & 0xFF) + ((to & 0xFF) - (from & 0xFF)) * progress);
     }
 
     static ConnectorLine connectorBetween(SelectionBox start, SelectionBox end) {

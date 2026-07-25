@@ -13,6 +13,8 @@ import org.kingdomfoxes.ralle.chat.ChatGraphicsTransform;
 import org.kingdomfoxes.ralle.chat.ChatMessageProjector;
 import org.kingdomfoxes.ralle.chat.ChatRenderLayout;
 import org.kingdomfoxes.ralle.chat.ChatScrollbarGraphics;
+import org.kingdomfoxes.ralle.chat.RalleChatMessageGraphics;
+import org.kingdomfoxes.ralle.chat.RalleChatMessagePanel;
 import org.kingdomfoxes.ralle.chat.render.FullShadowFrameCollector;
 import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotSnapshot;
@@ -183,7 +185,42 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
                 !ralle$capturingClickableText,
                 ralle$capturingClickableText ? null : ralle$fullShadowCollector
         );
-        return ChatScrollbarGraphics.wrap(transformed, contentWidth, behavior.hideChatScrollbar());
+        transformed = ChatScrollbarGraphics.wrap(transformed, contentWidth, behavior.hideChatScrollbar());
+        return RalleChatMessageGraphics.wrap(transformed);
+    }
+
+    @Inject(
+            method = "render(Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;IIZ)V",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/gui/components/ChatComponent;forEachLine(Lnet/minecraft/client/gui/components/ChatComponent$AlphaCalculator;Lnet/minecraft/client/gui/components/ChatComponent$LineConsumer;)I",
+                    ordinal = 1
+            ),
+            require = 0
+    )
+    private void ralle$drawModMessagePanelsBehindText(
+            ChatComponent.ChatGraphicsAccess graphics,
+            int canvasHeight,
+            int guiTick,
+            boolean focused,
+            CallbackInfo callback
+    ) {
+        double scale = Math.max(0.01, minecraft.options.chatScale().get());
+        int lineHeight = (int) (9 * (minecraft.options.chatLineSpacing().get() + 1.0));
+        int localBottom = Mth.floor((canvasHeight - 40) / scale);
+        RalleChatMessagePanel.render(
+                graphics,
+                trimmedMessages,
+                chatScrollbarPos,
+                ((ChatComponent) (Object) this).getLinesPerPage(),
+                lineHeight,
+                localBottom,
+                ralle$visualWidth(),
+                scale,
+                RalleClient.context().chatBehavior().messageDirection(),
+                guiTick,
+                focused
+        );
     }
 
     @Inject(

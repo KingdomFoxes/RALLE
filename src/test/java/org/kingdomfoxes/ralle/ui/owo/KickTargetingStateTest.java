@@ -39,6 +39,11 @@ class KickTargetingStateTest {
         assertTrue(state.active());
         assertFalse(state.holding());
         assertEquals(MEMBER, state.hovered());
+        assertEquals(0.5d, state.progress(), 0.000_001);
+        now[0] += KickTargetingState.CANCEL_FADE_NANOS / 2;
+        assertEquals(0.25d, state.progress(), 0.000_001);
+        now[0] += KickTargetingState.CANCEL_FADE_NANOS / 2;
+        assertEquals(0d, state.progress(), 0.000_001);
         assertNull(state.completedTarget());
     }
 

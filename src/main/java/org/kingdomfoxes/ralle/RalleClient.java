@@ -11,6 +11,7 @@ import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
+import org.kingdomfoxes.ralle.chat.RalleChatMessages;
 import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotService;
 import org.kingdomfoxes.ralle.chat.screenshot.TransparentChatCapture;
@@ -106,6 +107,11 @@ public final class RalleClient implements ClientModInitializer {
                     var client = Minecraft.getInstance();
                     client.schedule(() -> client.setScreen(new RaidLfgScreen(
                             client.screen, context().raidLfg(), context().lfgSounds())));
+                    return 1;
+                })).then(literal("text").executes(command -> {
+                    // Temporary visual-only prototype; production notifications do not use this path.
+                    var client = Minecraft.getInstance();
+                    client.schedule(() -> RalleChatMessages.postExample(client));
                     return 1;
                 }))
         ));

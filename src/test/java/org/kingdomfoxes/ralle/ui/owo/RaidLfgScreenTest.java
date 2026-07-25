@@ -89,6 +89,13 @@ class RaidLfgScreenTest {
         assertEquals(new RaidLfgScreen.ConnectorLine(87, 100, 200, 58), diagonal);
     }
 
+    @Test
+    void kickOutlineColorInterpolatesAndClamps() {
+        assertEquals(0xFFF2B84B, RaidLfgScreen.lerpArgb(0xFFF2B84B, 0xFFFF3333, -1d));
+        assertEquals(0xFFF9763F, RaidLfgScreen.lerpArgb(0xFFF2B84B, 0xFFFF3333, 0.5d));
+        assertEquals(0xFFFF3333, RaidLfgScreen.lerpArgb(0xFFF2B84B, 0xFFFF3333, 2d));
+    }
+
     private static LfgProtocol.Lobby lobby() {
         var guild = new LfgProtocol.GuildIdentity(GUILD, "Kingdom of Foxes", "FOX", "#FF8200");
         var host = new LfgProtocol.Member(HOST, "Host", guild, LfgProtocol.MemberRole.HOST,
