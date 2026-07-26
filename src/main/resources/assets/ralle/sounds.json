@@ -31,5 +31,26 @@
   },
   "ui.chat_copy_success": {
     "sounds": [{ "name": "ralle:ui/xylophone/chat_copy_success" }]
+  },
+  "lfg.toast_in": {
+    "sounds": [{ "name": "minecraft:ui/toast/in" }]
+  },
+  "lfg.toast_out": {
+    "sounds": [{ "name": "minecraft:ui/toast/out" }]
+  },
+  "lfg.resonate_1": {
+    "sounds": [{ "name": "minecraft:block/amethyst/resonate1" }]
+  },
+  "lfg.resonate_2": {
+    "sounds": [{ "name": "minecraft:block/amethyst/resonate2" }]
+  },
+  "lfg.resonate_3": {
+    "sounds": [{ "name": "minecraft:block/amethyst/resonate3" }]
+  },
+  "lfg.resonate_4": {
+    "sounds": [{ "name": "minecraft:block/amethyst/resonate4" }]
+  },
+  "lfg.fungus_break_4": {
+    "sounds": [{ "name": "minecraft:block/fungus/break4" }]
   }
 }

@@ -54,7 +54,12 @@ public final class RalleSettings {
                 Component.translatable("ralle.settings.category.raid-lfg.description"),
                 List.of(
                         subcategory("general", toggle("raid-lfg-enabled")),
-                        subcategory("notifications", toggle("notification-sounds")),
+                        subcategory("notifications",
+                                toggle("new-party-notifications"),
+                                toggle("reopened-party-notifications"),
+                                toggle("notification-sounds"),
+                                action("edit-notification-position")
+                        ),
                         subcategory("controls", keybind("raid-lfg-keybind"))
                 )
         ));
@@ -70,7 +75,10 @@ public final class RalleSettings {
         registry.requireEnabled("chat-screenshot-smooth-expansion", "chat-screenshot-enabled");
         registry.requireEnabled("chat-selection-sounds", "chat-enabled");
         registry.requireEnabled("chat-selection-sounds", "chat-screenshot-enabled");
+        registry.requireEnabled("new-party-notifications", "raid-lfg-enabled");
+        registry.requireEnabled("reopened-party-notifications", "raid-lfg-enabled");
         registry.requireEnabled("notification-sounds", "raid-lfg-enabled");
+        registry.requireEnabled("edit-notification-position", "raid-lfg-enabled");
         registry.requireEnabled("raid-lfg-keybind", "raid-lfg-enabled");
     }
 

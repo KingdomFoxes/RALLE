@@ -17,6 +17,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
+import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.PlacementPolicy;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.jetbrains.annotations.NotNull;
 
@@ -34,6 +35,7 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
 
     private final Screen parent;
     private final ChatLayoutService chatLayout;
+    private final String selectedElementId;
     private FlowLayout controlsPanel;
     private CheckboxComponent freeMoveCheckbox;
     private CheckboxComponent snapGridCheckbox;
@@ -55,8 +57,13 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
     private boolean showPositionInfo;
 
     ChatLayoutEditorScreen(Screen parent, ChatLayoutService chatLayout) {
+        this(parent, chatLayout, ChatLayoutService.CHAT_ELEMENT_ID);
+    }
+
+    ChatLayoutEditorScreen(Screen parent, ChatLayoutService chatLayout, String selectedElementId) {
         this.parent = parent;
         this.chatLayout = chatLayout;
+        this.selectedElementId = selectedElementId;
     }
 
     @Override
@@ -66,9 +73,9 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     protected void build(FlowLayout root) {
-        bounds = chatLayout.editorBounds(width, height);
+        bounds = chatLayout.editorBounds(selectedElementId, width, height);
         initialBounds = bounds;
-        initialHadCustomBounds = chatLayout.hasCustomEditorBounds();
+        initialHadCustomBounds = chatLayout.hasCustomEditorBounds(selectedElementId);
 
         root.surface(Surface.VANILLA_TRANSLUCENT)
                 .horizontalAlignment(HorizontalAlignment.CENTER)
@@ -142,9 +149,9 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
     private void resetSessionChanges() {
         bounds = initialBounds;
         if (initialHadCustomBounds) {
-            chatLayout.saveEditorBounds(bounds, width, height);
+            chatLayout.saveEditorBounds(selectedElementId, bounds, width, height);
         } else {
-            chatLayout.resetEditorBounds(width, height);
+            chatLayout.resetEditorBounds(selectedElementId, width, height);
         }
         dragMode = DragMode.NONE;
         clearAlignmentGuides();
@@ -191,7 +198,7 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void renderOtherElements(GuiGraphics graphics) {
-        for (var entry : chatLayout.otherEditorBounds(width, height).entrySet()) {
+        for (var entry : chatLayout.otherEditorBounds(selectedElementId, width, height).entrySet()) {
             var otherBounds = entry.getValue();
             graphics.fill(otherBounds.x(), otherBounds.y(), otherBounds.right(), otherBounds.bottom(), OTHER_FILL);
             graphics.renderOutline(
@@ -223,8 +230,9 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
             return super.mouseClicked(event, doubled);
         }
 
-        horizontalResizeEdge = edgeAt(event.x(), bounds.x(), bounds.right(), RESIZE_MARGIN);
-        verticalResizeEdge = edgeAt(event.y(), bounds.y(), bounds.bottom(), RESIZE_MARGIN);
+        boolean resizable = chatLayout.placementPolicy(selectedElementId) == PlacementPolicy.RESIZABLE_RECTANGLE;
+        horizontalResizeEdge = resizable ? edgeAt(event.x(), bounds.x(), bounds.right(), RESIZE_MARGIN) : AxisEdge.NONE;
+        verticalResizeEdge = resizable ? edgeAt(event.y(), bounds.y(), bounds.bottom(), RESIZE_MARGIN) : AxisEdge.NONE;
         if (horizontalResizeEdge != AxisEdge.NONE || verticalResizeEdge != AxisEdge.NONE) {
             dragMode = DragMode.RESIZE;
             pointerOffsetX = pointerOffset(event.x(), bounds.x(), bounds.right(), horizontalResizeEdge);
@@ -250,6 +258,17 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void moveTo(int desiredX, int desiredY) {
+        if (chatLayout.placementPolicy(selectedElementId) == PlacementPolicy.FIXED_SIDE_ANCHORED) {
+            int sideX = desiredX + bounds.width() / 2 < width / 2
+                    ? Math.min(8, Math.max(0, width - bounds.width()))
+                    : Math.max(0, width - bounds.width() - Math.min(8, Math.max(0, (width - bounds.width()) / 2)));
+            var ySnap = snapAxis(desiredY, bounds.height(), height, snapToGrid, alignmentGuides);
+            bounds = new Rectangle(sideX, ySnap.start(), bounds.width(), bounds.height())
+                    .clampTo(width, height, bounds.width(), bounds.height());
+            alignmentGuideX = null;
+            alignmentGuideY = featureMatches(bounds.y(), bounds.height(), ySnap.guide()) ? ySnap.guide() : null;
+            return;
+        }
         var xSnap = snapAxis(
                 desiredX, bounds.width(), width,
                 snapToGrid, alignmentGuides
@@ -368,7 +387,7 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
         if (event.button() == 0 && dragMode != DragMode.NONE) {
-            chatLayout.saveEditorBounds(bounds, width, height);
+            chatLayout.saveEditorBounds(selectedElementId, bounds, width, height);
             dragMode = DragMode.NONE;
             clearAlignmentGuides();
             return true;
@@ -379,7 +398,7 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     public void onClose() {
         if (dragMode != DragMode.NONE && bounds != null) {
-            chatLayout.saveEditorBounds(bounds, width, height);
+            chatLayout.saveEditorBounds(selectedElementId, bounds, width, height);
         }
         minecraft.setScreen(parent);
     }

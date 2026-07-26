@@ -8,7 +8,7 @@ import net.minecraft.sounds.SoundEvents;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 
-/** Uses deliberately vanilla cues for the first host-control sound pass. */
+/** Plays gated discovery/ping cues plus the deliberately quiet host-control feedback. */
 public final class MinecraftLfgSoundPlayer implements LfgSoundPlayer {
     private final Minecraft minecraft;
     private final BooleanSetting notificationSounds;
@@ -41,6 +41,40 @@ public final class MinecraftLfgSoundPlayer implements LfgSoundPlayer {
     @Override
     public void playPartyPing() {
         if (notificationSounds.value()) play(SoundEvents.BELL_BLOCK, 1.0F, 0.7F);
+    }
+
+    @Override
+    public void playNotificationIn() {
+        playNotificationCue(RalleSoundCue.LFG_TOAST_IN);
+    }
+
+    @Override
+    public void playNotificationOut() {
+        playNotificationCue(RalleSoundCue.LFG_TOAST_OUT);
+    }
+
+    @Override
+    public void playNewPartyReady() {
+        playNotificationCue(RalleSoundCue.LFG_RESONATE_1);
+    }
+
+    @Override
+    public void playRosterSlotOccupied(int occupiedSlot) {
+        playNotificationCue(switch (Math.clamp(occupiedSlot, 1, 4)) {
+            case 1 -> RalleSoundCue.LFG_RESONATE_1;
+            case 2 -> RalleSoundCue.LFG_RESONATE_2;
+            case 3 -> RalleSoundCue.LFG_RESONATE_3;
+            default -> RalleSoundCue.LFG_RESONATE_4;
+        });
+    }
+
+    @Override
+    public void playPartyFilledRaceLost() {
+        playNotificationCue(RalleSoundCue.LFG_FUNGUS_BREAK_4);
+    }
+
+    private void playNotificationCue(RalleSoundCue cue) {
+        if (notificationSounds.value()) play(RalleSoundEvents.event(cue), 1.0F, 0.8F);
     }
 
     private void play(SoundEvent sound, float pitch, float volume) {

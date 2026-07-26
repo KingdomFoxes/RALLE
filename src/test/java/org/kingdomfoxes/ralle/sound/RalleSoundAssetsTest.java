@@ -41,6 +41,26 @@ class RalleSoundAssetsTest {
         }
     }
 
+    @Test
+    void lfgNotificationCuesReferenceExactMinecraftAssets() throws IOException {
+        String manifest;
+        try (var input = resource("assets/ralle/sounds.json")) {
+            manifest = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        for (var asset : List.of(
+                "minecraft:ui/toast/in",
+                "minecraft:ui/toast/out",
+                "minecraft:block/amethyst/resonate1",
+                "minecraft:block/amethyst/resonate2",
+                "minecraft:block/amethyst/resonate3",
+                "minecraft:block/amethyst/resonate4",
+                "minecraft:block/fungus/break4"
+        )) {
+            assertTrue(manifest.contains(asset), asset);
+        }
+    }
+
     private static java.io.InputStream resource(String path) {
         var input = RalleSoundAssetsTest.class.getClassLoader().getResourceAsStream(path);
         assertNotNull(input, path);

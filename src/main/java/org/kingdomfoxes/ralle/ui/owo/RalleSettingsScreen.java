@@ -415,9 +415,14 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void openAction(ActionEntry action) {
-        if (!"edit-chat-layout".equals(action.id())) throw new IllegalArgumentException("Unknown settings action: " + action.id());
         persistNavigation();
-        minecraft.setScreen(new ChatLayoutEditorScreen(this, chatLayout));
+        if ("edit-chat-layout".equals(action.id())) {
+            minecraft.setScreen(new ChatLayoutEditorScreen(this, chatLayout));
+        } else if ("edit-notification-position".equals(action.id())) {
+            minecraft.setScreen(new ChatLayoutEditorScreen(this, chatLayout, LfgNotificationOverlay.ELEMENT_ID));
+        } else {
+            throw new IllegalArgumentException("Unknown settings action: " + action.id());
+        }
     }
 
     private void jumpTo(SettingsSubcategory subcategory) {

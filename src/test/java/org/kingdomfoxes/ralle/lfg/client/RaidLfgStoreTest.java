@@ -42,6 +42,29 @@ class RaidLfgStoreTest {
         assertEquals(1, store.state().lobbies().size());
     }
 
+    @Test
+    void changeSinkCarriesAcceptedOriginAndPreviousStateOnlyOnce() {
+        var store = new RaidLfgStore();
+        var changes = new java.util.ArrayList<RaidLfgStore.LobbyChange>();
+        store.observeLobbyChanges(changes::add);
+        store.replace(new LfgProtocol.Snapshot(1, 0, VIEWER,
+                new LfgProtocol.ViewerCapabilities(true, true, Map.of()), List.of()));
+
+        var first = lobby(1, false);
+        assertTrue(store.upsert(1, first, RaidLfgStore.UpdateOrigin.LIVE));
+        assertFalse(store.upsert(1, lobby(2, false), RaidLfgStore.UpdateOrigin.LIVE));
+        var second = lobby(2, true);
+        assertTrue(store.upsert(2, second, RaidLfgStore.UpdateOrigin.LOCAL_MUTATION));
+
+        assertEquals(2, changes.size());
+        assertEquals(RaidLfgStore.UpdateOrigin.LIVE, changes.get(0).origin());
+        assertNull(changes.get(0).previous());
+        assertEquals(first, changes.get(0).current());
+        assertEquals(RaidLfgStore.UpdateOrigin.LOCAL_MUTATION, changes.get(1).origin());
+        assertEquals(first, changes.get(1).previous());
+        assertEquals(second, changes.get(1).current());
+    }
+
     private static LfgProtocol.Lobby lobby(long revision, boolean viewerMember) {
         var members = viewerMember ? List.of(new LfgProtocol.Member(PLAYER, "Player01", GUILD_ID,
                 LfgProtocol.MemberRole.HOST, LfgProtocol.MemberSource.RALLE, Instant.EPOCH, null)) : List.<LfgProtocol.Member>of();

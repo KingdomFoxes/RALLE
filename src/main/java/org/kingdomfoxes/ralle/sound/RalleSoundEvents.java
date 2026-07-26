@@ -38,6 +38,13 @@ public final class RalleSoundEvents {
         events.put(RalleSoundCue.XYLOPHONE_E6, event("ui.xylophone.e6"));
         events.put(RalleSoundCue.XYLOPHONE_F_SHARP_6, event("ui.xylophone.f_sharp_6"));
         events.put(RalleSoundCue.CHAT_COPY_SUCCESS, event("ui.chat_copy_success"));
+        events.put(RalleSoundCue.LFG_TOAST_IN, event("lfg.toast_in"));
+        events.put(RalleSoundCue.LFG_TOAST_OUT, event("lfg.toast_out"));
+        events.put(RalleSoundCue.LFG_RESONATE_1, event("lfg.resonate_1"));
+        events.put(RalleSoundCue.LFG_RESONATE_2, event("lfg.resonate_2"));
+        events.put(RalleSoundCue.LFG_RESONATE_3, event("lfg.resonate_3"));
+        events.put(RalleSoundCue.LFG_RESONATE_4, event("lfg.resonate_4"));
+        events.put(RalleSoundCue.LFG_FUNGUS_BREAK_4, event("lfg.fungus_break_4"));
         return Map.copyOf(events);
     }
 

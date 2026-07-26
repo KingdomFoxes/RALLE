@@ -21,6 +21,7 @@ public final class HudPlacementRegistry {
     private final Path storagePath;
     private final Map<String, ElementDefinition> definitions = new LinkedHashMap<>();
     private final Map<String, NormalizedBounds> customBounds = new LinkedHashMap<>();
+    private final Map<String, SidePlacement> sidePlacements = new LinkedHashMap<>();
     private boolean sealed;
 
     public HudPlacementRegistry(Path storagePath) {
@@ -46,12 +47,17 @@ public final class HudPlacementRegistry {
     }
 
     public Optional<NormalizedBounds> customBounds(String id) {
-        definition(id);
+        var definition = definition(id);
+        if (definition.placementPolicy() != PlacementPolicy.RESIZABLE_RECTANGLE) return Optional.empty();
         return Optional.ofNullable(customBounds.get(id));
     }
 
     public Optional<Rectangle> resolveCustom(String id, int viewportWidth, int viewportHeight) {
         var definition = definition(id);
+        if (definition.placementPolicy() == PlacementPolicy.FIXED_SIDE_ANCHORED) {
+            return Optional.ofNullable(sidePlacements.get(id))
+                    .map(placement -> placement.toPixels(viewportWidth, viewportHeight, definition));
+        }
         return customBounds(id).map(bounds -> bounds.toPixels(viewportWidth, viewportHeight, definition));
     }
 
@@ -72,14 +78,55 @@ public final class HudPlacementRegistry {
 
     public void setPixels(String id, Rectangle rectangle, int viewportWidth, int viewportHeight) {
         var definition = definition(id);
+        if (definition.placementPolicy() == PlacementPolicy.FIXED_SIDE_ANCHORED) {
+            var fixed = new Rectangle(
+                    rectangle.x(),
+                    rectangle.y(),
+                    definition.minimumWidth(),
+                    definition.minimumHeight()
+            ).clampTo(viewportWidth, viewportHeight, definition.minimumWidth(), definition.minimumHeight());
+            var anchor = fixed.x() + fixed.width() / 2 < viewportWidth / 2
+                    ? SideAnchor.LEFT : SideAnchor.RIGHT;
+            sidePlacements.put(id, SidePlacement.fromPixels(anchor, fixed.y(), viewportHeight, fixed.height()));
+            customBounds.remove(id);
+            save();
+            return;
+        }
         var clamped = rectangle.clampTo(viewportWidth, viewportHeight, definition.minimumWidth(), definition.minimumHeight());
         customBounds.put(id, NormalizedBounds.fromPixels(clamped, viewportWidth, viewportHeight));
+        sidePlacements.remove(id);
         save();
+    }
+
+    public Rectangle resolveSideAnchored(
+            String id,
+            int viewportWidth,
+            int viewportHeight,
+            SideAnchor fallbackAnchor,
+            int fallbackTop
+    ) {
+        var definition = definition(id);
+        if (definition.placementPolicy() != PlacementPolicy.FIXED_SIDE_ANCHORED) {
+            throw new IllegalArgumentException("HUD element is not side-anchored: " + id);
+        }
+        return Optional.ofNullable(sidePlacements.get(id))
+                .orElseGet(() -> SidePlacement.fromPixels(
+                        fallbackAnchor, fallbackTop, viewportHeight, definition.minimumHeight()))
+                .toPixels(viewportWidth, viewportHeight, definition);
+    }
+
+    public boolean hasCustomPlacement(String id) {
+        var definition = definition(id);
+        return definition.placementPolicy() == PlacementPolicy.FIXED_SIDE_ANCHORED
+                ? sidePlacements.containsKey(id)
+                : customBounds.containsKey(id);
     }
 
     public void reset(String id) {
         definition(id);
-        if (customBounds.remove(id) != null) save();
+        boolean changed = customBounds.remove(id) != null;
+        changed |= sidePlacements.remove(id) != null;
+        if (changed) save();
     }
 
     private void load() {
@@ -95,6 +142,18 @@ public final class HudPlacementRegistry {
 
         for (var definition : definitions.values()) {
             var prefix = definition.id() + ".";
+            if (definition.placementPolicy() == PlacementPolicy.FIXED_SIDE_ANCHORED
+                    && (properties.containsKey(prefix + "anchor") || properties.containsKey(prefix + "vertical"))) {
+                try {
+                    sidePlacements.put(definition.id(), new SidePlacement(
+                            SideAnchor.valueOf(properties.getProperty(prefix + "anchor")),
+                            requireProperty(properties, prefix + "vertical")
+                    ));
+                } catch (IllegalArgumentException exception) {
+                    LOGGER.warn("Ignoring invalid side-anchored RALLE HUD layout for {}", definition.id());
+                }
+                continue;
+            }
             if (!properties.containsKey(prefix + "x")
                     && !properties.containsKey(prefix + "y")
                     && !properties.containsKey(prefix + "width")
@@ -134,6 +193,11 @@ public final class HudPlacementRegistry {
             properties.setProperty(prefix + "width", Double.toString(bounds.width()));
             properties.setProperty(prefix + "height", Double.toString(bounds.height()));
         }
+        for (var entry : sidePlacements.entrySet()) {
+            var prefix = entry.getKey() + ".";
+            properties.setProperty(prefix + "anchor", entry.getValue().anchor().name());
+            properties.setProperty(prefix + "vertical", Double.toString(entry.getValue().normalizedTop()));
+        }
 
         try {
             Files.createDirectories(storagePath.getParent());
@@ -145,12 +209,59 @@ public final class HudPlacementRegistry {
         }
     }
 
-    public record ElementDefinition(String id, int minimumWidth, int minimumHeight) {
+    public enum PlacementPolicy {
+        RESIZABLE_RECTANGLE,
+        FIXED_SIDE_ANCHORED
+    }
+
+    public enum SideAnchor {
+        LEFT,
+        RIGHT
+    }
+
+    public record ElementDefinition(String id, int minimumWidth, int minimumHeight,
+                                    PlacementPolicy placementPolicy) {
+        public ElementDefinition(String id, int minimumWidth, int minimumHeight) {
+            this(id, minimumWidth, minimumHeight, PlacementPolicy.RESIZABLE_RECTANGLE);
+        }
+
         public ElementDefinition {
             id = IdentifierRules.requireValid(id, "HUD element id");
+            placementPolicy = Objects.requireNonNull(placementPolicy, "placementPolicy");
             if (minimumWidth < 1 || minimumHeight < 1) {
                 throw new IllegalArgumentException("HUD element minimum dimensions must be positive");
             }
+        }
+    }
+
+    public record SidePlacement(SideAnchor anchor, double normalizedTop) {
+        private static final int EDGE_MARGIN = 8;
+
+        public SidePlacement {
+            anchor = Objects.requireNonNull(anchor, "anchor");
+            requireFinite(normalizedTop, "normalizedTop");
+        }
+
+        public static SidePlacement fromPixels(SideAnchor anchor, int top, int viewportHeight, int height) {
+            requireViewport(1, viewportHeight);
+            var maximumTop = Math.max(0, viewportHeight - Math.min(height, viewportHeight));
+            var clampedTop = Math.clamp(top, 0, maximumTop);
+            return new SidePlacement(anchor, maximumTop == 0 ? 0 : clampedTop / (double) maximumTop);
+        }
+
+        public Rectangle toPixels(int viewportWidth, int viewportHeight, ElementDefinition definition) {
+            requireViewport(viewportWidth, viewportHeight);
+            int width = Math.min(definition.minimumWidth(), viewportWidth);
+            int height = Math.min(definition.minimumHeight(), viewportHeight);
+            int margin = Math.min(EDGE_MARGIN, Math.max(0, (viewportWidth - width) / 2));
+            int x = anchor == SideAnchor.LEFT ? margin : viewportWidth - width - margin;
+            int maximumTop = Math.max(0, viewportHeight - height);
+            int y = (int) Math.round(Math.clamp(normalizedTop, 0d, 1d) * maximumTop);
+            return new Rectangle(x, y, width, height);
+        }
+
+        private static void requireFinite(double value, String name) {
+            if (!Double.isFinite(value)) throw new IllegalArgumentException(name + " must be finite");
         }
     }
 

@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.ElementDefinition;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
+import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.PlacementPolicy;
+import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.SideAnchor;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -59,6 +61,24 @@ class HudPlacementRegistryTest {
                 new Rectangle(40, 50, 200, 100),
                 registry.resolveAllCustom(800, 600).get("chat")
         );
+    }
+
+    @Test
+    void fixedElementsKeepSizeSnapSidesAndPersistVerticalPosition() {
+        var path = temporaryDirectory.resolve("layout.properties");
+        var registry = new HudPlacementRegistry(path);
+        registry.register(new ElementDefinition("notifications", 260, 100, PlacementPolicy.FIXED_SIDE_ANCHORED));
+        registry.seal();
+        registry.setPixels("notifications", new Rectangle(700, 250, 500, 300), 1000, 600);
+
+        registry = new HudPlacementRegistry(path);
+        registry.register(new ElementDefinition("notifications", 260, 100, PlacementPolicy.FIXED_SIDE_ANCHORED));
+        registry.seal();
+
+        assertEquals(new Rectangle(732, 250, 260, 100),
+                registry.resolveSideAnchored("notifications", 1000, 600, SideAnchor.LEFT, 0));
+        assertEquals(new Rectangle(532, 125, 260, 100),
+                registry.resolveSideAnchored("notifications", 800, 350, SideAnchor.LEFT, 0));
     }
 
     private HudPlacementRegistry registry(Path path) {

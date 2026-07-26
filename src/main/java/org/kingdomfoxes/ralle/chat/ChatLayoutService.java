@@ -4,6 +4,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
+import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.PlacementPolicy;
+import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.SideAnchor;
+import org.kingdomfoxes.ralle.api.hud.RalleHudElements;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 
@@ -11,9 +14,9 @@ import java.util.Map;
 import java.util.Optional;
 
 public final class ChatLayoutService {
-    public static final String CHAT_ELEMENT_ID = "chat";
-    public static final int MINIMUM_WIDTH = 120;
-    public static final int MINIMUM_HEIGHT = 45;
+    public static final String CHAT_ELEMENT_ID = RalleHudElements.CHAT;
+    public static final int MINIMUM_WIDTH = RalleHudElements.CHAT_MINIMUM_WIDTH;
+    public static final int MINIMUM_HEIGHT = RalleHudElements.CHAT_MINIMUM_HEIGHT;
     private static final int VANILLA_BOTTOM_MARGIN = 40;
 
     private final Minecraft minecraft;
@@ -30,6 +33,16 @@ public final class ChatLayoutService {
     }
 
     public Rectangle editorBounds(int viewportWidth, int viewportHeight) {
+        return editorBounds(CHAT_ELEMENT_ID, viewportWidth, viewportHeight);
+    }
+
+    public Rectangle editorBounds(String elementId, int viewportWidth, int viewportHeight) {
+        if (RalleHudElements.LFG_NOTIFICATIONS.equals(elementId)) {
+            return placements.resolveSideAnchored(
+                    elementId, viewportWidth, viewportHeight, SideAnchor.RIGHT,
+                    Math.max(0, viewportHeight - RalleHudElements.LFG_NOTIFICATION_HEIGHT - 8)
+            );
+        }
         return placements.resolve(
                 CHAT_ELEMENT_ID,
                 viewportWidth,
@@ -39,25 +52,59 @@ public final class ChatLayoutService {
     }
 
     public void saveEditorBounds(Rectangle rectangle, int viewportWidth, int viewportHeight) {
-        placements.setPixels(CHAT_ELEMENT_ID, rectangle, viewportWidth, viewportHeight);
-        rescaleChat();
+        saveEditorBounds(CHAT_ELEMENT_ID, rectangle, viewportWidth, viewportHeight);
+    }
+
+    public void saveEditorBounds(String elementId, Rectangle rectangle, int viewportWidth, int viewportHeight) {
+        placements.setPixels(elementId, rectangle, viewportWidth, viewportHeight);
+        if (CHAT_ELEMENT_ID.equals(elementId)) rescaleChat();
     }
 
     public boolean hasCustomEditorBounds() {
-        return placements.customBounds(CHAT_ELEMENT_ID).isPresent();
+        return hasCustomEditorBounds(CHAT_ELEMENT_ID);
+    }
+
+    public boolean hasCustomEditorBounds(String elementId) {
+        return placements.hasCustomPlacement(elementId);
     }
 
     public Map<String, Rectangle> otherEditorBounds(int viewportWidth, int viewportHeight) {
-        var allBounds = new java.util.LinkedHashMap<>(placements.resolveAllCustom(viewportWidth, viewportHeight));
-        allBounds.remove(CHAT_ELEMENT_ID);
+        return otherEditorBounds(CHAT_ELEMENT_ID, viewportWidth, viewportHeight);
+    }
+
+    public Map<String, Rectangle> otherEditorBounds(String selectedId, int viewportWidth, int viewportHeight) {
+        var allBounds = new java.util.LinkedHashMap<String, Rectangle>();
+        allBounds.put(CHAT_ELEMENT_ID, editorBounds(CHAT_ELEMENT_ID, viewportWidth, viewportHeight));
+        allBounds.put(RalleHudElements.LFG_NOTIFICATIONS,
+                editorBounds(RalleHudElements.LFG_NOTIFICATIONS, viewportWidth, viewportHeight));
+        allBounds.remove(selectedId);
         return Map.copyOf(allBounds);
     }
 
     public Rectangle resetEditorBounds(int viewportWidth, int viewportHeight) {
-        placements.reset(CHAT_ELEMENT_ID);
+        return resetEditorBounds(CHAT_ELEMENT_ID, viewportWidth, viewportHeight);
+    }
+
+    public Rectangle resetEditorBounds(String elementId, int viewportWidth, int viewportHeight) {
+        placements.reset(elementId);
+        if (RalleHudElements.LFG_NOTIFICATIONS.equals(elementId)) {
+            return editorBounds(elementId, viewportWidth, viewportHeight);
+        }
         rescaleChat();
         return vanillaBounds(viewportWidth, viewportHeight, true)
                 .clampTo(viewportWidth, viewportHeight, MINIMUM_WIDTH, MINIMUM_HEIGHT);
+    }
+
+    public PlacementPolicy placementPolicy(String elementId) {
+        return placements.definition(elementId).placementPolicy();
+    }
+
+    public int minimumWidth(String elementId) {
+        return placements.definition(elementId).minimumWidth();
+    }
+
+    public int minimumHeight(String elementId) {
+        return placements.definition(elementId).minimumHeight();
     }
 
     public Optional<Rectangle> activeCustomBounds() {

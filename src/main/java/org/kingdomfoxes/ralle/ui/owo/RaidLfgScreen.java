@@ -26,6 +26,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.jetbrains.annotations.NotNull;
 import org.kingdomfoxes.ralle.lfg.client.GuildTerritoryColors;
+import org.kingdomfoxes.ralle.lfg.client.LfgJoinController;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.lfg.client.RaidRegionDetector;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException;
@@ -62,7 +63,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private final Screen parent;
     private final RaidLfgService service;
     private final LfgSoundPlayer sounds;
-    private final JoinCountdownState joinCountdown;
+    private final LfgJoinController joinCountdown;
     private final KickTargetingState kickTargeting;
     private final Set<UUID> expandedLobbies = new HashSet<>();
     private final Map<UUID, FlowLayout> kickRows = new HashMap<>();
@@ -84,6 +85,8 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private long renderedRevision = Long.MIN_VALUE;
     private RaidLfgService.LifecycleState renderedLifecycle;
     private int renderedCountdownSeconds = -1;
+    private LfgJoinController.Phase renderedJoinPhase = LfgJoinController.Phase.IDLE;
+    private UUID renderedJoinLobby;
     private int renderedPingSeconds = -1;
     private UUID kickLobbyId;
     private ButtonComponent kickButton;
@@ -111,7 +114,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         this.service = service;
         this.sounds = sounds;
         this.currentRegion = regionDetector.detect().orElse(LfgProtocol.Region.EU);
-        this.joinCountdown = new JoinCountdownState(nanoTime);
+        this.joinCountdown = service.joinController();
         this.kickTargeting = new KickTargetingState(nanoTime);
     }
 
@@ -294,7 +297,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                     .color(RalleTheme.ACCENT).margins(Insets.right(3)));
         }
         if (!expanded) {
-            if (joinCountdown.activeFor(lobby.lobbyId())) {
+            if (joinCountdown.snapshot().activeFor(lobby.lobbyId())) {
                 summary.child(joinCountdownControls(true));
             } else if (collapsedActionVisible(lobby)) {
                 summary.child(collapsedAction(lobby));
@@ -321,7 +324,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         card.child(roster);
         if (lobby.hostedBy(viewerId())) {
             card.child(hostControls(lobby));
-        } else if (joinCountdown.activeFor(lobby.lobbyId())) {
+        } else if (joinCountdown.snapshot().activeFor(lobby.lobbyId())) {
             card.child(joinCountdownControls(false));
         } else {
             var action = expandedAction(lobby);
@@ -348,11 +351,11 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         button.active = allowed
                 && service.lifecycle() == RaidLfgService.LifecycleState.ONLINE
                 && !service.pending(lobby.lobbyId(), action.kind().protocolAction)
-                && (action.kind() != CardActionKind.JOIN || !joinCountdown.active());
+                && (action.kind() != CardActionKind.JOIN || !joinCountdown.snapshot().active());
         button.tooltip(RalleTheme.ui(Component.literal(switch (action.kind()) {
             case DISBAND -> "Disband this party";
             case LEAVE -> "Leave this party";
-            case JOIN -> joinCountdown.active()
+            case JOIN -> joinCountdown.snapshot().active()
                     ? "Cancel the current join countdown first"
                     : "Begin the join countdown";
         })));
@@ -432,11 +435,11 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         button.renderer(action.destructive() ? RalleButtonRenderers.destructive() : RalleButtonRenderers.primary());
         button.active = allowed
                 && !service.pending(lobby.lobbyId(), action.kind().protocolAction)
-                && (action.kind() != CardActionKind.JOIN || !joinCountdown.active());
+                && (action.kind() != CardActionKind.JOIN || !joinCountdown.snapshot().active());
         if (!allowed && lobby.capabilities() != null) {
             var reason = lobby.capabilities().reason(member ? "leave" : "join");
             if (reason != null) button.tooltip(RalleTheme.ui(Component.literal(capabilityReason(reason))));
-        } else if (action.kind() == CardActionKind.JOIN && joinCountdown.active()) {
+        } else if (action.kind() == CardActionKind.JOIN && joinCountdown.snapshot().active()) {
             button.tooltip(RalleTheme.ui(Component.literal("Cancel the current join countdown first")));
         }
         return button;
@@ -448,19 +451,29 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                 Sizing.fixed(20)
         );
         controls.gap(3).verticalAlignment(VerticalAlignment.CENTER);
+        var snapshot = joinCountdown.snapshot();
+        if (snapshot.phase() == LfgJoinController.Phase.SUBMITTING) {
+            var submitting = UIComponents.button(RalleTheme.ui(Component.literal("Joining...")), ignored -> {});
+            submitting.sizing(Sizing.fill(100), Sizing.fixed(20));
+            submitting.renderer(RalleButtonRenderers.neutral());
+            submitting.active = false;
+            controls.child(submitting);
+            return controls;
+        }
 
         var countdown = UIComponents.button(
-                RalleTheme.ui(Component.literal(Integer.toString(joinCountdown.secondsRemaining()))),
+                RalleTheme.ui(Component.literal(Integer.toString(snapshot.secondsRemaining()))),
                 ignored -> {}
         );
         countdown.sizing(compact ? Sizing.fixed(COMPACT_JOIN_CONTROL_WIDTH) : Sizing.fill(50), Sizing.fixed(20));
-        countdown.renderer(RalleButtonRenderers.countdown(joinCountdown::remainingFraction));
+        countdown.renderer(RalleButtonRenderers.countdown(() -> joinCountdown.snapshot().remainingFraction()));
         countdown.tooltip(RalleTheme.ui(Component.literal("Joining when the countdown reaches zero")));
 
         var cancel = UIComponents.button(RalleTheme.ui(Component.literal("Cancel")), ignored -> {
-            joinCountdown.cancel();
-            renderedCountdownSeconds = -1;
-            rebuildGrid();
+            if (joinCountdown.cancel()) {
+                renderedCountdownSeconds = -1;
+                rebuildGrid();
+            }
         });
         cancel.sizing(compact ? Sizing.fixed(COMPACT_JOIN_CONTROL_WIDTH) : Sizing.fill(50), Sizing.fixed(20));
         cancel.renderer(RalleButtonRenderers.destructive());
@@ -472,43 +485,31 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     private void startJoinCountdown(LfgProtocol.Lobby lobby) {
         if (!joinAvailable(lobby) || !joinCountdown.start(lobby.lobbyId())) return;
-        renderedCountdownSeconds = joinCountdown.secondsRemaining();
+        var snapshot = joinCountdown.snapshot();
+        renderedCountdownSeconds = snapshot.secondsRemaining();
+        renderedJoinPhase = snapshot.phase();
+        renderedJoinLobby = snapshot.lobbyId();
         rebuildGrid();
     }
 
     private void tickJoinCountdown() {
-        if (!joinCountdown.active()) return;
-        if (!joinCountdownAvailable()) {
-            joinCountdown.cancel();
-            renderedCountdownSeconds = -1;
-            rebuildGrid();
-            return;
-        }
-        if (joinCountdown.elapsed()) {
-            var lobby = lobby(joinCountdown.lobbyId());
-            joinCountdown.cancel();
-            renderedCountdownSeconds = -1;
-            if (lobby != null && joinAvailable(lobby)) performAction(lobby, CardActionKind.JOIN.protocolAction);
-            else rebuildGrid();
-            return;
-        }
-        int seconds = joinCountdown.secondsRemaining();
-        if (seconds != renderedCountdownSeconds) {
+        var snapshot = joinCountdown.snapshot();
+        int seconds = snapshot.secondsRemaining();
+        if (seconds != renderedCountdownSeconds
+                || snapshot.phase() != renderedJoinPhase
+                || !java.util.Objects.equals(snapshot.lobbyId(), renderedJoinLobby)) {
             renderedCountdownSeconds = seconds;
+            renderedJoinPhase = snapshot.phase();
+            renderedJoinLobby = snapshot.lobbyId();
             rebuildGrid();
         }
     }
 
     private void cancelUnavailableJoinCountdown() {
-        if (joinCountdown.active() && !joinCountdownAvailable()) {
-            joinCountdown.cancel();
+        var snapshot = joinCountdown.snapshot();
+        if (snapshot.phase().terminal()) {
             renderedCountdownSeconds = -1;
         }
-    }
-
-    private boolean joinCountdownAvailable() {
-        var lobby = lobby(joinCountdown.lobbyId());
-        return lobby != null && matchesFilters(lobby) && joinAvailable(lobby);
     }
 
     private boolean joinAvailable(LfgProtocol.Lobby lobby) {
@@ -971,7 +972,6 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     public void onClose() {
-        joinCountdown.cancel();
         kickTargeting.reset();
         minecraft.setScreen(parent);
     }

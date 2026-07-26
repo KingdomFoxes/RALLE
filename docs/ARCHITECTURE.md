@@ -59,11 +59,13 @@ values fall back to their declared defaults. Chat settings are consumed by the
 local chat integration. The Raid LFG opt-in gates the persistent Fox client
 service, while its shortcut remains unbound until configured.
 
-Custom HUD rectangles are stored separately in
-`config/ralle-hud-layout.properties` as normalized coordinates and dimensions.
-The registry currently exposes only the v1 chat box. Removing its custom entry
-restores the live vanilla chat position and dimensions rather than copying a
-snapshot of the vanilla options.
+Custom HUD placements are stored separately in
+`config/ralle-hud-layout.properties`. Resizable elements such as the v1 chat
+box persist normalized coordinates and dimensions. Fixed elements such as Raid
+LFG notification cards persist a left/right side anchor and normalized vertical
+position; their logical size is not configurable. Removing the chat placement
+restores the live vanilla position and dimensions, while removing the
+notification placement restores its eight-pixel bottom-right default.
 
 ## Programmatic UI development
 
@@ -121,5 +123,15 @@ without affecting local chat features. Global revisions are monotonic but may co
 private events can be invisible to a viewer. Successful REST mutations update the immutable store
 immediately; a WebSocket event at the same revision is ignored.
 
-The only persisted LFG values remain the opt-in setting and unbound keybind. Credentials, snapshots,
-pending actions, backend overrides, and connection state are memory-only.
+Accepted store changes also carry a presentation-neutral origin (`LIVE`,
+`SNAPSHOT`, `LOCAL_MUTATION`, or `CLEAR`) and their previous/current lobby
+projection. New-party and reopened-party discovery cards are created only from
+qualifying `LIVE` changes; snapshots, refreshes, reconnect synchronization,
+stale revisions, and local REST mutations can update or retire existing cards
+but cannot discover new ones. The persistent `LfgJoinController` owns the
+single three-second countdown and submission shared by the browser and HUD
+cards.
+
+The only persisted LFG values are local opt-in, notification, sound, keybind,
+and HUD-placement settings. Credentials, snapshots, pending actions, backend
+overrides, and connection state are memory-only.

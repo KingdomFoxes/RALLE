@@ -19,6 +19,7 @@ import org.kingdomfoxes.ralle.sound.MinecraftChatSelectionSoundPlayer;
 import org.kingdomfoxes.ralle.sound.MinecraftLfgSoundPlayer;
 import org.kingdomfoxes.ralle.sound.RalleSoundEvents;
 import org.kingdomfoxes.ralle.ui.owo.OwoSettingsScreenFactory;
+import org.kingdomfoxes.ralle.ui.owo.LfgNotificationOverlay;
 import org.kingdomfoxes.ralle.ui.owo.RaidLfgScreen;
 import org.kingdomfoxes.ralle.ui.owo.RalleTypography;
 import org.kingdomfoxes.ralle.ui.owo.SettingsNavigationState;
@@ -28,6 +29,7 @@ import org.kingdomfoxes.ralle.lfg.client.MinecraftRaidLfgEnvironment;
 import org.kingdomfoxes.ralle.lfg.client.MinecraftSessionProofAdapter;
 import org.kingdomfoxes.ralle.lfg.client.MinecraftLfgNotificationSink;
 import org.kingdomfoxes.ralle.lfg.client.MinecraftPartyCommandExecutor;
+import org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
@@ -53,6 +55,12 @@ public final class RalleClient implements ClientModInitializer {
                 ChatLayoutService.MINIMUM_WIDTH,
                 ChatLayoutService.MINIMUM_HEIGHT
         ));
+        placements.register(new HudPlacementRegistry.ElementDefinition(
+                LfgNotificationOverlay.ELEMENT_ID,
+                LfgNotificationOverlay.CARD_WIDTH,
+                LfgNotificationOverlay.CARD_HEIGHT,
+                HudPlacementRegistry.PlacementPolicy.FIXED_SIDE_ANCHORED
+        ));
         features.seal();
         settings.seal();
         placements.seal();
@@ -69,6 +77,11 @@ public final class RalleClient implements ClientModInitializer {
                 new MinecraftLfgNotificationSink(minecraft, lfgSounds),
                 new MinecraftPartyCommandExecutor(minecraft)
         );
+        var lfgNotifications = new LfgNotificationManager(
+                raidLfg, settings, lfgSounds, () -> minecraft.screen instanceof RaidLfgScreen);
+        var lfgNotificationOverlay = new LfgNotificationOverlay(
+                minecraft, raidLfg, lfgNotifications, placements, lfgSounds);
+        lfgNotificationOverlay.register();
         var lfgKeybind = new RaidLfgKeybind(minecraft, settings, raidLfg, lfgSounds);
         var chatBehavior = new ChatBehaviorService(Minecraft.getInstance(), settings);
         var chatScreenshots = new ChatScreenshotService(
@@ -95,6 +108,7 @@ public final class RalleClient implements ClientModInitializer {
             chatScreenshots.tick();
             lfgKeybind.tick();
             raidLfg.tick();
+            lfgNotificationOverlay.tick();
         });
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(

@@ -41,6 +41,7 @@ public final class RaidLfgService {
     private final LfgNotificationSink notifications;
     private final PartyCommandExecutor partyCommands;
     private final RaidLfgStore store = new RaidLfgStore();
+    private final LfgJoinController joinController;
     private final Set<String> pending = new HashSet<>();
     private final Map<UUID, Long> pingCooldowns = new HashMap<>();
     private final Set<UUID> processedCommandIds = new HashSet<>();
@@ -89,14 +90,17 @@ public final class RaidLfgService {
         this.jitter = jitter;
         this.notifications = notifications;
         this.partyCommands = partyCommands;
+        this.joinController = new LfgJoinController(this, clockMillis);
     }
 
     public RaidLfgStore store() { return store; }
+    public LfgJoinController joinController() { return joinController; }
     public LifecycleState lifecycle() { return lifecycle; }
     public String statusMessage() { return statusMessage; }
     public String releaseUrl() { return releaseUrl; }
     public UUID focusLobbyId() { return focusLobbyId; }
     public void clearFocus() { focusLobbyId = null; }
+    public void focusLobby(UUID lobbyId) { focusLobbyId = lobbyId; }
 
     public synchronized int pingCooldownSeconds(UUID lobbyId) {
         long remaining = pingCooldowns.getOrDefault(lobbyId, 0L) - clockMillis.getAsLong();
@@ -121,6 +125,7 @@ public final class RaidLfgService {
 
     /** Reevaluate every client tick; it performs no network request outside the opt-in Wynncraft state. */
     public synchronized void tick() {
+        joinController.tick();
         var host = normalizedHost(environment.serverHost());
         var nextContext = environment.enabled() + "|" + host + "|" + environment.playerId() + "|" + environment.modVersion();
         if (!nextContext.equals(contextKey)) {
@@ -155,7 +160,7 @@ public final class RaidLfgService {
         return gateway.snapshot(token).thenApply(snapshot -> {
             synchronized (this) {
                 if (expected != generation) return snapshot;
-                store.replace(snapshot);
+                store.replace(snapshot, RaidLfgStore.UpdateOrigin.SNAPSHOT);
                 lifecycle = LifecycleState.ONLINE;
                 statusMessage = "Live";
             }
@@ -220,13 +225,19 @@ public final class RaidLfgService {
                                                             java.util.function.Function<String, CompletableFuture<LfgProtocol.Mutation>> call) {
         final String key = pendingKey(lobbyId, action);
         final String token;
+        final long expected;
         synchronized (this) {
             if (lifecycle != LifecycleState.ONLINE || bearerToken == null) return unavailableFuture();
             if (!pending.add(key)) return CompletableFuture.failedFuture(new IllegalStateException("That action is already pending."));
             token = bearerToken;
+            expected = generation;
         }
         return call.apply(token).thenApply(mutation -> {
-            if (removal) store.remove(mutation.revision(), mutation.lobby().lobbyId());
+            synchronized (this) {
+                requireCurrent(expected);
+            }
+            if (removal) store.remove(mutation.revision(), mutation.lobby().lobbyId(),
+                    RaidLfgStore.UpdateOrigin.LOCAL_MUTATION);
             else store.apply(mutation);
             statusMessage = "Live";
             return mutation;
@@ -234,6 +245,7 @@ public final class RaidLfgService {
             synchronized (this) { pending.remove(key); }
             if (failure != null) {
                 var cause = unwrap(failure);
+                if (cause instanceof StaleGenerationException) return;
                 if (cause instanceof LfgGatewayException gatewayFailure) {
                     var error = gatewayFailure.error();
                     statusMessage = error.message();
@@ -312,17 +324,17 @@ public final class RaidLfgService {
             return;
         }
         if (frame instanceof LfgProtocol.SnapshotFrame snapshotFrame) {
-            store.replace(snapshotFrame.snapshot());
+            store.replace(snapshotFrame.snapshot(), RaidLfgStore.UpdateOrigin.SNAPSHOT);
             awaitingSnapshot = false;
             reconnectAttempt = 0;
             lifecycle = LifecycleState.ONLINE;
             statusMessage = "Live";
         } else if (frame instanceof LfgProtocol.UpsertFrame upsert) {
             requireProtocol(upsert.protocolVersion());
-            store.upsert(upsert.revision(), upsert.lobby());
+            store.upsert(upsert.revision(), upsert.lobby(), RaidLfgStore.UpdateOrigin.LIVE);
         } else if (frame instanceof LfgProtocol.RemoveFrame remove) {
             requireProtocol(remove.protocolVersion());
-            store.remove(remove.revision(), remove.lobbyId());
+            store.remove(remove.revision(), remove.lobbyId(), RaidLfgStore.UpdateOrigin.LIVE);
         } else if (frame instanceof LfgProtocol.PartyPingFrame ping) {
             requireProtocol(ping.protocolVersion());
             focusLobbyId = ping.lobbyId();

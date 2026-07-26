@@ -65,6 +65,19 @@ class RalleSettingsTest {
     }
 
     @Test
+    void discoveryNotificationsDefaultOffAndDependOnRaidLfg() {
+        var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
+        RalleSettings.register(registry);
+
+        assertFalse(registry.setting("new-party-notifications", BooleanSetting.class).value());
+        assertFalse(registry.setting("reopened-party-notifications", BooleanSetting.class).value());
+        assertFalse(registry.setting("notification-sounds", BooleanSetting.class).value());
+        assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("new-party-notifications"));
+        assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("reopened-party-notifications"));
+        assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("edit-notification-position"));
+    }
+
+    @Test
     void interfaceFontDefaultsPersistsAndFallsBackFromInvalidStorage() throws Exception {
         var path = temporaryDirectory.resolve("ralle.properties");
         var registry = new SettingsRegistry(path);
