@@ -4,6 +4,9 @@ import org.junit.jupiter.api.Test;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 
+import java.time.Instant;
+import java.util.UUID;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -44,5 +47,20 @@ class LfgNotificationOverlayTest {
         assertEquals(0xFF00FF55, LfgNotificationOverlay.regionColor(LfgProtocol.Region.EU));
         assertEquals(0xFFFFFF00, LfgNotificationOverlay.regionColor(LfgProtocol.Region.NA));
         assertEquals(0xFFFF3333, LfgNotificationOverlay.regionColor(LfgProtocol.Region.AS));
+    }
+
+    @Test
+    void rosterHoverIdentifiesGuildAndPlayer() {
+        var guild = new LfgProtocol.GuildIdentity(
+                UUID.randomUUID(), "Kingdom of Foxes", "FOX", "#FF8200");
+        var member = new LfgProtocol.Member(
+                UUID.randomUUID(), "RallePlayer", guild,
+                LfgProtocol.MemberRole.MEMBER, LfgProtocol.MemberSource.RALLE,
+                Instant.EPOCH, null);
+
+        assertEquals("[FOX] RallePlayer",
+                LfgNotificationOverlay.rosterTooltip(member).getString());
+        assertEquals(0xFFFF8200,
+                LfgNotificationOverlay.rosterBorderColor(member));
     }
 }

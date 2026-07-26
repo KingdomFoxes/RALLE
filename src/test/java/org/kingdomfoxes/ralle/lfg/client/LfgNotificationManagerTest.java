@@ -23,6 +23,11 @@ class LfgNotificationManagerTest {
             new LfgProtocol.PlayerIdentity(VIEWER_ID, "Viewer", GUILD);
 
     @Test
+    void notificationSlideAnimationLastsHalfASecond() {
+        assertEquals(500, LfgNotificationManager.ANIMATION_MILLIS);
+    }
+
+    @Test
     void onlyQualifyingLiveChangesDiscoverAndReopenedSkipsReadyCue() {
         var fixture = new Fixture();
         fixture.connect();
@@ -128,6 +133,8 @@ class LfgNotificationManagerTest {
         fixture.manager.tick();
         assertEquals(LfgNotificationManager.CardMode.EXITING,
                 fixture.manager.visibleCards().getFirst().mode());
+        assertEquals(LfgNotificationManager.CardMode.FILLED_RACE,
+                fixture.manager.visibleCards().getFirst().presentedMode());
     }
 
     @Test
@@ -155,6 +162,8 @@ class LfgNotificationManagerTest {
         fixture.manager.tick();
         assertEquals(LfgNotificationManager.CardMode.EXITING,
                 fixture.manager.visibleCards().getFirst().mode());
+        assertEquals(LfgNotificationManager.CardMode.FILLED_SUCCESS,
+                fixture.manager.visibleCards().getFirst().presentedMode());
     }
 
     private static LfgProtocol.Lobby lobby(int id, boolean locked, long revision) {

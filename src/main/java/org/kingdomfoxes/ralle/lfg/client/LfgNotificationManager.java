@@ -20,7 +20,7 @@ public final class LfgNotificationManager {
     public static final long PASSIVE_MILLIS = 20_000;
     public static final long FEEDBACK_MILLIS = 2_000;
     public static final long FILLED_SUCCESS_MILLIS = 5_000;
-    public static final long ANIMATION_MILLIS = 250;
+    public static final long ANIMATION_MILLIS = 500;
 
     private final RaidLfgService service;
     private final LfgSoundPlayer sounds;
@@ -259,6 +259,7 @@ public final class LfgNotificationManager {
 
     private void beginExit(Card card) {
         if (card.mode == CardMode.EXITING || card.mode == CardMode.REMOVED) return;
+        card.exitMode = card.mode;
         card.mode = CardMode.EXITING;
         card.animationStartedAt = clockMillis.getAsLong();
         sounds.playNotificationOut();
@@ -323,8 +324,8 @@ public final class LfgNotificationManager {
     }
 
     public record CardSnapshot(LfgProtocol.Lobby lobby, DiscoveryKind kind, CardMode mode,
-                               String feedbackText, int countdownSeconds, double countdownFraction,
-                               double animationProgress) {}
+                               CardMode presentedMode, String feedbackText, int countdownSeconds,
+                               double countdownFraction, double animationProgress) {}
 
     private static final class Card {
         private LfgProtocol.Lobby lobby;
@@ -337,6 +338,7 @@ public final class LfgNotificationManager {
         private long feedbackUntil;
         private boolean entranceCompleted;
         private int lastRosterSize;
+        private CardMode exitMode = CardMode.READY;
 
         private Card(LfgProtocol.Lobby lobby, DiscoveryKind kind) {
             this.lobby = lobby;
@@ -350,7 +352,9 @@ public final class LfgNotificationManager {
             double animation = mode == CardMode.EXITING ? 1 - eased : eased;
             int seconds = join.activeFor(lobby.lobbyId()) ? join.secondsRemaining() : 0;
             double fraction = join.activeFor(lobby.lobbyId()) ? join.remainingFraction() : 0;
-            return new CardSnapshot(lobby, kind, mode, feedbackText, seconds, fraction, animation);
+            var presentation = mode == CardMode.EXITING ? exitMode : mode;
+            return new CardSnapshot(lobby, kind, mode, presentation, feedbackText,
+                    seconds, fraction, animation);
         }
     }
 }

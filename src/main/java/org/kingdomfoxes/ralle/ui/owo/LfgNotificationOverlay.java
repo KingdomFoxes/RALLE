@@ -8,6 +8,8 @@ import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.PlayerFaceRenderer;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
+import net.minecraft.client.gui.screens.inventory.tooltip.DefaultTooltipPositioner;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -19,6 +21,7 @@ import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.SideAnchor;
 import org.kingdomfoxes.ralle.api.hud.RalleHudElements;
+import org.kingdomfoxes.ralle.lfg.client.GuildTerritoryColors;
 import org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
@@ -109,6 +112,7 @@ public final class LfgNotificationOverlay {
         );
         var stack = stackBounds(anchor, cards.size(), viewportWidth, viewportHeight);
         var hits = new ArrayList<HitRegion>();
+        Component hoveredRosterMember = null;
         for (int index = 0; index < cards.size(); index++) {
             var card = cards.get(index);
             var target = stack.get(index);
@@ -116,7 +120,18 @@ public final class LfgNotificationOverlay {
             int offscreen = left ? -CARD_WIDTH : viewportWidth;
             int animatedX = (int) Math.round(offscreen + (target.x() - offscreen) * card.animationProgress());
             var animated = new Rectangle(animatedX, target.y(), CARD_WIDTH, CARD_HEIGHT);
-            renderCard(graphics, card, animated, mouseX, mouseY, interactive, hits);
+            var hovered = renderCard(graphics, card, animated, mouseX, mouseY, interactive, hits);
+            if (hovered != null) hoveredRosterMember = hovered;
+        }
+        if (hoveredRosterMember != null) {
+            graphics.renderTooltip(
+                    minecraft.font,
+                    List.of(ClientTooltipComponent.create(hoveredRosterMember.getVisualOrderText())),
+                    mouseX,
+                    mouseY,
+                    DefaultTooltipPositioner.INSTANCE,
+                    null
+            );
         }
         hitRegions = interactive ? List.copyOf(hits) : List.of();
     }
@@ -137,9 +152,9 @@ public final class LfgNotificationOverlay {
                 new Rectangle(bounds.x(), bounds.y() + shift, bounds.width(), bounds.height())).toList();
     }
 
-    private void renderCard(GuiGraphics graphics, LfgNotificationManager.CardSnapshot card,
-                            Rectangle bounds, int mouseX, int mouseY, boolean interactive,
-                            List<HitRegion> hits) {
+    private Component renderCard(GuiGraphics graphics, LfgNotificationManager.CardSnapshot card,
+                                 Rectangle bounds, int mouseX, int mouseY, boolean interactive,
+                                 List<HitRegion> hits) {
         graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), SURFACE);
         graphics.renderOutline(bounds.x(), bounds.y(), bounds.width(), bounds.height(), OUTLINE);
 
@@ -166,24 +181,31 @@ public final class LfgNotificationOverlay {
                 RalleTypography.body(Component.literal(ellipsize(note, bounds.right() - 8 - noteX))),
                 noteX, detailY, MUTED, false);
 
+        Component hoveredRosterMember = null;
         for (int slot = 0; slot < 4; slot++) {
             var slotBounds = new Rectangle(rosterSlotX(bounds, slot), bounds.y() + 42, 20, 20);
             renderRosterSlot(graphics, lobby, slot, slotBounds);
+            if (interactive && slot < lobby.members().size() && slotBounds.contains(mouseX, mouseY)) {
+                hoveredRosterMember = rosterTooltip(lobby.members().get(slot));
+            }
         }
 
         var controls = new Rectangle(bounds.x() + 8, bounds.y() + 72, bounds.width() - 16, 20);
-        renderControls(graphics, card, controls, mouseX, mouseY, interactive, hits);
+        boolean controlsInteractive = interactive && card.mode() != LfgNotificationManager.CardMode.EXITING;
+        renderControls(graphics, card, controls, mouseX, mouseY, controlsInteractive, hits);
+        return hoveredRosterMember;
     }
 
     private void renderRosterSlot(GuiGraphics graphics, LfgProtocol.Lobby lobby, int slot, Rectangle bounds) {
-        graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), 0xFFFFFFFF);
         if (slot >= lobby.members().size()) {
+            graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), 0xFFFFFFFF);
             graphics.fill(bounds.x() + 1, bounds.y() + 1, bounds.right() - 1, bounds.bottom() - 1, SLOT);
             graphics.drawCenteredString(minecraft.font, Component.literal("+"),
                     bounds.x() + bounds.width() / 2, bounds.y() + 6, TEXT);
             return;
         }
         var member = lobby.members().get(slot);
+        graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), rosterBorderColor(member));
         var skin = resolvedSkin(member.minecraftUuid(), member.ign());
         PlayerFaceRenderer.draw(graphics, skin, bounds.x() + 1, bounds.y() + 1, 18);
     }
@@ -192,7 +214,7 @@ public final class LfgNotificationOverlay {
                                 Rectangle controls, int mouseX, int mouseY, boolean interactive,
                                 List<HitRegion> hits) {
         var id = card.lobby().lobbyId();
-        switch (card.mode()) {
+        switch (card.presentedMode()) {
             case READY -> {
                 int leftWidth = (controls.width() - 4) / 2;
                 var join = new Rectangle(controls.x(), controls.y(), leftWidth, controls.height());
@@ -274,6 +296,15 @@ public final class LfgNotificationOverlay {
         int usableWidth = bounds.width() - 16;
         int travel = usableWidth - 20;
         return bounds.x() + 8 + Math.round(slot * travel / 3f);
+    }
+
+    static Component rosterTooltip(LfgProtocol.Member member) {
+        return RalleTheme.ui(Component.literal(
+                "[" + member.guild().tag() + "] " + member.ign()));
+    }
+
+    static int rosterBorderColor(LfgProtocol.Member member) {
+        return GuildTerritoryColors.parse(member.guild().color());
     }
 
     static int regionColor(LfgProtocol.Region region) {
