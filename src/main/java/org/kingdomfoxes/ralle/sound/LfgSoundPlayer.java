@@ -1,6 +1,6 @@
 package org.kingdomfoxes.ralle.sound;
 
-/** Client-only feedback for Raid LFG host controls, party pings, and discovery cards. */
+/** Client-only feedback for Raid LFG controls, membership changes, pings, and discovery cards. */
 public interface LfgSoundPlayer {
     LfgSoundPlayer SILENT = new LfgSoundPlayer() {};
 
@@ -12,6 +12,8 @@ public interface LfgSoundPlayer {
     default void playNotificationIn() {}
     default void playNotificationOut() {}
     default void playNewPartyReady() {}
+    default void playPartyJoined() {}
+    default void playPartyLeft() {}
     default void playRosterSlotOccupied(int occupiedSlot) {}
     default void playPartyFilledRaceLost() {}
 }

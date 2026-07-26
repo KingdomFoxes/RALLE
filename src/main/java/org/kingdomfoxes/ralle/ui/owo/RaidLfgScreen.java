@@ -63,6 +63,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private final Screen parent;
     private final RaidLfgService service;
     private final LfgSoundPlayer sounds;
+    private final LfgMainUiSoundTracker soundTracker = new LfgMainUiSoundTracker();
     private final LfgJoinController joinCountdown;
     private final KickTargetingState kickTargeting;
     private final Set<UUID> expandedLobbies = new HashSet<>();
@@ -181,17 +182,23 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         panel.child(footer);
         root.child(panel);
         refreshFromService(true);
+        soundTracker.reset(service.store().state());
     }
 
     @Override
     public void tick() {
         super.tick();
+        var state = service.store().state();
+        if (service.lifecycle() == RaidLfgService.LifecycleState.ONLINE) {
+            soundTracker.update(state, sounds);
+        } else {
+            soundTracker.reset(state);
+        }
         if (scrollTargetComponent != null) {
             scroll.scrollTo(scrollTargetComponent);
             scrollTargetComponent = null;
             scrollTarget = null;
         }
-        var state = service.store().state();
         if (state.revision() != renderedRevision || service.lifecycle() != renderedLifecycle || service.focusLobbyId() != null) {
             refreshFromService(false);
         }
@@ -536,7 +543,10 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             case "leave" -> service.leave(lobby.lobbyId());
             default -> service.join(lobby.lobbyId());
         };
-        future.whenComplete((ignored, failure) -> minecraft.execute(() -> refreshFromService(true)));
+        future.whenComplete((ignored, failure) -> minecraft.execute(() -> {
+            soundTracker.actionCompleted(action, failure, sounds);
+            refreshFromService(true);
+        }));
         rebuildGrid();
     }
 

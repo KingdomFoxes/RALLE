@@ -102,8 +102,30 @@ class LfgNotificationManagerTest {
         fixture.manager.tick();
 
         assertEquals(1, fixture.gateway.joinCalls);
+        assertEquals(1, fixture.sounds.joined);
         assertEquals(LfgNotificationManager.CardMode.JOINED,
                 fixture.manager.visibleCards().getFirst().mode());
+    }
+
+    @Test
+    void acceptedCardlessMainUiJoinUsesTheSameSharedChargeCue() {
+        var fixture = new Fixture();
+        fixture.connect();
+        fixture.screenOpen[0] = true;
+        var open = lobby(31, false, 1);
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, open));
+        fixture.gateway.joinResult = new LfgProtocol.Mutation(1, 2, joinedLobby(open));
+
+        assertTrue(fixture.manager.visibleCards().isEmpty());
+        assertTrue(fixture.service.joinController().start(open.lobbyId()));
+        fixture.now[0] += 3_000;
+        fixture.service.tick();
+        fixture.manager.tick();
+
+        assertEquals(1, fixture.gateway.joinCalls);
+        assertEquals(1, fixture.sounds.joined);
+        assertEquals(LfgJoinController.Phase.IDLE,
+                fixture.service.joinController().snapshot().phase());
     }
 
     @Test
@@ -121,6 +143,7 @@ class LfgNotificationManagerTest {
 
         assertEquals(LfgNotificationManager.CardMode.FILLED_RACE,
                 fixture.manager.visibleCards().getFirst().mode());
+        assertEquals(0, fixture.sounds.joined);
         assertEquals(1, fixture.sounds.fungus);
         assertEquals(0, fixture.sounds.occupied);
         assertEquals(0, fixture.gateway.joinCalls);
@@ -138,7 +161,7 @@ class LfgNotificationManagerTest {
     }
 
     @Test
-    void acceptedFullPartyKeepsGreenSuccessForFiveSeconds() {
+    void acceptedFullPartyKeepsGreenSuccessWithoutOwningTheMainUiMembershipCue() {
         var fixture = new Fixture();
         fixture.connect();
         var open = lobbyWithMemberCount(50, 1, 1);
@@ -151,7 +174,8 @@ class LfgNotificationManagerTest {
         fixture.manager.tick();
         assertEquals(LfgNotificationManager.CardMode.FILLED_SUCCESS,
                 fixture.manager.visibleCards().getFirst().mode());
-        assertEquals(1, fixture.sounds.occupied);
+        assertEquals(1, fixture.sounds.joined);
+        assertEquals(0, fixture.sounds.occupied);
         assertEquals(0, fixture.sounds.fungus);
 
         fixture.now[0] += LfgNotificationManager.FILLED_SUCCESS_MILLIS - 1;
@@ -235,10 +259,12 @@ class LfgNotificationManagerTest {
     private static final class Sounds implements LfgSoundPlayer {
         int toastIn;
         int ready;
+        int joined;
         int occupied;
         int fungus;
         @Override public void playNotificationIn() { toastIn++; }
         @Override public void playNewPartyReady() { ready++; }
+        @Override public void playPartyJoined() { joined++; }
         @Override public void playRosterSlotOccupied(int occupiedSlot) { occupied++; }
         @Override public void playPartyFilledRaceLost() { fungus++; }
     }

@@ -1,7 +1,9 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
 import org.junit.jupiter.api.Test;
+import org.kingdomfoxes.ralle.lfg.client.RaidLfgStore;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
+import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
 
 import java.time.Instant;
 import java.util.List;
@@ -15,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RaidLfgScreenTest {
     private static final UUID HOST = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID MEMBER = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    private static final UUID OTHER_MEMBER = UUID.fromString("00000000-0000-0000-0000-000000000003");
     private static final UUID GUILD = UUID.fromString("00000000-0000-0000-0000-000000000100");
 
     @Test
@@ -96,6 +99,43 @@ class RaidLfgScreenTest {
         assertEquals(0xFFFF3333, RaidLfgScreen.lerpArgb(0xFFF2B84B, 0xFFFF3333, 2d));
     }
 
+    @Test
+    void mainUiDoesNotDuplicateTheSharedViewerJoinCue() {
+        var tracker = new LfgMainUiSoundTracker();
+        var sounds = new Sounds();
+        tracker.reset(state(lobby()));
+
+        tracker.update(state(lobbyWithMember()), sounds);
+
+        assertEquals(0, sounds.joined);
+        assertTrue(sounds.occupiedSlots.isEmpty());
+    }
+
+    @Test
+    void mainUiKeepsAmethystForMembersWhoJoinAfterTheViewer() {
+        var tracker = new LfgMainUiSoundTracker();
+        var sounds = new Sounds();
+        tracker.reset(state(lobbyWithMember()));
+
+        tracker.update(state(lobbyWithOtherMember()), sounds);
+
+        assertEquals(0, sounds.joined);
+        assertEquals(List.of(3), sounds.occupiedSlots);
+    }
+
+    @Test
+    void onlyASuccessfulExplicitLeaveGetsTheDepleteCue() {
+        var tracker = new LfgMainUiSoundTracker();
+        var sounds = new Sounds();
+
+        tracker.actionCompleted("join", null, sounds);
+        tracker.actionCompleted("leave", new IllegalStateException("rejected"), sounds);
+        assertEquals(0, sounds.left);
+
+        tracker.actionCompleted("leave", null, sounds);
+        assertEquals(1, sounds.left);
+    }
+
     private static LfgProtocol.Lobby lobby() {
         var guild = new LfgProtocol.GuildIdentity(GUILD, "Kingdom of Foxes", "FOX", "#FF8200");
         var host = new LfgProtocol.Member(HOST, "Host", guild, LfgProtocol.MemberRole.HOST,
@@ -118,6 +158,26 @@ class RaidLfgScreenTest {
                 2, 4, List.of(host, member), new LfgProtocol.LobbyCapabilities(false, true, Map.of()));
     }
 
+    private static LfgProtocol.Lobby lobbyWithOtherMember() {
+        var lobby = lobbyWithMember();
+        var members = new java.util.ArrayList<>(lobby.members());
+        members.add(new LfgProtocol.Member(OTHER_MEMBER, "Other", members.getFirst().guild(),
+                LfgProtocol.MemberRole.MEMBER, LfgProtocol.MemberSource.RALLE, Instant.EPOCH, null));
+        return new LfgProtocol.Lobby(
+                lobby.lobbyId(), lobby.raidType(), lobby.region(), lobby.note(), lobby.visibility(),
+                lobby.status(), lobby.locked(), lobby.hostMinecraftUuid(), lobby.hostGuildUuid(),
+                lobby.createdAt(), lobby.lastActivityAt(), lobby.revision() + 1, lobby.capacity(),
+                members, lobby.capabilities());
+    }
+
+    private static RaidLfgStore.State state(LfgProtocol.Lobby lobby) {
+        var viewer = new LfgProtocol.PlayerIdentity(
+                MEMBER, "Member", lobby.members().getFirst().guild());
+        return new RaidLfgStore.State(
+                lobby.revision(), viewer, new LfgProtocol.ViewerCapabilities(true, true, Map.of()),
+                Map.of(lobby.lobbyId(), lobby));
+    }
+
     private static LfgProtocol.Lobby lockedLobby() {
         var lobby = lobbyWithMember();
         return new LfgProtocol.Lobby(
@@ -125,5 +185,15 @@ class RaidLfgScreenTest {
                 lobby.status(), true, lobby.hostMinecraftUuid(), lobby.hostGuildUuid(),
                 lobby.createdAt(), lobby.lastActivityAt(), lobby.revision(), lobby.capacity(),
                 lobby.members(), lobby.capabilities());
+    }
+
+    private static final class Sounds implements LfgSoundPlayer {
+        int joined;
+        int left;
+        final java.util.ArrayList<Integer> occupiedSlots = new java.util.ArrayList<>();
+
+        @Override public void playPartyJoined() { joined++; }
+        @Override public void playPartyLeft() { left++; }
+        @Override public void playRosterSlotOccupied(int occupiedSlot) { occupiedSlots.add(occupiedSlot); }
     }
 }

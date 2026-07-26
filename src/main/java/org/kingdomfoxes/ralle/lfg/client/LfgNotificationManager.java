@@ -80,7 +80,6 @@ public final class LfgNotificationManager {
             existing.animationStartedAt = now;
             existing.entranceCompleted = false;
             existing.lastTickAt = now;
-            existing.lastRosterSize = lobby.members().size();
             if (visible.remove(lobby.lobbyId())) {
                 visible.addLast(lobby.lobbyId());
                 sounds.playNotificationIn();
@@ -115,6 +114,9 @@ public final class LfgNotificationManager {
 
     private void applyJoinSnapshot(LfgJoinController.Snapshot snapshot, long now) {
         if (snapshot.phase() == LfgJoinController.Phase.IDLE) return;
+        if (snapshot.outcome() == LfgJoinController.Outcome.ACCEPTED) {
+            sounds.playPartyJoined();
+        }
         var card = cards.get(snapshot.lobbyId());
         if (card == null) {
             if (snapshot.phase().terminal()) service.joinController().acknowledge(snapshot.lobbyId());
@@ -153,17 +155,6 @@ public final class LfgNotificationManager {
             return;
         }
 
-        var viewer = service.store().state().viewer();
-        boolean viewerAccepted = viewer != null && current.contains(viewer.minecraftUuid());
-        boolean activeJoin = service.joinController().snapshot().activeFor(card.lobby.lobbyId());
-        if (visible.contains(card.lobby.lobbyId())
-                && current.members().size() > card.lastRosterSize
-                && (!activeJoin || viewerAccepted)) {
-            for (int occupied = card.lastRosterSize + 1; occupied <= current.members().size(); occupied++) {
-                sounds.playRosterSlotOccupied(Math.min(4, occupied));
-            }
-        }
-        card.lastRosterSize = current.members().size();
         card.lobby = current;
 
         if (card.mode == CardMode.JOINED) {
@@ -337,13 +328,11 @@ public final class LfgNotificationManager {
         private long lastTickAt;
         private long feedbackUntil;
         private boolean entranceCompleted;
-        private int lastRosterSize;
         private CardMode exitMode = CardMode.READY;
 
         private Card(LfgProtocol.Lobby lobby, DiscoveryKind kind) {
             this.lobby = lobby;
             this.kind = kind;
-            this.lastRosterSize = lobby.members().size();
         }
 
         private CardSnapshot snapshot(long now, LfgJoinController.Snapshot join) {

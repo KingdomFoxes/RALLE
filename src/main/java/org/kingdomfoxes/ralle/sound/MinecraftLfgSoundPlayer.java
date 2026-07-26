@@ -8,14 +8,14 @@ import net.minecraft.sounds.SoundEvents;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 
-/** Plays gated discovery/ping cues plus the deliberately quiet host-control feedback. */
+/** Plays gated LFG presentation cues plus the deliberately quiet host-control feedback. */
 public final class MinecraftLfgSoundPlayer implements LfgSoundPlayer {
     private final Minecraft minecraft;
-    private final BooleanSetting notificationSounds;
+    private final BooleanSetting lfgSounds;
 
     public MinecraftLfgSoundPlayer(Minecraft minecraft, SettingsRegistry settings) {
         this.minecraft = minecraft;
-        this.notificationSounds = settings.setting("notification-sounds", BooleanSetting.class);
+        this.lfgSounds = settings.setting("notification-sounds", BooleanSetting.class);
     }
 
     @Override
@@ -40,7 +40,7 @@ public final class MinecraftLfgSoundPlayer implements LfgSoundPlayer {
 
     @Override
     public void playPartyPing() {
-        if (notificationSounds.value()) play(SoundEvents.BELL_BLOCK, 1.0F, 0.7F);
+        if (lfgSounds.value()) play(SoundEvents.BELL_BLOCK, 1.0F, 0.7F);
     }
 
     @Override
@@ -59,6 +59,16 @@ public final class MinecraftLfgSoundPlayer implements LfgSoundPlayer {
     }
 
     @Override
+    public void playPartyJoined() {
+        if (lfgSounds.value()) play(SoundEvents.RESPAWN_ANCHOR_CHARGE, 1.0F, 0.8F);
+    }
+
+    @Override
+    public void playPartyLeft() {
+        if (lfgSounds.value()) play(SoundEvents.RESPAWN_ANCHOR_DEPLETE, 1.0F, 0.8F);
+    }
+
+    @Override
     public void playRosterSlotOccupied(int occupiedSlot) {
         playNotificationCue(switch (Math.clamp(occupiedSlot, 1, 4)) {
             case 1 -> RalleSoundCue.LFG_RESONATE_1;
@@ -74,7 +84,7 @@ public final class MinecraftLfgSoundPlayer implements LfgSoundPlayer {
     }
 
     private void playNotificationCue(RalleSoundCue cue) {
-        if (notificationSounds.value()) play(RalleSoundEvents.event(cue), 1.0F, 0.8F);
+        if (lfgSounds.value()) play(RalleSoundEvents.event(cue), 1.0F, 0.8F);
     }
 
     private void play(SoundEvent sound, float pitch, float volume) {

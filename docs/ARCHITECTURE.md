@@ -33,6 +33,12 @@ platform ports. It must not depend on a concrete settings screen.
 - `sound`: client-only registered UI sound events and playback adapters. Chat
   selection injects this narrow port, while its Minecraft implementation owns
   parent-setting gates, count-to-cue mapping, rate limiting, and coalescing.
+  Raid LFG discovery cards own their lifecycle cues. The shared join-result
+  presentation plays the vanilla respawn-anchor charge variants after a
+  confirmed viewer join from either the main screen or a HUD card. The main
+  screen plays the deplete variants after an explicit successful Leave, and
+  later members joining the viewer's lobby retain the amethyst occupied-slot
+  cue. Cancelling a join countdown is silent.
   Packaged RALLE sounds use original processed-xylophone assets and perform no
   network activity.
 - `lfg`: strict Fox protocol, authentication, live connection, immutable lobby
