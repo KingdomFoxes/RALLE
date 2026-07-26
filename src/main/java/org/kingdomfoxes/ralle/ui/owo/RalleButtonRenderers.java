@@ -1,6 +1,7 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
 import io.wispforest.owo.ui.component.ButtonComponent;
+import net.minecraft.client.gui.GuiGraphics;
 
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
@@ -102,30 +103,42 @@ final class RalleButtonRenderers {
 
     private static ButtonComponent.Renderer renderer(Palette palette, BooleanSupplier selected) {
         return (graphics, button, delta) -> {
-            int x = button.getX();
-            int y = button.getY();
-            int right = x + button.getWidth();
-            int bottom = y + button.getHeight();
-
-            int fill;
-            int highlight;
-            if (!button.active()) {
-                fill = DISABLED;
-                highlight = DISABLED_HIGHLIGHT;
-            } else {
-                var colors = selected.getAsBoolean() ? Palette.SELECTED : palette;
-                fill = button.isHovered() ? colors.hovered : colors.normal;
-                highlight = colors.highlight;
-            }
-
-            // Two dark pixels on the bottom and right create the offset, flat-button depth.
-            graphics.fill(x, y, right, bottom, EDGE);
-            graphics.fill(x, y, right - 2, bottom - 2, fill);
-
-            // A restrained top/left highlight keeps the face legible on the dark navy panel.
-            graphics.fill(x, y, right - 2, y + 1, highlight);
-            graphics.fill(x, y, x + 1, bottom - 2, highlight);
+            drawFace(graphics, button.getX(), button.getY(), button.getWidth(), button.getHeight(),
+                    selected.getAsBoolean() ? Palette.SELECTED : palette,
+                    button.isHovered(), button.active());
         };
+    }
+
+    static void drawRaw(GuiGraphics graphics, int x, int y, int width, int height,
+                        Kind kind, boolean hovered, boolean active) {
+        var palette = switch (kind) {
+            case NEUTRAL -> Palette.NEUTRAL;
+            case PRIMARY -> Palette.PRIMARY;
+            case DESTRUCTIVE -> Palette.DESTRUCTIVE;
+        };
+        drawFace(graphics, x, y, width, height, palette, hovered, active);
+    }
+
+    private static void drawFace(GuiGraphics graphics, int x, int y, int width, int height,
+                                 Palette palette, boolean hovered, boolean active) {
+        int right = x + width;
+        int bottom = y + height;
+        int fill = active ? (hovered ? palette.hovered : palette.normal) : DISABLED;
+        int highlight = active ? palette.highlight : DISABLED_HIGHLIGHT;
+
+        // Two dark pixels on the bottom and right create the offset, flat-button depth.
+        graphics.fill(x, y, right, bottom, EDGE);
+        graphics.fill(x, y, right - 2, bottom - 2, fill);
+
+        // A restrained top/left highlight keeps the face legible on the dark navy panel.
+        graphics.fill(x, y, right - 2, y + 1, highlight);
+        graphics.fill(x, y, x + 1, bottom - 2, highlight);
+    }
+
+    enum Kind {
+        NEUTRAL,
+        PRIMARY,
+        DESTRUCTIVE
     }
 
     private enum Palette {

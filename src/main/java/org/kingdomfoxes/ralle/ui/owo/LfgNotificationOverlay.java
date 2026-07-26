@@ -42,13 +42,11 @@ public final class LfgNotificationOverlay {
     private static final int OUTLINE = 0xFF586985;
     private static final int TEXT = 0xFFFFFFFF;
     private static final int MUTED = 0xFFA9B0BE;
+    private static final int ACCENT = 0xFFF2B84B;
     private static final int SLOT = 0xFF061126;
-    private static final int GREEN = 0xFF22633E;
-    private static final int GREEN_HOVER = 0xFF2D8352;
-    private static final int RED = 0xFF792E39;
-    private static final int RED_HOVER = 0xFF9A3947;
-    private static final int NEUTRAL = 0xFF304664;
-    private static final int NEUTRAL_HOVER = 0xFF3D5A80;
+    private static final int REGION_GOOD = 0xFF00FF55;
+    private static final int REGION_MODERATE = 0xFFFFFF00;
+    private static final int REGION_POOR = 0xFFFF3333;
     private static final ConcurrentMap<UUID, CompletableFuture<PlayerSkin>> SKINS = new ConcurrentHashMap<>();
     private static final ConcurrentMap<UUID, PlayerSkin> RESOLVED_SKINS = new ConcurrentHashMap<>();
 
@@ -147,21 +145,28 @@ public final class LfgNotificationOverlay {
 
         var lobby = card.lobby();
         graphics.renderItem(new ItemStack(raidIcon(lobby.raidType())), bounds.x() + 7, bounds.y() + 6);
-        graphics.drawString(minecraft.font, RalleTypography.body(Component.literal(ellipsize(raidName(lobby.raidType()), 190))),
-                bounds.x() + 28, bounds.y() + 10, TEXT, false);
+        graphics.drawString(minecraft.font,
+                RalleTypography.body(Component.literal(ellipsize(raidName(lobby.raidType()), 190))),
+                bounds.x() + 28, bounds.y() + 10, ACCENT, false);
 
         var arrow = new Rectangle(bounds.right() - 25, bounds.y() + 4, 20, 20);
-        drawButton(graphics, arrow, "", NEUTRAL, NEUTRAL_HOVER, mouseX, mouseY);
-        graphics.drawCenteredString(minecraft.font, Component.literal(">"),
-                arrow.x() + arrow.width() / 2, arrow.y() + 6, TEXT);
+        drawButtonFace(graphics, arrow, RalleButtonRenderers.Kind.NEUTRAL, mouseX, mouseY, true);
+        drawOpenLfgArrow(graphics, arrow, TEXT);
         if (interactive) hits.add(new HitRegion(arrow, lobby.lobbyId(), Action.OPEN_LFG));
 
-        String note = "[" + lobby.region().name() + "] " + (lobby.note() == null ? "No note" : clean(lobby.note()));
-        graphics.drawString(minecraft.font, RalleTypography.body(Component.literal(ellipsize(note, 242))),
-                bounds.x() + 8, bounds.y() + 29, MUTED, false);
+        String regionText = "[" + lobby.region().name() + "]";
+        var renderedRegion = RalleTypography.body(Component.literal(regionText));
+        int detailY = bounds.y() + 29;
+        graphics.drawString(minecraft.font, renderedRegion, bounds.x() + 8, detailY,
+                regionColor(lobby.region()), false);
+        int noteX = bounds.x() + 8 + minecraft.font.width(renderedRegion) + 4;
+        String note = lobby.note() == null ? "No note" : clean(lobby.note());
+        graphics.drawString(minecraft.font,
+                RalleTypography.body(Component.literal(ellipsize(note, bounds.right() - 8 - noteX))),
+                noteX, detailY, MUTED, false);
 
         for (int slot = 0; slot < 4; slot++) {
-            var slotBounds = new Rectangle(bounds.x() + 8 + slot * 24, bounds.y() + 42, 20, 20);
+            var slotBounds = new Rectangle(rosterSlotX(bounds, slot), bounds.y() + 42, 20, 20);
             renderRosterSlot(graphics, lobby, slot, slotBounds);
         }
 
@@ -188,12 +193,12 @@ public final class LfgNotificationOverlay {
         var id = card.lobby().lobbyId();
         switch (card.mode()) {
             case READY -> {
-                int leftWidth = controls.width() * 2 / 3;
-                var join = new Rectangle(controls.x(), controls.y(), leftWidth - 2, controls.height());
-                var close = new Rectangle(controls.x() + leftWidth + 2, controls.y(),
-                        controls.width() - leftWidth - 2, controls.height());
-                drawButton(graphics, join, "Join", GREEN, GREEN_HOVER, mouseX, mouseY);
-                drawButton(graphics, close, "Close", RED, RED_HOVER, mouseX, mouseY);
+                int leftWidth = (controls.width() - 4) / 2;
+                var join = new Rectangle(controls.x(), controls.y(), leftWidth, controls.height());
+                var close = new Rectangle(join.right() + 4, controls.y(),
+                        controls.right() - join.right() - 4, controls.height());
+                drawButton(graphics, join, "Join", RalleButtonRenderers.Kind.PRIMARY, mouseX, mouseY, true);
+                drawButton(graphics, close, "Close", RalleButtonRenderers.Kind.DESTRUCTIVE, mouseX, mouseY, true);
                 if (interactive) {
                     hits.add(new HitRegion(join, id, Action.JOIN));
                     hits.add(new HitRegion(close, id, Action.CLOSE));
@@ -204,38 +209,78 @@ public final class LfgNotificationOverlay {
                 var countdown = new Rectangle(controls.x(), controls.y(), leftWidth - 2, controls.height());
                 var cancel = new Rectangle(controls.x() + leftWidth + 2, controls.y(),
                         controls.width() - leftWidth - 2, controls.height());
-                graphics.fill(countdown.x(), countdown.y(), countdown.right(), countdown.bottom(), NEUTRAL);
-                int progressWidth = (int) Math.round(countdown.width() * card.countdownFraction());
-                graphics.fill(countdown.x(), countdown.y(), countdown.x() + progressWidth, countdown.bottom(), 0xBB3D6C94);
-                graphics.renderOutline(countdown.x(), countdown.y(), countdown.width(), countdown.height(), OUTLINE);
+                drawButtonFace(graphics, countdown, RalleButtonRenderers.Kind.PRIMARY, -1, -1, true);
+                int progressWidth = RalleButtonRenderers.countdownOverlayWidth(
+                        Math.max(0, countdown.width() - 2), card.countdownFraction());
+                if (progressWidth > 0) {
+                    graphics.fill(countdown.x(), countdown.y() + 1,
+                            countdown.x() + progressWidth, countdown.bottom() - 2, 0x553CCB5A);
+                }
                 graphics.drawCenteredString(minecraft.font, RalleTypography.body(
                         Component.literal(Integer.toString(card.countdownSeconds()))),
                         countdown.x() + countdown.width() / 2, countdown.y() + 6, TEXT);
-                drawButton(graphics, cancel, "Cancel", RED, RED_HOVER, mouseX, mouseY);
+                drawButton(graphics, cancel, "Cancel", RalleButtonRenderers.Kind.DESTRUCTIVE,
+                        mouseX, mouseY, true);
                 if (interactive) hits.add(new HitRegion(cancel, id, Action.CANCEL));
             }
-            case SUBMITTING -> drawButton(graphics, controls, "Joining...", NEUTRAL, NEUTRAL, -1, -1);
+            case SUBMITTING -> drawButton(graphics, controls, "Joining...",
+                    RalleButtonRenderers.Kind.NEUTRAL, -1, -1, false);
             case JOINED -> {
-                drawButton(graphics, controls, "Close", RED, RED_HOVER, mouseX, mouseY);
+                drawButton(graphics, controls, "Close", RalleButtonRenderers.Kind.DESTRUCTIVE,
+                        mouseX, mouseY, true);
                 if (interactive) hits.add(new HitRegion(controls, id, Action.CLOSE));
             }
-            case FILLED_SUCCESS -> drawButton(graphics, controls, "Party filled", GREEN, GREEN, -1, -1);
+            case FILLED_SUCCESS -> drawButton(graphics, controls, "Party filled",
+                    RalleButtonRenderers.Kind.PRIMARY, -1, -1, true);
             case FILLED_RACE, FAILURE, UNAVAILABLE ->
                     drawButton(graphics, controls,
                             card.feedbackText() == null ? "Party unavailable" : card.feedbackText(),
-                            RED, RED, -1, -1);
+                            RalleButtonRenderers.Kind.DESTRUCTIVE, -1, -1, true);
             case EXITING, REMOVED -> {}
         }
     }
 
     private void drawButton(GuiGraphics graphics, Rectangle bounds, String label,
-                            int normal, int hovered, int mouseX, int mouseY) {
-        int fill = bounds.contains(mouseX, mouseY) ? hovered : normal;
-        graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), fill);
-        graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.y() + 1, 0x55FFFFFF);
-        graphics.fill(bounds.x(), bounds.bottom() - 2, bounds.right(), bounds.bottom(), 0xAA020814);
+                            RalleButtonRenderers.Kind kind, int mouseX, int mouseY, boolean active) {
+        drawButtonFace(graphics, bounds, kind, mouseX, mouseY, active);
         graphics.drawCenteredString(minecraft.font, RalleTypography.body(Component.literal(label)),
-                bounds.x() + bounds.width() / 2, bounds.y() + 6, TEXT);
+                bounds.x() + bounds.width() / 2, bounds.y() + 6, active ? TEXT : 0xFF8D96A5);
+    }
+
+    private static void drawButtonFace(GuiGraphics graphics, Rectangle bounds,
+                                       RalleButtonRenderers.Kind kind,
+                                       int mouseX, int mouseY, boolean active) {
+        RalleButtonRenderers.drawRaw(
+                graphics, bounds.x(), bounds.y(), bounds.width(), bounds.height(),
+                kind, bounds.contains(mouseX, mouseY), active
+        );
+    }
+
+    private static void drawOpenLfgArrow(GuiGraphics graphics, Rectangle bounds, int color) {
+        int left = bounds.x() + (bounds.width() - 12) / 2;
+        int top = bounds.y() + (bounds.height() - 12) / 2;
+
+        // Bent return arrow: a solid left arrowhead feeding into an upper-right corner.
+        graphics.fill(left, top + 6, left + 8, top + 8, color);
+        graphics.fill(left + 1, top + 4, left + 3, top + 10, color);
+        graphics.fill(left + 2, top + 3, left + 4, top + 11, color);
+        graphics.fill(left + 7, top + 2, left + 10, top + 4, color);
+        graphics.fill(left + 9, top + 3, left + 11, top + 8, color);
+    }
+
+    static int rosterSlotX(Rectangle bounds, int slot) {
+        if (slot < 0 || slot >= 4) throw new IllegalArgumentException("Roster slot must be between 0 and 3");
+        int usableWidth = bounds.width() - 16;
+        int travel = usableWidth - 20;
+        return bounds.x() + 8 + Math.round(slot * travel / 3f);
+    }
+
+    static int regionColor(LfgProtocol.Region region) {
+        return switch (region) {
+            case EU -> REGION_GOOD;
+            case NA -> REGION_MODERATE;
+            case AS -> REGION_POOR;
+        };
     }
 
     private boolean handleClick(double x, double y, int button) {
