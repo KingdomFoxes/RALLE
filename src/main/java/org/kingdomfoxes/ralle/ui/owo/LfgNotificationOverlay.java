@@ -280,15 +280,21 @@ public final class LfgNotificationOverlay {
     }
 
     private static void drawOpenLfgArrow(GuiGraphics graphics, Rectangle bounds, int color) {
-        int left = bounds.x() + (bounds.width() - 12) / 2;
-        int top = bounds.y() + (bounds.height() - 12) / 2;
+        int left = bounds.x() + (bounds.width() - 14) / 2;
+        int top = bounds.y() + (bounds.height() - 14) / 2;
 
-        // Bent return arrow: a solid left arrowhead feeding into an upper-right corner.
-        graphics.fill(left, top + 6, left + 8, top + 8, color);
-        graphics.fill(left + 1, top + 4, left + 3, top + 10, color);
-        graphics.fill(left + 2, top + 3, left + 4, top + 11, color);
-        graphics.fill(left + 7, top + 2, left + 10, top + 4, color);
-        graphics.fill(left + 9, top + 3, left + 11, top + 8, color);
+        // Open left chevron feeding into a straight horizontal shaft.
+        graphics.fill(left + 4, top, left + 6, top + 1, color);
+        graphics.fill(left + 3, top + 1, left + 5, top + 2, color);
+        graphics.fill(left + 2, top + 2, left + 4, top + 3, color);
+        graphics.fill(left + 1, top + 3, left + 3, top + 4, color);
+        graphics.fill(left, top + 4, left + 2, top + 5, color);
+        graphics.fill(left, top + 5, left + 12, top + 7, color);
+        graphics.fill(left, top + 7, left + 2, top + 8, color);
+        graphics.fill(left + 1, top + 8, left + 3, top + 9, color);
+        graphics.fill(left + 2, top + 9, left + 4, top + 10, color);
+        graphics.fill(left + 3, top + 10, left + 5, top + 11, color);
+        graphics.fill(left + 4, top + 11, left + 6, top + 12, color);
     }
 
     static int rosterSlotX(Rectangle bounds, int slot) {
