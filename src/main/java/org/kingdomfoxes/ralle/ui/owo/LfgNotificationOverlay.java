@@ -145,11 +145,12 @@ public final class LfgNotificationOverlay {
 
         var lobby = card.lobby();
         graphics.renderItem(new ItemStack(raidIcon(lobby.raidType())), bounds.x() + 7, bounds.y() + 6);
+        var arrow = new Rectangle(bounds.right() - 25, bounds.y() + 4, 20, 20);
+        int titleWidth = Math.max(20, arrow.x() - (bounds.x() + 28) - 6);
         graphics.drawString(minecraft.font,
-                RalleTypography.body(Component.literal(ellipsize(raidName(lobby.raidType()), 190))),
+                RalleTypography.body(Component.literal(ellipsize(raidName(lobby.raidType()), titleWidth))),
                 bounds.x() + 28, bounds.y() + 10, ACCENT, false);
 
-        var arrow = new Rectangle(bounds.right() - 25, bounds.y() + 4, 20, 20);
         drawButtonFace(graphics, arrow, RalleButtonRenderers.Kind.NEUTRAL, mouseX, mouseY, true);
         drawOpenLfgArrow(graphics, arrow, TEXT);
         if (interactive) hits.add(new HitRegion(arrow, lobby.lobbyId(), Action.OPEN_LFG));

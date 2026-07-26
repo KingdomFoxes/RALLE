@@ -10,32 +10,32 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class LfgNotificationOverlayTest {
     @Test
     void newestCardOccupiesBottomAnchorAndWholeStackClamps() {
-        var anchor = new Rectangle(732, 492, 260, 100);
+        var anchor = new Rectangle(802, 492, 190, 100);
         var stack = LfgNotificationOverlay.stackBounds(anchor, 3, 1000, 600);
 
-        assertEquals(new Rectangle(732, 492, 260, 100), stack.get(0));
-        assertEquals(new Rectangle(732, 386, 260, 100), stack.get(1));
-        assertEquals(new Rectangle(732, 280, 260, 100), stack.get(2));
+        assertEquals(new Rectangle(802, 492, 190, 100), stack.get(0));
+        assertEquals(new Rectangle(802, 386, 190, 100), stack.get(1));
+        assertEquals(new Rectangle(802, 280, 190, 100), stack.get(2));
     }
 
     @Test
     void upperAnchorStacksDownAndClampsAsAUnit() {
-        var anchor = new Rectangle(8, -20, 260, 100);
+        var anchor = new Rectangle(8, -20, 190, 100);
         var stack = LfgNotificationOverlay.stackBounds(anchor, 3, 800, 350);
 
-        assertEquals(new Rectangle(8, 0, 260, 100), stack.get(0));
-        assertEquals(new Rectangle(8, 106, 260, 100), stack.get(1));
-        assertEquals(new Rectangle(8, 212, 260, 100), stack.get(2));
+        assertEquals(new Rectangle(8, 0, 190, 100), stack.get(0));
+        assertEquals(new Rectangle(8, 106, 190, 100), stack.get(1));
+        assertEquals(new Rectangle(8, 212, 190, 100), stack.get(2));
     }
 
     @Test
     void rosterSlotsUseTheFullCardWidthWithoutChangingTheirSize() {
-        var card = new Rectangle(30, 40, 260, 100);
+        var card = new Rectangle(30, 40, 190, 100);
 
         assertEquals(38, LfgNotificationOverlay.rosterSlotX(card, 0));
-        assertEquals(113, LfgNotificationOverlay.rosterSlotX(card, 1));
-        assertEquals(187, LfgNotificationOverlay.rosterSlotX(card, 2));
-        assertEquals(262, LfgNotificationOverlay.rosterSlotX(card, 3));
+        assertEquals(89, LfgNotificationOverlay.rosterSlotX(card, 1));
+        assertEquals(141, LfgNotificationOverlay.rosterSlotX(card, 2));
+        assertEquals(192, LfgNotificationOverlay.rosterSlotX(card, 3));
         assertThrows(IllegalArgumentException.class, () -> LfgNotificationOverlay.rosterSlotX(card, 4));
     }
 
