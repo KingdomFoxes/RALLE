@@ -2,11 +2,11 @@ package org.kingdomfoxes.ralle.lfg.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.Component;
+import org.kingdomfoxes.ralle.chat.RalleChatMessages;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
 
-/** Delivers ephemeral, clickable LFG notifications through vanilla chat. */
+/** Delivers ephemeral LFG notifications through RALLE's shared local-chat presentation. */
 public final class MinecraftLfgNotificationSink implements LfgNotificationSink {
     private final Minecraft minecraft;
     private final LfgSoundPlayer sounds;
@@ -19,12 +19,11 @@ public final class MinecraftLfgNotificationSink implements LfgNotificationSink {
     @Override
     public void partyPing(LfgProtocol.PartyPingFrame ping) {
         minecraft.execute(() -> {
-            var message = Component.literal(ping.hostIgn() + " has pinged you!")
-                    .withStyle(style -> style
-                            .withColor(0xF2B84B)
-                            .withUnderlined(true)
-                            .withClickEvent(new ClickEvent.RunCommand("/ralle lfg")));
-            minecraft.gui.getChat().addMessage(message);
+            var message = RalleChatMessages.clickable(
+                    ping.hostIgn() + " has pinged you!",
+                    new ClickEvent.RunCommand("/ralle lfg")
+            );
+            RalleChatMessages.post(minecraft, message);
             sounds.playPartyPing();
         });
     }

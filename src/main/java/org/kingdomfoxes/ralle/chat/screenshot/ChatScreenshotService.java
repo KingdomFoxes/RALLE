@@ -7,6 +7,7 @@ import net.minecraft.network.chat.Component;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
+import org.kingdomfoxes.ralle.chat.RalleChatMessages;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotGeometry.LineRange;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotGeometry.Rectangle;
 import org.kingdomfoxes.ralle.sound.ChatSelectionSoundPlayer;
@@ -179,7 +180,10 @@ public final class ChatScreenshotService {
                     if (generation != copyGeneration || state() != State.COPYING) return;
                     lifecycle.copyFailed();
                     if (minecraft.gui != null) {
-                        minecraft.gui.getChat().addMessage(Component.translatable("ralle.chat-screenshot.copy-failed", safeMessage(error)));
+                        RalleChatMessages.post(
+                                minecraft,
+                                Component.translatable("ralle.chat-screenshot.copy-failed", safeMessage(error))
+                        );
                     }
                 });
             }

@@ -21,7 +21,7 @@ public final class ChatScreenshotTokens {
     public static final long EDGE_REPEAT_MILLIS = 100L;
     public static final long EXPANSION_MILLIS = 120L;
 
-    public static int withOpacity(int color, float opacity) {
+    static int withOpacity(int color, float opacity) {
         int baseAlpha = color >>> 24;
         int alpha = Math.round(baseAlpha * Math.max(0.0F, Math.min(1.0F, opacity)));
         return color & 0x00FFFFFF | alpha << 24;
