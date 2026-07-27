@@ -12,6 +12,7 @@ public interface LfgSoundPlayer {
     default void playNotificationIn() {}
     default void playNotificationOut() {}
     default void playNewPartyReady() {}
+    default void playPartyCreated() {}
     default void playPartyJoined() {}
     default void playPartyLeft() {}
     default void playRosterSlotOccupied(int occupiedSlot) {}

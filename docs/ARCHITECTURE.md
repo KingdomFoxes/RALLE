@@ -36,9 +36,10 @@ platform ports. It must not depend on a concrete settings screen.
   Raid LFG discovery cards own their lifecycle cues. The shared join-result
   presentation plays the vanilla respawn-anchor charge variants after a
   confirmed viewer join from either the main screen or a HUD card. The main
-  screen plays the deplete variants after an explicit successful Leave, and
-  later members joining the viewer's lobby retain the amethyst occupied-slot
-  cue. Cancelling a join countdown is silent.
+  screen plays the first amethyst resonance after confirmed party creation and
+  the deplete variants after an explicit successful Leave. Later members
+  joining the viewer's lobby retain the amethyst occupied-slot cue. Cancelling
+  a join countdown is silent.
   Packaged RALLE sounds use original processed-xylophone assets and perform no
   network activity.
 - `lfg`: strict Fox protocol, authentication, live connection, immutable lobby

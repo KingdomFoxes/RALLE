@@ -44,6 +44,8 @@ final class LfgMainUiSoundTracker {
     }
 
     void actionCompleted(String action, Throwable failure, LfgSoundPlayer sounds) {
-        if (failure == null && "leave".equals(action)) sounds.playPartyLeft();
+        if (failure != null) return;
+        if ("create".equals(action)) sounds.playPartyCreated();
+        if ("leave".equals(action)) sounds.playPartyLeft();
     }
 }

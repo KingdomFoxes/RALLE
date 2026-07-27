@@ -136,6 +136,18 @@ class RaidLfgScreenTest {
         assertEquals(1, sounds.left);
     }
 
+    @Test
+    void onlyASuccessfulCreateGetsTheFirstAmethystResonanceCue() {
+        var tracker = new LfgMainUiSoundTracker();
+        var sounds = new Sounds();
+
+        tracker.actionCompleted("create", new IllegalStateException("rejected"), sounds);
+        assertEquals(0, sounds.created);
+
+        tracker.actionCompleted("create", null, sounds);
+        assertEquals(1, sounds.created);
+    }
+
     private static LfgProtocol.Lobby lobby() {
         var guild = new LfgProtocol.GuildIdentity(GUILD, "Kingdom of Foxes", "FOX", "#FF8200");
         var host = new LfgProtocol.Member(HOST, "Host", guild, LfgProtocol.MemberRole.HOST,
@@ -188,10 +200,12 @@ class RaidLfgScreenTest {
     }
 
     private static final class Sounds implements LfgSoundPlayer {
+        int created;
         int joined;
         int left;
         final java.util.ArrayList<Integer> occupiedSlots = new java.util.ArrayList<>();
 
+        @Override public void playPartyCreated() { created++; }
         @Override public void playPartyJoined() { joined++; }
         @Override public void playPartyLeft() { left++; }
         @Override public void playRosterSlotOccupied(int occupiedSlot) { occupiedSlots.add(occupiedSlot); }

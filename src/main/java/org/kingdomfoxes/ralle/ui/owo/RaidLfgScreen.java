@@ -847,6 +847,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             error.text(RalleTheme.ui(Component.literal("Creating..."))).color(RalleTheme.MUTED);
             service.create(selectedRaid[0], selectedRegion[0], noteValue[0]).whenComplete((mutation, failure) -> minecraft.execute(() -> {
                 if (failure == null) {
+                    soundTracker.actionCompleted("create", null, sounds);
                     expandedLobbies.add(mutation.lobby().lobbyId());
                     statusFilter = StatusFilter.ALL;
                     raidFilter = RaidFilter.ALL;

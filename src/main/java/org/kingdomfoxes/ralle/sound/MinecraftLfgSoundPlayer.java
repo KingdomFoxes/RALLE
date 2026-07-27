@@ -59,6 +59,11 @@ public final class MinecraftLfgSoundPlayer implements LfgSoundPlayer {
     }
 
     @Override
+    public void playPartyCreated() {
+        playNotificationCue(RalleSoundCue.LFG_RESONATE_1);
+    }
+
+    @Override
     public void playPartyJoined() {
         if (lfgSounds.value()) play(SoundEvents.RESPAWN_ANCHOR_CHARGE, 1.0F, 0.8F);
     }
