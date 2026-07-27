@@ -29,6 +29,7 @@ public final class LfgNotificationManager {
     private final BooleanSupplier newPartyEnabled;
     private final BooleanSupplier reopenedPartyEnabled;
     private final BooleanSupplier partyStatusEnabled;
+    private final BooleanSupplier mainUiAutoPopOutEnabled;
     private final BooleanSupplier lfgScreenOpen;
     private final Map<UUID, Card> cards = new LinkedHashMap<>();
     private final ArrayDeque<UUID> visible = new ArrayDeque<>();
@@ -42,24 +43,31 @@ public final class LfgNotificationManager {
                 settings.setting("new-party-notifications", BooleanSetting.class)::value,
                 settings.setting("reopened-party-notifications", BooleanSetting.class)::value,
                 settings.setting("party-status-notifications", BooleanSetting.class)::value,
+                settings.setting("auto-pop-out-main-ui", BooleanSetting.class)::value,
                 lfgScreenOpen);
     }
 
     LfgNotificationManager(RaidLfgService service, LfgSoundPlayer sounds, LongSupplier clockMillis,
                            BooleanSupplier newPartyEnabled, BooleanSupplier reopenedPartyEnabled,
-                           BooleanSupplier partyStatusEnabled, BooleanSupplier lfgScreenOpen) {
+                           BooleanSupplier partyStatusEnabled, BooleanSupplier mainUiAutoPopOutEnabled,
+                           BooleanSupplier lfgScreenOpen) {
         this.service = service;
         this.sounds = sounds;
         this.clockMillis = clockMillis;
         this.newPartyEnabled = newPartyEnabled;
         this.reopenedPartyEnabled = reopenedPartyEnabled;
         this.partyStatusEnabled = partyStatusEnabled;
+        this.mainUiAutoPopOutEnabled = mainUiAutoPopOutEnabled;
         this.lfgScreenOpen = lfgScreenOpen;
         service.store().observeLobbyChanges(this::onLobbyChange);
     }
 
     private synchronized void onLobbyChange(RaidLfgStore.LobbyChange change) {
         var card = cards.get(change.lobbyId());
+        if (viewerDeparted(change)) {
+            if (card != null) beginExit(card);
+            return;
+        }
         if (card != null) synchronize(card, change.current());
         if (shouldShowPartyStatus(change)) {
             showPersistent(change.current(), DiscoveryKind.PARTY_STATUS);
@@ -87,9 +95,20 @@ public final class LfgNotificationManager {
         if (!becameMember) return false;
         if (consumeMainUiSuppression(change.lobbyId())) {
             removeCompletely(change.lobbyId());
+            if (mainUiAutoPopOutEnabled.getAsBoolean()) {
+                showPersistent(change.current(), DiscoveryKind.MAIN_UI);
+            }
             return false;
         }
         return partyStatusEnabled.getAsBoolean();
+    }
+
+    private boolean viewerDeparted(RaidLfgStore.LobbyChange change) {
+        if (change.origin() == RaidLfgStore.UpdateOrigin.CLEAR || change.previous() == null) return false;
+        var viewer = service.store().state().viewer();
+        return viewer != null
+                && change.previous().contains(viewer.minecraftUuid())
+                && (change.current() == null || !change.current().contains(viewer.minecraftUuid()));
     }
 
     /**
@@ -103,6 +122,10 @@ public final class LfgNotificationManager {
     /** Suppresses automatic party status for a main-UI join of the given lobby. */
     public synchronized PartyStatusSuppression suppressMainUiPartyStatus(UUID lobbyId) {
         return registerMainUiSuppression(java.util.Objects.requireNonNull(lobbyId, "lobbyId"));
+    }
+
+    public boolean mainUiAutoPopOutEnabled() {
+        return mainUiAutoPopOutEnabled.getAsBoolean();
     }
 
     private PartyStatusSuppression registerMainUiSuppression(UUID lobbyId) {
@@ -210,6 +233,9 @@ public final class LfgNotificationManager {
             var card = cards.get(id);
             if (card == null) continue;
             if (card.kind == DiscoveryKind.PARTY_STATUS && !partyStatusEnabled.getAsBoolean()) {
+                beginExit(card);
+            }
+            if (card.kind == DiscoveryKind.MAIN_UI && !mainUiAutoPopOutEnabled.getAsBoolean()) {
                 beginExit(card);
             }
             var current = service.store().state().lobbies().get(id);
@@ -421,7 +447,7 @@ public final class LfgNotificationManager {
                 && lobby.capabilities().join();
     }
 
-    public enum DiscoveryKind { NEW, REOPENED, PARTY_STATUS, MANUAL }
+    public enum DiscoveryKind { NEW, REOPENED, PARTY_STATUS, MAIN_UI, MANUAL }
 
     public enum CardMode {
         READY,

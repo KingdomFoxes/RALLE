@@ -191,7 +191,7 @@ class LfgNotificationManagerTest {
     }
 
     @Test
-    void externalPartyMembershipShowsPersistentStatusUntilClosed() {
+    void externalPartyMembershipStaysPersistentAcrossOrdinaryUpdatesUntilClosed() {
         var fixture = new Fixture();
         fixture.partyStatusEnabled[0] = true;
         fixture.connect();
@@ -208,10 +208,11 @@ class LfgNotificationManagerTest {
         assertEquals(LfgNotificationManager.CardMode.READY,
                 fixture.manager.visibleCards().getFirst().mode());
 
-        fixture.gateway.listener.onFrame(new LfgProtocol.RemoveFrame(1, 2, hosted.lobbyId()));
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(
+                1, 2, viewerHostedLobby(60, 2)));
         fixture.now[0] += LfgNotificationManager.FEEDBACK_MILLIS * 10;
         fixture.manager.tick();
-        assertEquals(LfgNotificationManager.CardMode.UNAVAILABLE,
+        assertEquals(LfgNotificationManager.CardMode.READY,
                 fixture.manager.visibleCards().getFirst().mode());
 
         fixture.manager.close(hosted.lobbyId());
@@ -292,6 +293,45 @@ class LfgNotificationManagerTest {
                 fixture.manager.visibleCards().getFirst().kind());
     }
 
+    @Test
+    void enabledMainUiAutoPopOutTracksCreateAndClosesAfterDisband() {
+        var fixture = new Fixture();
+        fixture.mainUiAutoPopOutEnabled[0] = true;
+        fixture.connect();
+        var hosted = viewerHostedLobby(65, 1);
+        fixture.manager.suppressNextMainUiPartyStatus();
+
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, hosted));
+
+        var card = fixture.manager.visibleCards().getFirst();
+        assertEquals(LfgNotificationManager.DiscoveryKind.MAIN_UI, card.kind());
+        assertTrue(card.persistent());
+
+        fixture.gateway.listener.onFrame(new LfgProtocol.RemoveFrame(1, 2, hosted.lobbyId()));
+        assertEquals(LfgNotificationManager.CardMode.EXITING,
+                fixture.manager.visibleCards().getFirst().mode());
+    }
+
+    @Test
+    void mainUiAutoPopOutClosesAfterViewerLeavesLobby() {
+        var fixture = new Fixture();
+        fixture.mainUiAutoPopOutEnabled[0] = true;
+        fixture.screenOpen[0] = true;
+        fixture.connect();
+        var open = lobby(66, false, 1);
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, open));
+        fixture.manager.suppressMainUiPartyStatus(open.lobbyId());
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 2, joinedLobby(open)));
+        assertEquals(LfgNotificationManager.DiscoveryKind.MAIN_UI,
+                fixture.manager.visibleCards().getFirst().kind());
+
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(
+                1, 3, lobby(66, false, 3)));
+
+        assertEquals(LfgNotificationManager.CardMode.EXITING,
+                fixture.manager.visibleCards().getFirst().mode());
+    }
+
     private static LfgProtocol.Lobby lobby(int id, boolean locked, long revision) {
         var host = new LfgProtocol.Member(HOST_ID, "Host", GUILD,
                 LfgProtocol.MemberRole.HOST, LfgProtocol.MemberSource.RALLE, Instant.EPOCH, null);
@@ -352,6 +392,7 @@ class LfgNotificationManagerTest {
         final long[] now = {0};
         final boolean[] screenOpen = {false};
         final boolean[] partyStatusEnabled = {false};
+        final boolean[] mainUiAutoPopOutEnabled = {false};
         final Gateway gateway = new Gateway();
         final Sounds sounds = new Sounds();
         final RaidLfgService service = new RaidLfgService(
@@ -359,7 +400,8 @@ class LfgNotificationManagerTest {
                 () -> now[0], () -> 0.5, LfgNotificationSink.IGNORE, PartyCommandExecutor.IGNORE);
         final LfgNotificationManager manager = new LfgNotificationManager(
                 service, sounds, () -> now[0], () -> true, () -> true,
-                () -> partyStatusEnabled[0], () -> screenOpen[0]);
+                () -> partyStatusEnabled[0], () -> mainUiAutoPopOutEnabled[0],
+                () -> screenOpen[0]);
 
         void connect() {
             service.tick();

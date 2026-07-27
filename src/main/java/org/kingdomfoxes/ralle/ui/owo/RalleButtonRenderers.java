@@ -101,27 +101,6 @@ final class RalleButtonRenderers {
         };
     }
 
-    static ButtonComponent.Renderer popOut() {
-        var background = neutral();
-        return (graphics, button, delta) -> {
-            background.draw(graphics, button, delta);
-
-            int left = button.getX() + (button.getWidth() - 11) / 2;
-            int top = button.getY() + (button.getHeight() - 11) / 2;
-            int color = button.active() ? 0xFFFFFFFF : 0xFF8D96A5;
-
-            // Open lower-left card corner with a diagonal arrow leaving toward the upper-right.
-            graphics.fill(left, top + 4, left + 1, top + 11, color);
-            graphics.fill(left, top + 10, left + 7, top + 11, color);
-            graphics.fill(left + 3, top + 6, left + 4, top + 7, color);
-            graphics.fill(left + 4, top + 5, left + 5, top + 6, color);
-            graphics.fill(left + 5, top + 4, left + 6, top + 5, color);
-            graphics.fill(left + 6, top + 3, left + 7, top + 4, color);
-            graphics.fill(left + 6, top + 1, left + 11, top + 2, color);
-            graphics.fill(left + 9, top + 1, left + 11, top + 6, color);
-        };
-    }
-
     private static ButtonComponent.Renderer renderer(Palette palette, BooleanSupplier selected) {
         return (graphics, button, delta) -> {
             drawFace(graphics, button.getX(), button.getY(), button.getWidth(), button.getHeight(),

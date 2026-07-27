@@ -141,16 +141,19 @@ cards.
 
 The optional party-status notification watches the authoritative projection for
 the viewer becoming a lobby member. Create and Join actions initiated by the
-Raid LFG screen explicitly suppress their next matching automatic status card,
+Raid LFG screen explicitly register their next matching membership transition
 and retire any existing discovery card for that lobby, so REST mutation and
-live-event delivery order cannot misclassify them.
-Synchronized snapshots and future non-screen local actions still qualify. This
-covers Discord and future keybind creation without assigning authority to
-client-reported member source labels. Abandoned suppressions expire after one
-minute. The card tracks roster and lobby changes and does not passively expire;
-disabling the option or closing the card dismisses it. Every expanded browser
-card also has an explicit pop-out control which creates the same persistent HUD
-presentation regardless of that automatic option and closes the browser.
+live-event delivery order cannot misclassify them. They remain suppressed by
+default; the separate `Auto Pop-out` option instead turns the matching
+transition into a persistent card and closes the browser. Synchronized
+snapshots and future non-screen local actions still qualify for the external
+party-status option. This covers Discord and future keybind creation without
+assigning authority to client-reported member source labels. Abandoned
+registrations expire after one minute. Persistent party-status cards track
+roster and lobby changes and do not passively expire, but an authoritative
+departure, kick, or disband closes the viewer's card. Every expanded browser
+card also has an explicit full-width neutral `Pop out` control which creates the
+same persistent HUD presentation and closes the browser.
 
 The only persisted LFG values are local opt-in, notification, sound, keybind,
 and HUD-placement settings. Whether a card is currently popped out remains

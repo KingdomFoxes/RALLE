@@ -341,10 +341,10 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         if (lobby.hostedBy(viewerId())) {
             card.child(hostControls(lobby));
         } else if (joinCountdown.snapshot().activeFor(lobby.lobbyId())) {
-            card.child(expandedBottomControls(lobby, joinCountdownControls(false)));
+            card.child(expandedActionStack(lobby, joinCountdownControls(false)));
         } else {
             var action = expandedAction(lobby);
-            card.child(expandedBottomControls(lobby, action));
+            card.child(expandedActionStack(lobby, action));
         }
         return card;
     }
@@ -430,26 +430,31 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                 && cooldown == 0 && !service.pending(lobby.lobbyId(), "ping");
         ping.tooltip(RalleTheme.ui(Component.literal(
                 cooldown > 0 ? "Party ping is on cooldown" : "Notify every current party member")));
-        controls.child(expandedBottomControls(lobby, ping));
+        controls.child(ping);
+        controls.child(popOutButton(lobby));
         renderedPingSeconds = cooldown;
         return controls;
     }
 
-    private FlowLayout expandedBottomControls(LfgProtocol.Lobby lobby,
-                                              io.wispforest.owo.ui.core.UIComponent primaryControl) {
-        var controls = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(20));
-        controls.gap(3).verticalAlignment(VerticalAlignment.CENTER);
+    private FlowLayout expandedActionStack(LfgProtocol.Lobby lobby,
+                                           io.wispforest.owo.ui.core.UIComponent primaryControl) {
+        var controls = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+        controls.gap(3);
         primaryControl.horizontalSizing(Sizing.fill(100));
         controls.child(primaryControl);
+        controls.child(popOutButton(lobby));
+        return controls;
+    }
 
-        var popOut = UIComponents.button(Component.empty(), ignored -> popOut(lobby));
-        popOut.sizing(Sizing.fixed(20), Sizing.fixed(20));
-        popOut.renderer(RalleButtonRenderers.popOut());
+    private ButtonComponent popOutButton(LfgProtocol.Lobby lobby) {
+        var popOut = UIComponents.button(
+                RalleTheme.ui(Component.literal("Pop out")), ignored -> popOut(lobby));
+        popOut.sizing(Sizing.fill(100), Sizing.fixed(20));
+        popOut.renderer(RalleButtonRenderers.neutral());
         popOut.active = notifications != null;
         popOut.tooltip(RalleTheme.ui(Component.literal(
                 "Keep this party on the HUD and close Raid LFG")));
-        controls.child(popOut);
-        return controls;
+        return popOut;
     }
 
     private void popOut(LfgProtocol.Lobby lobby) {
@@ -538,6 +543,13 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     private void tickJoinCountdown() {
         var snapshot = joinCountdown.snapshot();
+        if (snapshot.phase() == LfgJoinController.Phase.SUCCEEDED
+                && notifications != null && notifications.mainUiAutoPopOutEnabled()) {
+            clearMainUiJoinSuppression();
+            kickTargeting.reset();
+            minecraft.setScreen(null);
+            return;
+        }
         if (snapshot.phase() == LfgJoinController.Phase.IDLE || snapshot.phase().terminal()) {
             clearMainUiJoinSuppression();
         }
@@ -898,6 +910,11 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                 minecraft.execute(() -> {
                     if (failure == null) {
                         soundTracker.actionCompleted("create", null, sounds);
+                        if (notifications != null && notifications.mainUiAutoPopOutEnabled()) {
+                            kickTargeting.reset();
+                            minecraft.setScreen(null);
+                            return;
+                        }
                         expandedLobbies.add(mutation.lobby().lobbyId());
                         statusFilter = StatusFilter.ALL;
                         raidFilter = RaidFilter.ALL;
