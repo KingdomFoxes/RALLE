@@ -72,6 +72,8 @@
   "ralle.settings.option.new-party-notifications.description": "Shows a compact HUD card when a new party becomes available to join.",
   "ralle.settings.option.reopened-party-notifications": "Reopened Party Notifications",
   "ralle.settings.option.reopened-party-notifications.description": "Shows a compact HUD card when a locked or unavailable party becomes joinable again.",
+  "ralle.settings.option.party-status-notifications": "Party Status Notifications",
+  "ralle.settings.option.party-status-notifications.description": "Keeps your current party on the HUD when it was created or joined outside the Raid LFG screen. Close the card to dismiss it.",
   "ralle.settings.option.edit-notification-position": "Edit Notification Position",
   "ralle.settings.option.edit-notification-position.description": "Opens the HUD editor with the fixed-size Raid LFG notification anchor selected.",
   "ralle.settings.option.raid-lfg-keybind": "Raid LFG Keybind",

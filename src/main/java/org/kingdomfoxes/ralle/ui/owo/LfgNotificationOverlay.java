@@ -214,6 +214,16 @@ public final class LfgNotificationOverlay {
                                 Rectangle controls, int mouseX, int mouseY, boolean interactive,
                                 List<HitRegion> hits) {
         var id = card.lobby().lobbyId();
+        if (card.persistent() && viewerBelongsTo(card.lobby())) {
+            renderCloseControl(graphics, controls, id, mouseX, mouseY, interactive, hits);
+            return;
+        }
+        if (card.persistent() && card.presentedMode() == LfgNotificationManager.CardMode.READY
+                && !joinAvailable(card.lobby())) {
+            renderPersistentStatus(graphics, controls, id, persistentStatus(card.lobby()),
+                    mouseX, mouseY, interactive, hits);
+            return;
+        }
         switch (card.presentedMode()) {
             case READY -> {
                 int leftWidth = (controls.width() - 4) / 2;
@@ -249,18 +259,63 @@ public final class LfgNotificationOverlay {
             case SUBMITTING -> drawButton(graphics, controls, "Joining...",
                     RalleButtonRenderers.Kind.NEUTRAL, -1, -1, false);
             case JOINED -> {
-                drawButton(graphics, controls, "Close", RalleButtonRenderers.Kind.DESTRUCTIVE,
-                        mouseX, mouseY, true);
-                if (interactive) hits.add(new HitRegion(controls, id, Action.CLOSE));
+                renderCloseControl(graphics, controls, id, mouseX, mouseY, interactive, hits);
             }
             case FILLED_SUCCESS -> drawButton(graphics, controls, "Party filled",
                     RalleButtonRenderers.Kind.PRIMARY, -1, -1, true);
-            case FILLED_RACE, FAILURE, UNAVAILABLE ->
+            case FILLED_RACE, FAILURE, UNAVAILABLE -> {
+                if (card.persistent()) {
+                    renderPersistentStatus(graphics, controls, id,
+                            card.feedbackText() == null ? "Party unavailable" : card.feedbackText(),
+                            mouseX, mouseY, interactive, hits);
+                    return;
+                }
                     drawButton(graphics, controls,
                             card.feedbackText() == null ? "Party unavailable" : card.feedbackText(),
                             RalleButtonRenderers.Kind.DESTRUCTIVE, -1, -1, true);
+            }
             case EXITING, REMOVED -> {}
         }
+    }
+
+    private void renderCloseControl(GuiGraphics graphics, Rectangle controls, UUID lobbyId,
+                                    int mouseX, int mouseY, boolean interactive, List<HitRegion> hits) {
+        drawButton(graphics, controls, "Close", RalleButtonRenderers.Kind.DESTRUCTIVE,
+                mouseX, mouseY, true);
+        if (interactive) hits.add(new HitRegion(controls, lobbyId, Action.CLOSE));
+    }
+
+    private void renderPersistentStatus(GuiGraphics graphics, Rectangle controls, UUID lobbyId,
+                                        String status, int mouseX, int mouseY, boolean interactive,
+                                        List<HitRegion> hits) {
+        int leftWidth = (controls.width() - 4) * 2 / 3;
+        var message = new Rectangle(controls.x(), controls.y(), leftWidth, controls.height());
+        var close = new Rectangle(message.right() + 4, controls.y(),
+                controls.right() - message.right() - 4, controls.height());
+        drawButton(graphics, message, status, RalleButtonRenderers.Kind.NEUTRAL, -1, -1, false);
+        drawButton(graphics, close, "Close", RalleButtonRenderers.Kind.DESTRUCTIVE,
+                mouseX, mouseY, true);
+        if (interactive) hits.add(new HitRegion(close, lobbyId, Action.CLOSE));
+    }
+
+    private boolean viewerBelongsTo(LfgProtocol.Lobby lobby) {
+        var viewer = service.store().state().viewer();
+        return viewer != null && lobby.contains(viewer.minecraftUuid());
+    }
+
+    private boolean joinAvailable(LfgProtocol.Lobby lobby) {
+        return !lobby.locked()
+                && lobby.status() == LfgProtocol.LobbyStatus.OPEN
+                && lobby.members().size() < lobby.capacity()
+                && lobby.capabilities() != null
+                && lobby.capabilities().join();
+    }
+
+    private static String persistentStatus(LfgProtocol.Lobby lobby) {
+        if (lobby.status() == LfgProtocol.LobbyStatus.IN_RAID) return "In raid";
+        if (lobby.locked()) return "Locked";
+        if (lobby.members().size() >= lobby.capacity()) return "Party filled";
+        return "Unavailable";
     }
 
     private void drawButton(GuiGraphics graphics, Rectangle bounds, String label,
@@ -332,7 +387,8 @@ public final class LfgNotificationOverlay {
                 case OPEN_LFG -> {
                     notifications.removeImmediately(hit.lobbyId());
                     service.focusLobby(hit.lobbyId());
-                    minecraft.setScreen(new RaidLfgScreen(minecraft.screen, service, sounds));
+                    minecraft.setScreen(new RaidLfgScreen(
+                            minecraft.screen, service, sounds, notifications));
                 }
             }
             return true;

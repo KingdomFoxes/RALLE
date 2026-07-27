@@ -190,6 +190,108 @@ class LfgNotificationManagerTest {
                 fixture.manager.visibleCards().getFirst().presentedMode());
     }
 
+    @Test
+    void externalPartyMembershipShowsPersistentStatusUntilClosed() {
+        var fixture = new Fixture();
+        fixture.partyStatusEnabled[0] = true;
+        fixture.connect();
+        var hosted = viewerHostedLobby(60, 1);
+
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, hosted));
+
+        var card = fixture.manager.visibleCards().getFirst();
+        assertEquals(LfgNotificationManager.DiscoveryKind.PARTY_STATUS, card.kind());
+        assertTrue(card.persistent());
+
+        fixture.now[0] += LfgNotificationManager.PASSIVE_MILLIS * 10;
+        fixture.manager.tick();
+        assertEquals(LfgNotificationManager.CardMode.READY,
+                fixture.manager.visibleCards().getFirst().mode());
+
+        fixture.gateway.listener.onFrame(new LfgProtocol.RemoveFrame(1, 2, hosted.lobbyId()));
+        fixture.now[0] += LfgNotificationManager.FEEDBACK_MILLIS * 10;
+        fixture.manager.tick();
+        assertEquals(LfgNotificationManager.CardMode.UNAVAILABLE,
+                fixture.manager.visibleCards().getFirst().mode());
+
+        fixture.manager.close(hosted.lobbyId());
+        fixture.now[0] += LfgNotificationManager.ANIMATION_MILLIS;
+        fixture.manager.tick();
+        assertTrue(fixture.manager.visibleCards().isEmpty());
+    }
+
+    @Test
+    void explicitMainUiCreateSuppressesLiveFirstStatusButPopOutAlwaysPersists() {
+        var fixture = new Fixture();
+        fixture.partyStatusEnabled[0] = true;
+        fixture.screenOpen[0] = true;
+        fixture.connect();
+        var hosted = viewerHostedLobby(61, 1);
+        var suppression = fixture.manager.suppressNextMainUiPartyStatus();
+
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, hosted));
+        assertTrue(fixture.manager.visibleCards().isEmpty());
+        suppression.close();
+
+        fixture.partyStatusEnabled[0] = false;
+        fixture.manager.showPersistent(hosted);
+        assertTrue(fixture.manager.visibleCards().getFirst().persistent());
+
+        fixture.now[0] += LfgNotificationManager.PASSIVE_MILLIS * 10;
+        fixture.manager.tick();
+        assertEquals(LfgNotificationManager.CardMode.READY,
+                fixture.manager.visibleCards().getFirst().mode());
+    }
+
+    @Test
+    void explicitMainUiJoinSuppressesLiveFirstMembershipForItsLobby() {
+        var fixture = new Fixture();
+        fixture.partyStatusEnabled[0] = true;
+        fixture.connect();
+        var open = lobby(63, false, 1);
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, open));
+        assertEquals(1, fixture.manager.visibleCards().size());
+
+        fixture.screenOpen[0] = true;
+        var suppression = fixture.manager.suppressMainUiPartyStatus(open.lobbyId());
+
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(
+                1, 2, joinedLobby(open)));
+
+        assertTrue(fixture.manager.visibleCards().isEmpty());
+        suppression.close();
+    }
+
+    @Test
+    void externalLiveMembershipStillQueuesStatusWhileMainUiIsOpen() {
+        var fixture = new Fixture();
+        fixture.partyStatusEnabled[0] = true;
+        fixture.screenOpen[0] = true;
+        fixture.connect();
+
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(
+                1, 1, viewerHostedLobby(62, 1)));
+
+        assertEquals(LfgNotificationManager.DiscoveryKind.PARTY_STATUS,
+                fixture.manager.visibleCards().getFirst().kind());
+        assertTrue(fixture.manager.visibleCards().getFirst().persistent());
+    }
+
+    @Test
+    void abandonedMainUiSuppressionExpiresBeforeLaterExternalMembership() {
+        var fixture = new Fixture();
+        fixture.partyStatusEnabled[0] = true;
+        fixture.connect();
+        fixture.manager.suppressNextMainUiPartyStatus();
+        fixture.now[0] += LfgNotificationManager.MAIN_UI_SUPPRESSION_MILLIS;
+
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(
+                1, 1, viewerHostedLobby(64, 1)));
+
+        assertEquals(LfgNotificationManager.DiscoveryKind.PARTY_STATUS,
+                fixture.manager.visibleCards().getFirst().kind());
+    }
+
     private static LfgProtocol.Lobby lobby(int id, boolean locked, long revision) {
         var host = new LfgProtocol.Member(HOST_ID, "Host", GUILD,
                 LfgProtocol.MemberRole.HOST, LfgProtocol.MemberSource.RALLE, Instant.EPOCH, null);
@@ -233,6 +335,15 @@ class LfgNotificationManagerTest {
                 joined.members(), joined.capabilities());
     }
 
+    private static LfgProtocol.Lobby viewerHostedLobby(int id, long revision) {
+        var viewerHost = new LfgProtocol.Member(VIEWER_ID, "Viewer", GUILD,
+                LfgProtocol.MemberRole.HOST, LfgProtocol.MemberSource.DISCORD, Instant.EPOCH, null);
+        return new LfgProtocol.Lobby(uuid(id), LfgProtocol.RaidType.TWP, LfgProtocol.Region.EU,
+                "Party status", LfgProtocol.Visibility.PUBLIC, LfgProtocol.LobbyStatus.OPEN, false,
+                VIEWER_ID, GUILD_ID, Instant.EPOCH, Instant.EPOCH, revision, 4, List.of(viewerHost),
+                new LfgProtocol.LobbyCapabilities(false, true, Map.of()));
+    }
+
     private static UUID uuid(int suffix) {
         return UUID.fromString("00000000-0000-0000-0000-" + String.format("%012d", suffix));
     }
@@ -240,13 +351,15 @@ class LfgNotificationManagerTest {
     private static final class Fixture {
         final long[] now = {0};
         final boolean[] screenOpen = {false};
+        final boolean[] partyStatusEnabled = {false};
         final Gateway gateway = new Gateway();
         final Sounds sounds = new Sounds();
         final RaidLfgService service = new RaidLfgService(
                 gateway, new Environment(), ignored -> CompletableFuture.completedFuture(null),
                 () -> now[0], () -> 0.5, LfgNotificationSink.IGNORE, PartyCommandExecutor.IGNORE);
         final LfgNotificationManager manager = new LfgNotificationManager(
-                service, sounds, () -> now[0], () -> true, () -> true, () -> screenOpen[0]);
+                service, sounds, () -> now[0], () -> true, () -> true,
+                () -> partyStatusEnabled[0], () -> screenOpen[0]);
 
         void connect() {
             service.tick();

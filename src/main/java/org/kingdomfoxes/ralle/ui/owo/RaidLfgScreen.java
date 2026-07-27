@@ -27,6 +27,7 @@ import net.minecraft.world.item.Items;
 import org.jetbrains.annotations.NotNull;
 import org.kingdomfoxes.ralle.lfg.client.GuildTerritoryColors;
 import org.kingdomfoxes.ralle.lfg.client.LfgJoinController;
+import org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.lfg.client.RaidRegionDetector;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException;
@@ -63,6 +64,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private final Screen parent;
     private final RaidLfgService service;
     private final LfgSoundPlayer sounds;
+    private final LfgNotificationManager notifications;
     private final LfgMainUiSoundTracker soundTracker = new LfgMainUiSoundTracker();
     private final LfgJoinController joinCountdown;
     private final KickTargetingState kickTargeting;
@@ -92,28 +94,35 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private UUID kickLobbyId;
     private ButtonComponent kickButton;
     private ButtonComponent lockButton;
+    private LfgNotificationManager.PartyStatusSuppression pendingMainUiJoinSuppression;
 
     public RaidLfgScreen(Screen parent, RaidLfgService service) {
         this(parent, service, LfgSoundPlayer.SILENT);
     }
 
     public RaidLfgScreen(Screen parent, RaidLfgService service, LfgSoundPlayer sounds) {
-        this(parent, service, RaidRegionDetector.UNAVAILABLE, System::nanoTime, sounds);
+        this(parent, service, RaidRegionDetector.UNAVAILABLE, System::nanoTime, sounds, null);
+    }
+
+    public RaidLfgScreen(Screen parent, RaidLfgService service, LfgSoundPlayer sounds,
+                         LfgNotificationManager notifications) {
+        this(parent, service, RaidRegionDetector.UNAVAILABLE, System::nanoTime, sounds, notifications);
     }
 
     public RaidLfgScreen(Screen parent, RaidLfgService service, RaidRegionDetector regionDetector) {
-        this(parent, service, regionDetector, System::nanoTime, LfgSoundPlayer.SILENT);
+        this(parent, service, regionDetector, System::nanoTime, LfgSoundPlayer.SILENT, null);
     }
 
     RaidLfgScreen(Screen parent, RaidLfgService service, RaidRegionDetector regionDetector, LongSupplier nanoTime) {
-        this(parent, service, regionDetector, nanoTime, LfgSoundPlayer.SILENT);
+        this(parent, service, regionDetector, nanoTime, LfgSoundPlayer.SILENT, null);
     }
 
     RaidLfgScreen(Screen parent, RaidLfgService service, RaidRegionDetector regionDetector,
-                  LongSupplier nanoTime, LfgSoundPlayer sounds) {
+                  LongSupplier nanoTime, LfgSoundPlayer sounds, LfgNotificationManager notifications) {
         this.parent = parent;
         this.service = service;
         this.sounds = sounds;
+        this.notifications = notifications;
         this.currentRegion = regionDetector.detect().orElse(LfgProtocol.Region.EU);
         this.joinCountdown = service.joinController();
         this.kickTargeting = new KickTargetingState(nanoTime);
@@ -332,11 +341,10 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         if (lobby.hostedBy(viewerId())) {
             card.child(hostControls(lobby));
         } else if (joinCountdown.snapshot().activeFor(lobby.lobbyId())) {
-            card.child(joinCountdownControls(false));
+            card.child(expandedBottomControls(lobby, joinCountdownControls(false)));
         } else {
             var action = expandedAction(lobby);
-            action.horizontalSizing(Sizing.fill(100));
-            card.child(action);
+            card.child(expandedBottomControls(lobby, action));
         }
         return card;
     }
@@ -422,9 +430,33 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                 && cooldown == 0 && !service.pending(lobby.lobbyId(), "ping");
         ping.tooltip(RalleTheme.ui(Component.literal(
                 cooldown > 0 ? "Party ping is on cooldown" : "Notify every current party member")));
-        controls.child(ping);
+        controls.child(expandedBottomControls(lobby, ping));
         renderedPingSeconds = cooldown;
         return controls;
+    }
+
+    private FlowLayout expandedBottomControls(LfgProtocol.Lobby lobby,
+                                              io.wispforest.owo.ui.core.UIComponent primaryControl) {
+        var controls = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(20));
+        controls.gap(3).verticalAlignment(VerticalAlignment.CENTER);
+        primaryControl.horizontalSizing(Sizing.fill(100));
+        controls.child(primaryControl);
+
+        var popOut = UIComponents.button(Component.empty(), ignored -> popOut(lobby));
+        popOut.sizing(Sizing.fixed(20), Sizing.fixed(20));
+        popOut.renderer(RalleButtonRenderers.popOut());
+        popOut.active = notifications != null;
+        popOut.tooltip(RalleTheme.ui(Component.literal(
+                "Keep this party on the HUD and close Raid LFG")));
+        controls.child(popOut);
+        return controls;
+    }
+
+    private void popOut(LfgProtocol.Lobby lobby) {
+        if (notifications == null) return;
+        notifications.showPersistent(lobby);
+        kickTargeting.reset();
+        minecraft.setScreen(null);
     }
 
     private ButtonComponent expandedAction(LfgProtocol.Lobby lobby) {
@@ -478,6 +510,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
         var cancel = UIComponents.button(RalleTheme.ui(Component.literal("Cancel")), ignored -> {
             if (joinCountdown.cancel()) {
+                clearMainUiJoinSuppression();
                 renderedCountdownSeconds = -1;
                 rebuildGrid();
             }
@@ -492,6 +525,10 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     private void startJoinCountdown(LfgProtocol.Lobby lobby) {
         if (!joinAvailable(lobby) || !joinCountdown.start(lobby.lobbyId())) return;
+        clearMainUiJoinSuppression();
+        if (notifications != null) {
+            pendingMainUiJoinSuppression = notifications.suppressMainUiPartyStatus(lobby.lobbyId());
+        }
         var snapshot = joinCountdown.snapshot();
         renderedCountdownSeconds = snapshot.secondsRemaining();
         renderedJoinPhase = snapshot.phase();
@@ -501,6 +538,9 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     private void tickJoinCountdown() {
         var snapshot = joinCountdown.snapshot();
+        if (snapshot.phase() == LfgJoinController.Phase.IDLE || snapshot.phase().terminal()) {
+            clearMainUiJoinSuppression();
+        }
         int seconds = snapshot.secondsRemaining();
         if (seconds != renderedCountdownSeconds
                 || snapshot.phase() != renderedJoinPhase
@@ -510,6 +550,12 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             renderedJoinLobby = snapshot.lobbyId();
             rebuildGrid();
         }
+    }
+
+    private void clearMainUiJoinSuppression() {
+        if (pendingMainUiJoinSuppression == null) return;
+        pendingMainUiJoinSuppression.close();
+        pendingMainUiJoinSuppression = null;
     }
 
     private void cancelUnavailableJoinCountdown() {
@@ -845,27 +891,34 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var submit = UIComponents.button(RalleTheme.ui(Component.literal("Create")), ignored -> {
             ignored.active = false;
             error.text(RalleTheme.ui(Component.literal("Creating..."))).color(RalleTheme.MUTED);
-            service.create(selectedRaid[0], selectedRegion[0], noteValue[0]).whenComplete((mutation, failure) -> minecraft.execute(() -> {
-                if (failure == null) {
-                    soundTracker.actionCompleted("create", null, sounds);
-                    expandedLobbies.add(mutation.lobby().lobbyId());
-                    statusFilter = StatusFilter.ALL;
-                    raidFilter = RaidFilter.ALL;
-                    regionFilter = RegionFilter.ALL;
-                    overlayHolder[0].remove();
-                    refreshFromService(true);
-                    return;
-                }
-                var cause = unwrap(failure);
-                if (cause instanceof LfgGatewayException gateway && "RAID_ALREADY_LISTED".equals(gateway.error().code())) {
-                    overlayHolder[0].remove();
-                    refreshFromService(true);
-                } else {
-                    ignored.active = true;
-                    error.text(RalleTheme.ui(Component.literal(cause.getMessage() == null ? "Lobby creation failed." : cause.getMessage())))
-                            .color(Color.ofRgb(0xFF6B6B));
-                }
-            }));
+            var statusSuppression = notifications == null
+                    ? null : notifications.suppressNextMainUiPartyStatus();
+            service.create(selectedRaid[0], selectedRegion[0], noteValue[0]).whenComplete((mutation, failure) -> {
+                if (statusSuppression != null) statusSuppression.close();
+                minecraft.execute(() -> {
+                    if (failure == null) {
+                        soundTracker.actionCompleted("create", null, sounds);
+                        expandedLobbies.add(mutation.lobby().lobbyId());
+                        statusFilter = StatusFilter.ALL;
+                        raidFilter = RaidFilter.ALL;
+                        regionFilter = RegionFilter.ALL;
+                        overlayHolder[0].remove();
+                        refreshFromService(true);
+                        return;
+                    }
+                    var cause = unwrap(failure);
+                    if (cause instanceof LfgGatewayException gateway
+                            && "RAID_ALREADY_LISTED".equals(gateway.error().code())) {
+                        overlayHolder[0].remove();
+                        refreshFromService(true);
+                    } else {
+                        ignored.active = true;
+                        error.text(RalleTheme.ui(Component.literal(cause.getMessage() == null
+                                        ? "Lobby creation failed." : cause.getMessage())))
+                                .color(Color.ofRgb(0xFF6B6B));
+                    }
+                });
+            });
         });
         submit.horizontalSizing(Sizing.fill(50));
         submit.renderer(RalleButtonRenderers.primary());

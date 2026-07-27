@@ -139,6 +139,20 @@ but cannot discover new ones. The persistent `LfgJoinController` owns the
 single three-second countdown and submission shared by the browser and HUD
 cards.
 
+The optional party-status notification watches the authoritative projection for
+the viewer becoming a lobby member. Create and Join actions initiated by the
+Raid LFG screen explicitly suppress their next matching automatic status card,
+and retire any existing discovery card for that lobby, so REST mutation and
+live-event delivery order cannot misclassify them.
+Synchronized snapshots and future non-screen local actions still qualify. This
+covers Discord and future keybind creation without assigning authority to
+client-reported member source labels. Abandoned suppressions expire after one
+minute. The card tracks roster and lobby changes and does not passively expire;
+disabling the option or closing the card dismisses it. Every expanded browser
+card also has an explicit pop-out control which creates the same persistent HUD
+presentation regardless of that automatic option and closes the browser.
+
 The only persisted LFG values are local opt-in, notification, sound, keybind,
-and HUD-placement settings. Credentials, snapshots, pending actions, backend
-overrides, and connection state are memory-only.
+and HUD-placement settings. Whether a card is currently popped out remains
+session-only. Credentials, snapshots, pending actions, backend overrides, and
+connection state are memory-only.

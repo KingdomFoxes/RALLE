@@ -82,7 +82,8 @@ public final class RalleClient implements ClientModInitializer {
         var lfgNotificationOverlay = new LfgNotificationOverlay(
                 minecraft, raidLfg, lfgNotifications, placements, lfgSounds);
         lfgNotificationOverlay.register();
-        var lfgKeybind = new RaidLfgKeybind(minecraft, settings, raidLfg, lfgSounds);
+        var lfgKeybind = new RaidLfgKeybind(
+                minecraft, settings, raidLfg, lfgSounds, lfgNotifications);
         var chatBehavior = new ChatBehaviorService(Minecraft.getInstance(), settings);
         var chatScreenshots = new ChatScreenshotService(
                 Minecraft.getInstance(),
@@ -119,7 +120,7 @@ public final class RalleClient implements ClientModInitializer {
                 })).then(literal("lfg").executes(command -> {
                     var client = Minecraft.getInstance();
                     client.schedule(() -> client.setScreen(new RaidLfgScreen(
-                            client.screen, context().raidLfg(), context().lfgSounds())));
+                            client.screen, context().raidLfg(), context().lfgSounds(), lfgNotifications)));
                     return 1;
                 }))
         ));

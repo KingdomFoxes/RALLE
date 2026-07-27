@@ -57,6 +57,7 @@ public final class RalleSettings {
                         subcategory("notifications",
                                 toggle("new-party-notifications"),
                                 toggle("reopened-party-notifications"),
+                                toggle("party-status-notifications"),
                                 toggle("notification-sounds"),
                                 action("edit-notification-position")
                         ),
@@ -77,6 +78,7 @@ public final class RalleSettings {
         registry.requireEnabled("chat-selection-sounds", "chat-screenshot-enabled");
         registry.requireEnabled("new-party-notifications", "raid-lfg-enabled");
         registry.requireEnabled("reopened-party-notifications", "raid-lfg-enabled");
+        registry.requireEnabled("party-status-notifications", "raid-lfg-enabled");
         registry.requireEnabled("notification-sounds", "raid-lfg-enabled");
         registry.requireEnabled("edit-notification-position", "raid-lfg-enabled");
         registry.requireEnabled("raid-lfg-keybind", "raid-lfg-enabled");

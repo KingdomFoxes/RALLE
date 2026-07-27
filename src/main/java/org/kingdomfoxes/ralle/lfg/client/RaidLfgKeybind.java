@@ -22,13 +22,15 @@ public final class RaidLfgKeybind {
     private final KeyMapping mapping;
     private final RaidLfgService service;
     private final LfgSoundPlayer sounds;
+    private final LfgNotificationManager notifications;
     private String appliedValue;
 
     public RaidLfgKeybind(Minecraft minecraft, SettingsRegistry settings, RaidLfgService service,
-                          LfgSoundPlayer sounds) {
+                          LfgSoundPlayer sounds, LfgNotificationManager notifications) {
         this.minecraft = minecraft;
         this.service = service;
         this.sounds = sounds;
+        this.notifications = notifications;
         this.enabled = settings.setting("raid-lfg-enabled", BooleanSetting.class);
         this.setting = settings.setting("raid-lfg-keybind", KeybindSetting.class);
         this.mapping = KeyBindingHelper.registerKeyBinding(new KeyMapping(
@@ -43,7 +45,10 @@ public final class RaidLfgKeybind {
     public void tick() {
         if (!setting.value().equals(appliedValue)) applySetting();
         while (mapping.consumeClick()) {
-            if (enabled.value()) minecraft.setScreen(new RaidLfgScreen(minecraft.screen, service, sounds));
+            if (enabled.value()) {
+                minecraft.setScreen(new RaidLfgScreen(
+                        minecraft.screen, service, sounds, notifications));
+            }
         }
     }
 

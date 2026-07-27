@@ -14,40 +14,46 @@ import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
 
-/** Persistent lifecycle and queue for Raid LFG discovery HUD cards. */
+/** Lifecycle and queue for transient discovery and persistent party-status HUD cards. */
 public final class LfgNotificationManager {
     public static final int MAX_VISIBLE = 3;
     public static final long PASSIVE_MILLIS = 20_000;
     public static final long FEEDBACK_MILLIS = 2_000;
     public static final long FILLED_SUCCESS_MILLIS = 5_000;
     public static final long ANIMATION_MILLIS = 500;
+    static final long MAIN_UI_SUPPRESSION_MILLIS = 60_000;
 
     private final RaidLfgService service;
     private final LfgSoundPlayer sounds;
     private final LongSupplier clockMillis;
     private final BooleanSupplier newPartyEnabled;
     private final BooleanSupplier reopenedPartyEnabled;
+    private final BooleanSupplier partyStatusEnabled;
     private final BooleanSupplier lfgScreenOpen;
     private final Map<UUID, Card> cards = new LinkedHashMap<>();
     private final ArrayDeque<UUID> visible = new ArrayDeque<>();
     private final ArrayDeque<UUID> queued = new ArrayDeque<>();
+    private final Map<Long, PendingSuppression> mainUiSuppressions = new LinkedHashMap<>();
+    private long nextSuppressionId;
 
     public LfgNotificationManager(RaidLfgService service, SettingsRegistry settings,
                                   LfgSoundPlayer sounds, BooleanSupplier lfgScreenOpen) {
         this(service, sounds, System::currentTimeMillis,
                 settings.setting("new-party-notifications", BooleanSetting.class)::value,
                 settings.setting("reopened-party-notifications", BooleanSetting.class)::value,
+                settings.setting("party-status-notifications", BooleanSetting.class)::value,
                 lfgScreenOpen);
     }
 
     LfgNotificationManager(RaidLfgService service, LfgSoundPlayer sounds, LongSupplier clockMillis,
                            BooleanSupplier newPartyEnabled, BooleanSupplier reopenedPartyEnabled,
-                           BooleanSupplier lfgScreenOpen) {
+                           BooleanSupplier partyStatusEnabled, BooleanSupplier lfgScreenOpen) {
         this.service = service;
         this.sounds = sounds;
         this.clockMillis = clockMillis;
         this.newPartyEnabled = newPartyEnabled;
         this.reopenedPartyEnabled = reopenedPartyEnabled;
+        this.partyStatusEnabled = partyStatusEnabled;
         this.lfgScreenOpen = lfgScreenOpen;
         service.store().observeLobbyChanges(this::onLobbyChange);
     }
@@ -55,6 +61,10 @@ public final class LfgNotificationManager {
     private synchronized void onLobbyChange(RaidLfgStore.LobbyChange change) {
         var card = cards.get(change.lobbyId());
         if (card != null) synchronize(card, change.current());
+        if (shouldShowPartyStatus(change)) {
+            showPersistent(change.current(), DiscoveryKind.PARTY_STATUS);
+            return;
+        }
         if (change.origin() != RaidLfgStore.UpdateOrigin.LIVE || lfgScreenOpen.getAsBoolean()) return;
 
         var current = change.current();
@@ -68,15 +78,80 @@ public final class LfgNotificationManager {
         discover(current, kind);
     }
 
+    private boolean shouldShowPartyStatus(RaidLfgStore.LobbyChange change) {
+        if (change.current() == null) return false;
+        var viewer = service.store().state().viewer();
+        boolean becameMember = viewer != null
+                && change.current().contains(viewer.minecraftUuid())
+                && (change.previous() == null || !change.previous().contains(viewer.minecraftUuid()));
+        if (!becameMember) return false;
+        if (consumeMainUiSuppression(change.lobbyId())) {
+            removeCompletely(change.lobbyId());
+            return false;
+        }
+        return partyStatusEnabled.getAsBoolean();
+    }
+
+    /**
+     * Suppresses the next automatic party-status card for a main-UI create.
+     * The lobby ID is not known until the authoritative mutation arrives.
+     */
+    public synchronized PartyStatusSuppression suppressNextMainUiPartyStatus() {
+        return registerMainUiSuppression(null);
+    }
+
+    /** Suppresses automatic party status for a main-UI join of the given lobby. */
+    public synchronized PartyStatusSuppression suppressMainUiPartyStatus(UUID lobbyId) {
+        return registerMainUiSuppression(java.util.Objects.requireNonNull(lobbyId, "lobbyId"));
+    }
+
+    private PartyStatusSuppression registerMainUiSuppression(UUID lobbyId) {
+        removeExpiredSuppressions();
+        long id = ++nextSuppressionId;
+        mainUiSuppressions.put(id, new PendingSuppression(
+                lobbyId, clockMillis.getAsLong() + MAIN_UI_SUPPRESSION_MILLIS));
+        return new PartyStatusSuppression(this, id);
+    }
+
+    private boolean consumeMainUiSuppression(UUID lobbyId) {
+        removeExpiredSuppressions();
+        Long wildcard = null;
+        var iterator = mainUiSuppressions.entrySet().iterator();
+        while (iterator.hasNext()) {
+            var entry = iterator.next();
+            if (lobbyId.equals(entry.getValue().lobbyId())) {
+                iterator.remove();
+                return true;
+            }
+            if (entry.getValue().lobbyId() == null && wildcard == null) wildcard = entry.getKey();
+        }
+        if (wildcard == null) return false;
+        mainUiSuppressions.remove(wildcard);
+        return true;
+    }
+
+    private void removeExpiredSuppressions() {
+        long now = clockMillis.getAsLong();
+        mainUiSuppressions.values().removeIf(suppression -> now >= suppression.expiresAtMillis());
+    }
+
+    private synchronized void releaseMainUiSuppression(long id) {
+        mainUiSuppressions.remove(id);
+    }
+
+    private synchronized void releaseMainUiSuppressions(UUID lobbyId) {
+        mainUiSuppressions.values().removeIf(suppression -> lobbyId.equals(suppression.lobbyId()));
+    }
+
     private void discover(LfgProtocol.Lobby lobby, DiscoveryKind kind) {
         long now = clockMillis.getAsLong();
         var existing = cards.get(lobby.lobbyId());
         if (existing != null) {
             existing.lobby = lobby;
-            existing.kind = kind;
+            if (!existing.persistent) existing.kind = kind;
             existing.mode = CardMode.READY;
             existing.feedbackText = null;
-            existing.remainingPassiveMillis = PASSIVE_MILLIS;
+            if (!existing.persistent) existing.remainingPassiveMillis = PASSIVE_MILLIS;
             existing.animationStartedAt = now;
             existing.entranceCompleted = false;
             existing.lastTickAt = now;
@@ -95,6 +170,37 @@ public final class LfgNotificationManager {
         promote();
     }
 
+    /** Explicitly keeps a live lobby card on the HUD until the player closes it. */
+    public synchronized void showPersistent(LfgProtocol.Lobby lobby) {
+        showPersistent(lobby, DiscoveryKind.MANUAL);
+    }
+
+    private void showPersistent(LfgProtocol.Lobby lobby, DiscoveryKind kind) {
+        long now = clockMillis.getAsLong();
+        var card = cards.get(lobby.lobbyId());
+        boolean wasVisible = visible.remove(lobby.lobbyId());
+        queued.remove(lobby.lobbyId());
+        if (card == null) {
+            card = new Card(lobby, kind);
+            cards.put(lobby.lobbyId(), card);
+        }
+        card.lobby = lobby;
+        card.kind = kind;
+        card.persistent = true;
+        card.mode = CardMode.READY;
+        card.feedbackText = null;
+        card.animationStartedAt = now;
+        card.entranceCompleted = false;
+        card.lastTickAt = now;
+        if (wasVisible) {
+            visible.addLast(lobby.lobbyId());
+            sounds.playNotificationIn();
+        } else {
+            queued.addLast(lobby.lobbyId());
+            promote();
+        }
+    }
+
     public synchronized void tick() {
         long now = clockMillis.getAsLong();
         applyJoinSnapshot(service.joinController().snapshot(), now);
@@ -103,6 +209,9 @@ public final class LfgNotificationManager {
         for (var id : visible) {
             var card = cards.get(id);
             if (card == null) continue;
+            if (card.kind == DiscoveryKind.PARTY_STATUS && !partyStatusEnabled.getAsBoolean()) {
+                beginExit(card);
+            }
             var current = service.store().state().lobbies().get(id);
             synchronize(card, current);
             tickCard(card, now);
@@ -114,6 +223,7 @@ public final class LfgNotificationManager {
 
     private void applyJoinSnapshot(LfgJoinController.Snapshot snapshot, long now) {
         if (snapshot.phase() == LfgJoinController.Phase.IDLE) return;
+        if (snapshot.phase().terminal()) releaseMainUiSuppressions(snapshot.lobbyId());
         if (snapshot.outcome() == LfgJoinController.Outcome.ACCEPTED) {
             sounds.playPartyJoined();
         }
@@ -148,6 +258,13 @@ public final class LfgNotificationManager {
     private void synchronize(Card card, LfgProtocol.Lobby current) {
         long now = clockMillis.getAsLong();
         if (current == null) {
+            if (card.mode == CardMode.EXITING || card.mode == CardMode.REMOVED) return;
+            if (card.persistent) {
+                card.mode = CardMode.UNAVAILABLE;
+                card.feedbackText = "Party unavailable";
+                card.lastTickAt = now;
+                return;
+            }
             if (card.mode != CardMode.EXITING && card.mode != CardMode.REMOVED
                     && !card.mode.timedFeedback()) {
                 feedback(card, CardMode.UNAVAILABLE, "Party unavailable", now + FEEDBACK_MILLIS);
@@ -156,6 +273,14 @@ public final class LfgNotificationManager {
         }
 
         card.lobby = current;
+        if (card.persistent) {
+            if (card.mode != CardMode.COUNTDOWN && card.mode != CardMode.SUBMITTING
+                    && card.mode != CardMode.EXITING && card.mode != CardMode.REMOVED) {
+                card.mode = CardMode.READY;
+                card.feedbackText = null;
+            }
+            return;
+        }
 
         if (card.mode == CardMode.JOINED) {
             if (current.members().size() >= current.capacity()) {
@@ -181,6 +306,7 @@ public final class LfgNotificationManager {
 
         long elapsed = Math.max(0, now - card.lastTickAt);
         card.lastTickAt = now;
+        if (card.persistent && card.mode != CardMode.EXITING) return;
         if (card.mode == CardMode.READY) {
             card.remainingPassiveMillis -= elapsed;
             if (card.remainingPassiveMillis <= 0) beginExit(card);
@@ -209,7 +335,7 @@ public final class LfgNotificationManager {
 
     public synchronized boolean join(UUID lobbyId) {
         var card = cards.get(lobbyId);
-        if (card == null || card.mode != CardMode.READY) return false;
+        if (card == null || card.mode != CardMode.READY || !potentiallyJoinable(card.lobby)) return false;
         if (!service.joinController().start(lobbyId)) return false;
         card.mode = CardMode.COUNTDOWN;
         return true;
@@ -261,11 +387,11 @@ public final class LfgNotificationManager {
             var id = queued.removeFirst();
             var card = cards.get(id);
             var current = service.store().state().lobbies().get(id);
-            if (card == null || !potentiallyJoinable(current)) {
+            if (card == null || !card.persistent && !potentiallyJoinable(current)) {
                 cards.remove(id);
                 continue;
             }
-            card.lobby = current;
+            if (current != null) card.lobby = current;
             long now = clockMillis.getAsLong();
             visible.addLast(id);
             card.remainingPassiveMillis = PASSIVE_MILLIS;
@@ -295,7 +421,7 @@ public final class LfgNotificationManager {
                 && lobby.capabilities().join();
     }
 
-    public enum DiscoveryKind { NEW, REOPENED }
+    public enum DiscoveryKind { NEW, REOPENED, PARTY_STATUS, MANUAL }
 
     public enum CardMode {
         READY,
@@ -316,7 +442,25 @@ public final class LfgNotificationManager {
 
     public record CardSnapshot(LfgProtocol.Lobby lobby, DiscoveryKind kind, CardMode mode,
                                CardMode presentedMode, String feedbackText, int countdownSeconds,
-                               double countdownFraction, double animationProgress) {}
+                               double countdownFraction, double animationProgress,
+                               boolean persistent) {}
+
+    public static final class PartyStatusSuppression implements AutoCloseable {
+        private final LfgNotificationManager owner;
+        private final long id;
+
+        private PartyStatusSuppression(LfgNotificationManager owner, long id) {
+            this.owner = owner;
+            this.id = id;
+        }
+
+        @Override
+        public void close() {
+            owner.releaseMainUiSuppression(id);
+        }
+    }
+
+    private record PendingSuppression(UUID lobbyId, long expiresAtMillis) {}
 
     private static final class Card {
         private LfgProtocol.Lobby lobby;
@@ -328,6 +472,7 @@ public final class LfgNotificationManager {
         private long lastTickAt;
         private long feedbackUntil;
         private boolean entranceCompleted;
+        private boolean persistent;
         private CardMode exitMode = CardMode.READY;
 
         private Card(LfgProtocol.Lobby lobby, DiscoveryKind kind) {
@@ -343,7 +488,7 @@ public final class LfgNotificationManager {
             double fraction = join.activeFor(lobby.lobbyId()) ? join.remainingFraction() : 0;
             var presentation = mode == CardMode.EXITING ? exitMode : mode;
             return new CardSnapshot(lobby, kind, mode, presentation, feedbackText,
-                    seconds, fraction, animation);
+                    seconds, fraction, animation, persistent);
         }
     }
 }
