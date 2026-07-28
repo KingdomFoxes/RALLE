@@ -216,6 +216,8 @@ class LfgNotificationManagerTest {
                 fixture.manager.visibleCards().getFirst().mode());
 
         fixture.manager.close(hosted.lobbyId());
+        assertEquals(LfgNotificationManager.CardMode.EXITING,
+                fixture.manager.visibleCards().getFirst().mode());
         fixture.now[0] += LfgNotificationManager.ANIMATION_MILLIS;
         fixture.manager.tick();
         assertTrue(fixture.manager.visibleCards().isEmpty());

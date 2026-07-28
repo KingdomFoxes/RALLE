@@ -22,6 +22,7 @@ import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.SideAnchor;
 import org.kingdomfoxes.ralle.api.hud.RalleHudElements;
 import org.kingdomfoxes.ralle.lfg.client.GuildTerritoryColors;
+import org.kingdomfoxes.ralle.lfg.client.HostPartyInviteController;
 import org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
@@ -56,16 +57,19 @@ public final class LfgNotificationOverlay {
     private final Minecraft minecraft;
     private final RaidLfgService service;
     private final LfgNotificationManager notifications;
+    private final HostPartyInviteController hostPartyInvites;
     private final HudPlacementRegistry placements;
     private final LfgSoundPlayer sounds;
     private List<HitRegion> hitRegions = List.of();
 
     public LfgNotificationOverlay(Minecraft minecraft, RaidLfgService service,
                                   LfgNotificationManager notifications,
+                                  HostPartyInviteController hostPartyInvites,
                                   HudPlacementRegistry placements, LfgSoundPlayer sounds) {
         this.minecraft = minecraft;
         this.service = service;
         this.notifications = notifications;
+        this.hostPartyInvites = hostPartyInvites;
         this.placements = placements;
         this.sounds = sounds;
     }
@@ -214,6 +218,17 @@ public final class LfgNotificationOverlay {
                                 Rectangle controls, int mouseX, int mouseY, boolean interactive,
                                 List<HitRegion> hits) {
         var id = card.lobby().lobbyId();
+        var viewer = service.store().state().viewer();
+        if (showsPartyFilledControl(
+                card.lobby(),
+                card.persistent(),
+                viewer == null ? null : viewer.minecraftUuid(),
+                hostPartyInvites.hasCardOffer(id))) {
+            drawButton(graphics, controls, "Party filled", RalleButtonRenderers.Kind.PRIMARY,
+                    mouseX, mouseY, true);
+            if (interactive) hits.add(new HitRegion(controls, id, Action.INVITE_ALL));
+            return;
+        }
         if (card.persistent() && viewerBelongsTo(card.lobby())) {
             renderCloseControl(graphics, controls, id, mouseX, mouseY, interactive, hits);
             return;
@@ -318,6 +333,15 @@ public final class LfgNotificationOverlay {
         return "Unavailable";
     }
 
+    static boolean showsPartyFilledControl(LfgProtocol.Lobby lobby, boolean persistent,
+                                           UUID viewerId, boolean inviteOffer) {
+        return persistent
+                && inviteOffer
+                && viewerId != null
+                && lobby.hostedBy(viewerId)
+                && lobby.members().size() >= lobby.capacity();
+    }
+
     private void drawButton(GuiGraphics graphics, Rectangle bounds, String label,
                             RalleButtonRenderers.Kind kind, int mouseX, int mouseY, boolean active) {
         drawButtonFace(graphics, bounds, kind, mouseX, mouseY, active);
@@ -384,6 +408,11 @@ public final class LfgNotificationOverlay {
                 case JOIN -> notifications.join(hit.lobbyId());
                 case CANCEL -> notifications.cancel(hit.lobbyId());
                 case CLOSE -> notifications.close(hit.lobbyId());
+                case INVITE_ALL -> {
+                    if (hostPartyInvites.inviteAll(hit.lobbyId())) {
+                        notifications.close(hit.lobbyId());
+                    }
+                }
                 case OPEN_LFG -> {
                     notifications.removeImmediately(hit.lobbyId());
                     service.focusLobby(hit.lobbyId());
@@ -450,7 +479,7 @@ public final class LfgNotificationOverlay {
         };
     }
 
-    private enum Action { JOIN, CANCEL, CLOSE, OPEN_LFG }
+    private enum Action { JOIN, CANCEL, CLOSE, INVITE_ALL, OPEN_LFG }
 
     private record HitRegion(Rectangle bounds, UUID lobbyId, Action action) {}
 }

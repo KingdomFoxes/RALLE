@@ -6,6 +6,7 @@ import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -62,5 +63,38 @@ class LfgNotificationOverlayTest {
                 LfgNotificationOverlay.rosterTooltip(member).getString());
         assertEquals(0xFFFF8200,
                 LfgNotificationOverlay.rosterBorderColor(member));
+    }
+
+    @Test
+    void partyFilledControlRequiresPersistentFullViewerHostedOffer() {
+        var guild = new LfgProtocol.GuildIdentity(
+                UUID.randomUUID(), "Kingdom of Foxes", "FOX", "#FF8200");
+        var viewerId = UUID.randomUUID();
+        var members = new java.util.ArrayList<LfgProtocol.Member>();
+        members.add(new LfgProtocol.Member(
+                viewerId, "Viewer", guild, LfgProtocol.MemberRole.HOST,
+                LfgProtocol.MemberSource.RALLE, Instant.EPOCH, null));
+        for (int index = 0; index < 3; index++) {
+            members.add(new LfgProtocol.Member(
+                    UUID.randomUUID(), "Member" + index, guild, LfgProtocol.MemberRole.MEMBER,
+                    LfgProtocol.MemberSource.RALLE, Instant.EPOCH, null));
+        }
+        var full = new LfgProtocol.Lobby(
+                UUID.randomUUID(), LfgProtocol.RaidType.TNA, LfgProtocol.Region.EU, null,
+                LfgProtocol.Visibility.PUBLIC, LfgProtocol.LobbyStatus.OPEN, false,
+                viewerId, guild.uuid(), Instant.EPOCH, Instant.EPOCH, 2, 4, members,
+                new LfgProtocol.LobbyCapabilities(false, true, java.util.Map.of())
+        );
+        var below = new LfgProtocol.Lobby(
+                full.lobbyId(), full.raidType(), full.region(), full.note(), full.visibility(),
+                full.status(), full.locked(), full.hostMinecraftUuid(), full.hostGuildUuid(),
+                full.createdAt(), full.lastActivityAt(), 3, 4, List.copyOf(members.subList(0, 3)),
+                full.capabilities()
+        );
+
+        assertEquals(true, LfgNotificationOverlay.showsPartyFilledControl(full, true, viewerId, true));
+        assertEquals(false, LfgNotificationOverlay.showsPartyFilledControl(full, false, viewerId, true));
+        assertEquals(false, LfgNotificationOverlay.showsPartyFilledControl(below, true, viewerId, true));
+        assertEquals(false, LfgNotificationOverlay.showsPartyFilledControl(full, true, UUID.randomUUID(), true));
     }
 }

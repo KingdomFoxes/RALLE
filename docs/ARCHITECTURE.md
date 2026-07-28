@@ -124,6 +124,23 @@ the immutable lobby projection. Ping is limited to once per 30 seconds per lobby
 to current members other than the host; linked Discord members are notified through the same
 FastAPI-owned outbox flow.
 
+The host invitation controller watches only accepted `LIVE` store changes and offers invitations
+when the local host's lobby genuinely transitions from below capacity to full. Initial and
+reconnect snapshots, refreshes, local mutations, stale revisions, and non-host lobbies never create
+an offer; a later below-capacity to full refill does. If that lobby already has a persistent HUD
+card, it receives the affirmative `Party filled` action. Otherwise the controller posts one local
+RALLE chat notification with opaque client-only actions for inviting all or a synchronized member.
+Those actions are intercepted in the existing chat click path and never register, expose, or send
+another `/ralle` command.
+
+All accepted invitation actions re-resolve the current authoritative host lobby and member names.
+One controller-owned queue holds at most three distinct pending targets and emits `/pa <IGN>` no
+faster than once every 600 milliseconds. A target becomes eligible for another explicit invitation
+after its queued command executes. Disconnect, lobby removal, or lost host authority cancels
+pending work, and a member who authoritatively leaves is skipped. This automation is local,
+session-only, and remains inert unless Raid LFG is enabled, online, and freshly synchronized; it
+adds no protocol message, backend state, setting, sound, or unbounded command loop.
+
 Protocol JSON is decoded explicitly. Missing fields, unknown fields and enums, non-canonical UUIDs,
 invalid timestamps, unexpected frame types, and protocol-version mismatches make LFG unavailable
 without affecting local chat features. Global revisions are monotonic but may contain gaps because

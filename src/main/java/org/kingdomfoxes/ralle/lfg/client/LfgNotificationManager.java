@@ -400,6 +400,15 @@ public final class LfgNotificationManager {
         return queued.size();
     }
 
+    /** True only while an active, persistent card still owns the lobby presentation. */
+    public synchronized boolean hasPersistentCard(UUID lobbyId) {
+        var card = cards.get(lobbyId);
+        return card != null
+                && card.persistent
+                && card.mode != CardMode.EXITING
+                && card.mode != CardMode.REMOVED;
+    }
+
     private void beginExit(Card card) {
         if (card.mode == CardMode.EXITING || card.mode == CardMode.REMOVED) return;
         card.exitMode = card.mode;

@@ -6,6 +6,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
 import org.kingdomfoxes.ralle.RalleClient;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotService;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotSource;
@@ -44,6 +45,15 @@ abstract class ChatScreenMixin extends Screen {
             else callback.setReturnValue(true);
         } else if (service.active()) {
             service.cancel();
+        }
+    }
+
+    @Inject(method = "handleComponentClicked", at = @At("HEAD"), cancellable = true, require = 0)
+    private void ralle$handleLocalInviteAction(Style style, boolean insertionClickMode,
+                                               CallbackInfoReturnable<Boolean> callback) {
+        if (!insertionClickMode
+                && RalleClient.context().hostPartyInvites().handleClick(style.getClickEvent())) {
+            callback.setReturnValue(true);
         }
     }
 

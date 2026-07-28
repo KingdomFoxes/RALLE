@@ -28,7 +28,9 @@ import org.kingdomfoxes.ralle.lfg.client.HttpLfgGateway;
 import org.kingdomfoxes.ralle.lfg.client.MinecraftRaidLfgEnvironment;
 import org.kingdomfoxes.ralle.lfg.client.MinecraftSessionProofAdapter;
 import org.kingdomfoxes.ralle.lfg.client.MinecraftLfgNotificationSink;
+import org.kingdomfoxes.ralle.lfg.client.MinecraftHostPartyInviteSink;
 import org.kingdomfoxes.ralle.lfg.client.MinecraftPartyCommandExecutor;
+import org.kingdomfoxes.ralle.lfg.client.HostPartyInviteController;
 import org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 
@@ -70,17 +72,24 @@ public final class RalleClient implements ClientModInitializer {
         var navigation = new SettingsNavigationState(configDirectory.resolve("ralle-settings-ui.properties"), settings);
         var minecraft = Minecraft.getInstance();
         var lfgSounds = new MinecraftLfgSoundPlayer(minecraft, settings);
+        var partyCommands = new MinecraftPartyCommandExecutor(minecraft);
         var raidLfg = new RaidLfgService(
                 new HttpLfgGateway(),
                 new MinecraftRaidLfgEnvironment(minecraft, settings),
                 new MinecraftSessionProofAdapter(minecraft),
                 new MinecraftLfgNotificationSink(minecraft, lfgSounds),
-                new MinecraftPartyCommandExecutor(minecraft)
+                partyCommands
         );
         var lfgNotifications = new LfgNotificationManager(
                 raidLfg, settings, lfgSounds, () -> minecraft.screen instanceof RaidLfgScreen);
+        var hostPartyInvites = new HostPartyInviteController(
+                raidLfg,
+                partyCommands,
+                new MinecraftHostPartyInviteSink(minecraft),
+                lfgNotifications::hasPersistentCard
+        );
         var lfgNotificationOverlay = new LfgNotificationOverlay(
-                minecraft, raidLfg, lfgNotifications, placements, lfgSounds);
+                minecraft, raidLfg, lfgNotifications, hostPartyInvites, placements, lfgSounds);
         lfgNotificationOverlay.register();
         var lfgKeybind = new RaidLfgKeybind(
                 minecraft, settings, raidLfg, lfgSounds, lfgNotifications);
@@ -99,6 +108,7 @@ public final class RalleClient implements ClientModInitializer {
                 chatBehavior,
                 chatScreenshots,
                 raidLfg,
+                hostPartyInvites,
                 lfgSounds
         );
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> raidLfg.connectionChanged());
@@ -109,6 +119,7 @@ public final class RalleClient implements ClientModInitializer {
             chatScreenshots.tick();
             lfgKeybind.tick();
             raidLfg.tick();
+            hostPartyInvites.tick();
             lfgNotificationOverlay.tick();
         });
 
