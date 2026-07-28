@@ -62,6 +62,33 @@ class LfgNotificationManagerTest {
     }
 
     @Test
+    void visibleDiscoveryCardPlaysResonanceAsOtherPlayersOccupySlots() {
+        var fixture = new Fixture();
+        fixture.connect();
+        var open = lobby(12, false, 1);
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, open));
+
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(
+                1, 2, lobbyWithMemberCount(12, 3, 2)));
+
+        assertEquals(List.of(2, 3), fixture.sounds.occupiedSlots);
+    }
+
+    @Test
+    void hiddenDiscoveryCardDoesNotDuplicateMainScreenRosterFeedback() {
+        var fixture = new Fixture();
+        fixture.connect();
+        var open = lobby(13, false, 1);
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, open));
+        fixture.screenOpen[0] = true;
+
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(
+                1, 2, lobbyWithMemberCount(13, 2, 2)));
+
+        assertTrue(fixture.sounds.occupiedSlots.isEmpty());
+    }
+
+    @Test
     void fourthCardQueuesWithoutAgingUntilPromotion() {
         var fixture = new Fixture();
         fixture.connect();
@@ -105,6 +132,33 @@ class LfgNotificationManagerTest {
         assertEquals(1, fixture.sounds.joined);
         assertEquals(LfgNotificationManager.CardMode.JOINED,
                 fixture.manager.visibleCards().getFirst().mode());
+    }
+
+    @Test
+    void joiningThroughDiscoveryPromotesCardWithoutReplayingItsEntrance() {
+        var fixture = new Fixture();
+        fixture.partyStatusEnabled[0] = true;
+        fixture.connect();
+        var open = lobby(32, false, 1);
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, open));
+        fixture.gateway.joinResult = new LfgProtocol.Mutation(1, 2, joinedLobby(open));
+
+        fixture.now[0] += LfgNotificationManager.ANIMATION_MILLIS;
+        fixture.manager.tick();
+        assertEquals(1d, fixture.manager.visibleCards().getFirst().animationProgress());
+        assertEquals(1, fixture.sounds.toastIn);
+
+        assertTrue(fixture.manager.join(open.lobbyId()));
+        fixture.now[0] += 3_000;
+        fixture.service.tick();
+        fixture.manager.tick();
+
+        var card = fixture.manager.visibleCards().getFirst();
+        assertEquals(LfgNotificationManager.DiscoveryKind.PARTY_STATUS, card.kind());
+        assertTrue(card.persistent());
+        assertEquals(1d, card.animationProgress());
+        assertEquals(1, fixture.sounds.toastIn);
+        assertTrue(fixture.sounds.occupiedSlots.isEmpty());
     }
 
     @Test
@@ -419,10 +473,14 @@ class LfgNotificationManagerTest {
         int joined;
         int occupied;
         int fungus;
+        final java.util.ArrayList<Integer> occupiedSlots = new java.util.ArrayList<>();
         @Override public void playNotificationIn() { toastIn++; }
         @Override public void playNewPartyReady() { ready++; }
         @Override public void playPartyJoined() { joined++; }
-        @Override public void playRosterSlotOccupied(int occupiedSlot) { occupied++; }
+        @Override public void playRosterSlotOccupied(int occupiedSlot) {
+            occupied++;
+            occupiedSlots.add(occupiedSlot);
+        }
         @Override public void playPartyFilledRaceLost() { fungus++; }
     }
 

@@ -191,18 +191,12 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         panel.child(footer);
         root.child(panel);
         refreshFromService(true);
-        soundTracker.reset(service.store().state());
     }
 
     @Override
     public void tick() {
         super.tick();
         var state = service.store().state();
-        if (service.lifecycle() == RaidLfgService.LifecycleState.ONLINE) {
-            soundTracker.update(state, sounds);
-        } else {
-            soundTracker.reset(state);
-        }
         if (scrollTargetComponent != null) {
             scroll.scrollTo(scrollTargetComponent);
             scrollTargetComponent = null;

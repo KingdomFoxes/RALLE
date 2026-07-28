@@ -64,6 +64,7 @@ public final class LfgNotificationManager {
 
     private synchronized void onLobbyChange(RaidLfgStore.LobbyChange change) {
         var card = cards.get(change.lobbyId());
+        if (card != null) playObservedRosterGrowth(card, change);
         if (viewerDeparted(change)) {
             if (card != null) beginExit(card);
             return;
@@ -84,6 +85,33 @@ public final class LfgNotificationManager {
                 || kind == DiscoveryKind.NEW && !newPartyEnabled.getAsBoolean()
                 || kind == DiscoveryKind.REOPENED && !reopenedPartyEnabled.getAsBoolean()) return;
         discover(current, kind);
+    }
+
+    private void playObservedRosterGrowth(Card card, RaidLfgStore.LobbyChange change) {
+        if (!visible.contains(change.lobbyId())
+                || lfgScreenOpen.getAsBoolean()
+                || service.joinController().snapshot().activeFor(change.lobbyId())
+                || card.mode == CardMode.EXITING
+                || card.mode == CardMode.REMOVED
+                || change.origin() == RaidLfgStore.UpdateOrigin.SNAPSHOT
+                || change.origin() == RaidLfgStore.UpdateOrigin.CLEAR
+                || change.previous() == null
+                || change.current() == null) {
+            return;
+        }
+
+        var viewer = service.store().state().viewer();
+        if (viewer == null
+                || change.previous().contains(viewer.minecraftUuid())
+                || change.current().contains(viewer.minecraftUuid())) {
+            return;
+        }
+
+        int previousSize = change.previous().members().size();
+        int currentSize = change.current().members().size();
+        for (int occupied = previousSize + 1; occupied <= currentSize; occupied++) {
+            sounds.playRosterSlotOccupied(Math.min(change.current().capacity(), occupied));
+        }
     }
 
     private boolean shouldShowPartyStatus(RaidLfgStore.LobbyChange change) {
@@ -201,8 +229,8 @@ public final class LfgNotificationManager {
     private void showPersistent(LfgProtocol.Lobby lobby, DiscoveryKind kind) {
         long now = clockMillis.getAsLong();
         var card = cards.get(lobby.lobbyId());
-        boolean wasVisible = visible.remove(lobby.lobbyId());
-        queued.remove(lobby.lobbyId());
+        boolean wasVisible = visible.contains(lobby.lobbyId());
+        boolean wasQueued = queued.contains(lobby.lobbyId());
         if (card == null) {
             card = new Card(lobby, kind);
             cards.put(lobby.lobbyId(), card);
@@ -210,18 +238,21 @@ public final class LfgNotificationManager {
         card.lobby = lobby;
         card.kind = kind;
         card.persistent = true;
+
+        // Promoting an existing discovery card changes its lifetime, not its presentation identity.
+        // Keep its current entrance progress and queue position so joining through the card cannot
+        // replay the slide-in animation or notification-in cue.
+        if (wasVisible && card.mode != CardMode.EXITING && card.mode != CardMode.REMOVED) return;
+        if (wasQueued) return;
+
         card.mode = CardMode.READY;
         card.feedbackText = null;
         card.animationStartedAt = now;
         card.entranceCompleted = false;
         card.lastTickAt = now;
-        if (wasVisible) {
-            visible.addLast(lobby.lobbyId());
-            sounds.playNotificationIn();
-        } else {
-            queued.addLast(lobby.lobbyId());
-            promote();
-        }
+        visible.remove(lobby.lobbyId());
+        queued.addLast(lobby.lobbyId());
+        promote();
     }
 
     public synchronized void tick() {

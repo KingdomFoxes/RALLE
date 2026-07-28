@@ -37,9 +37,11 @@ platform ports. It must not depend on a concrete settings screen.
   presentation plays the vanilla respawn-anchor charge variants after a
   confirmed viewer join from either the main screen or a HUD card. The main
   screen plays the first amethyst resonance after confirmed party creation and
-  the deplete variants after an explicit successful Leave. Later members
-  joining the viewer's lobby retain the amethyst occupied-slot cue. Cancelling
-  a join countdown is silent.
+  the deplete variants after an explicit successful Leave. Visible discovery
+  cards play occupied-slot cues as their observed rosters grow. An always-on
+  synchronized-state observer owns the same cue for later members joining the
+  viewer's lobby, even when the browser is closed or no HUD card is present.
+  Reconnect snapshots remain silent. Cancelling a join countdown is silent.
   Packaged RALLE sounds use original processed-xylophone assets and perform no
   network activity.
 - `lfg`: strict Fox protocol, authentication, live connection, immutable lobby

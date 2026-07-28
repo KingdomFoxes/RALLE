@@ -32,6 +32,7 @@ import org.kingdomfoxes.ralle.lfg.client.MinecraftHostPartyInviteSink;
 import org.kingdomfoxes.ralle.lfg.client.MinecraftPartyCommandExecutor;
 import org.kingdomfoxes.ralle.lfg.client.HostPartyInviteController;
 import org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager;
+import org.kingdomfoxes.ralle.lfg.client.LfgRosterSoundController;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
@@ -82,6 +83,7 @@ public final class RalleClient implements ClientModInitializer {
         );
         var lfgNotifications = new LfgNotificationManager(
                 raidLfg, settings, lfgSounds, () -> minecraft.screen instanceof RaidLfgScreen);
+        new LfgRosterSoundController(raidLfg.store(), lfgSounds);
         var hostPartyInvites = new HostPartyInviteController(
                 raidLfg,
                 partyCommands,
