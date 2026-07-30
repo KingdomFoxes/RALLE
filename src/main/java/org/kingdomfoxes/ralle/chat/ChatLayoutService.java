@@ -43,6 +43,14 @@ public final class ChatLayoutService {
                     Math.max(0, viewportHeight - RalleHudElements.LFG_NOTIFICATION_HEIGHT - 8)
             );
         }
+        if (RalleHudElements.LFG_ACTION_BAR.equals(elementId)) {
+            return new Rectangle(
+                    Math.max(0, (viewportWidth - RalleHudElements.LFG_ACTION_BAR_WIDTH) / 2),
+                    Math.max(0, viewportHeight / 2 - 38),
+                    Math.min(viewportWidth, RalleHudElements.LFG_ACTION_BAR_WIDTH),
+                    Math.min(viewportHeight, RalleHudElements.LFG_ACTION_BAR_HEIGHT)
+            );
+        }
         return placements.resolve(
                 CHAT_ELEMENT_ID,
                 viewportWidth,
@@ -77,6 +85,8 @@ public final class ChatLayoutService {
         allBounds.put(CHAT_ELEMENT_ID, editorBounds(CHAT_ELEMENT_ID, viewportWidth, viewportHeight));
         allBounds.put(RalleHudElements.LFG_NOTIFICATIONS,
                 editorBounds(RalleHudElements.LFG_NOTIFICATIONS, viewportWidth, viewportHeight));
+        allBounds.put(RalleHudElements.LFG_ACTION_BAR,
+                editorBounds(RalleHudElements.LFG_ACTION_BAR, viewportWidth, viewportHeight));
         allBounds.remove(selectedId);
         return Map.copyOf(allBounds);
     }

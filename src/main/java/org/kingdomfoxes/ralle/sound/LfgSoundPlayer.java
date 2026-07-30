@@ -9,6 +9,7 @@ public interface LfgSoundPlayer {
     default void playKickHoldCancelled() {}
     default void playKickSucceeded() {}
     default void playPartyPing() {}
+    default void playLocalPartyPing() {}
     default void playNotificationIn() {}
     default void playNotificationOut() {}
     default void playNewPartyReady() {}

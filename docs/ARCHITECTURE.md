@@ -158,6 +158,30 @@ but cannot discover new ones. The persistent `LfgJoinController` owns the
 single three-second countdown and submission shared by the browser and HUD
 cards.
 
+`RaidLfgKeybinds` owns the eight persisted, unbound-by-default LFG mappings:
+Open plus Join, Close, Leave/Disband, Ping, Lock/Unlock, Create, and Kick. The
+action mappings run only during normal gameplay after the service reaches a
+fresh online snapshot; an open screen, absent player/world, disabled service,
+or duplicate RALLE key assignment makes the affected action inert. A narrow
+keyboard-handler mixin consumes only top-row digits participating in an active
+Create or Kick chord, preventing hotbar selection without owning unrelated
+keyboard input. Chords submit on digit release while their modifier remains
+held. Create maps 1–6 to Dailies, NOTG, NOL, TCC, TNA, and TWP and derives
+EU/NA/AS from locally synchronized Wynncraft server labels. Kick maps 2–4 to a
+captured member UUID and revalidates that member before mutation.
+
+Keybind-only feedback is held in `LfgActionBarState` and rendered by the fixed
+HUD overlay above the crosshair. Raid titles use the same centralized
+raid-name/item mapping as the browser and notification cards. Join remains
+card-driven and is intentionally absent from the Action Bar. The chat-layout
+editor previews the fixed Action Bar but does not make it movable.
+
+The keybind and persistent HUD card share one five-second disband confirmation
+state, keyed by lobby and revision. Timeout, disconnect, authority loss, lobby
+replacement, screen opening for keyboard prompts, or rebinding clears it.
+Card-visible confirmation replaces that card's bottom action; otherwise the
+Action Bar presents the prompt.
+
 The optional party-status notification watches the authoritative projection for
 the viewer becoming a lobby member. Create and Join actions initiated by the
 Raid LFG screen explicitly register their next matching membership transition
@@ -173,6 +197,13 @@ roster and lobby changes and do not passively expire, but an authoritative
 departure, kick, or disband closes the viewer's card. Every expanded browser
 card also has an explicit full-width neutral `Pop out` control which creates the
 same persistent HUD presentation and closes the browser.
+
+Notification cards reserve their top-right `20 x 20` control for a destructive
+red, pixel-drawn white X. It removes only that card presentation and never opens
+the browser, cancels a Join, leaves, or disbands. The persistent join controller
+continues a dismissed countdown or submission and still owns exactly-once
+terminal sound and state handling. Bottom actions are full-width Join, Joined,
+status, Leave, Disband, or Party filled states as applicable.
 
 The only persisted LFG values are local opt-in, notification, sound, keybind,
 and HUD-placement settings. Whether a card is currently popped out remains

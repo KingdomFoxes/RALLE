@@ -20,10 +20,14 @@ import org.kingdomfoxes.ralle.sound.MinecraftLfgSoundPlayer;
 import org.kingdomfoxes.ralle.sound.RalleSoundEvents;
 import org.kingdomfoxes.ralle.ui.owo.OwoSettingsScreenFactory;
 import org.kingdomfoxes.ralle.ui.owo.LfgNotificationOverlay;
+import org.kingdomfoxes.ralle.ui.owo.LfgActionBarOverlay;
+import org.kingdomfoxes.ralle.ui.owo.LfgActionBarState;
 import org.kingdomfoxes.ralle.ui.owo.RaidLfgScreen;
 import org.kingdomfoxes.ralle.ui.owo.RalleTypography;
 import org.kingdomfoxes.ralle.ui.owo.SettingsNavigationState;
-import org.kingdomfoxes.ralle.lfg.client.RaidLfgKeybind;
+import org.kingdomfoxes.ralle.lfg.client.RaidLfgKeybinds;
+import org.kingdomfoxes.ralle.lfg.client.LfgDisbandConfirmation;
+import org.kingdomfoxes.ralle.lfg.client.MinecraftRaidRegionDetector;
 import org.kingdomfoxes.ralle.lfg.client.HttpLfgGateway;
 import org.kingdomfoxes.ralle.lfg.client.MinecraftRaidLfgEnvironment;
 import org.kingdomfoxes.ralle.lfg.client.MinecraftSessionProofAdapter;
@@ -72,6 +76,7 @@ public final class RalleClient implements ClientModInitializer {
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), settings, placements);
         var navigation = new SettingsNavigationState(configDirectory.resolve("ralle-settings-ui.properties"), settings);
         var minecraft = Minecraft.getInstance();
+        var regionDetector = new MinecraftRaidRegionDetector(minecraft);
         var lfgSounds = new MinecraftLfgSoundPlayer(minecraft, settings);
         var partyCommands = new MinecraftPartyCommandExecutor(minecraft);
         var raidLfg = new RaidLfgService(
@@ -90,11 +95,17 @@ public final class RalleClient implements ClientModInitializer {
                 new MinecraftHostPartyInviteSink(minecraft),
                 lfgNotifications::hasPersistentCard
         );
+        var disbandConfirmation = new LfgDisbandConfirmation();
         var lfgNotificationOverlay = new LfgNotificationOverlay(
-                minecraft, raidLfg, lfgNotifications, hostPartyInvites, placements, lfgSounds);
+                minecraft, raidLfg, lfgNotifications, hostPartyInvites, placements, lfgSounds,
+                disbandConfirmation);
         lfgNotificationOverlay.register();
-        var lfgKeybind = new RaidLfgKeybind(
-                minecraft, settings, raidLfg, lfgSounds, lfgNotifications);
+        var actionBarState = new LfgActionBarState();
+        var actionBarOverlay = new LfgActionBarOverlay(minecraft, actionBarState);
+        actionBarOverlay.register();
+        var lfgKeybinds = new RaidLfgKeybinds(
+                minecraft, settings, raidLfg, lfgSounds, lfgNotifications, regionDetector,
+                actionBarState, disbandConfirmation);
         var chatBehavior = new ChatBehaviorService(Minecraft.getInstance(), settings);
         var chatScreenshots = new ChatScreenshotService(
                 Minecraft.getInstance(),
@@ -110,6 +121,7 @@ public final class RalleClient implements ClientModInitializer {
                 chatBehavior,
                 chatScreenshots,
                 raidLfg,
+                lfgKeybinds,
                 hostPartyInvites,
                 lfgSounds
         );
@@ -119,8 +131,8 @@ public final class RalleClient implements ClientModInitializer {
             chatLayout.tick();
             chatBehavior.tick();
             chatScreenshots.tick();
-            lfgKeybind.tick();
             raidLfg.tick();
+            lfgKeybinds.tick();
             hostPartyInvites.tick();
             lfgNotificationOverlay.tick();
         });
@@ -133,7 +145,8 @@ public final class RalleClient implements ClientModInitializer {
                 })).then(literal("lfg").executes(command -> {
                     var client = Minecraft.getInstance();
                     client.schedule(() -> client.setScreen(new RaidLfgScreen(
-                            client.screen, context().raidLfg(), context().lfgSounds(), lfgNotifications)));
+                            client.screen, context().raidLfg(), regionDetector,
+                            context().lfgSounds(), lfgNotifications)));
                     return 1;
                 }))
         ));
@@ -144,5 +157,9 @@ public final class RalleClient implements ClientModInitializer {
             throw new IllegalStateException("RALLE has not finished client initialization");
         }
         return context;
+    }
+
+    public static boolean initialized() {
+        return context != null;
     }
 }

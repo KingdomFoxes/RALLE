@@ -10,5 +10,9 @@ public final class RalleHudElements {
     public static final int LFG_NOTIFICATION_WIDTH = 190;
     public static final int LFG_NOTIFICATION_HEIGHT = 100;
 
+    public static final String LFG_ACTION_BAR = "lfg-action-bar";
+    public static final int LFG_ACTION_BAR_WIDTH = 220;
+    public static final int LFG_ACTION_BAR_HEIGHT = 24;
+
     private RalleHudElements() {}
 }

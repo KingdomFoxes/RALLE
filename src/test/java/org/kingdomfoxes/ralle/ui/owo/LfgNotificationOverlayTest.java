@@ -13,6 +13,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class LfgNotificationOverlayTest {
     @Test
+    void closeControlOccupiesTheTopRightTwentyPixelSquare() {
+        var card = new Rectangle(30, 40, 190, 100);
+
+        assertEquals(new Rectangle(195, 44, 20, 20),
+                LfgNotificationOverlay.closeBounds(card));
+    }
+
+    @Test
     void newestCardOccupiesBottomAnchorAndWholeStackClamps() {
         var anchor = new Rectangle(802, 492, 190, 100);
         var stack = LfgNotificationOverlay.stackBounds(anchor, 3, 1000, 600);

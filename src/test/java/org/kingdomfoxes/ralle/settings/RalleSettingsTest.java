@@ -61,7 +61,18 @@ class RalleSettingsTest {
                 categories.get(1).subcategories().stream().map(value -> value.id()).toList());
         assertEquals(List.of("general", "notifications", "controls"),
                 categories.get(2).subcategories().stream().map(value -> value.id()).toList());
-        assertEquals(KeybindSetting.UNBOUND, registry.setting("raid-lfg-keybind", KeybindSetting.class).value());
+        for (var id : List.of(
+                "raid-lfg-keybind",
+                "raid-lfg-join-keybind",
+                "raid-lfg-close-keybind",
+                "raid-lfg-leave-disband-keybind",
+                "raid-lfg-ping-keybind",
+                "raid-lfg-lock-keybind",
+                "raid-lfg-create-keybind",
+                "raid-lfg-kick-keybind")) {
+            assertEquals(KeybindSetting.UNBOUND, registry.setting(id, KeybindSetting.class).value());
+            assertEquals(List.of("raid-lfg-enabled"), registry.dependencies(id));
+        }
     }
 
     @Test

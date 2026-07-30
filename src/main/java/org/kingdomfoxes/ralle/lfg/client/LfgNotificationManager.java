@@ -289,6 +289,10 @@ public final class LfgNotificationManager {
             if (snapshot.phase().terminal()) service.joinController().acknowledge(snapshot.lobbyId());
             return;
         }
+        if (card.mode == CardMode.EXITING || card.mode == CardMode.REMOVED) {
+            if (snapshot.phase().terminal()) service.joinController().acknowledge(snapshot.lobbyId());
+            return;
+        }
         if (snapshot.phase() == LfgJoinController.Phase.COUNTDOWN) {
             card.mode = CardMode.COUNTDOWN;
         } else if (snapshot.phase() == LfgJoinController.Phase.SUBMITTING) {
@@ -412,6 +416,30 @@ public final class LfgNotificationManager {
         if (card != null) beginExit(card);
     }
 
+    /** Newest/topmost visible card, including a card with an active Join in progress. */
+    public synchronized java.util.Optional<UUID> newestVisibleCardId() {
+        var ids = new ArrayList<>(visible);
+        for (int index = ids.size() - 1; index >= 0; index--) {
+            var card = cards.get(ids.get(index));
+            if (card != null && card.mode != CardMode.EXITING && card.mode != CardMode.REMOVED) {
+                return java.util.Optional.of(ids.get(index));
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
+    /** Newest/topmost visible card which currently exposes a usable Join action. */
+    public synchronized java.util.Optional<UUID> newestJoinableCardId() {
+        var ids = new ArrayList<>(visible);
+        for (int index = ids.size() - 1; index >= 0; index--) {
+            var card = cards.get(ids.get(index));
+            if (card != null && card.mode == CardMode.READY && potentiallyJoinable(card.lobby)) {
+                return java.util.Optional.of(ids.get(index));
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
     public synchronized void removeImmediately(UUID lobbyId) {
         removeCompletely(lobbyId);
         promote();
@@ -435,6 +463,15 @@ public final class LfgNotificationManager {
     public synchronized boolean hasPersistentCard(UUID lobbyId) {
         var card = cards.get(lobbyId);
         return card != null
+                && card.persistent
+                && card.mode != CardMode.EXITING
+                && card.mode != CardMode.REMOVED;
+    }
+
+    public synchronized boolean hasVisiblePersistentCard(UUID lobbyId) {
+        var card = cards.get(lobbyId);
+        return visible.contains(lobbyId)
+                && card != null
                 && card.persistent
                 && card.mode != CardMode.EXITING
                 && card.mode != CardMode.REMOVED;

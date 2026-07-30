@@ -62,7 +62,16 @@ public final class RalleSettings {
                                 toggle("notification-sounds"),
                                 action("edit-notification-position")
                         ),
-                        subcategory("controls", keybind("raid-lfg-keybind"))
+                        subcategory("controls",
+                                keybind("raid-lfg-keybind"),
+                                keybind("raid-lfg-join-keybind"),
+                                keybind("raid-lfg-close-keybind"),
+                                keybind("raid-lfg-leave-disband-keybind"),
+                                keybind("raid-lfg-ping-keybind"),
+                                keybind("raid-lfg-lock-keybind"),
+                                keybind("raid-lfg-create-keybind"),
+                                keybind("raid-lfg-kick-keybind")
+                        )
                 )
         ));
 
@@ -84,6 +93,13 @@ public final class RalleSettings {
         registry.requireEnabled("notification-sounds", "raid-lfg-enabled");
         registry.requireEnabled("edit-notification-position", "raid-lfg-enabled");
         registry.requireEnabled("raid-lfg-keybind", "raid-lfg-enabled");
+        registry.requireEnabled("raid-lfg-join-keybind", "raid-lfg-enabled");
+        registry.requireEnabled("raid-lfg-close-keybind", "raid-lfg-enabled");
+        registry.requireEnabled("raid-lfg-leave-disband-keybind", "raid-lfg-enabled");
+        registry.requireEnabled("raid-lfg-ping-keybind", "raid-lfg-enabled");
+        registry.requireEnabled("raid-lfg-lock-keybind", "raid-lfg-enabled");
+        registry.requireEnabled("raid-lfg-create-keybind", "raid-lfg-enabled");
+        registry.requireEnabled("raid-lfg-kick-keybind", "raid-lfg-enabled");
     }
 
     private static SettingsSubcategory subcategory(String id, org.kingdomfoxes.ralle.api.settings.SettingsEntry... entries) {

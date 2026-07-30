@@ -15,7 +15,8 @@
     "client": ["org.kingdomfoxes.ralle.RalleClient"]
   },
   "mixins": [
-    "ralle.mixins.json"
+    "ralle.mixins.json",
+    "ralle.lfg.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.19.3",

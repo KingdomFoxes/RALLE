@@ -15,7 +15,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.PlayerSkin;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import org.kingdomfoxes.ralle.RalleClient;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
@@ -24,6 +23,7 @@ import org.kingdomfoxes.ralle.api.hud.RalleHudElements;
 import org.kingdomfoxes.ralle.lfg.client.GuildTerritoryColors;
 import org.kingdomfoxes.ralle.lfg.client.HostPartyInviteController;
 import org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager;
+import org.kingdomfoxes.ralle.lfg.client.LfgDisbandConfirmation;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
@@ -60,18 +60,21 @@ public final class LfgNotificationOverlay {
     private final HostPartyInviteController hostPartyInvites;
     private final HudPlacementRegistry placements;
     private final LfgSoundPlayer sounds;
+    private final LfgDisbandConfirmation disbandConfirmation;
     private List<HitRegion> hitRegions = List.of();
 
     public LfgNotificationOverlay(Minecraft minecraft, RaidLfgService service,
                                   LfgNotificationManager notifications,
                                   HostPartyInviteController hostPartyInvites,
-                                  HudPlacementRegistry placements, LfgSoundPlayer sounds) {
+                                  HudPlacementRegistry placements, LfgSoundPlayer sounds,
+                                  LfgDisbandConfirmation disbandConfirmation) {
         this.minecraft = minecraft;
         this.service = service;
         this.notifications = notifications;
         this.hostPartyInvites = hostPartyInvites;
         this.placements = placements;
         this.sounds = sounds;
+        this.disbandConfirmation = disbandConfirmation;
     }
 
     public void register() {
@@ -163,16 +166,18 @@ public final class LfgNotificationOverlay {
         graphics.renderOutline(bounds.x(), bounds.y(), bounds.width(), bounds.height(), OUTLINE);
 
         var lobby = card.lobby();
-        graphics.renderItem(new ItemStack(raidIcon(lobby.raidType())), bounds.x() + 7, bounds.y() + 6);
-        var arrow = new Rectangle(bounds.right() - 25, bounds.y() + 4, 20, 20);
-        int titleWidth = Math.max(20, arrow.x() - (bounds.x() + 28) - 6);
+        graphics.renderItem(new ItemStack(RaidPresentation.item(lobby.raidType())), bounds.x() + 7, bounds.y() + 6);
+        var close = closeBounds(bounds);
+        int titleWidth = Math.max(20, close.x() - (bounds.x() + 28) - 6);
         graphics.drawString(minecraft.font,
-                RalleTypography.body(Component.literal(ellipsize(raidName(lobby.raidType()), titleWidth))),
+                RalleTypography.body(Component.literal(ellipsize(RaidPresentation.name(lobby.raidType()), titleWidth))),
                 bounds.x() + 28, bounds.y() + 10, ACCENT, false);
 
-        drawButtonFace(graphics, arrow, RalleButtonRenderers.Kind.NEUTRAL, mouseX, mouseY, true);
-        drawOpenLfgArrow(graphics, arrow, TEXT);
-        if (interactive) hits.add(new HitRegion(arrow, lobby.lobbyId(), Action.OPEN_LFG));
+        drawButtonFace(graphics, close, RalleButtonRenderers.Kind.DESTRUCTIVE, mouseX, mouseY, true);
+        drawCloseX(graphics, close, TEXT);
+        if (interactive && card.mode() != LfgNotificationManager.CardMode.EXITING) {
+            hits.add(new HitRegion(close, lobby.lobbyId(), Action.CLOSE));
+        }
 
         String regionText = "[" + lobby.region().name() + "]";
         var renderedRegion = RalleTypography.body(Component.literal(regionText));
@@ -219,6 +224,14 @@ public final class LfgNotificationOverlay {
                                 List<HitRegion> hits) {
         var id = card.lobby().lobbyId();
         var viewer = service.store().state().viewer();
+        String disbandPrompt = disbandConfirmation.promptFor(id);
+        if (card.persistent() && viewer != null && card.lobby().hostedBy(viewer.minecraftUuid())
+                && disbandPrompt != null) {
+            drawButton(graphics, controls, disbandPrompt, RalleButtonRenderers.Kind.DESTRUCTIVE,
+                    mouseX, mouseY, true);
+            if (interactive) hits.add(new HitRegion(controls, id, Action.DISBAND));
+            return;
+        }
         if (showsPartyFilledControl(
                 card.lobby(),
                 card.persistent(),
@@ -230,7 +243,16 @@ public final class LfgNotificationOverlay {
             return;
         }
         if (card.persistent() && viewerBelongsTo(card.lobby())) {
-            renderCloseControl(graphics, controls, id, mouseX, mouseY, interactive, hits);
+            boolean host = viewer != null && card.lobby().hostedBy(viewer.minecraftUuid());
+            String action = host ? "Disband" : "Leave";
+            String protocolAction = host ? "disband" : "leave";
+            boolean pending = service.pending(id, protocolAction);
+            String label = pending ? (host ? "Disbanding..." : "Leaving...") : action;
+            drawButton(graphics, controls, label,
+                    RalleButtonRenderers.Kind.DESTRUCTIVE, mouseX, mouseY, !pending);
+            if (interactive && !pending) {
+                hits.add(new HitRegion(controls, id, host ? Action.DISBAND : Action.LEAVE));
+            }
             return;
         }
         if (card.persistent() && card.presentedMode() == LfgNotificationManager.CardMode.READY
@@ -241,16 +263,9 @@ public final class LfgNotificationOverlay {
         }
         switch (card.presentedMode()) {
             case READY -> {
-                int leftWidth = (controls.width() - 4) / 2;
-                var join = new Rectangle(controls.x(), controls.y(), leftWidth, controls.height());
-                var close = new Rectangle(join.right() + 4, controls.y(),
-                        controls.right() - join.right() - 4, controls.height());
-                drawButton(graphics, join, "Join", RalleButtonRenderers.Kind.PRIMARY, mouseX, mouseY, true);
-                drawButton(graphics, close, "Close", RalleButtonRenderers.Kind.DESTRUCTIVE, mouseX, mouseY, true);
-                if (interactive) {
-                    hits.add(new HitRegion(join, id, Action.JOIN));
-                    hits.add(new HitRegion(close, id, Action.CLOSE));
-                }
+                drawButton(graphics, controls, "Join", RalleButtonRenderers.Kind.PRIMARY,
+                        mouseX, mouseY, true);
+                if (interactive) hits.add(new HitRegion(controls, id, Action.JOIN));
             }
             case COUNTDOWN -> {
                 int leftWidth = controls.width() / 2;
@@ -273,9 +288,8 @@ public final class LfgNotificationOverlay {
             }
             case SUBMITTING -> drawButton(graphics, controls, "Joining...",
                     RalleButtonRenderers.Kind.NEUTRAL, -1, -1, false);
-            case JOINED -> {
-                renderCloseControl(graphics, controls, id, mouseX, mouseY, interactive, hits);
-            }
+            case JOINED -> drawButton(graphics, controls, "Joined",
+                    RalleButtonRenderers.Kind.PRIMARY, -1, -1, false);
             case FILLED_SUCCESS -> drawButton(graphics, controls, "Party filled",
                     RalleButtonRenderers.Kind.PRIMARY, -1, -1, true);
             case FILLED_RACE, FAILURE, UNAVAILABLE -> {
@@ -293,24 +307,10 @@ public final class LfgNotificationOverlay {
         }
     }
 
-    private void renderCloseControl(GuiGraphics graphics, Rectangle controls, UUID lobbyId,
-                                    int mouseX, int mouseY, boolean interactive, List<HitRegion> hits) {
-        drawButton(graphics, controls, "Close", RalleButtonRenderers.Kind.DESTRUCTIVE,
-                mouseX, mouseY, true);
-        if (interactive) hits.add(new HitRegion(controls, lobbyId, Action.CLOSE));
-    }
-
     private void renderPersistentStatus(GuiGraphics graphics, Rectangle controls, UUID lobbyId,
                                         String status, int mouseX, int mouseY, boolean interactive,
                                         List<HitRegion> hits) {
-        int leftWidth = (controls.width() - 4) * 2 / 3;
-        var message = new Rectangle(controls.x(), controls.y(), leftWidth, controls.height());
-        var close = new Rectangle(message.right() + 4, controls.y(),
-                controls.right() - message.right() - 4, controls.height());
-        drawButton(graphics, message, status, RalleButtonRenderers.Kind.NEUTRAL, -1, -1, false);
-        drawButton(graphics, close, "Close", RalleButtonRenderers.Kind.DESTRUCTIVE,
-                mouseX, mouseY, true);
-        if (interactive) hits.add(new HitRegion(close, lobbyId, Action.CLOSE));
+        drawButton(graphics, controls, status, RalleButtonRenderers.Kind.NEUTRAL, -1, -1, false);
     }
 
     private boolean viewerBelongsTo(LfgProtocol.Lobby lobby) {
@@ -358,22 +358,17 @@ public final class LfgNotificationOverlay {
         );
     }
 
-    private static void drawOpenLfgArrow(GuiGraphics graphics, Rectangle bounds, int color) {
-        int left = bounds.x() + (bounds.width() - 14) / 2;
-        int top = bounds.y() + (bounds.height() - 14) / 2;
+    static Rectangle closeBounds(Rectangle card) {
+        return new Rectangle(card.right() - 25, card.y() + 4, 20, 20);
+    }
 
-        // Open left chevron feeding into a straight horizontal shaft.
-        graphics.fill(left + 4, top, left + 6, top + 1, color);
-        graphics.fill(left + 3, top + 1, left + 5, top + 2, color);
-        graphics.fill(left + 2, top + 2, left + 4, top + 3, color);
-        graphics.fill(left + 1, top + 3, left + 3, top + 4, color);
-        graphics.fill(left, top + 4, left + 2, top + 5, color);
-        graphics.fill(left, top + 5, left + 12, top + 7, color);
-        graphics.fill(left, top + 7, left + 2, top + 8, color);
-        graphics.fill(left + 1, top + 8, left + 3, top + 9, color);
-        graphics.fill(left + 2, top + 9, left + 4, top + 10, color);
-        graphics.fill(left + 3, top + 10, left + 5, top + 11, color);
-        graphics.fill(left + 4, top + 11, left + 6, top + 12, color);
+    private static void drawCloseX(GuiGraphics graphics, Rectangle bounds, int color) {
+        int left = bounds.x() + 5;
+        int top = bounds.y() + 5;
+        for (int step = 0; step < 10; step++) {
+            graphics.fill(left + step, top + step, left + step + 2, top + step + 2, color);
+            graphics.fill(left + 9 - step, top + step, left + 11 - step, top + step + 2, color);
+        }
     }
 
     static int rosterSlotX(Rectangle bounds, int slot) {
@@ -408,16 +403,21 @@ public final class LfgNotificationOverlay {
                 case JOIN -> notifications.join(hit.lobbyId());
                 case CANCEL -> notifications.cancel(hit.lobbyId());
                 case CLOSE -> notifications.close(hit.lobbyId());
+                case LEAVE -> service.leave(hit.lobbyId()).whenComplete((ignored, failure) -> {
+                    if (failure == null) minecraft.execute(sounds::playPartyLeft);
+                });
+                case DISBAND -> {
+                    var lobby = service.store().state().lobbies().get(hit.lobbyId());
+                    if (lobby != null && disbandConfirmation.request(
+                            lobby.lobbyId(), lobby.revision(), "Click again to disband")
+                            == LfgDisbandConfirmation.Result.CONFIRMED) {
+                        service.disband(lobby.lobbyId());
+                    }
+                }
                 case INVITE_ALL -> {
                     if (hostPartyInvites.inviteAll(hit.lobbyId())) {
                         notifications.close(hit.lobbyId());
                     }
-                }
-                case OPEN_LFG -> {
-                    notifications.removeImmediately(hit.lobbyId());
-                    service.focusLobby(hit.lobbyId());
-                    minecraft.setScreen(new RaidLfgScreen(
-                            minecraft.screen, service, sounds, notifications));
                 }
             }
             return true;
@@ -457,29 +457,7 @@ public final class LfgNotificationOverlay {
                 .strip();
     }
 
-    static net.minecraft.world.item.Item raidIcon(LfgProtocol.RaidType raid) {
-        return switch (raid) {
-            case DAILIES -> Items.BUNDLE;
-            case NOTG -> Items.SALMON;
-            case NOL -> Items.OAK_SAPLING;
-            case TCC -> Items.CLAY_BALL;
-            case TNA -> Items.ENDER_PEARL;
-            case TWP -> Items.FIRE_CHARGE;
-        };
-    }
-
-    static String raidName(LfgProtocol.RaidType raid) {
-        return switch (raid) {
-            case DAILIES -> "Dailies";
-            case NOTG -> "Nest of the Grootslangs";
-            case NOL -> "Orphion's Nexus of Light";
-            case TCC -> "The Canyon Colossus";
-            case TNA -> "The Nameless Anomaly";
-            case TWP -> "The Wartorn Palace";
-        };
-    }
-
-    private enum Action { JOIN, CANCEL, CLOSE, INVITE_ALL, OPEN_LFG }
+    private enum Action { JOIN, CANCEL, CLOSE, LEAVE, DISBAND, INVITE_ALL }
 
     private record HitRegion(Rectangle bounds, UUID lobbyId, Action action) {}
 }

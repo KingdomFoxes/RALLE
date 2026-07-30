@@ -44,6 +44,11 @@ public final class MinecraftLfgSoundPlayer implements LfgSoundPlayer {
     }
 
     @Override
+    public void playLocalPartyPing() {
+        play(SoundEvents.BELL_BLOCK, 1.0F, 0.7F);
+    }
+
+    @Override
     public void playNotificationIn() {
         playNotificationCue(RalleSoundCue.LFG_TOAST_IN);
     }

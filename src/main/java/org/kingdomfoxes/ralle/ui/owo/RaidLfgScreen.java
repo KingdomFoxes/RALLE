@@ -109,6 +109,11 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         this(parent, service, RaidRegionDetector.UNAVAILABLE, System::nanoTime, sounds, notifications);
     }
 
+    public RaidLfgScreen(Screen parent, RaidLfgService service, RaidRegionDetector regionDetector,
+                         LfgSoundPlayer sounds, LfgNotificationManager notifications) {
+        this(parent, service, regionDetector, System::nanoTime, sounds, notifications);
+    }
+
     public RaidLfgScreen(Screen parent, RaidLfgService service, RaidRegionDetector regionDetector) {
         this(parent, service, regionDetector, System::nanoTime, LfgSoundPlayer.SILENT, null);
     }
@@ -294,8 +299,8 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                 .tooltip(RalleTheme.ui(Component.literal(expanded ? "Hide party details" : "Show party details")));
         var raidDetails = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
         raidDetails.verticalAlignment(VerticalAlignment.CENTER);
-        raidDetails.child(UIComponents.item(new ItemStack(raidIcon(lobby.raidType()))).showOverlay(false).margins(Insets.right(6)));
-        raidDetails.child(UIComponents.label(RalleTheme.ui(Component.literal(raidName(lobby.raidType())))).shadow(true).color(RalleTheme.ACCENT));
+        raidDetails.child(UIComponents.item(new ItemStack(RaidPresentation.item(lobby.raidType()))).showOverlay(false).margins(Insets.right(6)));
+        raidDetails.child(UIComponents.label(RalleTheme.ui(Component.literal(RaidPresentation.name(lobby.raidType())))).shadow(true).color(RalleTheme.ACCENT));
         summary.child(raidDetails);
         var spacer = UIComponents.spacer();
         spacer.verticalSizing(Sizing.fixed(0));
@@ -614,7 +619,10 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private void performPing(LfgProtocol.Lobby lobby) {
         if (service.pingCooldownSeconds(lobby.lobbyId()) > 0) return;
         service.ping(lobby.lobbyId())
-                .whenComplete((ignored, failure) -> minecraft.execute(() -> refreshFromService(true)));
+                .whenComplete((ignored, failure) -> minecraft.execute(() -> {
+                    if (failure == null) sounds.playLocalPartyPing();
+                    refreshFromService(true);
+                }));
         rebuildGrid();
     }
 
@@ -875,7 +883,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         raid.onPress(button -> {
             var values = LfgProtocol.RaidType.values();
             selectedRaid[0] = values[(selectedRaid[0].ordinal() + 1) % values.length];
-            button.setMessage(RalleTheme.ui(Component.literal("Raid: " + raidName(selectedRaid[0]))));
+            button.setMessage(RalleTheme.ui(Component.literal("Raid: " + RaidPresentation.name(selectedRaid[0]))));
         });
         var region = UIComponents.button(RalleTheme.ui(Component.literal("Region: " + selectedRegion[0])), ignored -> {});
         region.horizontalSizing(Sizing.fill(100));
@@ -953,7 +961,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     private void openRaidDropdown(ButtonComponent trigger) {
         DropdownComponent.openContextMenu(this, root, FlowLayout::child, trigger.x(), trigger.y() + trigger.height(), menu -> {
-            for (var option : RaidFilter.values()) menu.button(RalleTheme.ui(Component.literal(option.label)), dropdown -> {
+            for (var option : RaidFilter.values()) menu.button(RalleTheme.ui(Component.literal(option.label())), dropdown -> {
                 raidFilter = option; trigger.setMessage(raidLabel()); rebuildGrid(); root.removeChild(dropdown);
             });
         });
@@ -972,7 +980,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private Component statusLabel() { return RalleTheme.dropdownLabel(Component.literal("Status: " + statusFilter.label)); }
-    private Component raidLabel() { return RalleTheme.dropdownLabel(Component.literal("Raid: " + raidFilter.label)); }
+    private Component raidLabel() { return RalleTheme.dropdownLabel(Component.literal("Raid: " + raidFilter.label())); }
     private Component regionLabel() { return RalleTheme.dropdownLabel(Component.literal("Region: " + regionFilter.label)); }
 
     private Color regionColor(LfgProtocol.Region region) {
@@ -1018,28 +1026,6 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         };
     }
 
-    private static net.minecraft.world.item.Item raidIcon(LfgProtocol.RaidType raid) {
-        return switch (raid) {
-            case DAILIES -> Items.BUNDLE;
-            case NOTG -> Items.SALMON;
-            case NOL -> Items.OAK_SAPLING;
-            case TCC -> Items.CLAY_BALL;
-            case TNA -> Items.ENDER_PEARL;
-            case TWP -> Items.FIRE_CHARGE;
-        };
-    }
-
-    private static String raidName(LfgProtocol.RaidType raid) {
-        return switch (raid) {
-            case DAILIES -> "Dailies";
-            case NOTG -> "Nest of the Grootslangs";
-            case NOL -> "Orphion's Nexus of Light";
-            case TCC -> "The Canyon Colossus";
-            case TNA -> "The Nameless Anomaly";
-            case TWP -> "The Wartorn Palace";
-        };
-    }
-
     private static Throwable unwrap(Throwable failure) {
         while (failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null) failure = failure.getCause();
         return failure;
@@ -1074,15 +1060,16 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private enum RaidFilter {
-        ALL("All", null), DAILIES("Dailies", LfgProtocol.RaidType.DAILIES),
-        NOTG("Nest of the Grootslangs", LfgProtocol.RaidType.NOTG),
-        NOL("Orphion's Nexus of Light", LfgProtocol.RaidType.NOL),
-        TCC("The Canyon Colossus", LfgProtocol.RaidType.TCC),
-        TNA("The Nameless Anomaly", LfgProtocol.RaidType.TNA),
-        TWP("The Wartorn Palace", LfgProtocol.RaidType.TWP);
-        private final String label;
+        ALL(null),
+        DAILIES(LfgProtocol.RaidType.DAILIES),
+        NOTG(LfgProtocol.RaidType.NOTG),
+        NOL(LfgProtocol.RaidType.NOL),
+        TCC(LfgProtocol.RaidType.TCC),
+        TNA(LfgProtocol.RaidType.TNA),
+        TWP(LfgProtocol.RaidType.TWP);
         private final LfgProtocol.RaidType raid;
-        RaidFilter(String label, LfgProtocol.RaidType raid) { this.label = label; this.raid = raid; }
+        RaidFilter(LfgProtocol.RaidType raid) { this.raid = raid; }
+        String label() { return this == ALL ? "All" : RaidPresentation.name(raid); }
         boolean matches(LfgProtocol.Lobby lobby) { return this == ALL || raid == lobby.raidType(); }
     }
 

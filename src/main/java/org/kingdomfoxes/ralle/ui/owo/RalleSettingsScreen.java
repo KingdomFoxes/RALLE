@@ -385,15 +385,16 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     public boolean keyPressed(KeyEvent event) {
         if (capturingKeybind != null) {
             if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+                var cancelled = capturingKeybind;
                 capturingKeybind = null;
-                if (capturingButton != null) capturingButton.setMessage(keybindLabel(settings.setting("raid-lfg-keybind", KeybindSetting.class)));
+                if (capturingButton != null) capturingButton.setMessage(keybindLabel(cancelled));
                 capturingButton = null;
                 return true;
             }
             var key = event.key() == GLFW.GLFW_KEY_BACKSPACE || event.key() == GLFW.GLFW_KEY_DELETE
                     ? InputConstants.UNKNOWN : InputConstants.getKey(event);
             capturingKeybind.set(key == InputConstants.UNKNOWN ? KeybindSetting.UNBOUND : key.getName());
-            capturingButton.setMessage(keybindLabel(capturingKeybind));
+            if (capturingButton != null) capturingButton.setMessage(keybindLabel(capturingKeybind));
             capturingKeybind = null;
             capturingButton = null;
             return true;
@@ -404,11 +405,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
         if (capturingKeybind != null) {
-            var key = InputConstants.Type.MOUSE.getOrCreate(event.button());
-            capturingKeybind.set(key.getName());
-            if (capturingButton != null) capturingButton.setMessage(keybindLabel(capturingKeybind));
-            capturingKeybind = null;
-            capturingButton = null;
+            // Raid LFG bindings are deliberately keyboard-only; keep waiting for a keyboard key.
             return true;
         }
         return super.mouseClicked(event, doubled);

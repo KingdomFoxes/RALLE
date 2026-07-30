@@ -135,6 +135,51 @@ class LfgNotificationManagerTest {
     }
 
     @Test
+    void closingCountdownCardDismissesOnlyPresentationAndJoinStillCompletesOnce() {
+        var fixture = new Fixture();
+        fixture.connect();
+        var open = lobby(33, false, 1);
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, open));
+        fixture.gateway.joinResult = new LfgProtocol.Mutation(1, 2, joinedLobby(open));
+
+        assertTrue(fixture.manager.join(open.lobbyId()));
+        fixture.manager.close(open.lobbyId());
+        fixture.now[0] += LfgNotificationManager.ANIMATION_MILLIS;
+        fixture.manager.tick();
+
+        assertTrue(fixture.manager.visibleCards().isEmpty());
+        assertEquals(LfgJoinController.Phase.COUNTDOWN,
+                fixture.service.joinController().snapshot().phase());
+
+        fixture.now[0] += 3_000 - LfgNotificationManager.ANIMATION_MILLIS;
+        fixture.service.tick();
+        fixture.manager.tick();
+
+        assertEquals(1, fixture.gateway.joinCalls);
+        assertEquals(1, fixture.sounds.joined);
+        assertTrue(fixture.manager.visibleCards().isEmpty());
+        assertEquals(LfgJoinController.Phase.IDLE,
+                fixture.service.joinController().snapshot().phase());
+    }
+
+    @Test
+    void keybindTargetsNewestVisibleAndNewestJoinableCards() {
+        var fixture = new Fixture();
+        fixture.connect();
+        var older = lobby(34, false, 1);
+        var newer = lobby(35, false, 1);
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, older));
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 2, newer));
+
+        assertEquals(newer.lobbyId(), fixture.manager.newestVisibleCardId().orElseThrow());
+        assertEquals(newer.lobbyId(), fixture.manager.newestJoinableCardId().orElseThrow());
+
+        fixture.manager.close(newer.lobbyId());
+        assertEquals(older.lobbyId(), fixture.manager.newestVisibleCardId().orElseThrow());
+        assertEquals(older.lobbyId(), fixture.manager.newestJoinableCardId().orElseThrow());
+    }
+
+    @Test
     void joiningThroughDiscoveryPromotesCardWithoutReplayingItsEntrance() {
         var fixture = new Fixture();
         fixture.partyStatusEnabled[0] = true;
