@@ -40,13 +40,13 @@ public final class LfgActionBarOverlay {
         int y = graphics.guiHeight() / 2 - 34;
 
         if (snapshot.raid() == null) {
-            var text = RalleTypography.body(Component.literal(snapshot.text()));
+            var text = actionText(snapshot.glyph(), snapshot.text());
             int width = Math.round(minecraft.font.width(text) * TEXT_SCALE);
             drawScaledText(graphics, text, (graphics.guiWidth() - width) / 2, y, color);
             return;
         }
 
-        var prefix = RalleTypography.body(Component.literal(snapshot.prefix()));
+        var prefix = actionText(snapshot.glyph(), snapshot.prefix());
         var raid = RalleTypography.body(Component.literal(snapshot.raidLabel()));
         int prefixWidth = Math.round(minecraft.font.width(prefix) * TEXT_SCALE);
         int raidWidth = Math.round(minecraft.font.width(raid) * TEXT_SCALE);
@@ -58,6 +58,10 @@ public final class LfgActionBarOverlay {
             graphics.renderItem(new ItemStack(RaidPresentation.item(snapshot.raid())), itemX, y - 2);
         }
         drawScaledText(graphics, raid, itemX + ITEM_SIZE + ITEM_GAP, y, color);
+    }
+
+    private static Component actionText(LfgActionGlyph glyph, String text) {
+        return glyph == null ? RalleTypography.body(Component.literal(text)) : glyph.label(text);
     }
 
     private void drawScaledText(GuiGraphics graphics, Component text, int x, int y, int color) {

@@ -27,6 +27,7 @@ import net.minecraft.world.item.Items;
 import org.jetbrains.annotations.NotNull;
 import org.kingdomfoxes.ralle.lfg.client.GuildTerritoryColors;
 import org.kingdomfoxes.ralle.lfg.client.LfgJoinController;
+import org.kingdomfoxes.ralle.lfg.client.LfgLockDebouncer;
 import org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.lfg.client.RaidRegionDetector;
@@ -65,6 +66,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private final RaidLfgService service;
     private final LfgSoundPlayer sounds;
     private final LfgNotificationManager notifications;
+    private final LfgLockDebouncer lockDebouncer;
     private final LfgMainUiSoundTracker soundTracker = new LfgMainUiSoundTracker();
     private final LfgJoinController joinCountdown;
     private final KickTargetingState kickTargeting;
@@ -94,6 +96,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private UUID kickLobbyId;
     private ButtonComponent kickButton;
     private ButtonComponent lockButton;
+    private long renderedLockVersion = Long.MIN_VALUE;
     private LfgNotificationManager.PartyStatusSuppression pendingMainUiJoinSuppression;
 
     public RaidLfgScreen(Screen parent, RaidLfgService service) {
@@ -101,33 +104,46 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     public RaidLfgScreen(Screen parent, RaidLfgService service, LfgSoundPlayer sounds) {
-        this(parent, service, RaidRegionDetector.UNAVAILABLE, System::nanoTime, sounds, null);
+        this(parent, service, RaidRegionDetector.UNAVAILABLE, System::nanoTime, sounds, null,
+                new LfgLockDebouncer());
     }
 
     public RaidLfgScreen(Screen parent, RaidLfgService service, LfgSoundPlayer sounds,
                          LfgNotificationManager notifications) {
-        this(parent, service, RaidRegionDetector.UNAVAILABLE, System::nanoTime, sounds, notifications);
+        this(parent, service, RaidRegionDetector.UNAVAILABLE, System::nanoTime, sounds, notifications,
+                new LfgLockDebouncer());
     }
 
     public RaidLfgScreen(Screen parent, RaidLfgService service, RaidRegionDetector regionDetector,
                          LfgSoundPlayer sounds, LfgNotificationManager notifications) {
-        this(parent, service, regionDetector, System::nanoTime, sounds, notifications);
+        this(parent, service, regionDetector, System::nanoTime, sounds, notifications,
+                new LfgLockDebouncer());
+    }
+
+    public RaidLfgScreen(Screen parent, RaidLfgService service, RaidRegionDetector regionDetector,
+                         LfgSoundPlayer sounds, LfgNotificationManager notifications,
+                         LfgLockDebouncer lockDebouncer) {
+        this(parent, service, regionDetector, System::nanoTime, sounds, notifications, lockDebouncer);
     }
 
     public RaidLfgScreen(Screen parent, RaidLfgService service, RaidRegionDetector regionDetector) {
-        this(parent, service, regionDetector, System::nanoTime, LfgSoundPlayer.SILENT, null);
+        this(parent, service, regionDetector, System::nanoTime, LfgSoundPlayer.SILENT, null,
+                new LfgLockDebouncer());
     }
 
     RaidLfgScreen(Screen parent, RaidLfgService service, RaidRegionDetector regionDetector, LongSupplier nanoTime) {
-        this(parent, service, regionDetector, nanoTime, LfgSoundPlayer.SILENT, null);
+        this(parent, service, regionDetector, nanoTime, LfgSoundPlayer.SILENT, null,
+                new LfgLockDebouncer());
     }
 
     RaidLfgScreen(Screen parent, RaidLfgService service, RaidRegionDetector regionDetector,
-                  LongSupplier nanoTime, LfgSoundPlayer sounds, LfgNotificationManager notifications) {
+                  LongSupplier nanoTime, LfgSoundPlayer sounds, LfgNotificationManager notifications,
+                  LfgLockDebouncer lockDebouncer) {
         this.parent = parent;
         this.service = service;
         this.sounds = sounds;
         this.notifications = notifications;
+        this.lockDebouncer = lockDebouncer;
         this.currentRegion = regionDetector.detect().orElse(LfgProtocol.Region.EU);
         this.joinCountdown = service.joinController();
         this.kickTargeting = new KickTargetingState(nanoTime);
@@ -152,7 +168,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var filters = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
         filters.gap(6).padding(Insets.left(4)).verticalAlignment(VerticalAlignment.CENTER);
 
-        createButton = UIComponents.button(RalleTheme.ui(Component.literal("+")), ignored -> openCreateModal());
+        createButton = UIComponents.button(LfgActionGlyph.CREATE.symbol(), ignored -> openCreateModal());
         createButton.sizing(Sizing.fixed(30), Sizing.fixed(20));
         createButton.renderer(RalleButtonRenderers.primary());
         createButton.tooltip(RalleTheme.ui(Component.literal("Create a raid lobby")));
@@ -213,6 +229,10 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         tickJoinCountdown();
         tickKickTargeting();
         tickPingCooldown();
+        if (renderedLockVersion != lockDebouncer.version()) {
+            renderedLockVersion = lockDebouncer.version();
+            rebuildGrid();
+        }
     }
 
     private void refreshFromService(boolean force) {
@@ -350,7 +370,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     private ButtonComponent collapsedAction(LfgProtocol.Lobby lobby) {
         var action = collapsedActionFor(lobby, viewerId());
-        var button = UIComponents.button(RalleTheme.ui(Component.literal(action.label())), ignored -> {
+        var button = UIComponents.button(actionLabel(action), ignored -> {
             if (action.requiresConfirmation()) {
                 openDisbandConfirmation(lobby);
             } else if (action.kind() == CardActionKind.JOIN) {
@@ -408,21 +428,30 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                 kickTargeting.active() ? "Select a member, then hold left mouse for 1.5 seconds"
                         : "Choose a member to kick")));
 
+        boolean presentedLocked = lockDebouncer.desiredLocked(lobby.lobbyId()).orElse(lobby.locked());
+        boolean lockPending = service.pending(lobby.lobbyId(), "lock");
+        boolean lockSubmitting = lockPending && lockDebouncer.dispatched(lobby.lobbyId());
+        String lockLabel = lockSubmitting
+                ? (presentedLocked ? "Locking..." : "Unlocking...")
+                : (presentedLocked ? "Unlock" : "Lock");
+        var lockGlyph = lockSubmitting
+                ? (presentedLocked ? LfgActionGlyph.LOCK : LfgActionGlyph.UNLOCK)
+                : (presentedLocked ? LfgActionGlyph.UNLOCK : LfgActionGlyph.LOCK);
         lockButton = UIComponents.button(
-                RalleTheme.ui(Component.literal(lobby.locked() ? "Unlock" : "Lock")),
+                lockGlyph.label(lockLabel),
                 ignored -> performLock(lobby));
         lockButton.sizing(Sizing.fixed(HOST_CONTROL_RIGHT_WIDTH), Sizing.fixed(20));
         lockButton.renderer(RalleButtonRenderers.neutral());
         lockButton.active = service.lifecycle() == RaidLfgService.LifecycleState.ONLINE
-                && !service.pending(lobby.lobbyId(), "lock");
+                && !lockPending;
         lockButton.tooltip(RalleTheme.ui(Component.literal(
-                lobby.locked() ? "Allow new members to join" : "Prevent new members from joining")));
+                presentedLocked ? "Allow new members to join" : "Prevent new members from joining")));
         middle.child(kickButton).child(lockButton);
         controls.child(middle);
 
         int cooldown = service.pingCooldownSeconds(lobby.lobbyId());
-        var ping = UIComponents.button(RalleTheme.ui(Component.literal(
-                cooldown > 0 ? "Ping (" + cooldown + "s)" : "Ping")), ignored -> performPing(lobby));
+        var ping = UIComponents.button(LfgActionGlyph.PING.label(
+                cooldown > 0 ? "Ping (" + cooldown + "s)" : "Ping"), ignored -> performPing(lobby));
         ping.sizing(Sizing.fill(100), Sizing.fixed(20));
         ping.renderer(RalleButtonRenderers.neutral());
         ping.active = service.lifecycle() == RaidLfgService.LifecycleState.ONLINE
@@ -469,7 +498,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         boolean member = viewerId != null && lobby.contains(viewerId);
         boolean allowed = action.kind() == CardActionKind.DISBAND
                 || lobby.capabilities() != null && (member ? lobby.capabilities().leave() : lobby.capabilities().join());
-        var button = UIComponents.button(RalleTheme.ui(Component.literal(action.label())), ignored -> {
+        var button = UIComponents.button(actionLabel(action), ignored -> {
             if (action.requiresConfirmation()) openDisbandConfirmation(lobby);
             else if (action.kind() == CardActionKind.JOIN) startJoinCountdown(lobby);
             else performAction(lobby, action.kind().protocolAction);
@@ -608,12 +637,9 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void performLock(LfgProtocol.Lobby lobby) {
-        if (lockButton != null) {
-            lockButton.active = false;
-            lockButton.setMessage(RalleTheme.ui(Component.literal(lobby.locked() ? "Unlocking..." : "Locking...")));
-        }
-        service.setLocked(lobby.lobbyId(), !lobby.locked())
-                .whenComplete((ignored, failure) -> minecraft.execute(() -> refreshFromService(true)));
+        lockDebouncer.toggle(lobby, LfgLockDebouncer.Origin.SCREEN);
+        renderedLockVersion = lockDebouncer.version();
+        rebuildGrid();
     }
 
     private void performPing(LfgProtocol.Lobby lobby) {
@@ -822,13 +848,14 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         if (root == null || service.lifecycle() != RaidLfgService.LifecycleState.ONLINE) return;
         var content = UIContainers.verticalFlow(Sizing.fixed(300), Sizing.content());
         content.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
-        content.child(UIComponents.label(RalleTheme.ui(Component.literal("DISBAND PARTY"))).color(RalleTheme.ACCENT));
+        content.child(UIComponents.label(LfgActionGlyph.LEAVE_DISBAND.label("DISBAND PARTY"))
+                .color(RalleTheme.ACCENT));
         content.child(UIComponents.label(RalleTheme.ui(Component.literal(
                 "Disband this party? The listing will be removed for everyone."))).color(RalleTheme.MUTED).maxWidth(276));
 
         var controls = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content()).gap(8);
         var overlayHolder = new OverlayContainer<?>[1];
-        var confirm = UIComponents.button(RalleTheme.ui(Component.literal("Disband")), ignored -> {
+        var confirm = UIComponents.button(LfgActionGlyph.LEAVE_DISBAND.label("Disband"), ignored -> {
             overlayHolder[0].remove();
             performAction(lobby, CardActionKind.DISBAND.protocolAction);
         });
@@ -843,6 +870,12 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var overlay = UIContainers.overlay(content).closeOnClick(false);
         overlayHolder[0] = overlay;
         root.child(overlay);
+    }
+
+    private static Component actionLabel(CardAction action) {
+        return action.kind() == CardActionKind.LEAVE || action.kind() == CardActionKind.DISBAND
+                ? LfgActionGlyph.LEAVE_DISBAND.label(action.label())
+                : RalleTheme.ui(Component.literal(action.label()));
     }
 
     private UUID viewerId() {

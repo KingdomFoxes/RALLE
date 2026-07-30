@@ -18,8 +18,11 @@ party members. Seven additional unbound action shortcuts cover Join, Close,
 Leave/Disband, Ping, Lock/Unlock, Create, and Kick; Create and Kick use
 top-row-number chords and report their keybind-only feedback through a fixed
 Action Bar above the crosshair. Notification cards use a red top-right X for
-presentation-only dismissal, including during a Join countdown. Every feature
-still defaults off.
+presentation-only dismissal, including during a Join countdown, and show usable
+bound keys beside their actions. Action feedback pairs Vanilla-font recognition
+glyphs with the selected interface font, while rapid Lock/Unlock toggles are
+coalesced for one second before any backend mutation. Every feature still
+defaults off.
 
 ## Development
 

@@ -41,4 +41,14 @@ class LfgActionBarStateTest {
         assertEquals("Ping", state.snapshot().text());
         assertEquals(null, state.snapshot().raid());
     }
+
+    @Test
+    void actionGlyphIsStoredSeparatelyFromInterfaceText() {
+        var state = new LfgActionBarState(() -> 0);
+
+        state.show("Ping", LfgActionBarState.Tone.NORMAL, LfgActionGlyph.PING);
+
+        assertEquals("Ping", state.snapshot().text());
+        assertEquals(LfgActionGlyph.PING, state.snapshot().glyph());
+    }
 }

@@ -35,6 +35,8 @@ import org.kingdomfoxes.ralle.lfg.client.MinecraftLfgNotificationSink;
 import org.kingdomfoxes.ralle.lfg.client.MinecraftHostPartyInviteSink;
 import org.kingdomfoxes.ralle.lfg.client.MinecraftPartyCommandExecutor;
 import org.kingdomfoxes.ralle.lfg.client.HostPartyInviteController;
+import org.kingdomfoxes.ralle.lfg.client.LfgKeybindHints;
+import org.kingdomfoxes.ralle.lfg.client.LfgLockDebouncer;
 import org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager;
 import org.kingdomfoxes.ralle.lfg.client.LfgRosterSoundController;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
@@ -96,16 +98,18 @@ public final class RalleClient implements ClientModInitializer {
                 lfgNotifications::hasPersistentCard
         );
         var disbandConfirmation = new LfgDisbandConfirmation();
+        var lockDebouncer = new LfgLockDebouncer();
+        var keybindHints = new LfgKeybindHints(settings);
         var lfgNotificationOverlay = new LfgNotificationOverlay(
                 minecraft, raidLfg, lfgNotifications, hostPartyInvites, placements, lfgSounds,
-                disbandConfirmation);
+                disbandConfirmation, keybindHints);
         lfgNotificationOverlay.register();
         var actionBarState = new LfgActionBarState();
         var actionBarOverlay = new LfgActionBarOverlay(minecraft, actionBarState);
         actionBarOverlay.register();
         var lfgKeybinds = new RaidLfgKeybinds(
                 minecraft, settings, raidLfg, lfgSounds, lfgNotifications, regionDetector,
-                actionBarState, disbandConfirmation);
+                actionBarState, disbandConfirmation, lockDebouncer);
         var chatBehavior = new ChatBehaviorService(Minecraft.getInstance(), settings);
         var chatScreenshots = new ChatScreenshotService(
                 Minecraft.getInstance(),
@@ -146,7 +150,7 @@ public final class RalleClient implements ClientModInitializer {
                     var client = Minecraft.getInstance();
                     client.schedule(() -> client.setScreen(new RaidLfgScreen(
                             client.screen, context().raidLfg(), regionDetector,
-                            context().lfgSounds(), lfgNotifications)));
+                            context().lfgSounds(), lfgNotifications, lockDebouncer)));
                     return 1;
                 }))
         ));

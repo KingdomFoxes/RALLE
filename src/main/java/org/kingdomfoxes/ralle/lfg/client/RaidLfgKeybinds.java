@@ -11,6 +11,7 @@ import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
+import org.kingdomfoxes.ralle.ui.owo.LfgActionGlyph;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionBarState;
 import org.kingdomfoxes.ralle.ui.owo.RaidPresentation;
 import org.kingdomfoxes.ralle.ui.owo.RaidLfgScreen;
@@ -51,6 +52,7 @@ public final class RaidLfgKeybinds {
     private final RaidRegionDetector regionDetector;
     private final LfgActionBarState actionBar;
     private final LfgDisbandConfirmation disbandConfirmation;
+    private final LfgLockDebouncer lockDebouncer;
     private final EnumMap<Action, Binding> bindings = new EnumMap<>(Action.class);
     private final LfgChordState<Selection> chordState = new LfgChordState<>();
 
@@ -59,7 +61,8 @@ public final class RaidLfgKeybinds {
     public RaidLfgKeybinds(Minecraft minecraft, SettingsRegistry settings, RaidLfgService service,
                            LfgSoundPlayer sounds, LfgNotificationManager notifications,
                            RaidRegionDetector regionDetector, LfgActionBarState actionBar,
-                           LfgDisbandConfirmation disbandConfirmation) {
+                           LfgDisbandConfirmation disbandConfirmation,
+                           LfgLockDebouncer lockDebouncer) {
         this.minecraft = minecraft;
         this.service = service;
         this.sounds = sounds;
@@ -67,6 +70,7 @@ public final class RaidLfgKeybinds {
         this.regionDetector = regionDetector;
         this.actionBar = actionBar;
         this.disbandConfirmation = disbandConfirmation;
+        this.lockDebouncer = lockDebouncer;
         this.enabled = settings.setting("raid-lfg-enabled", BooleanSetting.class);
 
         register(settings, Action.OPEN, OPEN_ID, "key.ralle.raid-lfg");
@@ -84,6 +88,7 @@ public final class RaidLfgKeybinds {
         applyChangedSettings();
         drainClicks();
         validateConfirmation();
+        tickLockDebounce();
 
         if (!inputAllowed()) {
             resetChord(true);
@@ -167,7 +172,8 @@ public final class RaidLfgKeybinds {
             chordMode = nextMode;
             chordState.begin();
             actionBar.hold(nextMode == ChordMode.CREATE ? "Create" : "Kick",
-                    LfgActionBarState.Tone.NORMAL);
+                    LfgActionBarState.Tone.NORMAL,
+                    nextMode == ChordMode.CREATE ? LfgActionGlyph.CREATE : null);
         } else if (chordMode != nextMode) {
             resetChord(false);
         }
@@ -183,7 +189,7 @@ public final class RaidLfgKeybinds {
 
     private void openRaidLfg() {
         minecraft.setScreen(new RaidLfgScreen(
-                minecraft.screen, service, regionDetector, sounds, notifications));
+                minecraft.screen, service, regionDetector, sounds, notifications, lockDebouncer));
     }
 
     private void executeSimple(Action action) {
@@ -203,13 +209,22 @@ public final class RaidLfgKeybinds {
     private void leaveOrDisband() {
         var lobby = currentLobby();
         var viewer = service.store().state().viewer();
-        if (lobby == null || viewer == null) return;
+        if (lobby == null || viewer == null) {
+            showNoParty();
+            return;
+        }
         boolean cardVisible = notifications.hasVisiblePersistentCard(lobby.lobbyId());
         if (!lobby.hostedBy(viewer.minecraftUuid())) {
-            if (!cardVisible) actionBar.show("Leave", LfgActionBarState.Tone.DANGER);
+            if (!cardVisible) {
+                actionBar.show("Leave", LfgActionBarState.Tone.DANGER,
+                        LfgActionGlyph.LEAVE_DISBAND);
+            }
             service.leave(lobby.lobbyId()).whenComplete((ignored, failure) -> minecraft.execute(() -> {
                 if (failure == null) sounds.playPartyLeft();
-                else if (!cardVisible) actionBar.show("Leave failed", LfgActionBarState.Tone.DANGER);
+                else if (!cardVisible) {
+                    actionBar.show("Leave failed", LfgActionBarState.Tone.DANGER,
+                            LfgActionGlyph.LEAVE_DISBAND);
+                }
             }));
             return;
         }
@@ -220,38 +235,46 @@ public final class RaidLfgKeybinds {
         if (result == LfgDisbandConfirmation.Result.ARMED) {
             if (!cardVisible) {
                 actionBar.show(prompt, LfgActionBarState.Tone.DANGER,
-                        LfgDisbandConfirmation.DURATION.toMillis());
+                        LfgDisbandConfirmation.DURATION.toMillis(),
+                        LfgActionGlyph.LEAVE_DISBAND);
             }
             return;
         }
-        if (!cardVisible) actionBar.show("Disband", LfgActionBarState.Tone.DANGER);
+        if (!cardVisible) {
+            actionBar.show("Disband", LfgActionBarState.Tone.DANGER,
+                    LfgActionGlyph.LEAVE_DISBAND);
+        }
         service.disband(lobby.lobbyId()).whenComplete((ignored, failure) -> minecraft.execute(() -> {
             if (failure != null && !cardVisible) {
-                actionBar.show("Disband failed", LfgActionBarState.Tone.DANGER);
+                actionBar.show("Disband failed", LfgActionBarState.Tone.DANGER,
+                        LfgActionGlyph.LEAVE_DISBAND);
             }
         }));
     }
 
     private void ping() {
         var lobby = currentHostLobby();
-        if (lobby == null || service.pingCooldownSeconds(lobby.lobbyId()) > 0) return;
-        actionBar.show("Ping", LfgActionBarState.Tone.NORMAL);
+        if (lobby == null) {
+            showMissingHostParty();
+            return;
+        }
+        if (service.pingCooldownSeconds(lobby.lobbyId()) > 0) return;
+        actionBar.show("Ping", LfgActionBarState.Tone.NORMAL, LfgActionGlyph.PING);
         service.ping(lobby.lobbyId()).whenComplete((ignored, failure) -> minecraft.execute(() -> {
             if (failure == null) sounds.playLocalPartyPing();
-            else actionBar.show("Ping failed", LfgActionBarState.Tone.DANGER);
+            else actionBar.show("Ping failed", LfgActionBarState.Tone.DANGER, LfgActionGlyph.PING);
         }));
     }
 
     private void lockOrUnlock() {
         var lobby = currentHostLobby();
-        if (lobby == null) return;
-        boolean locked = !lobby.locked();
-        actionBar.show(locked ? "Lock" : "Unlock", LfgActionBarState.Tone.NORMAL);
-        service.setLocked(lobby.lobbyId(), locked).whenComplete((ignored, failure) -> minecraft.execute(() -> {
-            if (failure != null) {
-                actionBar.show(locked ? "Lock failed" : "Unlock failed", LfgActionBarState.Tone.DANGER);
-            }
-        }));
+        if (lobby == null) {
+            showMissingHostParty();
+            return;
+        }
+        lockDebouncer.toggle(lobby, LfgLockDebouncer.Origin.KEYBIND).ifPresent(locked ->
+                actionBar.show(locked ? "Lock" : "Unlock", LfgActionBarState.Tone.NORMAL,
+                        locked ? LfgActionGlyph.LOCK : LfgActionGlyph.UNLOCK));
     }
 
     private Selection select(int digit) {
@@ -274,11 +297,18 @@ public final class RaidLfgKeybinds {
             var raid = selected.raid();
             if (held) {
                 actionBar.holdRaid("Create + ", raid, RaidPresentation.shortName(raid),
-                        LfgActionBarState.Tone.ACCENT);
+                        LfgActionBarState.Tone.ACCENT, LfgActionGlyph.CREATE);
             } else {
                 actionBar.showRaid("Create + ", raid, RaidPresentation.shortName(raid),
-                        LfgActionBarState.Tone.ACCENT);
+                        LfgActionBarState.Tone.ACCENT, LfgActionGlyph.CREATE);
             }
+            return;
+        }
+        if (selected.lobbyId() == null) {
+            String message = currentLobby() == null
+                    ? "Not in a Raid LFG party" : "Only the party host can do that";
+            if (held) actionBar.hold(message, LfgActionBarState.Tone.DANGER);
+            else actionBar.show(message, LfgActionBarState.Tone.DANGER);
             return;
         }
         String target = selected.targetId() == null ? "Empty slot" : selected.targetIgn();
@@ -304,7 +334,8 @@ public final class RaidLfgKeybinds {
             service.create(selected.raid(), region.get(), null)
                     .whenComplete((ignored, failure) -> minecraft.execute(() -> {
                         if (failure == null) sounds.playPartyCreated();
-                        else actionBar.show("Create failed", LfgActionBarState.Tone.DANGER);
+                        else actionBar.show("Create failed", LfgActionBarState.Tone.DANGER,
+                                LfgActionGlyph.CREATE);
                     }));
             return;
         }
@@ -322,6 +353,31 @@ public final class RaidLfgKeybinds {
                     if (failure == null) sounds.playKickSucceeded();
                     else actionBar.show("Kick failed", LfgActionBarState.Tone.DANGER);
                 }));
+    }
+
+    private void tickLockDebounce() {
+        var lobby = currentHostLobby();
+        boolean online = service.lifecycle() == RaidLfgService.LifecycleState.ONLINE;
+        boolean pending = lobby != null && service.pending(lobby.lobbyId(), "lock");
+        lockDebouncer.poll(lobby, online, pending).ifPresent(command ->
+                service.setLocked(command.lobbyId(), command.locked())
+                        .whenComplete((ignored, failure) -> minecraft.execute(() -> {
+                            lockDebouncer.complete(command.lobbyId());
+                            if (failure != null && command.origin() == LfgLockDebouncer.Origin.KEYBIND) {
+                                actionBar.show(command.locked() ? "Lock failed" : "Unlock failed",
+                                        LfgActionBarState.Tone.DANGER,
+                                        command.locked() ? LfgActionGlyph.LOCK : LfgActionGlyph.UNLOCK);
+                            }
+                        })));
+    }
+
+    private void showMissingHostParty() {
+        if (currentLobby() == null) showNoParty();
+        else actionBar.show("Only the party host can do that", LfgActionBarState.Tone.DANGER);
+    }
+
+    private void showNoParty() {
+        actionBar.show("Not in a Raid LFG party", LfgActionBarState.Tone.DANGER);
     }
 
     private void validateConfirmation() {

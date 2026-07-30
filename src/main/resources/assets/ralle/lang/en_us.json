@@ -89,7 +89,7 @@
   "ralle.settings.option.raid-lfg-ping-keybind": "Ping Keybind",
   "ralle.settings.option.raid-lfg-ping-keybind.description": "Pings the current party when you are its host and Ping is off cooldown.",
   "ralle.settings.option.raid-lfg-lock-keybind": "Lock / Unlock Keybind",
-  "ralle.settings.option.raid-lfg-lock-keybind.description": "Toggles joining for the current party when you are its host.",
+  "ralle.settings.option.raid-lfg-lock-keybind.description": "Toggles joining for the current party after a one-second coalescing delay when you are its host.",
   "ralle.settings.option.raid-lfg-create-keybind": "Create Modifier Keybind",
   "ralle.settings.option.raid-lfg-create-keybind.description": "Hold this key and release top-row 1–6 to create Dailies, NOTG, NOL, TCC, TNA, or TWP.",
   "ralle.settings.option.raid-lfg-kick-keybind": "Kick Modifier Keybind",

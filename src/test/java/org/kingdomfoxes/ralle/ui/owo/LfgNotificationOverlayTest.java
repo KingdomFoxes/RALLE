@@ -15,9 +15,11 @@ class LfgNotificationOverlayTest {
     @Test
     void closeControlOccupiesTheTopRightTwentyPixelSquare() {
         var card = new Rectangle(30, 40, 190, 100);
+        var close = LfgNotificationOverlay.closeBounds(card);
 
-        assertEquals(new Rectangle(195, 44, 20, 20),
-                LfgNotificationOverlay.closeBounds(card));
+        assertEquals(new Rectangle(195, 44, 20, 20), close);
+        assertEquals(new Rectangle(200, 49, 10, 10),
+                LfgNotificationOverlay.closeXBounds(close));
     }
 
     @Test

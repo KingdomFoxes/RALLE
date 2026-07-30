@@ -45,4 +45,19 @@ class RalleTypographyTest {
         assertEquals(FontDescription.DEFAULT, label.getSiblings().getLast().getStyle().getFont());
         assertEquals(" ▾", label.getSiblings().getLast().getString());
     }
+
+    @Test
+    void actionGlyphUsesVanillaWhileItsTextUsesKarla() {
+        var registry = new SettingsRegistry(directory.resolve("ralle-actions.properties"));
+        RalleSettings.register(registry);
+        registry.seal();
+        RalleTypography.bind(registry);
+        registry.setting(RalleSettings.INTERFACE_FONT_ID, ChoiceSetting.class).set("karla");
+
+        var label = LfgActionGlyph.PING.label("Ping");
+
+        assertEquals(FontDescription.DEFAULT, label.getSiblings().getFirst().getStyle().getFont());
+        assertNotNull(label.getSiblings().getLast().getStyle().getFont());
+        assertEquals("🔔 Ping", label.getString());
+    }
 }

@@ -21,11 +21,20 @@ public final class LfgActionBarState {
     }
 
     public synchronized void hold(String text, Tone tone) {
-        entry = new Entry(text, null, null, null, tone, true, 0, 0);
+        hold(text, tone, null);
+    }
+
+    public synchronized void hold(String text, Tone tone, LfgActionGlyph glyph) {
+        entry = new Entry(text, null, null, null, glyph, tone, true, 0, 0);
     }
 
     public synchronized void holdRaid(String prefix, LfgProtocol.RaidType raid, String raidLabel, Tone tone) {
-        entry = new Entry(null, prefix, raid, raidLabel, tone, true, 0, 0);
+        holdRaid(prefix, raid, raidLabel, tone, null);
+    }
+
+    public synchronized void holdRaid(String prefix, LfgProtocol.RaidType raid, String raidLabel,
+                                      Tone tone, LfgActionGlyph glyph) {
+        entry = new Entry(null, prefix, raid, raidLabel, glyph, tone, true, 0, 0);
     }
 
     public synchronized void show(String text, Tone tone) {
@@ -33,22 +42,35 @@ public final class LfgActionBarState {
     }
 
     public synchronized void show(String text, Tone tone, long lingerMillis) {
+        show(text, tone, lingerMillis, null);
+    }
+
+    public synchronized void show(String text, Tone tone, LfgActionGlyph glyph) {
+        show(text, tone, LINGER_MILLIS, glyph);
+    }
+
+    public synchronized void show(String text, Tone tone, long lingerMillis, LfgActionGlyph glyph) {
         long now = clockMillis.getAsLong();
-        entry = new Entry(text, null, null, null, tone, false, now + lingerMillis,
+        entry = new Entry(text, null, null, null, glyph, tone, false, now + lingerMillis,
                 now + lingerMillis + FADE_MILLIS);
     }
 
     public synchronized void showRaid(String prefix, LfgProtocol.RaidType raid, String raidLabel, Tone tone) {
+        showRaid(prefix, raid, raidLabel, tone, null);
+    }
+
+    public synchronized void showRaid(String prefix, LfgProtocol.RaidType raid, String raidLabel,
+                                      Tone tone, LfgActionGlyph glyph) {
         long now = clockMillis.getAsLong();
-        entry = new Entry(null, prefix, raid, raidLabel, tone, false, now + LINGER_MILLIS,
+        entry = new Entry(null, prefix, raid, raidLabel, glyph, tone, false, now + LINGER_MILLIS,
                 now + LINGER_MILLIS + FADE_MILLIS);
     }
 
     public synchronized void release() {
         if (entry == null || !entry.held()) return;
         long now = clockMillis.getAsLong();
-        entry = new Entry(entry.text(), entry.prefix(), entry.raid(), entry.raidLabel(), entry.tone(),
-                false, now + LINGER_MILLIS, now + LINGER_MILLIS + FADE_MILLIS);
+        entry = new Entry(entry.text(), entry.prefix(), entry.raid(), entry.raidLabel(), entry.glyph(),
+                entry.tone(), false, now + LINGER_MILLIS, now + LINGER_MILLIS + FADE_MILLIS);
     }
 
     public synchronized void clear() {
@@ -70,18 +92,19 @@ public final class LfgActionBarState {
 
     private static Snapshot snapshot(Entry entry, double opacity) {
         return new Snapshot(true, entry.text(), entry.prefix(), entry.raid(), entry.raidLabel(),
-                entry.tone(), opacity);
+                entry.glyph(), entry.tone(), opacity);
     }
 
     public enum Tone { NORMAL, ACCENT, MUTED, DANGER, POSITIVE }
 
     public record Snapshot(boolean visible, String text, String prefix, LfgProtocol.RaidType raid,
-                           String raidLabel, Tone tone, double opacity) {
+                           String raidLabel, LfgActionGlyph glyph, Tone tone, double opacity) {
         static Snapshot hidden() {
-            return new Snapshot(false, null, null, null, null, Tone.NORMAL, 0d);
+            return new Snapshot(false, null, null, null, null, null, Tone.NORMAL, 0d);
         }
     }
 
     private record Entry(String text, String prefix, LfgProtocol.RaidType raid, String raidLabel,
-                         Tone tone, boolean held, long fadeAtMillis, long expiresAtMillis) {}
+                         LfgActionGlyph glyph, Tone tone, boolean held,
+                         long fadeAtMillis, long expiresAtMillis) {}
 }

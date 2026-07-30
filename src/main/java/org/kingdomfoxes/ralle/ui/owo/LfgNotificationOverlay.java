@@ -24,6 +24,7 @@ import org.kingdomfoxes.ralle.lfg.client.GuildTerritoryColors;
 import org.kingdomfoxes.ralle.lfg.client.HostPartyInviteController;
 import org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager;
 import org.kingdomfoxes.ralle.lfg.client.LfgDisbandConfirmation;
+import org.kingdomfoxes.ralle.lfg.client.LfgKeybindHints;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
@@ -61,13 +62,15 @@ public final class LfgNotificationOverlay {
     private final HudPlacementRegistry placements;
     private final LfgSoundPlayer sounds;
     private final LfgDisbandConfirmation disbandConfirmation;
+    private final LfgKeybindHints keybindHints;
     private List<HitRegion> hitRegions = List.of();
 
     public LfgNotificationOverlay(Minecraft minecraft, RaidLfgService service,
                                   LfgNotificationManager notifications,
                                   HostPartyInviteController hostPartyInvites,
                                   HudPlacementRegistry placements, LfgSoundPlayer sounds,
-                                  LfgDisbandConfirmation disbandConfirmation) {
+                                  LfgDisbandConfirmation disbandConfirmation,
+                                  LfgKeybindHints keybindHints) {
         this.minecraft = minecraft;
         this.service = service;
         this.notifications = notifications;
@@ -75,6 +78,7 @@ public final class LfgNotificationOverlay {
         this.placements = placements;
         this.sounds = sounds;
         this.disbandConfirmation = disbandConfirmation;
+        this.keybindHints = keybindHints;
     }
 
     public void register() {
@@ -168,10 +172,18 @@ public final class LfgNotificationOverlay {
         var lobby = card.lobby();
         graphics.renderItem(new ItemStack(RaidPresentation.item(lobby.raidType())), bounds.x() + 7, bounds.y() + 6);
         var close = closeBounds(bounds);
-        int titleWidth = Math.max(20, close.x() - (bounds.x() + 28) - 6);
+        var closeHint = keybindHints.closeKeyName()
+                .map(key -> RalleTypography.body(Component.literal("[" + key + "]")))
+                .orElse(null);
+        int closeHintWidth = closeHint == null ? 0 : minecraft.font.width(closeHint) + 4;
+        int titleWidth = Math.max(20, close.x() - closeHintWidth - (bounds.x() + 28) - 6);
         graphics.drawString(minecraft.font,
                 RalleTypography.body(Component.literal(ellipsize(RaidPresentation.name(lobby.raidType()), titleWidth))),
                 bounds.x() + 28, bounds.y() + 10, ACCENT, false);
+        if (closeHint != null) {
+            graphics.drawString(minecraft.font, closeHint,
+                    close.x() - closeHintWidth, bounds.y() + 10, MUTED, false);
+        }
 
         drawButtonFace(graphics, close, RalleButtonRenderers.Kind.DESTRUCTIVE, mouseX, mouseY, true);
         drawCloseX(graphics, close, TEXT);
@@ -227,7 +239,8 @@ public final class LfgNotificationOverlay {
         String disbandPrompt = disbandConfirmation.promptFor(id);
         if (card.persistent() && viewer != null && card.lobby().hostedBy(viewer.minecraftUuid())
                 && disbandPrompt != null) {
-            drawButton(graphics, controls, disbandPrompt, RalleButtonRenderers.Kind.DESTRUCTIVE,
+            drawButton(graphics, controls, LfgActionGlyph.LEAVE_DISBAND.label(disbandPrompt),
+                    RalleButtonRenderers.Kind.DESTRUCTIVE,
                     mouseX, mouseY, true);
             if (interactive) hits.add(new HitRegion(controls, id, Action.DISBAND));
             return;
@@ -248,7 +261,8 @@ public final class LfgNotificationOverlay {
             String protocolAction = host ? "disband" : "leave";
             boolean pending = service.pending(id, protocolAction);
             String label = pending ? (host ? "Disbanding..." : "Leaving...") : action;
-            drawButton(graphics, controls, label,
+            if (!pending) label = keybindHints.leaveDisbandLabel(label);
+            drawButton(graphics, controls, LfgActionGlyph.LEAVE_DISBAND.label(label),
                     RalleButtonRenderers.Kind.DESTRUCTIVE, mouseX, mouseY, !pending);
             if (interactive && !pending) {
                 hits.add(new HitRegion(controls, id, host ? Action.DISBAND : Action.LEAVE));
@@ -263,7 +277,8 @@ public final class LfgNotificationOverlay {
         }
         switch (card.presentedMode()) {
             case READY -> {
-                drawButton(graphics, controls, "Join", RalleButtonRenderers.Kind.PRIMARY,
+                drawButton(graphics, controls, keybindHints.joinLabel("Join"),
+                        RalleButtonRenderers.Kind.PRIMARY,
                         mouseX, mouseY, true);
                 if (interactive) hits.add(new HitRegion(controls, id, Action.JOIN));
             }
@@ -344,8 +359,14 @@ public final class LfgNotificationOverlay {
 
     private void drawButton(GuiGraphics graphics, Rectangle bounds, String label,
                             RalleButtonRenderers.Kind kind, int mouseX, int mouseY, boolean active) {
+        drawButton(graphics, bounds, RalleTypography.body(Component.literal(label)),
+                kind, mouseX, mouseY, active);
+    }
+
+    private void drawButton(GuiGraphics graphics, Rectangle bounds, Component label,
+                            RalleButtonRenderers.Kind kind, int mouseX, int mouseY, boolean active) {
         drawButtonFace(graphics, bounds, kind, mouseX, mouseY, active);
-        graphics.drawCenteredString(minecraft.font, RalleTypography.body(Component.literal(label)),
+        graphics.drawCenteredString(minecraft.font, label,
                 bounds.x() + bounds.width() / 2, bounds.y() + 6, active ? TEXT : 0xFF8D96A5);
     }
 
@@ -363,12 +384,22 @@ public final class LfgNotificationOverlay {
     }
 
     private static void drawCloseX(GuiGraphics graphics, Rectangle bounds, int color) {
-        int left = bounds.x() + 5;
-        int top = bounds.y() + 5;
-        for (int step = 0; step < 10; step++) {
+        var glyph = closeXBounds(bounds);
+        int left = glyph.x();
+        int top = glyph.y();
+        for (int step = 0; step < 9; step++) {
             graphics.fill(left + step, top + step, left + step + 2, top + step + 2, color);
-            graphics.fill(left + 9 - step, top + step, left + 11 - step, top + step + 2, color);
+            graphics.fill(left + 8 - step, top + step, left + 10 - step, top + step + 2, color);
         }
+    }
+
+    static Rectangle closeXBounds(Rectangle closeButton) {
+        return new Rectangle(
+                closeButton.x() + (closeButton.width() - 10) / 2,
+                closeButton.y() + (closeButton.height() - 10) / 2,
+                10,
+                10
+        );
     }
 
     static int rosterSlotX(Rectangle bounds, int slot) {
