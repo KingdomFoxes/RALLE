@@ -34,10 +34,6 @@ public final class LfgKeybindHints {
         return label(action, RaidLfgKeybinds.LEAVE_DISBAND_ID);
     }
 
-    public Optional<String> closeKeyName() {
-        return keyName(RaidLfgKeybinds.CLOSE_ID);
-    }
-
     private String label(String action, String settingId) {
         return keyName(settingId).map(key -> action + " [" + key + "]").orElse(action);
     }

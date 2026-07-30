@@ -39,6 +39,16 @@ public final class MinecraftLfgSoundPlayer implements LfgSoundPlayer {
     }
 
     @Override
+    public void playPartyLocked() {
+        play(SoundEvents.VAULT_INSERT_ITEM, 1.0F, 0.8F);
+    }
+
+    @Override
+    public void playPartyUnlocked() {
+        play(SoundEvents.VAULT_INSERT_ITEM_FAIL, 1.0F, 0.8F);
+    }
+
+    @Override
     public void playPartyPing() {
         if (lfgSounds.value()) play(SoundEvents.BELL_BLOCK, 1.0F, 0.7F);
     }

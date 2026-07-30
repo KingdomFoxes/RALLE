@@ -59,5 +59,6 @@ class RalleTypographyTest {
         assertEquals(FontDescription.DEFAULT, label.getSiblings().getFirst().getStyle().getFont());
         assertNotNull(label.getSiblings().getLast().getStyle().getFont());
         assertEquals("🔔 Ping", label.getString());
+        assertEquals("☁ Kick", LfgActionGlyph.KICK.label("Kick").getString());
     }
 }

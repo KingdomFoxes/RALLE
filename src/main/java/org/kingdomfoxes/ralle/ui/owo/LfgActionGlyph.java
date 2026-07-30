@@ -3,9 +3,10 @@ package org.kingdomfoxes.ralle.ui.owo;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.FontDescription;
 
-/** Vanilla-font glyphs paired with interface-font Raid LFG action text. */
+/** Vanilla-font recognition glyphs used exclusively by the keybind Action Bar. */
 public enum LfgActionGlyph {
     CREATE("⛨"),
+    KICK("☁"),
     LOCK("🔒"),
     UNLOCK("🔓"),
     PING("🔔"),

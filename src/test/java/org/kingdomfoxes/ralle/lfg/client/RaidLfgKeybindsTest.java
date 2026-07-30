@@ -1,6 +1,7 @@
 package org.kingdomfoxes.ralle.lfg.client;
 
 import org.junit.jupiter.api.Test;
+import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
 import org.lwjgl.glfw.GLFW;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -13,5 +14,30 @@ class RaidLfgKeybindsTest {
         assertEquals(0, RaidLfgKeybinds.topRowDigit(GLFW.GLFW_KEY_7));
         assertEquals(0, RaidLfgKeybinds.topRowDigit(GLFW.GLFW_KEY_KP_2));
         assertEquals(0, RaidLfgKeybinds.topRowDigit(GLFW.GLFW_KEY_UNKNOWN));
+    }
+
+    @Test
+    void pingCooldownFeedbackIncludesTheRemainingSeconds() {
+        assertEquals("Ping on cooldown (17s remaining)",
+                RaidLfgKeybinds.pingCooldownMessage(17));
+    }
+
+    @Test
+    void lockAndUnlockPressesUseTheirDistinctVaultCuesImmediately() {
+        var sounds = new Sounds();
+
+        sounds.playLockToggle(true);
+        sounds.playLockToggle(false);
+
+        assertEquals(1, sounds.locked);
+        assertEquals(1, sounds.unlocked);
+    }
+
+    private static final class Sounds implements LfgSoundPlayer {
+        int locked;
+        int unlocked;
+
+        @Override public void playPartyLocked() { locked++; }
+        @Override public void playPartyUnlocked() { unlocked++; }
     }
 }

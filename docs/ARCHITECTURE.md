@@ -175,18 +175,24 @@ HUD overlay above the crosshair. Raid titles use the same centralized
 raid-name/item mapping as the browser and notification cards. Join remains
 card-driven and is intentionally absent from the Action Bar. The chat-layout
 editor previews the fixed Action Bar but does not make it movable.
-Create, Lock, Unlock, Ping, and Leave/Disband feedback prepends its fixed
-recognition glyph as an explicitly Vanilla-font component, leaving the action
-copy in the selected interface font. Party-scoped keybinds report when the
-viewer has no synchronized Raid LFG party, and host-only bindings distinguish
-that state from being a non-host member.
+Create, Kick, Lock, Unlock, Ping, and Leave/Disband Action Bar feedback
+prepends its fixed recognition glyph as an explicitly Vanilla-font component,
+leaving the action copy in the selected interface font. Those glyphs do not
+appear on notification-card or Raid LFG browser controls. A Ping activation
+during the locally tracked cooldown reports the rounded-up seconds remaining.
+Party-scoped keybinds report when the viewer has no synchronized Raid LFG
+party, and host-only bindings distinguish that state from being a non-host
+member.
 
 `LfgLockDebouncer` is shared by the keybind controller and Raid LFG screen.
 Each Lock/Unlock activation toggles a desired local state and restarts a
 one-second deadline. At the deadline it submits at most one ordinary
 server-authoritative lock mutation, and submits nothing when the desired state
 has returned to the current authoritative state. Disconnect, authority loss,
-or lobby replacement clears an unsent intent.
+or lobby replacement clears an unsent intent. Each accepted local toggle
+immediately plays the vanilla vault insert cue for Lock or vault insert fail cue
+for Unlock, regardless of whether it originated from the keybind or main screen;
+server completion does not replay the cue.
 
 The keybind and persistent HUD card share one five-second disband confirmation
 state, keyed by lobby and revision. Timeout, disconnect, authority loss, lobby
@@ -211,13 +217,15 @@ card also has an explicit full-width neutral `Pop out` control which creates the
 same persistent HUD presentation and closes the browser.
 
 Notification cards reserve their top-right `20 x 20` control for a destructive
-red, centered `10 x 10` pixel-drawn white X. It removes only that card presentation and never opens
+red, `10 x 10` pixel-drawn white X, optically offset one pixel up and left
+within the shaded face. It removes only that card presentation and never opens
 the browser, cancels a Join, leaves, or disbands. The persistent join controller
 continues a dismissed countdown or submission and still owns exactly-once
 terminal sound and state handling. Bottom actions are full-width Join, Joined,
 status, Leave, Disband, or Party filled states as applicable. Usable bound
-Join, Close, and Leave/Disband keys appear beside their card actions; unbound
-or conflicting mappings do not advertise a nonfunctional shortcut.
+Join and Leave/Disband keys appear beside their card actions; the Close binding
+is not printed beside the X. Unbound or conflicting mappings do not advertise a
+nonfunctional shortcut.
 
 The only persisted LFG values are local opt-in, notification, sound, keybind,
 and HUD-placement settings. Whether a card is currently popped out remains

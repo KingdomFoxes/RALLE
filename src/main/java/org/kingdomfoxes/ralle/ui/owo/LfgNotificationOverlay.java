@@ -172,18 +172,10 @@ public final class LfgNotificationOverlay {
         var lobby = card.lobby();
         graphics.renderItem(new ItemStack(RaidPresentation.item(lobby.raidType())), bounds.x() + 7, bounds.y() + 6);
         var close = closeBounds(bounds);
-        var closeHint = keybindHints.closeKeyName()
-                .map(key -> RalleTypography.body(Component.literal("[" + key + "]")))
-                .orElse(null);
-        int closeHintWidth = closeHint == null ? 0 : minecraft.font.width(closeHint) + 4;
-        int titleWidth = Math.max(20, close.x() - closeHintWidth - (bounds.x() + 28) - 6);
+        int titleWidth = Math.max(20, close.x() - (bounds.x() + 28) - 6);
         graphics.drawString(minecraft.font,
                 RalleTypography.body(Component.literal(ellipsize(RaidPresentation.name(lobby.raidType()), titleWidth))),
                 bounds.x() + 28, bounds.y() + 10, ACCENT, false);
-        if (closeHint != null) {
-            graphics.drawString(minecraft.font, closeHint,
-                    close.x() - closeHintWidth, bounds.y() + 10, MUTED, false);
-        }
 
         drawButtonFace(graphics, close, RalleButtonRenderers.Kind.DESTRUCTIVE, mouseX, mouseY, true);
         drawCloseX(graphics, close, TEXT);
@@ -239,8 +231,7 @@ public final class LfgNotificationOverlay {
         String disbandPrompt = disbandConfirmation.promptFor(id);
         if (card.persistent() && viewer != null && card.lobby().hostedBy(viewer.minecraftUuid())
                 && disbandPrompt != null) {
-            drawButton(graphics, controls, LfgActionGlyph.LEAVE_DISBAND.label(disbandPrompt),
-                    RalleButtonRenderers.Kind.DESTRUCTIVE,
+            drawButton(graphics, controls, disbandPrompt, RalleButtonRenderers.Kind.DESTRUCTIVE,
                     mouseX, mouseY, true);
             if (interactive) hits.add(new HitRegion(controls, id, Action.DISBAND));
             return;
@@ -262,7 +253,7 @@ public final class LfgNotificationOverlay {
             boolean pending = service.pending(id, protocolAction);
             String label = pending ? (host ? "Disbanding..." : "Leaving...") : action;
             if (!pending) label = keybindHints.leaveDisbandLabel(label);
-            drawButton(graphics, controls, LfgActionGlyph.LEAVE_DISBAND.label(label),
+            drawButton(graphics, controls, label,
                     RalleButtonRenderers.Kind.DESTRUCTIVE, mouseX, mouseY, !pending);
             if (interactive && !pending) {
                 hits.add(new HitRegion(controls, id, host ? Action.DISBAND : Action.LEAVE));
@@ -395,8 +386,8 @@ public final class LfgNotificationOverlay {
 
     static Rectangle closeXBounds(Rectangle closeButton) {
         return new Rectangle(
-                closeButton.x() + (closeButton.width() - 10) / 2,
-                closeButton.y() + (closeButton.height() - 10) / 2,
+                closeButton.x() + (closeButton.width() - 10) / 2 - 1,
+                closeButton.y() + (closeButton.height() - 10) / 2 - 1,
                 10,
                 10
         );

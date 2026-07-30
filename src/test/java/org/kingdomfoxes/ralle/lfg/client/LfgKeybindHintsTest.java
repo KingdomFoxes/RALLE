@@ -23,10 +23,6 @@ class LfgKeybindHintsTest {
         settings.setting(RaidLfgKeybinds.JOIN_ID, KeybindSetting.class)
                 .set("key.keyboard.equal");
         assertEquals("Join [=]", hints.joinLabel("Join"));
-
-        settings.setting(RaidLfgKeybinds.CLOSE_ID, KeybindSetting.class)
-                .set("key.keyboard.minus");
-        assertEquals("-", hints.closeKeyName().orElseThrow());
     }
 
     @Test

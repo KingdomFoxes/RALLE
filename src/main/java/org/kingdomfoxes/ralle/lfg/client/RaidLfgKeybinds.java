@@ -173,7 +173,7 @@ public final class RaidLfgKeybinds {
             chordState.begin();
             actionBar.hold(nextMode == ChordMode.CREATE ? "Create" : "Kick",
                     LfgActionBarState.Tone.NORMAL,
-                    nextMode == ChordMode.CREATE ? LfgActionGlyph.CREATE : null);
+                    nextMode == ChordMode.CREATE ? LfgActionGlyph.CREATE : LfgActionGlyph.KICK);
         } else if (chordMode != nextMode) {
             resetChord(false);
         }
@@ -258,7 +258,12 @@ public final class RaidLfgKeybinds {
             showMissingHostParty();
             return;
         }
-        if (service.pingCooldownSeconds(lobby.lobbyId()) > 0) return;
+        int cooldownSeconds = service.pingCooldownSeconds(lobby.lobbyId());
+        if (cooldownSeconds > 0) {
+            actionBar.show(pingCooldownMessage(cooldownSeconds),
+                    LfgActionBarState.Tone.MUTED, LfgActionGlyph.PING);
+            return;
+        }
         actionBar.show("Ping", LfgActionBarState.Tone.NORMAL, LfgActionGlyph.PING);
         service.ping(lobby.lobbyId()).whenComplete((ignored, failure) -> minecraft.execute(() -> {
             if (failure == null) sounds.playLocalPartyPing();
@@ -272,9 +277,11 @@ public final class RaidLfgKeybinds {
             showMissingHostParty();
             return;
         }
-        lockDebouncer.toggle(lobby, LfgLockDebouncer.Origin.KEYBIND).ifPresent(locked ->
-                actionBar.show(locked ? "Lock" : "Unlock", LfgActionBarState.Tone.NORMAL,
-                        locked ? LfgActionGlyph.LOCK : LfgActionGlyph.UNLOCK));
+        lockDebouncer.toggle(lobby, LfgLockDebouncer.Origin.KEYBIND).ifPresent(locked -> {
+            sounds.playLockToggle(locked);
+            actionBar.show(locked ? "Lock" : "Unlock", LfgActionBarState.Tone.NORMAL,
+                    locked ? LfgActionGlyph.LOCK : LfgActionGlyph.UNLOCK);
+        });
     }
 
     private Selection select(int digit) {
@@ -307,17 +314,19 @@ public final class RaidLfgKeybinds {
         if (selected.lobbyId() == null) {
             String message = currentLobby() == null
                     ? "Not in a Raid LFG party" : "Only the party host can do that";
-            if (held) actionBar.hold(message, LfgActionBarState.Tone.DANGER);
-            else actionBar.show(message, LfgActionBarState.Tone.DANGER);
+            if (held) actionBar.hold(message, LfgActionBarState.Tone.DANGER, LfgActionGlyph.KICK);
+            else actionBar.show(message, LfgActionBarState.Tone.DANGER, LfgActionGlyph.KICK);
             return;
         }
         String target = selected.targetId() == null ? "Empty slot" : selected.targetIgn();
         if (held) {
             actionBar.hold("Kick + " + target,
-                    selected.targetId() == null ? LfgActionBarState.Tone.MUTED : LfgActionBarState.Tone.NORMAL);
+                    selected.targetId() == null ? LfgActionBarState.Tone.MUTED : LfgActionBarState.Tone.NORMAL,
+                    LfgActionGlyph.KICK);
         } else {
             actionBar.show("Kick + " + target,
-                    selected.targetId() == null ? LfgActionBarState.Tone.MUTED : LfgActionBarState.Tone.NORMAL);
+                    selected.targetId() == null ? LfgActionBarState.Tone.MUTED : LfgActionBarState.Tone.NORMAL,
+                    LfgActionGlyph.KICK);
         }
     }
 
@@ -351,7 +360,8 @@ public final class RaidLfgKeybinds {
         service.kick(lobby.lobbyId(), target.minecraftUuid(), target.ign())
                 .whenComplete((ignored, failure) -> minecraft.execute(() -> {
                     if (failure == null) sounds.playKickSucceeded();
-                    else actionBar.show("Kick failed", LfgActionBarState.Tone.DANGER);
+                    else actionBar.show("Kick failed", LfgActionBarState.Tone.DANGER,
+                            LfgActionGlyph.KICK);
                 }));
     }
 
@@ -483,6 +493,10 @@ public final class RaidLfgKeybinds {
     static int topRowDigit(int key) {
         return key >= GLFW.GLFW_KEY_1 && key <= GLFW.GLFW_KEY_6
                 ? key - GLFW.GLFW_KEY_0 : 0;
+    }
+
+    static String pingCooldownMessage(int seconds) {
+        return "Ping on cooldown (" + seconds + "s remaining)";
     }
 
     private enum Action { OPEN, JOIN, CLOSE, LEAVE_DISBAND, PING, LOCK, CREATE, KICK }

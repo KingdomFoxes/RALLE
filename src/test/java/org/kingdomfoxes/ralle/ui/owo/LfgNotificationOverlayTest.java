@@ -18,7 +18,7 @@ class LfgNotificationOverlayTest {
         var close = LfgNotificationOverlay.closeBounds(card);
 
         assertEquals(new Rectangle(195, 44, 20, 20), close);
-        assertEquals(new Rectangle(200, 49, 10, 10),
+        assertEquals(new Rectangle(199, 48, 10, 10),
                 LfgNotificationOverlay.closeXBounds(close));
     }
 

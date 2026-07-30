@@ -168,7 +168,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var filters = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
         filters.gap(6).padding(Insets.left(4)).verticalAlignment(VerticalAlignment.CENTER);
 
-        createButton = UIComponents.button(LfgActionGlyph.CREATE.symbol(), ignored -> openCreateModal());
+        createButton = UIComponents.button(RalleTheme.ui(Component.literal("+")), ignored -> openCreateModal());
         createButton.sizing(Sizing.fixed(30), Sizing.fixed(20));
         createButton.renderer(RalleButtonRenderers.primary());
         createButton.tooltip(RalleTheme.ui(Component.literal("Create a raid lobby")));
@@ -434,11 +434,8 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         String lockLabel = lockSubmitting
                 ? (presentedLocked ? "Locking..." : "Unlocking...")
                 : (presentedLocked ? "Unlock" : "Lock");
-        var lockGlyph = lockSubmitting
-                ? (presentedLocked ? LfgActionGlyph.LOCK : LfgActionGlyph.UNLOCK)
-                : (presentedLocked ? LfgActionGlyph.UNLOCK : LfgActionGlyph.LOCK);
         lockButton = UIComponents.button(
-                lockGlyph.label(lockLabel),
+                RalleTheme.ui(Component.literal(lockLabel)),
                 ignored -> performLock(lobby));
         lockButton.sizing(Sizing.fixed(HOST_CONTROL_RIGHT_WIDTH), Sizing.fixed(20));
         lockButton.renderer(RalleButtonRenderers.neutral());
@@ -450,8 +447,8 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         controls.child(middle);
 
         int cooldown = service.pingCooldownSeconds(lobby.lobbyId());
-        var ping = UIComponents.button(LfgActionGlyph.PING.label(
-                cooldown > 0 ? "Ping (" + cooldown + "s)" : "Ping"), ignored -> performPing(lobby));
+        var ping = UIComponents.button(RalleTheme.ui(Component.literal(
+                cooldown > 0 ? "Ping (" + cooldown + "s)" : "Ping")), ignored -> performPing(lobby));
         ping.sizing(Sizing.fill(100), Sizing.fixed(20));
         ping.renderer(RalleButtonRenderers.neutral());
         ping.active = service.lifecycle() == RaidLfgService.LifecycleState.ONLINE
@@ -637,7 +634,8 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void performLock(LfgProtocol.Lobby lobby) {
-        lockDebouncer.toggle(lobby, LfgLockDebouncer.Origin.SCREEN);
+        lockDebouncer.toggle(lobby, LfgLockDebouncer.Origin.SCREEN)
+                .ifPresent(sounds::playLockToggle);
         renderedLockVersion = lockDebouncer.version();
         rebuildGrid();
     }
@@ -848,14 +846,14 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         if (root == null || service.lifecycle() != RaidLfgService.LifecycleState.ONLINE) return;
         var content = UIContainers.verticalFlow(Sizing.fixed(300), Sizing.content());
         content.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
-        content.child(UIComponents.label(LfgActionGlyph.LEAVE_DISBAND.label("DISBAND PARTY"))
+        content.child(UIComponents.label(RalleTheme.ui(Component.literal("DISBAND PARTY")))
                 .color(RalleTheme.ACCENT));
         content.child(UIComponents.label(RalleTheme.ui(Component.literal(
                 "Disband this party? The listing will be removed for everyone."))).color(RalleTheme.MUTED).maxWidth(276));
 
         var controls = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content()).gap(8);
         var overlayHolder = new OverlayContainer<?>[1];
-        var confirm = UIComponents.button(LfgActionGlyph.LEAVE_DISBAND.label("Disband"), ignored -> {
+        var confirm = UIComponents.button(RalleTheme.ui(Component.literal("Disband")), ignored -> {
             overlayHolder[0].remove();
             performAction(lobby, CardActionKind.DISBAND.protocolAction);
         });
@@ -873,9 +871,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private static Component actionLabel(CardAction action) {
-        return action.kind() == CardActionKind.LEAVE || action.kind() == CardActionKind.DISBAND
-                ? LfgActionGlyph.LEAVE_DISBAND.label(action.label())
-                : RalleTheme.ui(Component.literal(action.label()));
+        return RalleTheme.ui(Component.literal(action.label()));
     }
 
     private UUID viewerId() {
