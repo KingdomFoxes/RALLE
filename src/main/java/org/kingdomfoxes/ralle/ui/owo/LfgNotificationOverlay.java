@@ -229,21 +229,33 @@ public final class LfgNotificationOverlay {
         var id = card.lobby().lobbyId();
         var viewer = service.store().state().viewer();
         String disbandPrompt = disbandConfirmation.promptFor(id);
+        boolean partyFilledControl = showsPartyFilledControl(
+                card.lobby(),
+                card.persistent(),
+                viewer == null ? null : viewer.minecraftUuid(),
+                hostPartyInvites.hasCardOffer(id));
+        if (partyFilledControl) {
+            var split = splitPartyControls(controls);
+            String partyFilledLabel = fittingHint(
+                    keybindHints.partyFilledLabel("Party filled"), "Party filled", split.left());
+            drawButton(graphics, split.left(), partyFilledLabel,
+                    RalleButtonRenderers.Kind.PRIMARY, mouseX, mouseY, true);
+            if (interactive) hits.add(new HitRegion(split.left(), id, Action.INVITE_ALL));
+
+            boolean pending = service.pending(id, "disband");
+            String disbandLabel = pending ? "Disbanding" : disbandPrompt == null
+                    ? fittingHint(keybindHints.leaveDisbandLabel("Disband"), "Disband", split.right())
+                    : "Confirm";
+            drawButton(graphics, split.right(), disbandLabel,
+                    RalleButtonRenderers.Kind.DESTRUCTIVE, mouseX, mouseY, !pending);
+            if (interactive && !pending) hits.add(new HitRegion(split.right(), id, Action.DISBAND));
+            return;
+        }
         if (card.persistent() && viewer != null && card.lobby().hostedBy(viewer.minecraftUuid())
                 && disbandPrompt != null) {
             drawButton(graphics, controls, disbandPrompt, RalleButtonRenderers.Kind.DESTRUCTIVE,
                     mouseX, mouseY, true);
             if (interactive) hits.add(new HitRegion(controls, id, Action.DISBAND));
-            return;
-        }
-        if (showsPartyFilledControl(
-                card.lobby(),
-                card.persistent(),
-                viewer == null ? null : viewer.minecraftUuid(),
-                hostPartyInvites.hasCardOffer(id))) {
-            drawButton(graphics, controls, "Party filled", RalleButtonRenderers.Kind.PRIMARY,
-                    mouseX, mouseY, true);
-            if (interactive) hits.add(new HitRegion(controls, id, Action.INVITE_ALL));
             return;
         }
         if (card.persistent() && viewerBelongsTo(card.lobby())) {
@@ -348,10 +360,25 @@ public final class LfgNotificationOverlay {
                 && lobby.members().size() >= lobby.capacity();
     }
 
+    static SplitControls splitPartyControls(Rectangle controls) {
+        int gap = 4;
+        int leftWidth = Math.round((controls.width() - gap) * 0.6f);
+        return new SplitControls(
+                new Rectangle(controls.x(), controls.y(), leftWidth, controls.height()),
+                new Rectangle(controls.x() + leftWidth + gap, controls.y(),
+                        controls.width() - leftWidth - gap, controls.height())
+        );
+    }
+
     private void drawButton(GuiGraphics graphics, Rectangle bounds, String label,
                             RalleButtonRenderers.Kind kind, int mouseX, int mouseY, boolean active) {
         drawButton(graphics, bounds, RalleTypography.body(Component.literal(label)),
                 kind, mouseX, mouseY, active);
+    }
+
+    private String fittingHint(String hinted, String plain, Rectangle bounds) {
+        return minecraft.font.width(RalleTypography.body(Component.literal(hinted))) <= bounds.width() - 6
+                ? hinted : plain;
     }
 
     private void drawButton(GuiGraphics graphics, Rectangle bounds, Component label,
@@ -480,6 +507,8 @@ public final class LfgNotificationOverlay {
     }
 
     private enum Action { JOIN, CANCEL, CLOSE, LEAVE, DISBAND, INVITE_ALL }
+
+    record SplitControls(Rectangle left, Rectangle right) {}
 
     private record HitRegion(Rectangle bounds, UUID lobbyId, Action action) {}
 }

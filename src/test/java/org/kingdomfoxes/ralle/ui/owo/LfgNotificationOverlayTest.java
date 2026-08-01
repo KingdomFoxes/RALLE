@@ -54,6 +54,16 @@ class LfgNotificationOverlayTest {
     }
 
     @Test
+    void filledHostControlsKeepInviteLeftAndDisbandRight() {
+        var controls = new Rectangle(38, 112, 174, 20);
+
+        var split = LfgNotificationOverlay.splitPartyControls(controls);
+
+        assertEquals(new Rectangle(38, 112, 102, 20), split.left());
+        assertEquals(new Rectangle(144, 112, 68, 20), split.right());
+    }
+
+    @Test
     void notificationRegionColorsMatchTheRaidLfgSemanticScale() {
         assertEquals(0xFF00FF55, LfgNotificationOverlay.regionColor(LfgProtocol.Region.EU));
         assertEquals(0xFFFFFF00, LfgNotificationOverlay.regionColor(LfgProtocol.Region.NA));

@@ -15,7 +15,7 @@ final class SettingsScreenLayout {
     static final int DOCUMENT_PADDING = 8;
     static final int SECTION_TOP_MARGIN = 6;
     static final int ACTIVE_MARKER = DOCUMENT_PADDING + SECTION_TOP_MARGIN;
-    static final int MINIMUM_DOCUMENT_BOTTOM_SPACE = 24;
+    static final int MINIMUM_DOCUMENT_BOTTOM_SPACE = 16;
     private static final int MAX_PANEL_WIDTH = 620;
 
     private SettingsScreenLayout() {}
@@ -50,6 +50,10 @@ final class SettingsScreenLayout {
 
     static int jumpScrollOffset(int anchorOffset, int maxScroll) {
         return Math.clamp(anchorOffset - ACTIVE_MARKER, 0, Math.max(0, maxScroll));
+    }
+
+    static int anchoredScrollOffset(int anchorOffset, int viewportOffset, int maxScroll) {
+        return Math.clamp(anchorOffset - viewportOffset, 0, Math.max(0, maxScroll));
     }
 
     static int activeSection(List<Integer> anchorOffsets, int scrollOffset, int maxScroll) {

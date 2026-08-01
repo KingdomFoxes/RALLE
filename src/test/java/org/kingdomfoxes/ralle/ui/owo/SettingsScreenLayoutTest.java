@@ -36,6 +36,7 @@ class SettingsScreenLayoutTest {
         int anchor = 500;
         int contentAfterAnchor = 60;
         int trailing = SettingsScreenLayout.trailingDocumentSpace(viewport, contentAfterAnchor);
+        assertEquals(142, trailing);
         int maximumScroll = anchor + contentAfterAnchor + trailing - viewport;
         assertTrue(anchor - maximumScroll <= SettingsScreenLayout.ACTIVE_MARKER);
         assertTrue(trailing >= SettingsScreenLayout.MINIMUM_DOCUMENT_BOTTOM_SPACE);
@@ -65,6 +66,13 @@ class SettingsScreenLayoutTest {
         assertEquals(0, SettingsScreenLayout.jumpScrollOffset(anchors.getFirst(), 300));
         assertEquals(300, SettingsScreenLayout.jumpScrollOffset(500, 300));
         assertEquals(2, SettingsScreenLayout.activeSection(anchors, 300, 300));
+    }
+
+    @Test
+    void anchoredScrollKeepsRebuiltControlAtItsViewportPosition() {
+        assertEquals(180, SettingsScreenLayout.anchoredScrollOffset(220, 40, 500));
+        assertEquals(0, SettingsScreenLayout.anchoredScrollOffset(20, 40, 500));
+        assertEquals(500, SettingsScreenLayout.anchoredScrollOffset(620, 40, 500));
     }
 
     @Test

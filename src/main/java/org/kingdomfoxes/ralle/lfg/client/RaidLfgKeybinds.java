@@ -26,6 +26,7 @@ public final class RaidLfgKeybinds {
     public static final String JOIN_ID = "raid-lfg-join-keybind";
     public static final String CLOSE_ID = "raid-lfg-close-keybind";
     public static final String LEAVE_DISBAND_ID = "raid-lfg-leave-disband-keybind";
+    public static final String PARTY_FILLED_ID = "raid-lfg-party-filled-keybind";
     public static final String PING_ID = "raid-lfg-ping-keybind";
     public static final String LOCK_ID = "raid-lfg-lock-keybind";
     public static final String CREATE_ID = "raid-lfg-create-keybind";
@@ -49,6 +50,7 @@ public final class RaidLfgKeybinds {
     private final RaidLfgService service;
     private final LfgSoundPlayer sounds;
     private final LfgNotificationManager notifications;
+    private final HostPartyInviteController hostPartyInvites;
     private final RaidRegionDetector regionDetector;
     private final LfgActionBarState actionBar;
     private final LfgDisbandConfirmation disbandConfirmation;
@@ -60,6 +62,7 @@ public final class RaidLfgKeybinds {
 
     public RaidLfgKeybinds(Minecraft minecraft, SettingsRegistry settings, RaidLfgService service,
                            LfgSoundPlayer sounds, LfgNotificationManager notifications,
+                           HostPartyInviteController hostPartyInvites,
                            RaidRegionDetector regionDetector, LfgActionBarState actionBar,
                            LfgDisbandConfirmation disbandConfirmation,
                            LfgLockDebouncer lockDebouncer) {
@@ -67,6 +70,7 @@ public final class RaidLfgKeybinds {
         this.service = service;
         this.sounds = sounds;
         this.notifications = notifications;
+        this.hostPartyInvites = hostPartyInvites;
         this.regionDetector = regionDetector;
         this.actionBar = actionBar;
         this.disbandConfirmation = disbandConfirmation;
@@ -77,6 +81,7 @@ public final class RaidLfgKeybinds {
         register(settings, Action.JOIN, JOIN_ID, "key.ralle.raid-lfg-join");
         register(settings, Action.CLOSE, CLOSE_ID, "key.ralle.raid-lfg-close");
         register(settings, Action.LEAVE_DISBAND, LEAVE_DISBAND_ID, "key.ralle.raid-lfg-leave-disband");
+        register(settings, Action.PARTY_FILLED, PARTY_FILLED_ID, "key.ralle.raid-lfg-party-filled");
         register(settings, Action.PING, PING_ID, "key.ralle.raid-lfg-ping");
         register(settings, Action.LOCK, LOCK_ID, "key.ralle.raid-lfg-lock");
         register(settings, Action.CREATE, CREATE_ID, "key.ralle.raid-lfg-create");
@@ -200,9 +205,33 @@ public final class RaidLfgKeybinds {
                 notifications.close(id);
             });
             case LEAVE_DISBAND -> leaveOrDisband();
+            case PARTY_FILLED -> partyFilled();
             case PING -> ping();
             case LOCK -> lockOrUnlock();
             default -> {}
+        }
+    }
+
+    private void partyFilled() {
+        var lobby = currentLobby();
+        var viewer = service.store().state().viewer();
+        if (lobby == null || viewer == null) {
+            showNoParty();
+            return;
+        }
+        if (!lobby.hostedBy(viewer.minecraftUuid())) {
+            showMissingHostParty();
+            return;
+        }
+        if (lobby.members().size() < lobby.capacity()) {
+            actionBar.show("Party is not filled", LfgActionBarState.Tone.MUTED);
+            return;
+        }
+        if (hostPartyInvites.inviteAll(lobby.lobbyId())) {
+            actionBar.show("Party filled", LfgActionBarState.Tone.ACCENT);
+            notifications.close(lobby.lobbyId());
+        } else {
+            actionBar.show("Party invite unavailable", LfgActionBarState.Tone.DANGER);
         }
     }
 
@@ -499,7 +528,7 @@ public final class RaidLfgKeybinds {
         return "Ping on cooldown (" + seconds + "s remaining)";
     }
 
-    private enum Action { OPEN, JOIN, CLOSE, LEAVE_DISBAND, PING, LOCK, CREATE, KICK }
+    private enum Action { OPEN, JOIN, CLOSE, LEAVE_DISBAND, PARTY_FILLED, PING, LOCK, CREATE, KICK }
     private enum ChordMode { NONE, CREATE, KICK }
 
     private record Selection(int digit, LfgProtocol.RaidType raid, UUID targetId,

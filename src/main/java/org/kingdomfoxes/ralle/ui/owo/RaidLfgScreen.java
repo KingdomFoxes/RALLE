@@ -43,6 +43,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 /** Live Raid LFG browser backed by the persistent protocol-v1 service. */
 public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
@@ -180,7 +181,9 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         raidButton.horizontalSizing(Sizing.fixed(164));
         regionButton.horizontalSizing(Sizing.fixed(164));
         statusButton.renderer(RalleButtonRenderers.selectable(() -> statusFilter != StatusFilter.OPEN));
-        raidButton.renderer(RalleButtonRenderers.selectable(() -> raidFilter != RaidFilter.ALL));
+        raidButton.renderer(raidItemRenderer(
+                RalleButtonRenderers.selectable(() -> raidFilter != RaidFilter.ALL),
+                () -> raidFilter.raid));
         regionButton.renderer(RalleButtonRenderers.selectable(() -> regionFilter != RegionFilter.ALL));
         statusButton.onPress(button -> openStatusDropdown(button));
         raidButton.onPress(button -> openRaidDropdown(button));
@@ -903,24 +906,24 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         if (root == null || service.lifecycle() != RaidLfgService.LifecycleState.ONLINE) return;
         var content = UIContainers.verticalFlow(Sizing.fixed(320), Sizing.content());
         content.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
-        content.child(UIComponents.label(RalleTheme.ui(Component.literal("CREATE RAID LOBBY"))).color(RalleTheme.ACCENT));
+        content.child(UIComponents.label(RalleTheme.ui(Component.literal("CREATE RAID LOBBY BRATAN"))).color(RalleTheme.ACCENT));
         var selectedRaid = new LfgProtocol.RaidType[]{LfgProtocol.RaidType.DAILIES};
         var selectedRegion = new LfgProtocol.Region[]{currentRegion};
-        var raid = UIComponents.button(RalleTheme.ui(Component.literal("Raid: Dailies")), ignored -> {});
+        var raid = UIComponents.button(raidSelectionLabel(selectedRaid[0], RaidPresentation.name(selectedRaid[0]), false), ignored -> {});
         raid.horizontalSizing(Sizing.fill(100));
-        raid.renderer(RalleButtonRenderers.neutral());
+        raid.renderer(raidItemRenderer(RalleButtonRenderers.neutral(), () -> selectedRaid[0]));
         raid.onPress(button -> {
             var values = LfgProtocol.RaidType.values();
             selectedRaid[0] = values[(selectedRaid[0].ordinal() + 1) % values.length];
-            button.setMessage(RalleTheme.ui(Component.literal("Raid: " + RaidPresentation.name(selectedRaid[0]))));
+            button.setMessage(raidSelectionLabel(selectedRaid[0], RaidPresentation.name(selectedRaid[0]), false));
         });
-        var region = UIComponents.button(RalleTheme.ui(Component.literal("Region: " + selectedRegion[0])), ignored -> {});
+        var region = UIComponents.button(RalleTheme.ui(Component.literal(selectedRegion[0].name())), ignored -> {});
         region.horizontalSizing(Sizing.fill(100));
         region.renderer(RalleButtonRenderers.neutral());
         region.onPress(button -> {
             var values = LfgProtocol.Region.values();
             selectedRegion[0] = values[(selectedRegion[0].ordinal() + 1) % values.length];
-            button.setMessage(RalleTheme.ui(Component.literal("Region: " + selectedRegion[0])));
+            button.setMessage(RalleTheme.ui(Component.literal(selectedRegion[0].name())));
         });
         var noteValue = new String[]{""};
         var note = UIComponents.textBox(Sizing.fill(100));
@@ -1008,9 +1011,30 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         return statusFilter.matches(lobby) && raidFilter.matches(lobby) && regionFilter.matches(lobby);
     }
 
-    private Component statusLabel() { return RalleTheme.dropdownLabel(Component.literal("Status: " + statusFilter.label)); }
-    private Component raidLabel() { return RalleTheme.dropdownLabel(Component.literal("Raid: " + raidFilter.label())); }
-    private Component regionLabel() { return RalleTheme.dropdownLabel(Component.literal("Region: " + regionFilter.label)); }
+    private Component statusLabel() { return RalleTheme.dropdownLabel(Component.literal(statusFilter.label)); }
+
+    private Component raidLabel() {
+        return raidSelectionLabel(raidFilter.raid, raidFilter.label(), true);
+    }
+
+    private Component regionLabel() { return RalleTheme.dropdownLabel(Component.literal(regionFilter.label)); }
+
+    private static Component raidSelectionLabel(LfgProtocol.RaidType raid, String label, boolean dropdown) {
+        var copy = Component.literal(raid == null ? label : "    " + label);
+        return dropdown ? RalleTheme.dropdownLabel(copy) : RalleTheme.ui(copy);
+    }
+
+    private ButtonComponent.Renderer raidItemRenderer(ButtonComponent.Renderer background,
+                                                       Supplier<LfgProtocol.RaidType> selectedRaid) {
+        return (graphics, button, delta) -> {
+            background.draw(graphics, button, delta);
+            var raid = selectedRaid.get();
+            if (raid == null) return;
+            int textLeft = button.getX() + (button.getWidth() - minecraft.font.width(button.getMessage())) / 2;
+            int itemY = button.getY() + (button.getHeight() - 16) / 2;
+            graphics.renderItem(new ItemStack(RaidPresentation.item(raid)), textLeft, itemY);
+        };
+    }
 
     private Color regionColor(LfgProtocol.Region region) {
         if (region == currentRegion) return REGION_GOOD;

@@ -158,8 +158,8 @@ but cannot discover new ones. The persistent `LfgJoinController` owns the
 single three-second countdown and submission shared by the browser and HUD
 cards.
 
-`RaidLfgKeybinds` owns the eight persisted, unbound-by-default LFG mappings:
-Open plus Join, Close, Leave/Disband, Ping, Lock/Unlock, Create, and Kick. The
+`RaidLfgKeybinds` owns the nine persisted, unbound-by-default LFG mappings:
+Open plus Join, Close, Leave/Disband, Party Filled, Ping, Lock/Unlock, Create, and Kick. The
 action mappings run only during normal gameplay after the service reaches a
 fresh online snapshot; an open screen, absent player/world, disabled service,
 or duplicate RALLE key assignment makes the affected action inert. A narrow
@@ -182,7 +182,8 @@ appear on notification-card or Raid LFG browser controls. A Ping activation
 during the locally tracked cooldown reports the rounded-up seconds remaining.
 Party-scoped keybinds report when the viewer has no synchronized Raid LFG
 party, and host-only bindings distinguish that state from being a non-host
-member.
+member. Party Filled queues the synchronized non-host roster through the same bounded invitation
+controller only while the authoritative host lobby is full.
 
 `LfgLockDebouncer` is shared by the keybind controller and Raid LFG screen.
 Each Lock/Unlock activation toggles a desired local state and restarts a
@@ -222,8 +223,9 @@ within the shaded face. It removes only that card presentation and never opens
 the browser, cancels a Join, leaves, or disbands. The persistent join controller
 continues a dismissed countdown or submission and still owns exactly-once
 terminal sound and state handling. Bottom actions are full-width Join, Joined,
-status, Leave, Disband, or Party filled states as applicable. Usable bound
-Join and Leave/Disband keys appear beside their card actions; the Close binding
+status, Leave, or Disband states as applicable. A full persistent host card instead keeps
+`Party filled` on the left and `Disband` on the right. Usable bound
+Join, Leave/Disband, and Party Filled keys appear beside their card actions; the Close binding
 is not printed beside the X. Unbound or conflicting mappings do not advertise a
 nonfunctional shortcut.
 

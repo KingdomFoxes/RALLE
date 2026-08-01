@@ -324,10 +324,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private ButtonComponent control(SettingsEntry entry, boolean available) {
         ButtonComponent button;
         if (entry instanceof BooleanSetting setting) {
-            button = UIComponents.button(booleanLabel(setting), ignored -> {
-                setting.set(!setting.value());
-                renderCategory(selectedCategory, selectedSubcategory, scroll.progress(), false);
-            });
+            button = UIComponents.button(booleanLabel(setting), pressed -> toggleBoolean(setting, pressed));
             button.renderer(RalleButtonRenderers.selectable(setting::value));
         } else if (entry instanceof ChoiceSetting setting) {
             button = UIComponents.button(choiceLabel(setting), ignored -> openChoice(setting, buttonFor(entry.id())));
@@ -346,6 +343,25 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         button.active = available;
         if (!available) button.tooltip(RalleTheme.ui(Component.translatable("ralle.settings.unavailable")));
         return button;
+    }
+
+    private void toggleBoolean(BooleanSetting setting, ButtonComponent trigger) {
+        int triggerViewportOffset = trigger.y() - scroll.y();
+        double fallbackProgress = scroll.progress();
+        setting.set(!setting.value());
+        renderCategory(selectedCategory, selectedSubcategory, fallbackProgress, false);
+
+        // The mounted document lays out synchronously. Finalize its dynamic tail before restoring
+        // the replacement control so an intermediate zero-scroll layout is never presented.
+        updateTrailingSpace();
+        var replacement = buttonFor(setting.id());
+        if (replacement == null) return;
+
+        int replacementDocumentOffset = replacement.y() - document.y();
+        scroll.scrollToOffsetImmediately(SettingsScreenLayout.anchoredScrollOffset(
+                replacementDocumentOffset, triggerViewportOffset, scroll.maximumOffset()
+        ));
+        pendingScrollProgress = null;
     }
 
     private ButtonComponent buttonFor(String id) {

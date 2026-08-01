@@ -14,12 +14,12 @@ disabled processed-xylophone count and successful-copy feedback.
 `/ralle lfg` opens the live, authenticated owo-lib Raid LFG browser when the
 feature is explicitly enabled on Wynncraft. Hosts can disband, kick with a
 hold-to-confirm roster interaction, lock or reopen joining, and ping current
-party members. Seven additional unbound action shortcuts cover Join, Close,
-Leave/Disband, Ping, Lock/Unlock, Create, and Kick; Create and Kick use
+party members. Eight additional unbound action shortcuts cover Join, Close,
+Leave/Disband, Party Filled, Ping, Lock/Unlock, Create, and Kick; Create and Kick use
 top-row-number chords and report their keybind-only feedback through a fixed
 Action Bar above the crosshair. Notification cards use a red top-right X for
 presentation-only dismissal, including during a Join countdown, and show usable
-bound keys beside their Join and Leave/Disband actions. Action Bar feedback
+bound keys beside their Join, Leave/Disband, and Party Filled actions. Action Bar feedback
 pairs Vanilla-font recognition glyphs with the selected interface font,
 including a remaining-time message when Ping is on cooldown, while rapid
 Lock/Unlock toggles are coalesced for one second before any backend mutation.

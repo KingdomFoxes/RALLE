@@ -14,6 +14,7 @@ public final class LfgKeybindHints {
             RaidLfgKeybinds.JOIN_ID,
             RaidLfgKeybinds.CLOSE_ID,
             RaidLfgKeybinds.LEAVE_DISBAND_ID,
+            RaidLfgKeybinds.PARTY_FILLED_ID,
             RaidLfgKeybinds.PING_ID,
             RaidLfgKeybinds.LOCK_ID,
             RaidLfgKeybinds.CREATE_ID,
@@ -32,6 +33,10 @@ public final class LfgKeybindHints {
 
     public String leaveDisbandLabel(String action) {
         return label(action, RaidLfgKeybinds.LEAVE_DISBAND_ID);
+    }
+
+    public String partyFilledLabel(String action) {
+        return label(action, RaidLfgKeybinds.PARTY_FILLED_ID);
     }
 
     private String label(String action, String settingId) {

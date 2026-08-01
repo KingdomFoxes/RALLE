@@ -66,6 +66,7 @@ class RalleSettingsTest {
                 "raid-lfg-join-keybind",
                 "raid-lfg-close-keybind",
                 "raid-lfg-leave-disband-keybind",
+                "raid-lfg-party-filled-keybind",
                 "raid-lfg-ping-keybind",
                 "raid-lfg-lock-keybind",
                 "raid-lfg-create-keybind",

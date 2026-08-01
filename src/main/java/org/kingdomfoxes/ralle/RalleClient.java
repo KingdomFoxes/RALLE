@@ -108,7 +108,7 @@ public final class RalleClient implements ClientModInitializer {
         var actionBarOverlay = new LfgActionBarOverlay(minecraft, actionBarState);
         actionBarOverlay.register();
         var lfgKeybinds = new RaidLfgKeybinds(
-                minecraft, settings, raidLfg, lfgSounds, lfgNotifications, regionDetector,
+                minecraft, settings, raidLfg, lfgSounds, lfgNotifications, hostPartyInvites, regionDetector,
                 actionBarState, disbandConfirmation, lockDebouncer);
         var chatBehavior = new ChatBehaviorService(Minecraft.getInstance(), settings);
         var chatScreenshots = new ChatScreenshotService(

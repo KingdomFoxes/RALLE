@@ -23,6 +23,11 @@ class LfgKeybindHintsTest {
         settings.setting(RaidLfgKeybinds.JOIN_ID, KeybindSetting.class)
                 .set("key.keyboard.equal");
         assertEquals("Join [=]", hints.joinLabel("Join"));
+        settings.setting(RaidLfgKeybinds.JOIN_ID, KeybindSetting.class)
+                .set(KeybindSetting.UNBOUND);
+        settings.setting(RaidLfgKeybinds.PARTY_FILLED_ID, KeybindSetting.class)
+                .set("key.keyboard.equal");
+        assertEquals("Party filled [=]", hints.partyFilledLabel("Party filled"));
     }
 
     @Test
