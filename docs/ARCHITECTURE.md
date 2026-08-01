@@ -36,8 +36,9 @@ platform ports. It must not depend on a concrete settings screen.
   Raid LFG discovery cards own their lifecycle cues. The shared join-result
   presentation plays the vanilla respawn-anchor charge variants after a
   confirmed viewer join from either the main screen or a HUD card. The main
-  screen plays the first amethyst resonance after confirmed party creation and
-  the deplete variants after an explicit successful Leave. Visible discovery
+  screen plays the first amethyst resonance after confirmed party creation.
+  An explicit successful Leave or Disband from the main screen, notification
+  card, or keybind Action Bar path plays the deplete variants. Visible discovery
   cards play occupied-slot cues as their observed rosters grow. An always-on
   synchronized-state observer owns the same cue for later members joining the
   viewer's lobby, even when the browser is closed or no HUD card is present.

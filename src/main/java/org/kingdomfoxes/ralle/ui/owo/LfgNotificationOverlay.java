@@ -460,7 +460,9 @@ public final class LfgNotificationOverlay {
                     if (lobby != null && disbandConfirmation.request(
                             lobby.lobbyId(), lobby.revision(), "Click again to disband")
                             == LfgDisbandConfirmation.Result.CONFIRMED) {
-                        service.disband(lobby.lobbyId());
+                        service.disband(lobby.lobbyId()).whenComplete((ignored, failure) -> {
+                            if (failure == null) minecraft.execute(sounds::playPartyLeft);
+                        });
                     }
                 }
                 case INVITE_ALL -> {

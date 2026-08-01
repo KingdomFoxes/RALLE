@@ -274,7 +274,9 @@ public final class RaidLfgKeybinds {
                     LfgActionGlyph.LEAVE_DISBAND);
         }
         service.disband(lobby.lobbyId()).whenComplete((ignored, failure) -> minecraft.execute(() -> {
-            if (failure != null && !cardVisible) {
+            if (failure == null) {
+                sounds.playPartyLeft();
+            } else if (!cardVisible) {
                 actionBar.show("Disband failed", LfgActionBarState.Tone.DANGER,
                         LfgActionGlyph.LEAVE_DISBAND);
             }

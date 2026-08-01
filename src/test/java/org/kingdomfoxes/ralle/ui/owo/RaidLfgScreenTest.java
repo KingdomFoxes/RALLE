@@ -98,16 +98,19 @@ class RaidLfgScreenTest {
     }
 
     @Test
-    void onlyASuccessfulExplicitLeaveGetsTheDepleteCue() {
+    void onlySuccessfulExplicitLeaveAndDisbandGetTheDepleteCue() {
         var tracker = new LfgMainUiSoundTracker();
         var sounds = new Sounds();
 
         tracker.actionCompleted("join", null, sounds);
         tracker.actionCompleted("leave", new IllegalStateException("rejected"), sounds);
+        tracker.actionCompleted("disband", new IllegalStateException("rejected"), sounds);
         assertEquals(0, sounds.left);
 
         tracker.actionCompleted("leave", null, sounds);
         assertEquals(1, sounds.left);
+        tracker.actionCompleted("disband", null, sounds);
+        assertEquals(2, sounds.left);
     }
 
     @Test
