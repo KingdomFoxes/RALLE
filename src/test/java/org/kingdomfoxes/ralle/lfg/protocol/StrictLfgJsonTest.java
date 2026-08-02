@@ -34,6 +34,25 @@ class StrictLfgJsonTest {
     }
 
     @Test
+    void decodesMinimalStatusAndRejectsLegacyOrUnknownFields() {
+        var status = StrictLfgJson.decodeStatus("{\"enabled\":true,\"protocol_version\":1}");
+        assertTrue(status.enabled());
+        assertEquals(1, status.protocolVersion());
+        assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeStatus(
+                "{\"enabled\":true,\"protocol_version\":1,\"legacy_requirement\":\"old\"}"));
+        assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeStatus(
+                "{\"enabled\":true,\"protocol_version\":1,\"future\":true}"));
+    }
+
+    @Test
+    void encodesChallengeWithoutModBuildVersion() {
+        assertEquals(
+                "{\"minecraft_uuid\":\"00000000-0000-0000-0000-000000000001\",\"ign\":\"Player01\",\"protocol_version\":1}",
+                StrictLfgJson.challengeRequest(
+                        java.util.UUID.fromString("00000000-0000-0000-0000-000000000001"), "Player01"));
+    }
+
+    @Test
     void decodesCompleteSnapshotAndLiveFrames() {
         var snapshot = StrictLfgJson.decodeSnapshot(snapshot());
         assertEquals(2, snapshot.revision());
@@ -100,5 +119,18 @@ class StrictLfgJsonTest {
                 """.formatted(LOBBY));
         assertEquals("RAID_ALREADY_LISTED", error.code());
         assertNotNull(error.returnedLobby());
+    }
+
+    @Test
+    void decodesRateLimitRetryAndRejectsUnknownErrorDetails() {
+        var error = StrictLfgJson.decodeError("""
+                {"error":{"code":"RATE_LIMITED","message":"Slow down","retryable":true,
+                 "details":{"retry_after":17}}}
+                """);
+        assertEquals(17, error.retryAfterSeconds());
+        assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeError("""
+                {"error":{"code":"RATE_LIMITED","message":"Slow down","retryable":true,
+                 "details":{"future":17}}}
+                """));
     }
 }

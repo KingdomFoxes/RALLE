@@ -49,7 +49,6 @@ public final class RaidLfgService {
 
     private volatile LifecycleState lifecycle = LifecycleState.DISABLED;
     private volatile String statusMessage = "Raid LFG is disabled in settings.";
-    private volatile String releaseUrl;
     private volatile UUID focusLobbyId;
     private String contextKey = "";
     private String bearerToken;
@@ -97,7 +96,6 @@ public final class RaidLfgService {
     public LfgJoinController joinController() { return joinController; }
     public LifecycleState lifecycle() { return lifecycle; }
     public String statusMessage() { return statusMessage; }
-    public String releaseUrl() { return releaseUrl; }
     public UUID focusLobbyId() { return focusLobbyId; }
     public void clearFocus() { focusLobbyId = null; }
     public void focusLobby(UUID lobbyId) { focusLobbyId = lobbyId; }
@@ -127,7 +125,7 @@ public final class RaidLfgService {
     public synchronized void tick() {
         joinController.tick();
         var host = normalizedHost(environment.serverHost());
-        var nextContext = environment.enabled() + "|" + host + "|" + environment.playerId() + "|" + environment.modVersion();
+        var nextContext = environment.enabled() + "|" + host + "|" + environment.playerId();
         if (!nextContext.equals(contextKey)) {
             contextKey = nextContext;
             invalidate(environment.enabled() ? LifecycleState.NOT_ON_WYNNCRAFT : LifecycleState.DISABLED,
@@ -160,6 +158,7 @@ public final class RaidLfgService {
         return gateway.snapshot(token).thenApply(snapshot -> {
             synchronized (this) {
                 if (expected != generation) return snapshot;
+                requireProtocol(snapshot.protocolVersion());
                 store.replace(snapshot, RaidLfgStore.UpdateOrigin.SNAPSHOT);
                 lifecycle = LifecycleState.ONLINE;
                 statusMessage = "Live";
@@ -236,6 +235,7 @@ public final class RaidLfgService {
             synchronized (this) {
                 requireCurrent(expected);
             }
+            requireProtocol(mutation.protocolVersion());
             if (removal) store.remove(mutation.revision(), mutation.lobby().lobbyId(),
                     RaidLfgStore.UpdateOrigin.LOCAL_MUTATION);
             else store.apply(mutation);
@@ -254,6 +254,17 @@ public final class RaidLfgService {
                         focusLobbyId = error.returnedLobby().lobbyId();
                     }
                     if (gatewayFailure.status() == 401) restartAuthentication();
+                    else if (isIneligible(error, gatewayFailure.status())) {
+                        terminalState(LifecycleState.INELIGIBLE, error.message());
+                    } else if (isUnsupportedProtocol(error, gatewayFailure.status())) {
+                        terminalState(LifecycleState.OUTDATED, error.message());
+                    } else if (gatewayFailure.transportFailure()
+                            || (error.retryable() && !"RATE_LIMITED".equals(error.code()))) {
+                        scheduleReconnect(error.message());
+                    }
+                } else if (cause instanceof TerminalException terminal
+                        && "UNSUPPORTED_PROTOCOL".equals(terminal.code)) {
+                    terminalState(LifecycleState.OUTDATED, terminal.getMessage());
                 } else {
                     statusMessage = cause.getMessage() == null || cause.getMessage().isBlank()
                             ? "The host action failed."
@@ -273,23 +284,22 @@ public final class RaidLfgService {
         gateway.status()
                 .thenCompose(status -> {
                     requireCurrent(expected);
-                    releaseUrl = status.modrinthReleaseUrl();
                     if (!status.enabled()) throw terminal("LFG_DISABLED", "Raid LFG is currently unavailable.");
-                    if (status.protocolVersion() != LfgProtocol.VERSION || !environment.modVersion().equals(status.requiredClientVersion())) {
-                        throw terminal("CLIENT_VERSION_MISMATCH", "Update RALLE to use Raid LFG.");
+                    if (status.protocolVersion() != LfgProtocol.VERSION) {
+                        throw terminal("UNSUPPORTED_PROTOCOL", "Fox Raid LFG uses an incompatible protocol.");
                     }
-                    return gateway.challenge(environment.playerId(), environment.ign(), environment.modVersion());
+                    return gateway.challenge(environment.playerId(), environment.ign());
                 })
                 .thenCompose(challenge -> {
                     requireCurrent(expected);
-                    if (challenge.protocolVersion() != LfgProtocol.VERSION) throw new LfgProtocolException("Challenge protocol mismatch");
+                    requireProtocol(challenge.protocolVersion());
                     return sessionProof.prove(challenge.serverId()).thenApply(ignored -> challenge);
                 })
                 .thenCompose(challenge -> gateway.complete(challenge.challengeId()))
                 .thenCompose(session -> {
                     synchronized (this) {
                         requireCurrent(expected);
-                        if (session.protocolVersion() != LfgProtocol.VERSION) throw new LfgProtocolException("Session protocol mismatch");
+                        requireProtocol(session.protocolVersion());
                         bearerToken = session.accessToken();
                         lifecycle = LifecycleState.SYNCING;
                         statusMessage = "Synchronizing live lobbies...";
@@ -324,6 +334,7 @@ public final class RaidLfgService {
             return;
         }
         if (frame instanceof LfgProtocol.SnapshotFrame snapshotFrame) {
+            requireProtocol(snapshotFrame.snapshot().protocolVersion());
             store.replace(snapshotFrame.snapshot(), RaidLfgStore.UpdateOrigin.SNAPSHOT);
             awaitingSnapshot = false;
             reconnectAttempt = 0;
@@ -345,15 +356,25 @@ public final class RaidLfgService {
         } else if (frame instanceof LfgProtocol.SessionExpiringFrame) {
             restartAuthentication();
         } else if (frame instanceof LfgProtocol.ErrorFrame error) {
-            statusMessage = error.error().message();
+            applyLiveError(error.error());
         }
     }
 
     private synchronized void liveClosed(long expected, int statusCode, String reason) {
         if (expected != generation) return;
-        if (statusCode == 4401) restartAuthentication();
-        else if (statusCode == 4403) terminalUnavailable("Fox rejected this client protocol.");
-        else scheduleReconnect("Live connection lost. Reconnecting...");
+        var code = reason == null ? "" : reason.strip().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+        if (statusCode == 4401 || "UNAUTHORIZED".equals(code)) {
+            restartAuthentication();
+        } else if (statusCode == 4403 || "INELIGIBLE".equals(code) || "INELIGIBLE_GUILD".equals(code)) {
+            terminalState(LifecycleState.INELIGIBLE, "Alliance access is unavailable.");
+        } else if (statusCode == 4406 || "UNSUPPORTED_PROTOCOL".equals(code)) {
+            terminalState(LifecycleState.OUTDATED, "Fox Raid LFG uses an incompatible protocol.");
+        } else if ("WYNNCRAFT_UNAVAILABLE".equals(code) || "UPSTREAM_UNAVAILABLE".equals(code)
+                || "TRANSPORT_FAILURE".equals(code) || statusCode < 4000) {
+            scheduleReconnect("Live connection lost. Reconnecting...");
+        } else {
+            terminalUnavailable("Fox rejected the live connection.");
+        }
     }
 
     private synchronized void handleAsyncFailure(long expected, Throwable failure, boolean connectedPhase) {
@@ -362,9 +383,21 @@ public final class RaidLfgService {
         if (cause instanceof StaleGenerationException) return;
         if (cause instanceof LfgGatewayException gatewayFailure) {
             var error = gatewayFailure.error();
+            if (gatewayFailure.status() == 401) {
+                scheduleReconnect("Authentication expired. Reconnecting...");
+                return;
+            }
+            if (isIneligible(error, gatewayFailure.status())) {
+                terminalState(LifecycleState.INELIGIBLE, error.message());
+                return;
+            }
+            if (isUnsupportedProtocol(error, gatewayFailure.status())) {
+                terminalState(LifecycleState.OUTDATED, error.message());
+                return;
+            }
             switch (error.code()) {
-                case "CLIENT_VERSION_MISMATCH", "UNSUPPORTED_PROTOCOL" -> terminalState(LifecycleState.OUTDATED, error.message());
-                case "INELIGIBLE_GUILD" -> terminalState(LifecycleState.INELIGIBLE, error.message());
+                case "UNSUPPORTED_PROTOCOL" -> terminalState(LifecycleState.OUTDATED, error.message());
+                case "INELIGIBLE", "INELIGIBLE_GUILD" -> terminalState(LifecycleState.INELIGIBLE, error.message());
                 case "UNAUTHORIZED", "INVALID_CHALLENGE" -> scheduleReconnect("Authentication expired. Reconnecting...");
                 default -> {
                     if (gatewayFailure.transportFailure() || error.retryable()) scheduleReconnect(error.message());
@@ -375,7 +408,7 @@ public final class RaidLfgService {
             LOGGER.error("Fox returned incompatible Raid LFG data: {}", cause.getMessage(), cause);
             terminalUnavailable("Fox returned incompatible Raid LFG data.");
         } else if (cause instanceof TerminalException terminal) {
-            if ("CLIENT_VERSION_MISMATCH".equals(terminal.code)) terminalState(LifecycleState.OUTDATED, terminal.getMessage());
+            if ("UNSUPPORTED_PROTOCOL".equals(terminal.code)) terminalState(LifecycleState.OUTDATED, terminal.getMessage());
             else terminalUnavailable(terminal.getMessage());
         } else {
             scheduleReconnect(connectedPhase ? "Live connection failed. Reconnecting..." : "Authentication failed. Reconnecting...");
@@ -386,6 +419,20 @@ public final class RaidLfgService {
         if (!environment.enabled() || !isWynncraft(normalizedHost(environment.serverHost()))) return;
         lifecycle = LifecycleState.NOT_ON_WYNNCRAFT;
         authenticate();
+    }
+
+    private void applyLiveError(LfgProtocol.Error error) {
+        if ("UNAUTHORIZED".equals(error.code()) || "INVALID_CHALLENGE".equals(error.code())) {
+            restartAuthentication();
+        } else if (isIneligible(error, 0)) {
+            terminalState(LifecycleState.INELIGIBLE, error.message());
+        } else if (isUnsupportedProtocol(error, 0)) {
+            terminalState(LifecycleState.OUTDATED, error.message());
+        } else if (error.retryable()) {
+            scheduleReconnect(error.message());
+        } else {
+            terminalUnavailable(error.message());
+        }
     }
 
     private void scheduleReconnect(String message) {
@@ -443,7 +490,9 @@ public final class RaidLfgService {
     }
 
     private static void requireProtocol(int version) {
-        if (version != LfgProtocol.VERSION) throw new LfgProtocolException("Protocol version mismatch");
+        if (version != LfgProtocol.VERSION) {
+            throw terminal("UNSUPPORTED_PROTOCOL", "Fox Raid LFG uses an incompatible protocol.");
+        }
     }
 
     private static String sanitizeNote(String note) {
@@ -476,6 +525,14 @@ public final class RaidLfgService {
 
     private static String pendingKey(UUID lobbyId, String action) {
         return lobbyId == null ? action : lobbyId + ":" + action;
+    }
+
+    private static boolean isIneligible(LfgProtocol.Error error, int status) {
+        return status == 403 || "INELIGIBLE".equals(error.code()) || "INELIGIBLE_GUILD".equals(error.code());
+    }
+
+    private static boolean isUnsupportedProtocol(LfgProtocol.Error error, int status) {
+        return status == 426 || "UNSUPPORTED_PROTOCOL".equals(error.code());
     }
 
     private boolean rememberCommand(UUID eventId) {

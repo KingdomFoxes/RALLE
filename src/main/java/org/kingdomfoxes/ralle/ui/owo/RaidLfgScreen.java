@@ -21,7 +21,6 @@ import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.jetbrains.annotations.NotNull;
@@ -38,7 +37,6 @@ import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.net.URI;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -303,13 +301,6 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         panel.horizontalAlignment(HorizontalAlignment.CENTER).verticalAlignment(VerticalAlignment.CENTER)
                 .surface(RalleSurfaces.NAVY_PANEL);
         panel.child(UIComponents.label(RalleTheme.ui(Component.literal(message))).color(RalleTheme.MUTED).maxWidth(GRID_WIDTH - 40));
-        if (service.lifecycle() == RaidLfgService.LifecycleState.OUTDATED && service.releaseUrl() != null
-                && !service.releaseUrl().isBlank()) {
-            var link = Component.literal("Open current Modrinth release").withStyle(style -> style
-                    .withColor(0xF2B84B).withUnderlined(true)
-                    .withClickEvent(new ClickEvent.OpenUrl(URI.create(service.releaseUrl()))));
-            panel.child(UIComponents.label(link));
-        }
         return panel;
     }
 
@@ -1053,7 +1044,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             case AUTHENTICATING -> "Authenticating...";
             case SYNCING -> "Synchronizing...";
             case RECONNECTING -> "Offline · reconnecting";
-            case OUTDATED -> "Update required";
+            case OUTDATED -> "Protocol incompatible";
             case INELIGIBLE -> "Alliance access unavailable";
             case DISABLED -> "Disabled";
             case NOT_ON_WYNNCRAFT -> "Not connected to Wynncraft";

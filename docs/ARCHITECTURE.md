@@ -103,10 +103,9 @@ browser does not own authentication or live synchronization. Networking starts o
 Disconnecting, disabling the setting, or changing servers closes the WebSocket and clears the
 in-memory bearer credential and lobby projection.
 
-During private feature development, the packaged protocol-v1 base URL is
-`http://127.0.0.1:8001/api/ralle/v1`, matching the single-worker local Uvicorn service. The intended
-production URL remains `https://kingdomfoxes.com/api/ralle/v1` as a named constant for the release
-switch. Either build may override its default with the `ralle.lfg.baseUrl` JVM property. Insecure
+The packaged protocol-v1 base URL is `https://kingdomfoxes.com/api/ralle/v1`. Local development
+may explicitly override it with the `ralle.lfg.baseUrl` JVM property; the client never falls back
+to loopback automatically. Insecure
 HTTP and WebSocket transports are accepted only for loopback hosts; this is intentionally not a
 player setting. The JDK gateway is pinned to HTTP/1.1 so local requests do not attempt an `h2c`
 upgrade that Uvicorn does not support.
@@ -118,6 +117,11 @@ complete authorized snapshot; create, join, leave, disband, kick, lock/unlock, a
 UUID `Idempotency-Key` per player action. A failed transport attempt is retried once with the same
 key. The `WS /live` connection sends the bearer credential in its `Authorization` header and must
 deliver a complete `snapshot` frame before any `lobby.upsert` or `lobby.remove` frame.
+
+The status response contains only the feature flag and protocol version. Authentication identifies
+the client protocol but does not send or compare the mod build version. Unsupported protocol
+versions enter an incompatible client state without a release link; exact mod-version enforcement
+is deferred.
 
 Kick, lock/unlock, and ping remain Fox-authoritative host actions. An accepted kick removes the
 member, applies a 120-second rejoin block, and causes exactly one bounded `/party kick <IGN>`

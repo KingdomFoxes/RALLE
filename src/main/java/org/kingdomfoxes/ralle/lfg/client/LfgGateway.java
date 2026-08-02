@@ -8,7 +8,7 @@ import java.util.concurrent.CompletableFuture;
 /** Transport boundary for the public Fox protocol-v1 client API. */
 public interface LfgGateway {
     CompletableFuture<LfgProtocol.Status> status();
-    CompletableFuture<LfgProtocol.Challenge> challenge(UUID playerId, String ign, String modVersion);
+    CompletableFuture<LfgProtocol.Challenge> challenge(UUID playerId, String ign);
     CompletableFuture<LfgProtocol.Session> complete(String challengeId);
     CompletableFuture<LfgProtocol.Snapshot> snapshot(String bearerToken);
     CompletableFuture<LfgProtocol.Mutation> create(String bearerToken, LfgProtocol.RaidType raid,

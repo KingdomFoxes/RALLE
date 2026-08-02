@@ -24,9 +24,8 @@ public final class StrictLfgJson {
 
     public static Status decodeStatus(String json) {
         var object = object(json, "status");
-        fields(object, "status", Set.of("enabled", "protocol_version", "required_client_version", "modrinth_release_url"), Set.of());
-        return new Status(bool(object, "enabled"), integer(object, "protocol_version"),
-                string(object, "required_client_version"), string(object, "modrinth_release_url"));
+        fields(object, "status", Set.of("enabled", "protocol_version"), Set.of());
+        return new Status(bool(object, "enabled"), integer(object, "protocol_version"));
     }
 
     public static Challenge decodeChallenge(String json) {
@@ -101,12 +100,11 @@ public final class StrictLfgJson {
         };
     }
 
-    public static String challengeRequest(UUID playerId, String ign, String modVersion) {
+    public static String challengeRequest(UUID playerId, String ign) {
         var object = new JsonObject();
         object.addProperty("minecraft_uuid", playerId.toString());
         object.addProperty("ign", ign);
         object.addProperty("protocol_version", VERSION);
-        object.addProperty("mod_version", modVersion);
         return object.toString();
     }
 
@@ -220,13 +218,21 @@ public final class StrictLfgJson {
         fields(object, path, Set.of("code", "message", "retryable"), Set.of("lobby_id", "details"));
         UUID lobbyId = object.has("lobby_id") && !object.get("lobby_id").isJsonNull() ? uuid(object, "lobby_id") : null;
         Lobby returned = null;
+        Integer retryAfterSeconds = null;
         if (object.has("details") && !object.get("details").isJsonNull()) {
             var details = asObject(object.get("details"), path + ".details");
+            fields(details, path + ".details", Set.of(), Set.of("lobby", "retry_after"));
             if (details.has("lobby") && !details.get("lobby").isJsonNull()) {
                 returned = lobby(asObject(details.get("lobby"), path + ".details.lobby"), path + ".details.lobby");
             }
+            if (details.has("retry_after") && !details.get("retry_after").isJsonNull()) {
+                int seconds = integer(details, "retry_after");
+                if (seconds < 0) throw malformed(path + ".details.retry_after must not be negative");
+                retryAfterSeconds = seconds;
+            }
         }
-        return new LfgProtocol.Error(string(object, "code"), string(object, "message"), bool(object, "retryable"), lobbyId, returned);
+        return new LfgProtocol.Error(string(object, "code"), string(object, "message"),
+                bool(object, "retryable"), lobbyId, returned, retryAfterSeconds);
     }
 
     private static Map<String, String> stringMap(JsonObject object, String path) {

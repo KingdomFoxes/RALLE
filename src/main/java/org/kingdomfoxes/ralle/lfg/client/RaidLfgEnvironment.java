@@ -8,5 +8,4 @@ public interface RaidLfgEnvironment {
     String serverHost();
     UUID playerId();
     String ign();
-    String modVersion();
 }

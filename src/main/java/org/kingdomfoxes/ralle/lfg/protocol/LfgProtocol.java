@@ -18,8 +18,7 @@ public final class LfgProtocol {
     public enum MemberRole { HOST, MEMBER }
     public enum MemberSource { RALLE, DISCORD, MANUAL }
 
-    public record Status(boolean enabled, int protocolVersion, String requiredClientVersion,
-                         String modrinthReleaseUrl) {}
+    public record Status(boolean enabled, int protocolVersion) {}
 
     public record Challenge(String challengeId, String serverId, int expiresIn,
                             int protocolVersion) {}
@@ -80,7 +79,12 @@ public final class LfgProtocol {
     public record Mutation(int protocolVersion, long revision, Lobby lobby) {}
 
     public record Error(String code, String message, boolean retryable, UUID lobbyId,
-                        Lobby returnedLobby) {}
+                        Lobby returnedLobby, Integer retryAfterSeconds) {
+        public Error(String code, String message, boolean retryable, UUID lobbyId,
+                     Lobby returnedLobby) {
+            this(code, message, retryable, lobbyId, returnedLobby, null);
+        }
+    }
 
     public sealed interface LiveFrame permits SnapshotFrame, UpsertFrame, RemoveFrame,
             PartyPingFrame, PartyKickCommandFrame, SessionExpiringFrame, ErrorFrame {}

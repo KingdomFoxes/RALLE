@@ -534,7 +534,6 @@ class LfgNotificationManagerTest {
         @Override public String serverHost() { return "wynncraft.com"; }
         @Override public UUID playerId() { return VIEWER_ID; }
         @Override public String ign() { return "Viewer"; }
-        @Override public String modVersion() { return "test"; }
     }
 
     private static final class Gateway implements LfgGateway {
@@ -542,9 +541,9 @@ class LfgNotificationManagerTest {
         int joinCalls;
         LfgProtocol.Mutation joinResult;
         @Override public CompletableFuture<LfgProtocol.Status> status() {
-            return CompletableFuture.completedFuture(new LfgProtocol.Status(true, 1, "test", ""));
+            return CompletableFuture.completedFuture(new LfgProtocol.Status(true, 1));
         }
-        @Override public CompletableFuture<LfgProtocol.Challenge> challenge(UUID playerId, String ign, String modVersion) {
+        @Override public CompletableFuture<LfgProtocol.Challenge> challenge(UUID playerId, String ign) {
             return CompletableFuture.completedFuture(new LfgProtocol.Challenge("challenge", "proof", 60, 1));
         }
         @Override public CompletableFuture<LfgProtocol.Session> complete(String challengeId) {

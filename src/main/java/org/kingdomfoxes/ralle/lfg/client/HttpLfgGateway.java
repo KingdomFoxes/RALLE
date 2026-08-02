@@ -10,6 +10,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.WebSocket;
+import java.net.http.WebSocketHandshakeException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Locale;
@@ -21,9 +22,8 @@ import java.util.function.Function;
 
 /** JDK HTTP/WebSocket implementation with bearer headers and one safe mutation retry. */
 public final class HttpLfgGateway implements LfgGateway {
-    public static final String LOCAL_DEVELOPMENT_BASE_URL = "http://127.0.0.1:8001/api/ralle/v1";
     public static final String PRODUCTION_BASE_URL = "https://kingdomfoxes.com/api/ralle/v1";
-    public static final String DEFAULT_BASE_URL = LOCAL_DEVELOPMENT_BASE_URL;
+    public static final String DEFAULT_BASE_URL = PRODUCTION_BASE_URL;
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(12);
 
     private final HttpClient client;
@@ -48,9 +48,9 @@ public final class HttpLfgGateway implements LfgGateway {
     }
 
     @Override
-    public CompletableFuture<LfgProtocol.Challenge> challenge(UUID playerId, String ign, String modVersion) {
+    public CompletableFuture<LfgProtocol.Challenge> challenge(UUID playerId, String ign) {
         return post("/auth/challenge", null, null,
-                StrictLfgJson.challengeRequest(playerId, ign, modVersion), StrictLfgJson::decodeChallenge, false);
+                StrictLfgJson.challengeRequest(playerId, ign), StrictLfgJson::decodeChallenge, false);
     }
 
     @Override
@@ -156,7 +156,8 @@ public final class HttpLfgGateway implements LfgGateway {
                 .connectTimeout(REQUEST_TIMEOUT)
                 .header("Authorization", "Bearer " + bearerToken)
                 .buildAsync(uri, adapter)
-                .thenApply(socket -> (LiveConnection) () -> socket.sendClose(1000, "client lifecycle changed"));
+                .thenApply(socket -> (LiveConnection) () -> socket.sendClose(1000, "client lifecycle changed"))
+                .exceptionallyCompose(failure -> CompletableFuture.failedFuture(websocketFailure(failure)));
     }
 
     private <T> CompletableFuture<T> get(String path, String token, Function<String, T> decoder) {
@@ -239,5 +240,21 @@ public final class HttpLfgGateway implements LfgGateway {
 
     private static Throwable unwrap(Throwable failure) {
         return failure instanceof CompletionException && failure.getCause() != null ? failure.getCause() : failure;
+    }
+
+    private static RuntimeException websocketFailure(Throwable failure) {
+        var cause = unwrap(failure);
+        if (cause instanceof WebSocketHandshakeException handshake) {
+            int status = handshake.getResponse().statusCode();
+            var error = switch (status) {
+                case 401 -> new LfgProtocol.Error("UNAUTHORIZED", "Authentication expired.", false, null, null);
+                case 403 -> new LfgProtocol.Error("INELIGIBLE", "Alliance access is unavailable.", false, null, null);
+                case 426 -> new LfgProtocol.Error("UNSUPPORTED_PROTOCOL", "Fox Raid LFG uses an incompatible protocol.", false, null, null);
+                default -> new LfgProtocol.Error("HTTP_" + status, "Fox rejected the live connection (HTTP " + status + ").",
+                        status >= 500, null, null);
+            };
+            return new LfgGatewayException(status, error);
+        }
+        return new LfgGatewayException("Fox Raid LFG live connection could not be reached.", cause);
     }
 }

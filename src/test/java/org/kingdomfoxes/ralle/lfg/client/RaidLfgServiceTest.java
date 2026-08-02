@@ -51,6 +51,64 @@ class RaidLfgServiceTest {
     }
 
     @Test
+    void unsupportedStatusProtocolStopsBeforeChallengeWithoutReleaseState() {
+        var gateway = new FakeGateway();
+        gateway.status = new LfgProtocol.Status(true, 2);
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+
+        var service = service(gateway, env);
+        service.tick();
+
+        assertEquals(RaidLfgService.LifecycleState.OUTDATED, service.lifecycle());
+        assertEquals(0, gateway.challengeCalls);
+        assertTrue(service.statusMessage().contains("incompatible protocol"));
+    }
+
+    @Test
+    void liveHandshakeEligibilityFailureIsTerminal() {
+        var gateway = new FakeGateway();
+        gateway.liveFailure = new org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException(
+                403, new LfgProtocol.Error("INELIGIBLE", "Guild is not registered.", false, null, null));
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+
+        var service = service(gateway, env);
+        service.tick();
+
+        assertEquals(RaidLfgService.LifecycleState.INELIGIBLE, service.lifecycle());
+        assertEquals("Guild is not registered.", service.statusMessage());
+    }
+
+    @Test
+    void liveCloseAndErrorCodesUseDistinctLifecycleStates() {
+        var ineligibleGateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var ineligible = service(ineligibleGateway, env);
+        ineligible.tick();
+        ineligibleGateway.listener.onClosed(4403, "INELIGIBLE");
+        assertEquals(RaidLfgService.LifecycleState.INELIGIBLE, ineligible.lifecycle());
+
+        var protocolGateway = new FakeGateway();
+        var protocol = service(protocolGateway, env);
+        protocol.tick();
+        protocolGateway.listener.onClosed(4406, "UNSUPPORTED_PROTOCOL");
+        assertEquals(RaidLfgService.LifecycleState.OUTDATED, protocol.lifecycle());
+
+        var outageGateway = new FakeGateway();
+        var outage = service(outageGateway, env);
+        outage.tick();
+        outageGateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+        outageGateway.listener.onFrame(new LfgProtocol.ErrorFrame(new LfgProtocol.Error(
+                "WYNNCRAFT_UNAVAILABLE", "Wynncraft is temporarily unavailable.", true, null, null)));
+        assertEquals(RaidLfgService.LifecycleState.RECONNECTING, outage.lifecycle());
+    }
+
+    @Test
     void disablingInvalidatesOutstandingAuthenticationCallback() {
         var gateway = new FakeGateway();
         gateway.challengeFuture = new CompletableFuture<>();
@@ -206,7 +264,6 @@ class RaidLfgServiceTest {
         @Override public String serverHost() { return host; }
         @Override public UUID playerId() { return PLAYER; }
         @Override public String ign() { return "Player01"; }
-        @Override public String modVersion() { return "test"; }
     }
 
     private static final class FakeGateway implements LfgGateway {
@@ -218,12 +275,14 @@ class RaidLfgServiceTest {
         LfgProtocol.Mutation lockResult;
         boolean requestedLocked;
         LiveListener listener;
+        LfgProtocol.Status status = new LfgProtocol.Status(true, 1);
+        RuntimeException liveFailure;
 
         @Override public CompletableFuture<LfgProtocol.Status> status() {
             statusCalls++;
-            return CompletableFuture.completedFuture(new LfgProtocol.Status(true, 1, "test", "https://modrinth.com/mod/ralle"));
+            return CompletableFuture.completedFuture(status);
         }
-        @Override public CompletableFuture<LfgProtocol.Challenge> challenge(UUID playerId, String ign, String modVersion) {
+        @Override public CompletableFuture<LfgProtocol.Challenge> challenge(UUID playerId, String ign) {
             challengeCalls++;
             return challengeFuture != null ? challengeFuture : CompletableFuture.completedFuture(
                     new LfgProtocol.Challenge("challenge", "server-proof", 60, 1));
@@ -248,6 +307,7 @@ class RaidLfgServiceTest {
         @Override public CompletableFuture<LfgProtocol.Mutation> ping(String bearerToken, UUID lobbyId, UUID idempotencyKey) { return unsupported(); }
         @Override public CompletableFuture<LiveConnection> connectLive(String bearerToken, LiveListener listener) {
             this.listener = listener;
+            if (liveFailure != null) return CompletableFuture.failedFuture(liveFailure);
             return CompletableFuture.completedFuture(() -> {});
         }
         private static <T> CompletableFuture<T> unsupported() { return CompletableFuture.failedFuture(new UnsupportedOperationException()); }
