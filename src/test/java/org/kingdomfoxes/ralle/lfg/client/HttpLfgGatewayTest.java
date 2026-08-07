@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -76,6 +77,27 @@ class HttpLfgGatewayTest {
         assertEquals("HTTP_404", error.code());
         assertEquals("This action is unavailable on the connected Fox backend (HTTP 404).", error.message());
         assertFalse(error.retryable());
+    }
+
+    @Test
+    void oversizedHttpResponseIsRejectedBeforeJsonParsing() throws Exception {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/ralle/v1/status", exchange -> {
+            var response = "x".repeat(HttpLfgGateway.MAX_HTTP_BODY_BYTES + 1)
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        var gateway = new HttpLfgGateway(HttpClient.newHttpClient(),
+                "http://127.0.0.1:" + server.getAddress().getPort() + "/api/ralle/v1");
+
+        var failure = assertThrows(ExecutionException.class,
+                () -> gateway.status().get(5, TimeUnit.SECONDS));
+
+        assertInstanceOf(org.kingdomfoxes.ralle.lfg.protocol.LfgProtocolException.class,
+                failure.getCause());
     }
 
     private static String mutationJson() {

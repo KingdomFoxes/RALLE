@@ -32,6 +32,7 @@ import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.lfg.client.RaidRegionDetector;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
+import org.kingdomfoxes.ralle.lfg.protocol.LfgNoteText;
 import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
 
 import java.util.HashMap;
@@ -345,7 +346,10 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var details = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
         details.child(UIComponents.label(RalleTheme.ui(Component.literal("[" + lobby.region().name() + "]"))).color(regionColor(lobby.region())));
         if (lobby.note() != null && !lobby.note().isBlank()) {
-            details.child(UIComponents.label(RalleTheme.ui(Component.literal(" " + lobby.note()))).color(RalleTheme.MUTED).maxWidth(CARD_WIDTH - 54));
+            var note = LfgNoteText.sanitizeForDisplay(lobby.note());
+            if (!note.isEmpty()) {
+                details.child(UIComponents.label(RalleTheme.ui(Component.literal(" " + note))).color(RalleTheme.MUTED).maxWidth(CARD_WIDTH - 54));
+            }
         }
         card.child(details);
         var roster = UIContainers.grid(Sizing.fill(100), Sizing.content(), 2, 2);

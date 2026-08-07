@@ -20,6 +20,8 @@ import static org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol.*;
 
 /** Explicit protocol-v1 codec. It rejects unknown and missing fields at every object level. */
 public final class StrictLfgJson {
+    public static final int MAX_DOCUMENT_CHARS = 65_536;
+
     private StrictLfgJson() {}
 
     public static Status decodeStatus(String json) {
@@ -115,6 +117,7 @@ public final class StrictLfgJson {
     }
 
     public static String createRequest(RaidType raidType, Region region, String note) {
+        note = LfgNoteText.sanitizeForSubmission(note);
         var object = new JsonObject();
         object.addProperty("raid_type", raidType.name());
         object.addProperty("region", region.name());
@@ -141,6 +144,9 @@ public final class StrictLfgJson {
         fields(object, "snapshot", required, Set.of());
         var lobbies = new ArrayList<Lobby>();
         var array = array(object, "lobbies");
+        if (array.size() > RaidType.values().length) {
+            throw malformed("snapshot contains more lobbies than protocol v1 permits");
+        }
         for (int i = 0; i < array.size(); i++) {
             lobbies.add(lobby(asObject(array.get(i), "snapshot.lobbies[" + i + "]"), "snapshot.lobbies[" + i + "]"));
         }
@@ -167,6 +173,9 @@ public final class StrictLfgJson {
                 "members", "capabilities"), Set.of());
         var members = new ArrayList<Member>();
         var array = array(object, "members");
+        if (array.size() == 0 || array.size() > 4) {
+            throw malformed(path + " must contain one to four members");
+        }
         for (int i = 0; i < array.size(); i++) {
             members.add(member(asObject(array.get(i), path + ".members[" + i + "]"), path + ".members[" + i + "]"));
         }
@@ -181,9 +190,7 @@ public final class StrictLfgJson {
             throw malformed(path + " contains an invalid or duplicate roster");
         }
         var note = nullableString(object, "note");
-        if (note != null && (note.length() > 80 || note.chars().anyMatch(Character::isISOControl))) {
-            throw malformed(path + ".note is not valid single-line plain text");
-        }
+        LfgNoteText.requireValidWireValue(note, path + ".note");
         var capabilitiesElement = object.get("capabilities");
         var capabilities = capabilitiesElement == null || capabilitiesElement.isJsonNull()
                 ? null : lobbyCapabilities(asObject(capabilitiesElement, path + ".capabilities"), path + ".capabilities");
@@ -247,6 +254,9 @@ public final class StrictLfgJson {
     }
 
     private static JsonObject object(String json, String path) {
+        if (json == null || json.length() > MAX_DOCUMENT_CHARS) {
+            throw malformed(path + " exceeds the protocol document limit");
+        }
         try {
             return asObject(JsonParser.parseString(json), path);
         } catch (LfgProtocolException exception) {

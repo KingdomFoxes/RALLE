@@ -1,6 +1,7 @@
 package org.kingdomfoxes.ralle.lfg.client;
 
 import org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException;
+import org.kingdomfoxes.ralle.lfg.protocol.LfgNoteText;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocolException;
 import org.slf4j.Logger;
@@ -30,7 +31,6 @@ public final class RaidLfgService {
     private static final long[] RECONNECT_SECONDS = {1, 2, 4, 8, 15};
     private static final long PING_COOLDOWN_MILLIS = 30_000L;
     private static final int COMMAND_DEDUPLICATION_LIMIT = 128;
-    private static final Pattern FORMATTING = Pattern.compile("(?:\\u00a7|&)[0-9A-FK-OR]", Pattern.CASE_INSENSITIVE);
     private static final Pattern IGN = Pattern.compile("[A-Za-z0-9_]{1,16}");
 
     private final LfgGateway gateway;
@@ -496,11 +496,7 @@ public final class RaidLfgService {
     }
 
     private static String sanitizeNote(String note) {
-        if (note == null) return null;
-        var cleaned = FORMATTING.matcher(note).replaceAll("");
-        cleaned = cleaned.replaceAll("\\p{Cc}", "").replaceAll("[ \\t]+", " ").strip();
-        if (cleaned.length() > 80) throw new IllegalArgumentException("Note must be at most 80 characters.");
-        return cleaned.isEmpty() ? null : cleaned;
+        return LfgNoteText.sanitizeForSubmission(note);
     }
 
     private static String normalizedHost(String host) {

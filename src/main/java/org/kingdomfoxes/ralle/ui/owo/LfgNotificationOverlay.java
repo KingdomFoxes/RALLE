@@ -27,6 +27,7 @@ import org.kingdomfoxes.ralle.lfg.client.LfgDisbandConfirmation;
 import org.kingdomfoxes.ralle.lfg.client.LfgKeybindHints;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
+import org.kingdomfoxes.ralle.lfg.protocol.LfgNoteText;
 import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
 
 import java.util.ArrayList;
@@ -189,7 +190,7 @@ public final class LfgNotificationOverlay {
         graphics.drawString(minecraft.font, renderedRegion, bounds.x() + 8, detailY,
                 regionColor(lobby.region()), false);
         int noteX = bounds.x() + 8 + minecraft.font.width(renderedRegion) + 4;
-        String note = lobby.note() == null ? "No note" : clean(lobby.note());
+        String note = lobby.note() == null ? "No note" : LfgNoteText.sanitizeForDisplay(lobby.note());
         graphics.drawString(minecraft.font,
                 RalleTypography.body(Component.literal(ellipsize(note, bounds.right() - 8 - noteX))),
                 noteX, detailY, MUTED, false);
@@ -500,12 +501,6 @@ public final class LfgNotificationOverlay {
             candidate = candidate.substring(0, candidate.length() - 1);
         }
         return candidate + "...";
-    }
-
-    private static String clean(String text) {
-        return text.replaceAll("(?:\\u00a7|&)[0-9A-FK-ORa-fk-or]", "")
-                .replaceAll("\\p{Cc}", "")
-                .strip();
     }
 
     private enum Action { JOIN, CANCEL, CLOSE, LEAVE, DISBAND, INVITE_ALL }

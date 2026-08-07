@@ -5,6 +5,7 @@ import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocolException;
 import org.kingdomfoxes.ralle.lfg.protocol.StrictLfgJson;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -12,6 +13,7 @@ import java.net.http.HttpResponse;
 import java.net.http.WebSocket;
 import java.net.http.WebSocketHandshakeException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.UUID;
@@ -25,6 +27,7 @@ public final class HttpLfgGateway implements LfgGateway {
     public static final String PRODUCTION_BASE_URL = "https://kingdomfoxes.com/api/ralle/v1";
     public static final String DEFAULT_BASE_URL = PRODUCTION_BASE_URL;
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(12);
+    static final int MAX_HTTP_BODY_BYTES = StrictLfgJson.MAX_DOCUMENT_CHARS * 4;
 
     private final HttpClient client;
     private final URI baseUri;
@@ -112,6 +115,7 @@ public final class HttpLfgGateway implements LfgGateway {
         URI uri = websocketUri();
         var adapter = new WebSocket.Listener() {
             private final StringBuilder text = new StringBuilder();
+            private boolean rejected;
 
             @Override
             public void onOpen(WebSocket webSocket) {
@@ -120,6 +124,13 @@ public final class HttpLfgGateway implements LfgGateway {
 
             @Override
             public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
+                if (rejected) return CompletableFuture.completedFuture(null);
+                if (data.length() > StrictLfgJson.MAX_DOCUMENT_CHARS - text.length()) {
+                    rejected = true;
+                    text.setLength(0);
+                    listener.onFailure(new LfgProtocolException("Live frame exceeds the protocol document limit"));
+                    return webSocket.sendClose(1009, "frame too large");
+                }
                 text.append(data);
                 if (last) {
                     var frameText = text.toString();
@@ -178,7 +189,7 @@ public final class HttpLfgGateway implements LfgGateway {
 
     private <T> CompletableFuture<T> send(HttpRequest request, Function<String, T> decoder,
                                           boolean retryTransport, int attempt) {
-        return client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
                 .handle((response, failure) -> {
                     if (failure != null) {
                         if (retryTransport && attempt == 0) return send(request, decoder, true, 1);
@@ -186,15 +197,30 @@ public final class HttpLfgGateway implements LfgGateway {
                                 "Fox Raid LFG could not be reached.", unwrap(failure)));
                     }
                     try {
+                        var body = readBody(response.body());
                         if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                            return CompletableFuture.completedFuture(decoder.apply(response.body()));
+                            return CompletableFuture.completedFuture(decoder.apply(body));
                         }
                         return CompletableFuture.<T>failedFuture(new LfgGatewayException(
-                                response.statusCode(), httpError(response.statusCode(), response.body())));
+                                response.statusCode(), httpError(response.statusCode(), body)));
+                    } catch (IOException exception) {
+                        if (retryTransport && attempt == 0) return send(request, decoder, true, 1);
+                        return CompletableFuture.<T>failedFuture(new LfgGatewayException(
+                                "Fox Raid LFG returned an unreadable response.", exception));
                     } catch (RuntimeException exception) {
                         return CompletableFuture.<T>failedFuture(exception);
                     }
                 }).thenCompose(Function.identity());
+    }
+
+    private static String readBody(java.io.InputStream body) throws IOException {
+        try (body) {
+            var bytes = body.readNBytes(MAX_HTTP_BODY_BYTES + 1);
+            if (bytes.length > MAX_HTTP_BODY_BYTES) {
+                throw new LfgProtocolException("HTTP response exceeds the protocol document limit");
+            }
+            return new String(bytes, StandardCharsets.UTF_8);
+        }
     }
 
     static LfgProtocol.Error httpError(int status, String body) {

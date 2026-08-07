@@ -96,6 +96,25 @@ class StrictLfgJsonTest {
     }
 
     @Test
+    void rejectsHostileNotesAndOversizedDocuments() {
+        assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeSnapshot(
+                snapshot().replace("\"note\":\"chill run\"", "\"note\":\"bad\\u202etxt\"")));
+        assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeSnapshot(
+                snapshot().replace("\"note\":\"chill run\"", "\"note\":\"\\u00a7cpretend\"")));
+        assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeSnapshot(
+                snapshot().replace("\"note\":\"chill run\"", "\"note\":\"" + "x".repeat(81) + "\"")));
+        assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeStatus(
+                "{\"enabled\":true,\"protocol_version\":1}" + " ".repeat(StrictLfgJson.MAX_DOCUMENT_CHARS)));
+    }
+
+    @Test
+    void createRequestAppliesTheSamePlainTextPolicy() {
+        assertEquals("{\"raid_type\":\"TNA\",\"region\":\"EU\",\"note\":\"Hello world\"}",
+                StrictLfgJson.createRequest(LfgProtocol.RaidType.TNA, LfgProtocol.Region.EU,
+                        " \u00a7cHello\n\u202eworld "));
+    }
+
+    @Test
     void encodesStrictHostActionBodies() {
         assertEquals(
                 "{\"target_minecraft_uuid\":\"00000000-0000-0000-0000-000000000002\"}",

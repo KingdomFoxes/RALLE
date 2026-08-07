@@ -150,9 +150,14 @@ adds no protocol message, backend state, setting, sound, or unbounded command lo
 
 Protocol JSON is decoded explicitly. Missing fields, unknown fields and enums, non-canonical UUIDs,
 invalid timestamps, unexpected frame types, and protocol-version mismatches make LFG unavailable
-without affecting local chat features. Global revisions are monotonic but may contain gaps because
-private events can be invisible to a viewer. Successful REST mutations update the immutable store
-immediately; a WebSocket event at the same revision is ignored.
+without affecting local chat features. Protocol documents and live frames are size-bounded before
+JSON parsing, and collection counts are bounded before allocation. The player-authored lobby note
+is at most 80 characters and is always handled as inert literal text: local submissions remove
+legacy formatting and unsafe Unicode controls, inbound values violating that policy are rejected,
+and both LFG presentations apply the same final display guard. Notes never become component JSON,
+click events, URLs, commands, logs, file paths, or process arguments. Global revisions are monotonic
+but may contain gaps because private events can be invisible to a viewer. Successful REST mutations
+update the immutable store immediately; a WebSocket event at the same revision is ignored.
 
 Accepted store changes also carry a presentation-neutral origin (`LIVE`,
 `SNAPSHOT`, `LOCAL_MUTATION`, or `CLEAR`) and their previous/current lobby
