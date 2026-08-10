@@ -189,7 +189,12 @@ public final class RaidLfgService {
     }
 
     public CompletableFuture<LfgProtocol.Mutation> disband(UUID lobbyId) {
-        return mutate("disband", lobbyId, true, token -> gateway.disband(token, lobbyId, UUID.randomUUID()));
+        return mutate("disband", lobbyId, true,
+                token -> gateway.disband(token, lobbyId, UUID.randomUUID()))
+                .thenApply(mutation -> {
+                    partyCommands.disband();
+                    return mutation;
+                });
     }
 
     public CompletableFuture<LfgProtocol.Mutation> kick(UUID lobbyId, UUID targetId, String targetIgn) {

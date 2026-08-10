@@ -23,6 +23,16 @@ public final class MinecraftPartyCommandExecutor implements PartyCommandExecutor
         send("pa ", ign);
     }
 
+    @Override
+    public void disband() {
+        minecraft.execute(() -> {
+            var connection = minecraft.getConnection();
+            if (connection != null && minecraft.player != null) {
+                connection.sendCommand("pa disband");
+            }
+        });
+    }
+
     private void send(String command, String ign) {
         if (ign == null || !IGN.matcher(ign).matches()) return;
         minecraft.execute(() -> {

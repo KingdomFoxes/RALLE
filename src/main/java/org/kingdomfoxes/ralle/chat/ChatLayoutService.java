@@ -7,8 +7,6 @@ import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.PlacementPolicy;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.SideAnchor;
 import org.kingdomfoxes.ralle.api.hud.RalleHudElements;
-import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
-import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 
 import java.util.Map;
 import java.util.Optional;
@@ -21,15 +19,13 @@ public final class ChatLayoutService {
 
     private final Minecraft minecraft;
     private final HudPlacementRegistry placements;
-    private final BooleanSetting chatEnabled;
     private int lastViewportWidth = -1;
     private int lastViewportHeight = -1;
     private int lastCustomWidth = -1;
 
-    public ChatLayoutService(Minecraft minecraft, SettingsRegistry settings, HudPlacementRegistry placements) {
+    public ChatLayoutService(Minecraft minecraft, HudPlacementRegistry placements) {
         this.minecraft = minecraft;
         this.placements = placements;
-        this.chatEnabled = settings.setting("chat-enabled", BooleanSetting.class);
     }
 
     public Rectangle editorBounds(int viewportWidth, int viewportHeight) {
@@ -118,8 +114,6 @@ public final class ChatLayoutService {
     }
 
     public Optional<Rectangle> activeCustomBounds() {
-        if (!chatEnabled.value()) return Optional.empty();
-
         var window = minecraft.getWindow();
         return placements.resolveCustom(
                 CHAT_ELEMENT_ID,

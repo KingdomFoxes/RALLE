@@ -109,9 +109,8 @@ public final class MinecraftChatSelectionSoundPlayer implements ChatSelectionSou
     }
 
     static BooleanSupplier soundGate(SettingsRegistry settings) {
-        BooleanSetting chatEnabled = settings.setting("chat-enabled", BooleanSetting.class);
         BooleanSetting screenshotsEnabled = settings.setting("chat-screenshot-enabled", BooleanSetting.class);
         BooleanSetting soundsEnabled = settings.setting("chat-selection-sounds", BooleanSetting.class);
-        return () -> chatEnabled.value() && screenshotsEnabled.value() && soundsEnabled.value();
+        return () -> screenshotsEnabled.value() && soundsEnabled.value();
     }
 }

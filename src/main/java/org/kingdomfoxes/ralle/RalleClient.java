@@ -75,7 +75,7 @@ public final class RalleClient implements ClientModInitializer {
         placements.seal();
         RalleTypography.bind(settings);
 
-        var chatLayout = new ChatLayoutService(Minecraft.getInstance(), settings, placements);
+        var chatLayout = new ChatLayoutService(Minecraft.getInstance(), placements);
         var navigation = new SettingsNavigationState(configDirectory.resolve("ralle-settings-ui.properties"), settings);
         var minecraft = Minecraft.getInstance();
         var regionDetector = new MinecraftRaidRegionDetector(minecraft);
