@@ -65,8 +65,11 @@ platform ports. It must not depend on a concrete settings screen.
 
 `/ralle settings` opens the owo-lib adapter over RALLE-owned category and setting
 models. Values are stored in `config/ralle.properties`; invalid or obsolete
-values fall back to their declared defaults. Chat settings are consumed by the
-local chat integration. The Raid LFG opt-in gates the persistent Fox client
+values fall back to their declared defaults. Chat has no global enable setting;
+each disabled-by-default feature toggle independently gates its behavior, and
+choice controls depend only on their paired feature toggle. Chat settings are
+consumed by the local chat integration. The Raid LFG opt-in gates the persistent
+Fox client
 service, while its shortcut remains unbound until configured.
 
 Custom HUD placements are stored separately in
@@ -76,6 +79,12 @@ LFG notification cards persist a left/right side anchor and normalized vertical
 position; their logical size is not configurable. Removing the chat placement
 restores the live vanilla position and dimensions, while removing the
 notification placement restores its eight-pixel bottom-right default.
+
+`/ralle hud` opens the layout editor in its all-elements mode. The chat box is
+always available there, while Raid LFG notification placement is included only
+when Raid LFG is currently enabled. Setting-specific editor actions remain
+scoped to their own element; their `Show all` option is preview-only. The fixed
+Raid LFG Action Bar may be previewed but is never movable.
 
 ## Programmatic UI development
 
@@ -130,6 +139,10 @@ command on the host client. Recipient-scoped `party.ping` and Discord-originated
 the immutable lobby projection. Ping is limited to once per 30 seconds per lobby and is delivered
 to current members other than the host; linked Discord members are notified through the same
 FastAPI-owned outbox flow.
+
+An explicit host disband sends exactly one bounded `/pa disband` command only after the backend
+accepts the synchronized lobby disband. Failed disband mutations and backend-initiated lobby
+closures never disband the Wynncraft party.
 
 The host invitation controller watches only accepted `LIVE` store changes and offers invitations
 when the local host's lobby genuinely transitions from below capacity to full. Initial and

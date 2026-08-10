@@ -21,7 +21,10 @@ public final class RalleSettings {
                 "about",
                 Component.translatable("ralle.settings.about"),
                 Component.translatable("ralle.settings.about.description"),
-                List.of(subcategory("interface", choice(INTERFACE_FONT_ID, "vanilla", "vanilla", "karla")))
+                List.of(subcategory("interface",
+                        action("edit-huds"),
+                        choice(INTERFACE_FONT_ID, "vanilla", "vanilla", "karla")
+                ))
         ));
 
         registry.registerCategory(new SettingsCategory(
@@ -29,13 +32,17 @@ public final class RalleSettings {
                 Component.translatable("ralle.settings.category.chat"),
                 Component.translatable("ralle.settings.category.chat.description"),
                 List.of(
-                        subcategory("general", toggle("chat-enabled"), action("edit-chat-layout")),
-                        subcategory("appearance",
-                                toggle("hide-chat-scrollbar"),
+                        subcategory("general", action("edit-chat-layout")),
+                        subcategory("appearance", toggle("hide-chat-scrollbar")),
+                        subcategory("message-direction",
                                 toggle("message-direction-enabled"),
-                                choice("message-direction", "bottom-up", "bottom-up", "top-down"),
+                                choice("message-direction", "bottom-up", "bottom-up", "top-down")
+                        ),
+                        subcategory("horizontal-alignment",
                                 toggle("horizontal-alignment-enabled"),
-                                choice("horizontal-alignment", "left", "left", "right"),
+                                choice("horizontal-alignment", "left", "left", "right")
+                        ),
+                        subcategory("text-shadow",
                                 toggle("text-shadow-enabled"),
                                 choice("text-shadow", "vanilla", "none", "vanilla", "full", "wrapped-full")
                         ),
@@ -76,16 +83,10 @@ public final class RalleSettings {
                 )
         ));
 
-        requireChat(registry,
-                "edit-chat-layout", "hide-chat-scrollbar", "message-direction-enabled", "horizontal-alignment-enabled",
-                "text-shadow-enabled", "compact-chat", "stack-empty-lines", "chat-screenshot-enabled"
-        );
         registry.requireEnabled("message-direction", "message-direction-enabled");
         registry.requireEnabled("horizontal-alignment", "horizontal-alignment-enabled");
         registry.requireEnabled("text-shadow", "text-shadow-enabled");
-        registry.requireEnabled("chat-screenshot-smooth-expansion", "chat-enabled");
         registry.requireEnabled("chat-screenshot-smooth-expansion", "chat-screenshot-enabled");
-        registry.requireEnabled("chat-selection-sounds", "chat-enabled");
         registry.requireEnabled("chat-selection-sounds", "chat-screenshot-enabled");
         registry.requireEnabled("new-party-notifications", "raid-lfg-enabled");
         registry.requireEnabled("reopened-party-notifications", "raid-lfg-enabled");
@@ -111,10 +112,6 @@ public final class RalleSettings {
                 Component.translatable("ralle.settings.subcategory." + id + ".description"),
                 List.of(entries)
         );
-    }
-
-    private static void requireChat(SettingsRegistry registry, String... ids) {
-        for (var id : ids) registry.requireEnabled(id, "chat-enabled");
     }
 
     private static BooleanSetting toggle(String id) {

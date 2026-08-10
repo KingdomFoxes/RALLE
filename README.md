@@ -6,11 +6,13 @@ RALLE-owned feature and settings registry, local settings persistence, and a
 searchable owo-lib settings screen opened with `/ralle settings`. Its chat
 section includes a dedicated editor for moving, resizing, and restoring the
 single chat box; placements are normalized across resolution and GUI-scale
-changes and apply in singleplayer or on any server while chat customization is
-enabled. Compact chat, empty-line stacking, message direction, horizontal text
-alignment, and text-shadow modes are implemented as independently disabled
+changes and apply in singleplayer or on any server. Compact chat, empty-line
+stacking, message direction, horizontal text alignment, and text-shadow modes
+are implemented as independently disabled
 local options. Transparent chat screenshot selection also supports separately
 disabled processed-xylophone count and successful-copy feedback.
+`/ralle hud` opens the layout editor with every currently enabled editable HUD
+element available; the About page exposes the same action as `Edit HUDs`.
 `/ralle lfg` opens the live, authenticated owo-lib Raid LFG browser when the
 feature is explicitly enabled on Wynncraft. Hosts can disband, kick with a
 hold-to-confirm roster interaction, lock or reopen joining, and ping current

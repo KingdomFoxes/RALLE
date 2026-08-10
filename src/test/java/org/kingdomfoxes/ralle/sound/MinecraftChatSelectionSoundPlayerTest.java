@@ -111,18 +111,16 @@ class MinecraftChatSelectionSoundPlayerTest {
     }
 
     @Test
-    void soundSettingRemainsInertUntilBothParentChatFeaturesAreEnabled(@TempDir Path temporaryDirectory) {
+    void soundSettingRemainsInertUntilScreenshottingIsEnabled(@TempDir Path temporaryDirectory) {
         var settings = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(settings);
         var gate = MinecraftChatSelectionSoundPlayer.soundGate(settings);
 
         settings.setting("chat-selection-sounds", BooleanSetting.class).set(true);
         assertFalse(gate.getAsBoolean());
-        settings.setting("chat-enabled", BooleanSetting.class).set(true);
-        assertFalse(gate.getAsBoolean());
         settings.setting("chat-screenshot-enabled", BooleanSetting.class).set(true);
         assertTrue(gate.getAsBoolean());
-        settings.setting("chat-enabled", BooleanSetting.class).set(false);
+        settings.setting("chat-screenshot-enabled", BooleanSetting.class).set(false);
         assertFalse(gate.getAsBoolean());
     }
 

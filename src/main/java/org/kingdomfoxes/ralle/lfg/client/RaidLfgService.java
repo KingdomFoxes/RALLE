@@ -169,6 +169,22 @@ public final class RaidLfgService {
         });
     }
 
+    /**
+     * Request fresh LFG state from the browser, retrying the connection immediately after a failure.
+     * Disabled and off-Wynncraft contexts remain inert, and an authentication or synchronization
+     * already in progress is not restarted.
+     */
+    public synchronized void requestRefresh() {
+        if (!environment.enabled() || !isWynncraft(normalizedHost(environment.serverHost()))) return;
+        if (lifecycle == LifecycleState.AUTHENTICATING || lifecycle == LifecycleState.SYNCING) return;
+        if (lifecycle == LifecycleState.ONLINE) {
+            refresh();
+            return;
+        }
+        reconnectAttempt = 0;
+        authenticate();
+    }
+
     public CompletableFuture<LfgProtocol.Mutation> create(LfgProtocol.RaidType raid,
                                                            LfgProtocol.Region region, String note) {
         final String cleaned;
@@ -189,7 +205,12 @@ public final class RaidLfgService {
     }
 
     public CompletableFuture<LfgProtocol.Mutation> disband(UUID lobbyId) {
-        return mutate("disband", lobbyId, true, token -> gateway.disband(token, lobbyId, UUID.randomUUID()));
+        return mutate("disband", lobbyId, true,
+                token -> gateway.disband(token, lobbyId, UUID.randomUUID()))
+                .thenApply(mutation -> {
+                    partyCommands.disband();
+                    return mutation;
+                });
     }
 
     public CompletableFuture<LfgProtocol.Mutation> kick(UUID lobbyId, UUID targetId, String targetIgn) {

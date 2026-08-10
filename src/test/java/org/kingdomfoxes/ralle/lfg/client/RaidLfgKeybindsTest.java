@@ -23,6 +23,36 @@ class RaidLfgKeybindsTest {
     }
 
     @Test
+    void modSettingWinsWhenItChangedSinceTheLastSynchronization() {
+        assertEquals("key.keyboard.g", RaidLfgKeybinds.synchronizedValue(
+                "key.keyboard.g", "unbound", "key.keyboard.h"));
+    }
+
+    @Test
+    void existingVanillaBindingMigratesWhenTheModSettingIsStillAtItsDefault() {
+        assertEquals("key.keyboard.h", RaidLfgKeybinds.synchronizedValue(
+                "unbound", null, "key.keyboard.h"));
+    }
+
+    @Test
+    void existingModBindingWinsInitialSynchronization() {
+        assertEquals("key.keyboard.g", RaidLfgKeybinds.synchronizedValue(
+                "key.keyboard.g", null, "key.keyboard.h"));
+    }
+
+    @Test
+    void vanillaMappingWinsWhenOnlyItChangedSinceTheLastSynchronization() {
+        assertEquals("key.keyboard.h", RaidLfgKeybinds.synchronizedValue(
+                "key.keyboard.g", "key.keyboard.g", "key.keyboard.h"));
+    }
+
+    @Test
+    void vanillaUnknownMappingBecomesTheModUnboundValue() {
+        assertEquals("unbound", RaidLfgKeybinds.synchronizedValue(
+                "key.keyboard.g", "key.keyboard.g", "key.keyboard.unknown"));
+    }
+
+    @Test
     void lockAndUnlockPressesUseTheirDistinctVaultCuesImmediately() {
         var sounds = new Sounds();
 

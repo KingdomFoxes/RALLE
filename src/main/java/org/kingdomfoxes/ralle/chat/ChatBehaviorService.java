@@ -10,7 +10,6 @@ public final class ChatBehaviorService {
     public static final int DEFAULT_COMPACT_WINDOW_TICKS = DEFAULT_COMPACT_WINDOW_SECONDS * 20;
 
     private final Minecraft minecraft;
-    private final BooleanSetting chatEnabled;
     private final BooleanSetting hideChatScrollbar;
     private final BooleanSetting compactChat;
     private final BooleanSetting stackEmptyLines;
@@ -24,7 +23,6 @@ public final class ChatBehaviorService {
 
     public ChatBehaviorService(Minecraft minecraft, SettingsRegistry settings) {
         this.minecraft = minecraft;
-        this.chatEnabled = settings.setting("chat-enabled", BooleanSetting.class);
         this.hideChatScrollbar = settings.setting("hide-chat-scrollbar", BooleanSetting.class);
         this.compactChat = settings.setting("compact-chat", BooleanSetting.class);
         this.stackEmptyLines = settings.setting("stack-empty-lines", BooleanSetting.class);
@@ -42,29 +40,29 @@ public final class ChatBehaviorService {
     }
 
     public boolean hideChatScrollbar() {
-        return chatEnabled.value() && hideChatScrollbar.value();
+        return hideChatScrollbar.value();
     }
 
     public boolean compactChatEnabled() {
-        return chatEnabled.value() && compactChat.value();
+        return compactChat.value();
     }
 
     public boolean stackEmptyLinesEnabled() {
-        return chatEnabled.value() && stackEmptyLines.value();
+        return stackEmptyLines.value();
     }
 
     public MessageDirection messageDirection() {
-        if (!chatEnabled.value() || !messageDirectionEnabled.value()) return MessageDirection.BOTTOM_UP;
+        if (!messageDirectionEnabled.value()) return MessageDirection.BOTTOM_UP;
         return "top-down".equals(messageDirection.value()) ? MessageDirection.TOP_DOWN : MessageDirection.BOTTOM_UP;
     }
 
     public HorizontalAlignment horizontalAlignment() {
-        if (!chatEnabled.value() || !horizontalAlignmentEnabled.value()) return HorizontalAlignment.LEFT;
+        if (!horizontalAlignmentEnabled.value()) return HorizontalAlignment.LEFT;
         return "right".equals(horizontalAlignment.value()) ? HorizontalAlignment.RIGHT : HorizontalAlignment.LEFT;
     }
 
     public TextShadow textShadow() {
-        if (!chatEnabled.value() || !textShadowEnabled.value()) return TextShadow.VANILLA;
+        if (!textShadowEnabled.value()) return TextShadow.VANILLA;
         return parseTextShadow(textShadow.value());
     }
 
@@ -87,7 +85,7 @@ public final class ChatBehaviorService {
     }
 
     private ProjectionSettings projectionSettings() {
-        return new ProjectionSettings(chatEnabled.value(), compactChat.value(), stackEmptyLines.value());
+        return new ProjectionSettings(compactChat.value(), stackEmptyLines.value());
     }
 
     public enum MessageDirection {
@@ -107,5 +105,5 @@ public final class ChatBehaviorService {
         FULL
     }
 
-    private record ProjectionSettings(boolean chatEnabled, boolean compactChat, boolean stackEmptyLines) {}
+    private record ProjectionSettings(boolean compactChat, boolean stackEmptyLines) {}
 }

@@ -8,4 +8,7 @@ public interface PartyCommandExecutor {
 
     /** Sends one explicitly queued, locally validated Wynncraft party invitation. */
     default void invite(String ign) {}
+
+    /** Sends one explicitly confirmed Wynncraft party disband command. */
+    default void disband() {}
 }
