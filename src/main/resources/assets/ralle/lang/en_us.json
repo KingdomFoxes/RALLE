@@ -44,6 +44,8 @@
 
   "ralle.settings.option.edit-chat-layout": "Edit Chat Layout",
   "ralle.settings.option.edit-chat-layout.description": "Opens the HUD layout editor for moving, resizing, or restoring the single chat box.",
+  "ralle.settings.option.edit-huds": "Edit HUDs",
+  "ralle.settings.option.edit-huds.description": "runs /ralle hud to show every currently enabled hud element.",
   "ralle.settings.option.hide-chat-scrollbar": "Hide Chat Scrollbar",
   "ralle.settings.option.hide-chat-scrollbar.description": "Hides Minecraft's scrollbar while chat is open. Mouse-wheel scrolling still works.",
   "ralle.settings.option.chat-screenshot-enabled": "Chat Screenshotting",

@@ -19,6 +19,7 @@ import org.kingdomfoxes.ralle.sound.MinecraftChatSelectionSoundPlayer;
 import org.kingdomfoxes.ralle.sound.MinecraftLfgSoundPlayer;
 import org.kingdomfoxes.ralle.sound.RalleSoundEvents;
 import org.kingdomfoxes.ralle.ui.owo.OwoSettingsScreenFactory;
+import org.kingdomfoxes.ralle.ui.owo.ChatLayoutEditorScreen;
 import org.kingdomfoxes.ralle.ui.owo.LfgNotificationOverlay;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionBarOverlay;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionBarState;
@@ -145,6 +146,11 @@ public final class RalleClient implements ClientModInitializer {
                 literal("ralle").then(literal("settings").executes(command -> {
                     var client = Minecraft.getInstance();
                     client.schedule(() -> client.setScreen(context().settingsScreens().create(client.screen)));
+                    return 1;
+                })).then(literal("hud").executes(command -> {
+                    var client = Minecraft.getInstance();
+                    client.schedule(() -> client.setScreen(ChatLayoutEditorScreen.forAllEnabled(
+                            client.screen, context().chatLayout(), context().settings())));
                     return 1;
                 })).then(literal("lfg").executes(command -> {
                     var client = Minecraft.getInstance();

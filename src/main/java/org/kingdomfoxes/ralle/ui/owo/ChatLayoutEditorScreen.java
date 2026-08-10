@@ -16,10 +16,17 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import org.kingdomfoxes.ralle.api.hud.RalleHudElements;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.PlacementPolicy;
+import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
+import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
     static final int GRID_SIZE = 10;
@@ -35,13 +42,17 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
 
     private final Screen parent;
     private final ChatLayoutService chatLayout;
-    private final String selectedElementId;
+    private final List<String> editableElementIds;
+    private final List<String> previewElementIds;
+    private final boolean editAll;
+    private final Map<String, Rectangle> elementBounds = new LinkedHashMap<>();
+    private final Map<String, Rectangle> initialElementBounds = new LinkedHashMap<>();
+    private final Map<String, Boolean> initiallyCustomized = new LinkedHashMap<>();
+    private String selectedElementId;
     private FlowLayout controlsPanel;
     private CheckboxComponent freeMoveCheckbox;
     private CheckboxComponent snapGridCheckbox;
     private Rectangle bounds;
-    private Rectangle initialBounds;
-    private boolean initialHadCustomBounds;
     private DragMode dragMode = DragMode.NONE;
     private AxisEdge horizontalResizeEdge = AxisEdge.NONE;
     private AxisEdge verticalResizeEdge = AxisEdge.NONE;
@@ -61,9 +72,58 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     ChatLayoutEditorScreen(Screen parent, ChatLayoutService chatLayout, String selectedElementId) {
+        this(parent, chatLayout, List.of(selectedElementId), allPreviewElementIds(), false);
+    }
+
+    private ChatLayoutEditorScreen(
+            Screen parent,
+            ChatLayoutService chatLayout,
+            List<String> editableElementIds,
+            List<String> previewElementIds,
+            boolean editAll
+    ) {
         this.parent = parent;
         this.chatLayout = chatLayout;
-        this.selectedElementId = selectedElementId;
+        this.editableElementIds = List.copyOf(editableElementIds);
+        this.previewElementIds = List.copyOf(previewElementIds);
+        this.editAll = editAll;
+        this.showAll = editAll;
+        this.selectedElementId = this.editableElementIds.getFirst();
+    }
+
+    public static ChatLayoutEditorScreen forAllEnabled(
+            Screen parent,
+            ChatLayoutService chatLayout,
+            SettingsRegistry settings
+    ) {
+        boolean raidLfgEnabled = settings.setting("raid-lfg-enabled", BooleanSetting.class).value();
+        return new ChatLayoutEditorScreen(
+                parent,
+                chatLayout,
+                enabledEditableElementIds(raidLfgEnabled),
+                enabledPreviewElementIds(raidLfgEnabled),
+                true
+        );
+    }
+
+    static List<String> enabledEditableElementIds(boolean raidLfgEnabled) {
+        return raidLfgEnabled
+                ? List.of(RalleHudElements.CHAT, RalleHudElements.LFG_NOTIFICATIONS)
+                : List.of(RalleHudElements.CHAT);
+    }
+
+    static List<String> enabledPreviewElementIds(boolean raidLfgEnabled) {
+        return raidLfgEnabled
+                ? allPreviewElementIds()
+                : List.of(RalleHudElements.CHAT);
+    }
+
+    private static List<String> allPreviewElementIds() {
+        return List.of(
+                RalleHudElements.CHAT,
+                RalleHudElements.LFG_NOTIFICATIONS,
+                RalleHudElements.LFG_ACTION_BAR
+        );
     }
 
     @Override
@@ -73,9 +133,16 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     protected void build(FlowLayout root) {
-        bounds = chatLayout.editorBounds(selectedElementId, width, height);
-        initialBounds = bounds;
-        initialHadCustomBounds = chatLayout.hasCustomEditorBounds(selectedElementId);
+        elementBounds.clear();
+        initialElementBounds.clear();
+        initiallyCustomized.clear();
+        for (var elementId : editableElementIds) {
+            var elementBounds = chatLayout.editorBounds(elementId, width, height);
+            this.elementBounds.put(elementId, elementBounds);
+            initialElementBounds.put(elementId, elementBounds);
+            initiallyCustomized.put(elementId, chatLayout.hasCustomEditorBounds(elementId));
+        }
+        bounds = elementBounds.get(selectedElementId);
 
         root.surface(Surface.VANILLA_TRANSLUCENT)
                 .horizontalAlignment(HorizontalAlignment.CENTER)
@@ -96,7 +163,7 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
             alignmentGuides = checked;
             if (!checked) clearAlignmentGuides();
         });
-        checkbox(movementColumn, "show-all", false, checked -> showAll = checked);
+        checkbox(movementColumn, "show-all", editAll, checked -> showAll = checked);
         checkbox(gridColumn, "show-grid", false, checked -> showGrid = checked);
         checkbox(displayColumn, "position-info", false, checked -> showPositionInfo = checked);
         toggles.child(movementColumn).child(gridColumn).child(displayColumn);
@@ -147,12 +214,17 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void resetSessionChanges() {
-        bounds = initialBounds;
-        if (initialHadCustomBounds) {
-            chatLayout.saveEditorBounds(selectedElementId, bounds, width, height);
-        } else {
-            chatLayout.resetEditorBounds(selectedElementId, width, height);
+        for (var elementId : editableElementIds) {
+            Rectangle restored;
+            if (initiallyCustomized.getOrDefault(elementId, false)) {
+                restored = initialElementBounds.get(elementId);
+                chatLayout.saveEditorBounds(elementId, restored, width, height);
+            } else {
+                restored = chatLayout.resetEditorBounds(elementId, width, height);
+            }
+            elementBounds.put(elementId, restored);
         }
+        bounds = elementBounds.get(selectedElementId);
         dragMode = DragMode.NONE;
         clearAlignmentGuides();
     }
@@ -198,15 +270,18 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void renderOtherElements(GuiGraphics graphics) {
-        for (var entry : chatLayout.otherEditorBounds(selectedElementId, width, height).entrySet()) {
-            var otherBounds = entry.getValue();
+        for (var elementId : previewElementIds) {
+            if (elementId.equals(selectedElementId)) continue;
+            var otherBounds = elementBounds.containsKey(elementId)
+                    ? elementBounds.get(elementId)
+                    : chatLayout.editorBounds(elementId, width, height);
             graphics.fill(otherBounds.x(), otherBounds.y(), otherBounds.right(), otherBounds.bottom(), OTHER_FILL);
             graphics.renderOutline(
                     otherBounds.x(), otherBounds.y(), otherBounds.width(), otherBounds.height(), OTHER_OUTLINE
             );
             graphics.drawCenteredString(
                     font,
-                    RalleTypography.body(Component.literal(entry.getKey())),
+                    RalleTypography.body(Component.literal(elementId)),
                     otherBounds.x() + otherBounds.width() / 2,
                     otherBounds.y() + Math.max(4, otherBounds.height() / 2 - 4),
                     0xFFA9B0BE
@@ -226,7 +301,7 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
         if (isControlsAt(event.x(), event.y())) return super.mouseClicked(event, doubled);
-        if (event.button() != 0 || bounds == null || !bounds.contains(event.x(), event.y())) {
+        if (event.button() != 0 || !selectEditableElementAt(event.x(), event.y())) {
             return super.mouseClicked(event, doubled);
         }
 
@@ -243,6 +318,20 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
             pointerOffsetY = (int) event.y() - bounds.y();
         }
         return true;
+    }
+
+    private boolean selectEditableElementAt(double pointerX, double pointerY) {
+        if (editAll && showAll) {
+            for (var elementId : editableElementIds) {
+                if (elementId.equals(selectedElementId)) continue;
+                var candidate = elementBounds.get(elementId);
+                if (candidate == null || !candidate.contains(pointerX, pointerY)) continue;
+                selectedElementId = elementId;
+                bounds = candidate;
+                return true;
+            }
+        }
+        return bounds != null && bounds.contains(pointerX, pointerY);
     }
 
     @Override
@@ -263,8 +352,8 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
                     ? Math.min(8, Math.max(0, width - bounds.width()))
                     : Math.max(0, width - bounds.width() - Math.min(8, Math.max(0, (width - bounds.width()) / 2)));
             var ySnap = snapAxis(desiredY, bounds.height(), height, snapToGrid, alignmentGuides);
-            bounds = new Rectangle(sideX, ySnap.start(), bounds.width(), bounds.height())
-                    .clampTo(width, height, bounds.width(), bounds.height());
+            setBounds(new Rectangle(sideX, ySnap.start(), bounds.width(), bounds.height())
+                    .clampTo(width, height, bounds.width(), bounds.height()));
             alignmentGuideX = null;
             alignmentGuideY = featureMatches(bounds.y(), bounds.height(), ySnap.guide()) ? ySnap.guide() : null;
             return;
@@ -277,8 +366,8 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
                 desiredY, bounds.height(), height,
                 snapToGrid, alignmentGuides
         );
-        bounds = new Rectangle(xSnap.start(), ySnap.start(), bounds.width(), bounds.height())
-                .clampTo(width, height, ChatLayoutService.MINIMUM_WIDTH, ChatLayoutService.MINIMUM_HEIGHT);
+        setBounds(new Rectangle(xSnap.start(), ySnap.start(), bounds.width(), bounds.height())
+                .clampTo(width, height, ChatLayoutService.MINIMUM_WIDTH, ChatLayoutService.MINIMUM_HEIGHT));
         alignmentGuideX = featureMatches(bounds.x(), bounds.width(), xSnap.guide()) ? xSnap.guide() : null;
         alignmentGuideY = featureMatches(bounds.y(), bounds.height(), ySnap.guide()) ? ySnap.guide() : null;
     }
@@ -310,7 +399,7 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
             adjustedPointerY = ySnap.start();
         }
 
-        bounds = resize(
+        setBounds(resize(
                 bounds,
                 horizontalResizeEdge,
                 verticalResizeEdge,
@@ -320,7 +409,7 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
                 0,
                 width,
                 height
-        );
+        ));
         alignmentGuideX = resizeEdgeMatches(bounds, horizontalResizeEdge, xSnap) ? xSnap.guide() : null;
         alignmentGuideY = resizeEdgeMatches(bounds, verticalResizeEdge, ySnap) ? ySnap.guide() : null;
     }
@@ -329,6 +418,11 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
         if (snap == null || snap.guide() == null) return false;
         return edge == AxisEdge.START && bounds.x() == snap.start()
                 || edge == AxisEdge.END && bounds.right() == snap.start();
+    }
+
+    private void setBounds(Rectangle updatedBounds) {
+        bounds = updatedBounds;
+        elementBounds.put(selectedElementId, updatedBounds);
     }
 
     private static boolean featureMatches(int start, int size, Integer guide) {

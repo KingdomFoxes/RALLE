@@ -11,6 +11,8 @@ stacking, message direction, horizontal text alignment, and text-shadow modes
 are implemented as independently disabled
 local options. Transparent chat screenshot selection also supports separately
 disabled processed-xylophone count and successful-copy feedback.
+`/ralle hud` opens the layout editor with every currently enabled editable HUD
+element available; the About page exposes the same action as `Edit HUDs`.
 `/ralle lfg` opens the live, authenticated owo-lib Raid LFG browser when the
 feature is explicitly enabled on Wynncraft. Hosts can disband, kick with a
 hold-to-confirm roster interaction, lock or reopen joining, and ping current

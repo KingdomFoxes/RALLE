@@ -21,7 +21,10 @@ public final class RalleSettings {
                 "about",
                 Component.translatable("ralle.settings.about"),
                 Component.translatable("ralle.settings.about.description"),
-                List.of(subcategory("interface", choice(INTERFACE_FONT_ID, "vanilla", "vanilla", "karla")))
+                List.of(subcategory("interface",
+                        action("edit-huds"),
+                        choice(INTERFACE_FONT_ID, "vanilla", "vanilla", "karla")
+                ))
         ));
 
         registry.registerCategory(new SettingsCategory(

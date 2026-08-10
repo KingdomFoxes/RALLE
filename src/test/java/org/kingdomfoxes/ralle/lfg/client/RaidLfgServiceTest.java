@@ -196,7 +196,7 @@ class RaidLfgServiceTest {
     @Test
     void acceptedDisbandRunsOneBoundedPartyCommandOnlyAfterBackendSuccess() {
         var gateway = new FakeGateway();
-        gateway.disbandResult = new LfgProtocol.Mutation(1, 2, null);
+        gateway.disbandResult = new LfgProtocol.Mutation(1, 2, hostedLobby(false));
         var env = new MutableEnvironment();
         env.enabled = true;
         env.host = "wynncraft.com";

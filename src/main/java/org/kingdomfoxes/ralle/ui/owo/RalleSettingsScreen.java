@@ -260,6 +260,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         links.child(source).child(issues);
         document.child(links);
         document.child(new SettingsSectionDivider(Component.translatable("ralle.settings.subcategory.interface")));
+        document.child(entryRow(settings.entry("edit-huds").orElseThrow()));
         document.child(entryRow(settings.setting(RalleSettings.INTERFACE_FONT_ID, ChoiceSetting.class)));
         document.child(fixedSpacer(SettingsScreenLayout.MINIMUM_DOCUMENT_BOTTOM_SPACE));
     }
@@ -433,6 +434,8 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             minecraft.setScreen(new ChatLayoutEditorScreen(this, chatLayout));
         } else if ("edit-notification-position".equals(action.id())) {
             minecraft.setScreen(new ChatLayoutEditorScreen(this, chatLayout, LfgNotificationOverlay.ELEMENT_ID));
+        } else if ("edit-huds".equals(action.id())) {
+            minecraft.setScreen(ChatLayoutEditorScreen.forAllEnabled(this, chatLayout, settings));
         } else {
             throw new IllegalArgumentException("Unknown settings action: " + action.id());
         }

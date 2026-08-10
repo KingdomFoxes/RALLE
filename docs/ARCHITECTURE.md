@@ -80,6 +80,12 @@ position; their logical size is not configurable. Removing the chat placement
 restores the live vanilla position and dimensions, while removing the
 notification placement restores its eight-pixel bottom-right default.
 
+`/ralle hud` opens the layout editor in its all-elements mode. The chat box is
+always available there, while Raid LFG notification placement is included only
+when Raid LFG is currently enabled. Setting-specific editor actions remain
+scoped to their own element; their `Show all` option is preview-only. The fixed
+Raid LFG Action Bar may be previewed but is never movable.
+
 ## Programmatic UI development
 
 RALLE's settings, chat-layout editor, and Raid LFG screens build their owo

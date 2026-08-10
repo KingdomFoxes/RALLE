@@ -72,6 +72,9 @@ class RalleSettingsTest {
         assertEquals(List.of("about", "chat", "raid-lfg"), categories.stream().map(value -> value.id()).toList());
         assertEquals(List.of("interface"),
                 categories.get(0).subcategories().stream().map(value -> value.id()).toList());
+        assertEquals(List.of("edit-huds", RalleSettings.INTERFACE_FONT_ID),
+                categories.get(0).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
+        assertEquals(List.of(), registry.dependencies("edit-huds"));
         assertEquals(List.of("general", "appearance", "message-direction", "horizontal-alignment", "text-shadow",
                         "message-behavior", "screenshots"),
                 categories.get(1).subcategories().stream().map(value -> value.id()).toList());
