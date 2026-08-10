@@ -109,6 +109,40 @@ class RaidLfgServiceTest {
     }
 
     @Test
+    void manualRefreshRetriesImmediatelyAfterApiFailure() {
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var service = service(gateway, env);
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+        gateway.listener.onFrame(new LfgProtocol.ErrorFrame(new LfgProtocol.Error(
+                "UPSTREAM_UNAVAILABLE", "The API is temporarily unavailable.", true, null, null)));
+        assertEquals(RaidLfgService.LifecycleState.RECONNECTING, service.lifecycle());
+        assertEquals(1, gateway.statusCalls);
+
+        service.requestRefresh();
+
+        assertEquals(2, gateway.statusCalls);
+        assertEquals(RaidLfgService.LifecycleState.SYNCING, service.lifecycle());
+    }
+
+    @Test
+    void manualRefreshRemainsInertOutsideEnabledWynncraftContext() {
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        var service = service(gateway, env);
+
+        service.requestRefresh();
+        env.enabled = true;
+        env.host = "example.org";
+        service.requestRefresh();
+
+        assertEquals(0, gateway.statusCalls);
+    }
+
+    @Test
     void disablingInvalidatesOutstandingAuthenticationCallback() {
         var gateway = new FakeGateway();
         gateway.challengeFuture = new CompletableFuture<>();
