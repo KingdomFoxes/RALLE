@@ -403,13 +403,8 @@ public final class LfgNotificationOverlay {
     }
 
     private static void drawCloseX(GuiGraphics graphics, Rectangle bounds, int color) {
-        var glyph = closeXBounds(bounds);
-        int left = glyph.x();
-        int top = glyph.y();
-        for (int step = 0; step < 9; step++) {
-            graphics.fill(left + step, top + step, left + step + 2, top + step + 2, color);
-            graphics.fill(left + 8 - step, top + step, left + 10 - step, top + step + 2, color);
-        }
+        RalleButtonRenderers.drawPixelX(
+                graphics, bounds.x(), bounds.y(), bounds.width(), bounds.height(), color);
     }
 
     static Rectangle closeXBounds(Rectangle closeButton) {

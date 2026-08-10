@@ -502,22 +502,48 @@ public final class RaidLfgKeybinds {
     private void applyChangedSettings() {
         boolean changed = false;
         for (var binding : bindings.values()) {
-            if (binding.setting.value().equals(binding.appliedValue)) continue;
-            InputConstants.Key key;
-            try {
-                key = KeybindSetting.UNBOUND.equals(binding.setting.value())
-                        ? InputConstants.UNKNOWN : InputConstants.getKey(binding.setting.value());
-            } catch (IllegalArgumentException ignored) {
-                key = InputConstants.UNKNOWN;
+            String mappingValue = storedValue(binding.mapping.saveString());
+            String synchronizedValue = synchronizedValue(
+                    binding.setting.value(), binding.appliedValue, mappingValue);
+            if (synchronizedValue.equals(binding.appliedValue)) continue;
+
+            if (!synchronizedValue.equals(binding.setting.value())) {
+                binding.setting.set(synchronizedValue);
             }
-            binding.mapping.setKey(key);
-            binding.appliedValue = binding.setting.value();
+            if (!synchronizedValue.equals(mappingValue)) {
+                binding.mapping.setKey(key(synchronizedValue));
+            }
+            binding.appliedValue = synchronizedValue;
             changed = true;
         }
         if (changed) {
             KeyMapping.resetMapping();
             disbandConfirmation.clear();
             resetChord(true);
+        }
+    }
+
+    static String synchronizedValue(String settingValue, String appliedValue, String mappingValue) {
+        String storedMappingValue = storedValue(mappingValue);
+        if (appliedValue == null) {
+            return KeybindSetting.UNBOUND.equals(settingValue)
+                    && !KeybindSetting.UNBOUND.equals(storedMappingValue)
+                    ? storedMappingValue : settingValue;
+        }
+        return !settingValue.equals(appliedValue) ? settingValue : storedMappingValue;
+    }
+
+    private static String storedValue(String mappingValue) {
+        return InputConstants.UNKNOWN.getName().equals(mappingValue)
+                ? KeybindSetting.UNBOUND : mappingValue;
+    }
+
+    private static InputConstants.Key key(String storedValue) {
+        if (KeybindSetting.UNBOUND.equals(storedValue)) return InputConstants.UNKNOWN;
+        try {
+            return InputConstants.getKey(storedValue);
+        } catch (IllegalArgumentException ignored) {
+            return InputConstants.UNKNOWN;
         }
     }
 

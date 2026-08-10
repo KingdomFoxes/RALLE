@@ -322,7 +322,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         return row;
     }
 
-    private ButtonComponent control(SettingsEntry entry, boolean available) {
+    private UIComponent control(SettingsEntry entry, boolean available) {
         ButtonComponent button;
         if (entry instanceof BooleanSetting setting) {
             button = UIComponents.button(booleanLabel(setting), pressed -> toggleBoolean(setting, pressed));
@@ -336,14 +336,35 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         } else if (entry instanceof KeybindSetting setting) {
             button = UIComponents.button(keybindLabel(setting), ignored -> beginKeyCapture(setting, buttonFor(entry.id())));
             button.renderer(RalleButtonRenderers.neutral());
+            if (!KeybindSetting.UNBOUND.equals(setting.value())) {
+                configureControlButton(entry, available, button);
+                button.horizontalSizing(Sizing.fixed(102));
+                var reset = UIComponents.button(
+                        Component.empty(),
+                        ignored -> resetKeybind(setting, button)
+                );
+                reset.sizing(Sizing.fixed(20), Sizing.fixed(20));
+                reset.renderer(RalleButtonRenderers.destructiveX());
+                reset.active = available;
+                reset.tooltip(RalleTheme.ui(Component.translatable(
+                        available ? "ralle.settings.keybind.reset" : "ralle.settings.unavailable")));
+
+                var controls = UIContainers.horizontalFlow(Sizing.fixed(126), Sizing.fixed(20));
+                controls.gap(4).child(reset).child(button);
+                return controls;
+            }
         } else {
             throw new IllegalArgumentException("Unknown settings entry type: " + entry.getClass().getName());
         }
+        configureControlButton(entry, available, button);
+        return button;
+    }
+
+    private void configureControlButton(SettingsEntry entry, boolean available, ButtonComponent button) {
         button.id("setting-control-" + entry.id());
         button.sizing(Sizing.fixed(126), Sizing.fixed(20));
         button.active = available;
         if (!available) button.tooltip(RalleTheme.ui(Component.translatable("ralle.settings.unavailable")));
-        return button;
     }
 
     private void toggleBoolean(BooleanSetting setting, ButtonComponent trigger) {
@@ -398,6 +419,30 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         if (button != null) button.setMessage(RalleTheme.ui(Component.translatable("ralle.settings.keybind.press-key")));
     }
 
+    private void resetKeybind(KeybindSetting setting, ButtonComponent trigger) {
+        updateKeybind(setting, KeybindSetting.UNBOUND, trigger);
+    }
+
+    private void updateKeybind(KeybindSetting setting, String value, ButtonComponent trigger) {
+        int triggerViewportOffset = trigger.y() - scroll.y();
+        double fallbackProgress = scroll.progress();
+        setting.set(value);
+        if (query.isEmpty()) {
+            renderCategory(selectedCategory, selectedSubcategory, fallbackProgress, false);
+            updateTrailingSpace();
+        } else {
+            renderSearchResults();
+        }
+
+        var replacement = buttonFor(setting.id());
+        if (replacement == null) return;
+        int replacementDocumentOffset = replacement.y() - document.y();
+        scroll.scrollToOffsetImmediately(SettingsScreenLayout.anchoredScrollOffset(
+                replacementDocumentOffset, triggerViewportOffset, scroll.maximumOffset()
+        ));
+        pendingScrollProgress = null;
+    }
+
     @Override
     public boolean keyPressed(KeyEvent event) {
         if (capturingKeybind != null) {
@@ -410,10 +455,11 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             }
             var key = event.key() == GLFW.GLFW_KEY_BACKSPACE || event.key() == GLFW.GLFW_KEY_DELETE
                     ? InputConstants.UNKNOWN : InputConstants.getKey(event);
-            capturingKeybind.set(key == InputConstants.UNKNOWN ? KeybindSetting.UNBOUND : key.getName());
-            if (capturingButton != null) capturingButton.setMessage(keybindLabel(capturingKeybind));
+            var captured = capturingKeybind;
+            var trigger = capturingButton;
             capturingKeybind = null;
             capturingButton = null;
+            updateKeybind(captured, key == InputConstants.UNKNOWN ? KeybindSetting.UNBOUND : key.getName(), trigger);
             return true;
         }
         return super.keyPressed(event);

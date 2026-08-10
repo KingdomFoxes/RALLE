@@ -15,6 +15,7 @@
   "ralle.settings.action.open": "Open",
   "ralle.settings.keybind.unbound": "Unbound",
   "ralle.settings.keybind.press-key": "Press a key...",
+  "ralle.settings.keybind.reset": "Reset keybind",
 
   "ralle.settings.subcategory.general": "General",
   "ralle.settings.subcategory.general.description": "Core feature controls.",
