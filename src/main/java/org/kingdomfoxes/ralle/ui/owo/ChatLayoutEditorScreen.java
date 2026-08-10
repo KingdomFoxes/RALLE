@@ -237,6 +237,7 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
         if (bounds != null) {
             graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), CHAT_FILL);
             graphics.renderOutline(bounds.x(), bounds.y(), bounds.width(), bounds.height(), CHAT_OUTLINE);
+            renderElementName(graphics, selectedElementId, bounds, CHAT_OUTLINE, showPositionInfo ? -6 : 0);
             if (showPositionInfo) {
                 graphics.drawCenteredString(
                         font,
@@ -248,7 +249,7 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
                                 bounds.height()
                         )),
                         bounds.x() + bounds.width() / 2,
-                        bounds.y() + Math.max(4, bounds.height() / 2 - 4),
+                        centeredTextY(bounds, 6),
                         0xFFFFFFFF
                 );
             }
@@ -279,14 +280,28 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
             graphics.renderOutline(
                     otherBounds.x(), otherBounds.y(), otherBounds.width(), otherBounds.height(), OTHER_OUTLINE
             );
-            graphics.drawCenteredString(
-                    font,
-                    RalleTypography.body(Component.literal(elementId)),
-                    otherBounds.x() + otherBounds.width() / 2,
-                    otherBounds.y() + Math.max(4, otherBounds.height() / 2 - 4),
-                    0xFFA9B0BE
-            );
+            renderElementName(graphics, elementId, otherBounds, 0xFFA9B0BE, 0);
         }
+    }
+
+    private void renderElementName(
+            GuiGraphics graphics,
+            String elementId,
+            Rectangle elementBounds,
+            int color,
+            int verticalOffset
+    ) {
+        graphics.drawCenteredString(
+                font,
+                RalleTypography.body(Component.literal(elementId)),
+                elementBounds.x() + elementBounds.width() / 2,
+                centeredTextY(elementBounds, verticalOffset),
+                color
+        );
+    }
+
+    static int centeredTextY(Rectangle elementBounds, int verticalOffset) {
+        return elementBounds.y() + Math.max(4, elementBounds.height() / 2 - 4) + verticalOffset;
     }
 
     private void renderAlignmentGuides(GuiGraphics graphics) {

@@ -26,6 +26,14 @@ class ChatLayoutEditorScreenTest {
     }
 
     @Test
+    void selectedElementNameAndPositionUseSeparateCenteredLines() {
+        var bounds = new Rectangle(10, 20, 190, 100);
+
+        assertEquals(60, ChatLayoutEditorScreen.centeredTextY(bounds, -6));
+        assertEquals(72, ChatLayoutEditorScreen.centeredTextY(bounds, 6));
+    }
+
+    @Test
     void detectsEveryResizeEdgeAndLeavesTheInteriorForMoving() {
         assertEquals(ChatLayoutEditorScreen.AxisEdge.START, ChatLayoutEditorScreen.edgeAt(10, 10, 210, 6));
         assertEquals(ChatLayoutEditorScreen.AxisEdge.END, ChatLayoutEditorScreen.edgeAt(209, 10, 210, 6));
