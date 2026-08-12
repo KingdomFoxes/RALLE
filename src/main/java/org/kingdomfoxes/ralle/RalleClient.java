@@ -82,8 +82,11 @@ public final class RalleClient implements ClientModInitializer {
         var regionDetector = new MinecraftRaidRegionDetector(minecraft);
         var lfgSounds = new MinecraftLfgSoundPlayer(minecraft, settings);
         var partyCommands = new MinecraftPartyCommandExecutor(minecraft);
+        var modVersion = FabricLoader.getInstance().getModContainer(MOD_ID)
+                .map(container -> container.getMetadata().getVersion().getFriendlyString())
+                .orElse("unknown");
         var raidLfg = new RaidLfgService(
-                new HttpLfgGateway(),
+                new HttpLfgGateway(modVersion),
                 new MinecraftRaidLfgEnvironment(minecraft, settings),
                 new MinecraftSessionProofAdapter(minecraft),
                 new MinecraftLfgNotificationSink(minecraft, lfgSounds),

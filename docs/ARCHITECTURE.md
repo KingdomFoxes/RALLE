@@ -127,10 +127,22 @@ UUID `Idempotency-Key` per player action. A failed transport attempt is retried 
 key. The `WS /live` connection sends the bearer credential in its `Authorization` header and must
 deliver a complete `snapshot` frame before any `lobby.upsert` or `lobby.remove` frame.
 
-The status response contains only the feature flag and protocol version. Authentication identifies
-the client protocol but does not send or compare the mod build version. Unsupported protocol
-versions enter an incompatible client state without a release link; exact mod-version enforcement
-is deferred.
+Every REST and WebSocket attempt carries a random `X-Request-ID`, a stable
+`X-Operation-ID` across the one safe mutation retry, the operation name,
+attempt number, protocol version, and packaged mod version. Transport,
+timeout, 5xx, unreadable-response, protocol, handshake, and abnormal-close
+failures enter a 100-entry in-memory diagnostic ring. After a later successful
+authentication, the client submits at most 50 minimal events at a time to the
+authenticated `/diagnostics/client-events` endpoint. Reporting is best-effort
+and cannot affect LFG state or reconnect behavior. The ring is never persisted
+and contains no bearer credential, session proof, request/response body, IP
+address, or local stack trace. Because networking remains behind the Raid LFG
+opt-in, diagnostics are inert while Raid LFG is disabled.
+
+The status response contains only the feature flag and protocol version. Request metadata includes
+the mod build version for site-admin diagnostics, but authentication neither authorizes from nor
+compares that build version. Unsupported protocol versions enter an incompatible client state
+without a release link; exact mod-version enforcement is deferred.
 
 Kick, lock/unlock, and ping remain Fox-authoritative host actions. An accepted kick removes the
 member, applies a 120-second rejoin block, and causes exactly one bounded `/party kick <IGN>`

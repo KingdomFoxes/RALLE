@@ -35,11 +35,17 @@ class HttpLfgGatewayTest {
         var calls = new AtomicInteger();
         var keys = new ArrayList<String>();
         var authorizations = new ArrayList<String>();
+        var requestIds = new ArrayList<String>();
+        var operationIds = new ArrayList<String>();
+        var attempts = new ArrayList<String>();
         server.createContext("/api/ralle/v1/lobbies/00000000-0000-0000-0000-000000000010/join", exchange -> {
             exchange.getRequestBody().readAllBytes();
             synchronized (keys) {
                 keys.add(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
                 authorizations.add(exchange.getRequestHeaders().getFirst("Authorization"));
+                requestIds.add(exchange.getRequestHeaders().getFirst("X-Request-ID"));
+                operationIds.add(exchange.getRequestHeaders().getFirst("X-Operation-ID"));
+                attempts.add(exchange.getRequestHeaders().getFirst("X-Client-Attempt"));
             }
             if (calls.incrementAndGet() == 1) {
                 exchange.close();
@@ -62,6 +68,9 @@ class HttpLfgGatewayTest {
         assertEquals(2, calls.get());
         assertEquals(List.of(key.toString(), key.toString()), keys);
         assertEquals(List.of("Bearer memory-only-token", "Bearer memory-only-token"), authorizations);
+        assertNotEquals(requestIds.get(0), requestIds.get(1));
+        assertEquals(List.of(key.toString(), key.toString()), operationIds);
+        assertEquals(List.of("1", "2"), attempts);
     }
 
     @Test
