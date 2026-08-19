@@ -19,11 +19,13 @@ import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.jetbrains.annotations.NotNull;
+import org.lwjgl.glfw.GLFW;
 import org.kingdomfoxes.ralle.lfg.client.GuildTerritoryColors;
 import org.kingdomfoxes.ralle.lfg.client.LfgJoinController;
 import org.kingdomfoxes.ralle.lfg.client.LfgLockDebouncer;
@@ -70,6 +72,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private final LfgMainUiSoundTracker soundTracker = new LfgMainUiSoundTracker();
     private final LfgJoinController joinCountdown;
     private final KickTargetingState kickTargeting;
+    private final boolean alliancePreviewEnabled = AllianceRequirementPreview.enabled();
     private final Set<UUID> expandedLobbies = new HashSet<>();
     private final Map<UUID, FlowLayout> kickRows = new HashMap<>();
     private StatusFilter statusFilter = StatusFilter.OPEN;
@@ -98,6 +101,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private ButtonComponent lockButton;
     private long renderedLockVersion = Long.MIN_VALUE;
     private LfgNotificationManager.PartyStatusSuppression pendingMainUiJoinSuppression;
+    private AllianceRequirementPreviewModal alliancePreviewModal;
 
     public RaidLfgScreen(Screen parent, RaidLfgService service) {
         this(parent, service, LfgSoundPlayer.SILENT);
@@ -196,7 +200,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         panel.child(filters);
 
         gridHost = UIContainers.verticalFlow(Sizing.fixed(GRID_WIDTH), Sizing.content());
-        scroll = UIContainers.verticalScroll(Sizing.fixed(592), Sizing.fill(100), gridHost);
+        scroll = UIContainers.verticalScroll(Sizing.fixed(592), Sizing.expand(100), gridHost);
         scroll.scrollbarThiccness(4).scrollStep(36);
         panel.child(scroll);
 
@@ -207,8 +211,19 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var spacer = UIComponents.spacer();
         spacer.verticalSizing(Sizing.fixed(0));
         footer.child(spacer);
+        if (alliancePreviewEnabled) {
+            var alliancePreview = UIComponents.button(
+                    RalleTheme.ui(Component.literal("Preview alliance gate")),
+                    ignored -> openAlliancePreview());
+            alliancePreview.sizing(Sizing.fixed(150), Sizing.fixed(20));
+            alliancePreview.margins(Insets.left(16));
+            alliancePreview.renderer(RalleButtonRenderers.neutral());
+            alliancePreview.tooltip(RalleTheme.ui(Component.literal(
+                    "Open the local-only alliance requirement preview")));
+            footer.child(alliancePreview);
+        }
         var close = UIComponents.button(RalleTheme.ui(Component.translatable("gui.done")), ignored -> onClose());
-        close.horizontalSizing(Sizing.fixed(92)).margins(Insets.left(16));
+        close.horizontalSizing(Sizing.fixed(92)).margins(Insets.left(alliancePreviewEnabled ? 6 : 16));
         close.renderer(RalleButtonRenderers.neutral());
         footer.child(close);
         panel.child(footer);
@@ -231,6 +246,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         tickJoinCountdown();
         tickKickTargeting();
         tickPingCooldown();
+        tickAlliancePreview();
         if (renderedLockVersion != lockDebouncer.version()) {
             renderedLockVersion = lockDebouncer.version();
             rebuildGrid();
@@ -976,6 +992,33 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var overlay = UIContainers.overlay(content).closeOnClick(false);
         overlayHolder[0] = overlay;
         root.child(overlay);
+    }
+
+    private void openAlliancePreview() {
+        if (root == null || alliancePreviewModal != null && alliancePreviewModal.mounted()) return;
+        alliancePreviewModal = new AllianceRequirementPreviewModal(
+                AllianceRequirementPreview.defaultGuilds(), System::nanoTime);
+        root.child(alliancePreviewModal.component());
+        alliancePreviewModal.focusFirst();
+    }
+
+    private void tickAlliancePreview() {
+        if (alliancePreviewModal == null) return;
+        if (!alliancePreviewModal.mounted()) {
+            alliancePreviewModal = null;
+            return;
+        }
+        alliancePreviewModal.tick();
+    }
+
+    @Override
+    public boolean keyPressed(KeyEvent event) {
+        if (alliancePreviewModal != null && alliancePreviewModal.mounted()
+                && event.key() == GLFW.GLFW_KEY_TAB
+                && alliancePreviewModal.cycleFocus((event.modifiers() & GLFW.GLFW_MOD_SHIFT) != 0)) {
+            return true;
+        }
+        return super.keyPressed(event);
     }
 
     private void openStatusDropdown(ButtonComponent trigger) {

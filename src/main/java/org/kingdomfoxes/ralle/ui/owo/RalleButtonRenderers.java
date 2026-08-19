@@ -33,6 +33,13 @@ final class RalleButtonRenderers {
         return renderer(Palette.PRIMARY, () -> false);
     }
 
+    /** A non-interactive healthy-state face which remains green while the component is disabled. */
+    static ButtonComponent.Renderer positiveStatus() {
+        return (graphics, button, delta) -> drawFace(
+                graphics, button.getX(), button.getY(), button.getWidth(), button.getHeight(),
+                Palette.PRIMARY, false, true);
+    }
+
     static ButtonComponent.Renderer destructive() {
         return renderer(Palette.DESTRUCTIVE, () -> false);
     }

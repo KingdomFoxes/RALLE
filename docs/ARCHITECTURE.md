@@ -112,9 +112,9 @@ browser does not own authentication or live synchronization. Networking starts o
 Disconnecting, disabling the setting, or changing servers closes the WebSocket and clears the
 in-memory bearer credential and lobby projection.
 
-The packaged protocol-v1 base URL is `https://kingdomfoxes.com/api/ralle/v1`. Local development
-may explicitly override it with the `ralle.lfg.baseUrl` JVM property; the client never falls back
-to loopback automatically. Insecure
+On the `ally-req` internal-test branch, the packaged protocol-v1 base URL is
+`http://127.0.0.1:8001/api/ralle/v1`. Other environments may explicitly override it with the
+`ralle.lfg.baseUrl` JVM property. Insecure
 HTTP and WebSocket transports are accepted only for loopback hosts; this is intentionally not a
 player setting. The JDK gateway is pinned to HTTP/1.1 so local requests do not attempt an `h2c`
 upgrade that Uvicorn does not support.

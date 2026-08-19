@@ -36,6 +36,12 @@ Requirements: Java 21.
 ./gradlew runClient
 ```
 
+The local-only alliance requirement dialog can be exercised by adding
+`-Dralle.lfg.allyPreview=true` to the Minecraft development run's JVM options.
+The flag adds a `Preview alliance gate` footer button to Raid LFG; without it,
+the browser is unchanged. The preview never sends a command or request and does
+not alter real LFG eligibility or join state.
+
 Import the repository root as a Gradle project in IntelliJ IDEA and select a
 Java 21 Gradle JVM.
 
