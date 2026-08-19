@@ -80,6 +80,35 @@ class HttpLfgGatewayTest {
     }
 
     @Test
+    void retryAfterHeaderIsPreservedWhenStructuredErrorOmitsIt() throws Exception {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/ralle/v1/status", exchange -> {
+            var response = "{\"error\":{\"code\":\"RATE_LIMITED\",\"message\":\"Slow down\",\"retryable\":true}}"
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Retry-After", "23");
+            exchange.sendResponseHeaders(429, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        var gateway = new HttpLfgGateway(HttpClient.newHttpClient(),
+                "http://127.0.0.1:" + server.getAddress().getPort() + "/api/ralle/v1");
+
+        var failure = assertThrows(ExecutionException.class,
+                () -> gateway.status().get(5, TimeUnit.SECONDS));
+        var gatewayFailure = assertInstanceOf(
+                org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException.class, failure.getCause());
+        assertEquals(23, gatewayFailure.error().retryAfterSeconds());
+    }
+
+    @Test
+    void parsesRetryAfterSecondsAndRejectsMalformedValues() {
+        assertEquals(17, HttpLfgGateway.parseRetryAfter("17"));
+        assertEquals(0, HttpLfgGateway.parseRetryAfter("-5"));
+        assertNull(HttpLfgGateway.parseRetryAfter("later"));
+    }
+
+    @Test
     void oversizedHttpResponseIsRejectedBeforeJsonParsing() throws Exception {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/api/ralle/v1/status", exchange -> {

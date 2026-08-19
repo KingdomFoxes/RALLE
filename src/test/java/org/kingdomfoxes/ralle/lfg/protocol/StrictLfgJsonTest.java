@@ -86,6 +86,16 @@ class StrictLfgJsonTest {
     }
 
     @Test
+    void protocolV1RejectsInternalCauseOnLobbyFrames() {
+        assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeLiveFrame(
+                "{\"type\":\"lobby.upsert\",\"protocol_version\":1,\"revision\":3,\"cause\":\"CREATE\",\"lobby\":"
+                        + LOBBY + "}"));
+        assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeLiveFrame(
+                "{\"type\":\"lobby.remove\",\"protocol_version\":1,\"revision\":4,\"cause\":\"DISBAND\","
+                        + "\"lobby_id\":\"00000000-0000-0000-0000-000000000010\"}"));
+    }
+
+    @Test
     void rejectsMissingUnknownInvalidAndMalformedFields() {
         assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeSnapshot(snapshot().replace("\"revision\":2,", "")));
         assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeSnapshot(snapshot().replaceFirst("\\{", "{\"surprise\":true,")));

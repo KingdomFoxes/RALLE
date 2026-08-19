@@ -15,6 +15,10 @@ import java.net.http.WebSocketHandshakeException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -201,8 +205,13 @@ public final class HttpLfgGateway implements LfgGateway {
                         if (response.statusCode() >= 200 && response.statusCode() < 300) {
                             return CompletableFuture.completedFuture(decoder.apply(body));
                         }
-                        return CompletableFuture.<T>failedFuture(new LfgGatewayException(
-                                response.statusCode(), httpError(response.statusCode(), body)));
+                        var error = httpError(response.statusCode(), body);
+                        var retryAfter = parseRetryAfter(response.headers().firstValue("Retry-After").orElse(null));
+                        if (error.retryAfterSeconds() == null && retryAfter != null) {
+                            error = new LfgProtocol.Error(error.code(), error.message(), error.retryable(),
+                                    error.lobbyId(), error.returnedLobby(), retryAfter);
+                        }
+                        return CompletableFuture.<T>failedFuture(new LfgGatewayException(response.statusCode(), error));
                     } catch (IOException exception) {
                         if (retryTransport && attempt == 0) return send(request, decoder, true, 1);
                         return CompletableFuture.<T>failedFuture(new LfgGatewayException(
@@ -231,6 +240,23 @@ public final class HttpLfgGateway implements LfgGateway {
                     ? "This action is unavailable on the connected Fox backend (HTTP 404)."
                     : "Fox Raid LFG rejected the request (HTTP " + status + ").";
             return new LfgProtocol.Error("HTTP_" + status, message, status >= 500, null, null);
+        }
+    }
+
+    static Integer parseRetryAfter(String value) {
+        if (value == null || value.isBlank()) return null;
+        var cleaned = value.strip();
+        try {
+            long seconds = Long.parseLong(cleaned);
+            return (int) Math.min(Integer.MAX_VALUE, Math.max(0L, seconds));
+        } catch (NumberFormatException ignored) {
+            try {
+                var retryAt = ZonedDateTime.parse(cleaned, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();
+                long seconds = Math.max(0L, Duration.between(Instant.now(), retryAt).toSeconds());
+                return (int) Math.min(Integer.MAX_VALUE, seconds);
+            } catch (DateTimeParseException invalidDate) {
+                return null;
+            }
         }
     }
 

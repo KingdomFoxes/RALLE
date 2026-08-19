@@ -251,8 +251,7 @@ public final class RaidLfgKeybinds {
             service.leave(lobby.lobbyId()).whenComplete((ignored, failure) -> minecraft.execute(() -> {
                 if (failure == null) sounds.playPartyLeft();
                 else if (!cardVisible) {
-                    actionBar.show("Leave failed", LfgActionBarState.Tone.DANGER,
-                            LfgActionGlyph.LEAVE_DISBAND);
+                    showMutationFailure(failure, "Leave failed", LfgActionGlyph.LEAVE_DISBAND);
                 }
             }));
             return;
@@ -277,8 +276,7 @@ public final class RaidLfgKeybinds {
             if (failure == null) {
                 sounds.playPartyLeft();
             } else if (!cardVisible) {
-                actionBar.show("Disband failed", LfgActionBarState.Tone.DANGER,
-                        LfgActionGlyph.LEAVE_DISBAND);
+                showMutationFailure(failure, "Disband failed", LfgActionGlyph.LEAVE_DISBAND);
             }
         }));
     }
@@ -298,7 +296,7 @@ public final class RaidLfgKeybinds {
         actionBar.show("Ping", LfgActionBarState.Tone.NORMAL, LfgActionGlyph.PING);
         service.ping(lobby.lobbyId()).whenComplete((ignored, failure) -> minecraft.execute(() -> {
             if (failure == null) sounds.playLocalPartyPing();
-            else actionBar.show("Ping failed", LfgActionBarState.Tone.DANGER, LfgActionGlyph.PING);
+            else showMutationFailure(failure, "Ping failed", LfgActionGlyph.PING);
         }));
     }
 
@@ -374,8 +372,7 @@ public final class RaidLfgKeybinds {
             service.create(selected.raid(), region.get(), null)
                     .whenComplete((ignored, failure) -> minecraft.execute(() -> {
                         if (failure == null) sounds.playPartyCreated();
-                        else actionBar.show("Create failed", LfgActionBarState.Tone.DANGER,
-                                LfgActionGlyph.CREATE);
+                        else showMutationFailure(failure, "Create failed", LfgActionGlyph.CREATE);
                     }));
             return;
         }
@@ -391,8 +388,7 @@ public final class RaidLfgKeybinds {
         service.kick(lobby.lobbyId(), target.minecraftUuid(), target.ign())
                 .whenComplete((ignored, failure) -> minecraft.execute(() -> {
                     if (failure == null) sounds.playKickSucceeded();
-                    else actionBar.show("Kick failed", LfgActionBarState.Tone.DANGER,
-                            LfgActionGlyph.KICK);
+                    else showMutationFailure(failure, "Kick failed", LfgActionGlyph.KICK);
                 }));
     }
 
@@ -405,8 +401,7 @@ public final class RaidLfgKeybinds {
                         .whenComplete((ignored, failure) -> minecraft.execute(() -> {
                             lockDebouncer.complete(command.lobbyId());
                             if (failure != null && command.origin() == LfgLockDebouncer.Origin.KEYBIND) {
-                                actionBar.show(command.locked() ? "Lock failed" : "Unlock failed",
-                                        LfgActionBarState.Tone.DANGER,
+                                showMutationFailure(failure, command.locked() ? "Lock failed" : "Unlock failed",
                                         command.locked() ? LfgActionGlyph.LOCK : LfgActionGlyph.UNLOCK);
                             }
                         })));
@@ -415,6 +410,15 @@ public final class RaidLfgKeybinds {
     private void showMissingHostParty() {
         if (currentLobby() == null) showNoParty();
         else actionBar.show("Only the party host can do that", LfgActionBarState.Tone.DANGER);
+    }
+
+    private void showMutationFailure(Throwable failure, String failedText, LfgActionGlyph glyph) {
+        if (RaidLfgService.isOutcomeUnknown(failure)) {
+            actionBar.show("Outcome unknown · synchronized state restored",
+                    LfgActionBarState.Tone.MUTED, glyph);
+        } else {
+            actionBar.show(failedText, LfgActionBarState.Tone.DANGER, glyph);
+        }
     }
 
     private void showNoParty() {
