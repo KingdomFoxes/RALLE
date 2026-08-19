@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -211,6 +212,208 @@ class RaidLfgServiceTest {
         assertTrue(service.store().state().lobbyList().getFirst().locked());
     }
 
+    @Test
+    void repeatedExpirationFramesUseOneParallelRenewalAndKeepOldConnectionLiveUntilSnapshot() {
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var service = service(gateway, env);
+        service.tick();
+        var oldListener = gateway.listeners.getFirst();
+        var oldConnection = gateway.connections.getFirst();
+        oldListener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+
+        var expiring = new LfgProtocol.SessionExpiringFrame(1, Instant.ofEpochSecond(900));
+        oldListener.onFrame(expiring);
+        oldListener.onFrame(expiring);
+
+        assertEquals(2, gateway.challengeCalls);
+        assertEquals(RaidLfgService.LifecycleState.ONLINE, service.lifecycle());
+        assertEquals(0, oldConnection.closeCalls);
+        gateway.listeners.get(1).onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+        assertEquals(RaidLfgService.LifecycleState.ONLINE, service.lifecycle());
+        assertEquals(1, oldConnection.closeCalls);
+    }
+
+    @Test
+    void expiredOldCredentialBecomesReadOnlyWithoutStartingOverlappingAuthentication() {
+        var now = new long[]{0L};
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var service = new RaidLfgService(gateway, env, ignored -> CompletableFuture.completedFuture(null),
+                () -> now[0], () -> 0.5);
+        service.tick();
+        var oldListener = gateway.listeners.getFirst();
+        oldListener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+        gateway.challengeFuture = new CompletableFuture<>();
+        oldListener.onFrame(new LfgProtocol.SessionExpiringFrame(1, Instant.ofEpochMilli(1_000)));
+
+        now[0] = 1_000;
+        service.tick();
+        service.tick();
+
+        assertEquals(RaidLfgService.LifecycleState.RECONNECTING, service.lifecycle());
+        assertTrue(service.statusMessage().contains("read-only"));
+        assertEquals(2, gateway.challengeCalls);
+    }
+
+    @Test
+    void renewalBackoffDeduplicatesExpiryFramesAndHonorsRetryAfter() {
+        var now = new long[]{0L};
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var service = new RaidLfgService(gateway, env, ignored -> CompletableFuture.completedFuture(null),
+                () -> now[0], () -> 0.5);
+        service.tick();
+        var oldListener = gateway.listener;
+        oldListener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+        gateway.challengeFuture = CompletableFuture.failedFuture(
+                new org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException(429,
+                        new LfgProtocol.Error("RATE_LIMITED", "Slow down", true, null, null, 10)));
+        var expiring = new LfgProtocol.SessionExpiringFrame(1, Instant.ofEpochSecond(900));
+
+        oldListener.onFrame(expiring);
+        oldListener.onFrame(expiring);
+        now[0] = 9_999;
+        service.tick();
+        assertEquals(2, gateway.challengeCalls);
+
+        now[0] = 10_000;
+        service.tick();
+        assertEquals(3, gateway.challengeCalls);
+        assertEquals(RaidLfgService.LifecycleState.ONLINE, service.lifecycle());
+    }
+
+    @Test
+    void transportUnknownCreateReconcilesFromFreshSnapshotWithoutRetryingOrFalseFailure() {
+        var now = new long[]{0L};
+        var gateway = new FakeGateway();
+        gateway.createFuture = new CompletableFuture<>();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var service = new RaidLfgService(gateway, env, ignored -> CompletableFuture.completedFuture(null),
+                () -> now[0], () -> 0.5);
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+
+        var result = service.create(LfgProtocol.RaidType.TNA, LfgProtocol.Region.EU, null);
+        var duplicate = service.create(LfgProtocol.RaidType.TNA, LfgProtocol.Region.EU, null);
+        gateway.createFuture.completeExceptionally(new org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException(
+                "Fox Raid LFG could not be reached.", new java.io.IOException("lost response")));
+
+        assertFalse(result.isDone());
+        assertThrows(CompletionException.class, duplicate::join);
+        assertTrue(service.outcomeUnknown(null, "create"));
+        assertTrue(service.statusMessage().startsWith("Action submitted"));
+        now[0] = 1_000;
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshotWithLobby()));
+
+        assertEquals(hostedLobby(true).lobbyId(), result.join().lobby().lobbyId());
+        assertEquals(1, gateway.createCalls);
+        assertEquals(1, gateway.createKeys.stream().distinct().count());
+        assertEquals("Live", service.statusMessage());
+    }
+
+    @Test
+    void acceptedKickAfterLiveLossRunsExactlyOneCommandAndLateRestStillWins() {
+        var gateway = new FakeGateway();
+        gateway.kickFuture = new CompletableFuture<>();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var commands = new Commands();
+        var service = new RaidLfgService(gateway, env, ignored -> CompletableFuture.completedFuture(null),
+                () -> 0L, () -> 0.5, LfgNotificationSink.IGNORE, commands);
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshotWithLobby()));
+        var result = service.kick(hostedLobby(true).lobbyId(),
+                UUID.fromString("00000000-0000-0000-0000-000000000002"), "Player02");
+
+        gateway.listener.onFailure(new java.io.IOException("socket lost"));
+        gateway.kickFuture.complete(new LfgProtocol.Mutation(1, 2, hostedLobby(false)));
+        result.join();
+
+        assertEquals(List.of("Player02"), commands.kicks);
+    }
+
+    @Test
+    void liveUpsertBeforeRestResponseIsAppliedOnce() {
+        var gateway = new FakeGateway();
+        gateway.createFuture = new CompletableFuture<>();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var service = service(gateway, env);
+        var changes = new java.util.ArrayList<RaidLfgStore.LobbyChange>();
+        service.store().observeLobbyChanges(changes::add);
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+        var result = service.create(LfgProtocol.RaidType.TNA, LfgProtocol.Region.EU, null);
+        var mutation = new LfgProtocol.Mutation(1, 2, hostedLobby(false));
+
+        gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 2, hostedLobby(false)));
+        gateway.createFuture.complete(mutation);
+        result.join();
+
+        assertEquals(1, changes.size());
+        assertEquals(RaidLfgStore.UpdateOrigin.LIVE, changes.getFirst().origin());
+        assertEquals(2, service.store().state().revision());
+    }
+
+    @Test
+    void unknownDisbandRunsOnePartyCommandOnlyAfterSnapshotConfirmsRemoval() {
+        var now = new long[]{0L};
+        var gateway = new FakeGateway();
+        gateway.disbandFuture = new CompletableFuture<>();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var commands = new Commands();
+        var service = new RaidLfgService(gateway, env, ignored -> CompletableFuture.completedFuture(null),
+                () -> now[0], () -> 0.5, LfgNotificationSink.IGNORE, commands);
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshotWithLobby()));
+        var result = service.disband(hostedLobby(true).lobbyId());
+        gateway.disbandFuture.completeExceptionally(new org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException(
+                "Fox Raid LFG could not be reached.", new java.io.IOException("lost response")));
+
+        assertEquals(0, commands.disbands);
+        now[0] = 1_000;
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+        result.join();
+
+        assertEquals(1, commands.disbands);
+    }
+
+    @Test
+    void refreshDuringReconnectStartsOnlyOneImmediateAuthenticationAndSharesSynchronization() {
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var service = service(gateway, env);
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+        gateway.listener.onFailure(new java.io.IOException("offline"));
+
+        var first = service.refresh();
+        var second = service.refresh();
+
+        assertSame(first, second);
+        assertEquals(2, gateway.challengeCalls);
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+        assertEquals(1, first.join().revision());
+        assertEquals(RaidLfgService.LifecycleState.ONLINE, service.lifecycle());
+    }
+
     private static RaidLfgService service(FakeGateway gateway, MutableEnvironment env) {
         return new RaidLfgService(gateway, env, ignored -> CompletableFuture.completedFuture(null),
                 () -> 0L, () -> 0.5);
@@ -271,12 +474,19 @@ class RaidLfgServiceTest {
         int challengeCalls;
         int completeCalls;
         CompletableFuture<LfgProtocol.Challenge> challengeFuture;
+        CompletableFuture<LfgProtocol.Mutation> createFuture;
+        CompletableFuture<LfgProtocol.Mutation> disbandFuture;
+        CompletableFuture<LfgProtocol.Mutation> kickFuture;
         LfgProtocol.Mutation kickResult;
         LfgProtocol.Mutation lockResult;
         boolean requestedLocked;
         LiveListener listener;
         LfgProtocol.Status status = new LfgProtocol.Status(true, 1);
         RuntimeException liveFailure;
+        int createCalls;
+        final java.util.ArrayList<UUID> createKeys = new java.util.ArrayList<>();
+        final java.util.ArrayList<LiveListener> listeners = new java.util.ArrayList<>();
+        final java.util.ArrayList<FakeConnection> connections = new java.util.ArrayList<>();
 
         @Override public CompletableFuture<LfgProtocol.Status> status() {
             statusCalls++;
@@ -293,11 +503,18 @@ class RaidLfgServiceTest {
                     Instant.now().plusSeconds(900), 1, RaidLfgServiceTest.snapshot().viewer()));
         }
         @Override public CompletableFuture<LfgProtocol.Snapshot> snapshot(String bearerToken) { return CompletableFuture.completedFuture(RaidLfgServiceTest.snapshot()); }
-        @Override public CompletableFuture<LfgProtocol.Mutation> create(String bearerToken, LfgProtocol.RaidType raid, LfgProtocol.Region region, String note, UUID idempotencyKey) { return unsupported(); }
+        @Override public CompletableFuture<LfgProtocol.Mutation> create(String bearerToken, LfgProtocol.RaidType raid, LfgProtocol.Region region, String note, UUID idempotencyKey) {
+            createCalls++;
+            createKeys.add(idempotencyKey);
+            return createFuture == null ? unsupported() : createFuture;
+        }
         @Override public CompletableFuture<LfgProtocol.Mutation> join(String bearerToken, UUID lobbyId, UUID idempotencyKey) { return unsupported(); }
         @Override public CompletableFuture<LfgProtocol.Mutation> leave(String bearerToken, UUID lobbyId, UUID idempotencyKey) { return unsupported(); }
-        @Override public CompletableFuture<LfgProtocol.Mutation> disband(String bearerToken, UUID lobbyId, UUID idempotencyKey) { return unsupported(); }
+        @Override public CompletableFuture<LfgProtocol.Mutation> disband(String bearerToken, UUID lobbyId, UUID idempotencyKey) {
+            return disbandFuture == null ? unsupported() : disbandFuture;
+        }
         @Override public CompletableFuture<LfgProtocol.Mutation> kick(String bearerToken, UUID lobbyId, UUID targetId, UUID idempotencyKey) {
+            if (kickFuture != null) return kickFuture;
             return kickResult == null ? unsupported() : CompletableFuture.completedFuture(kickResult);
         }
         @Override public CompletableFuture<LfgProtocol.Mutation> setLocked(String bearerToken, UUID lobbyId, boolean locked, UUID idempotencyKey) {
@@ -307,9 +524,24 @@ class RaidLfgServiceTest {
         @Override public CompletableFuture<LfgProtocol.Mutation> ping(String bearerToken, UUID lobbyId, UUID idempotencyKey) { return unsupported(); }
         @Override public CompletableFuture<LiveConnection> connectLive(String bearerToken, LiveListener listener) {
             this.listener = listener;
+            listeners.add(listener);
             if (liveFailure != null) return CompletableFuture.failedFuture(liveFailure);
-            return CompletableFuture.completedFuture(() -> {});
+            var connection = new FakeConnection();
+            connections.add(connection);
+            return CompletableFuture.completedFuture(connection);
         }
         private static <T> CompletableFuture<T> unsupported() { return CompletableFuture.failedFuture(new UnsupportedOperationException()); }
+    }
+
+    private static final class FakeConnection implements LfgGateway.LiveConnection {
+        int closeCalls;
+        @Override public void close() { closeCalls++; }
+    }
+
+    private static final class Commands implements PartyCommandExecutor {
+        final java.util.ArrayList<String> kicks = new java.util.ArrayList<>();
+        int disbands;
+        @Override public void kick(String ign) { kicks.add(ign); }
+        @Override public void disband() { disbands++; }
     }
 }

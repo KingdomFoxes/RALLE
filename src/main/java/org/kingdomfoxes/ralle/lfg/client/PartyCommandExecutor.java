@@ -6,6 +6,9 @@ public interface PartyCommandExecutor {
 
     void kick(String ign);
 
+    /** Sends one explicitly confirmed host party disband command. */
+    default void disband() {}
+
     /** Sends one explicitly queued, locally validated Wynncraft party invitation. */
     default void invite(String ign) {}
 }

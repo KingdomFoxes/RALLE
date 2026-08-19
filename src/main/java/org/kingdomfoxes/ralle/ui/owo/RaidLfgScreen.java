@@ -89,6 +89,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private FlowLayout scrollTargetComponent;
     private long renderedRevision = Long.MIN_VALUE;
     private RaidLfgService.LifecycleState renderedLifecycle;
+    private String renderedStatusMessage;
     private int renderedCountdownSeconds = -1;
     private LfgJoinController.Phase renderedJoinPhase = LfgJoinController.Phase.IDLE;
     private UUID renderedJoinLobby;
@@ -225,7 +226,9 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             scrollTargetComponent = null;
             scrollTarget = null;
         }
-        if (state.revision() != renderedRevision || service.lifecycle() != renderedLifecycle || service.focusLobbyId() != null) {
+        if (state.revision() != renderedRevision || service.lifecycle() != renderedLifecycle
+                || !java.util.Objects.equals(service.statusMessage(), renderedStatusMessage)
+                || service.focusLobbyId() != null) {
             refreshFromService(false);
         }
         tickJoinCountdown();
@@ -242,9 +245,11 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var state = service.store().state();
         var lifecycle = service.lifecycle();
         var focus = service.focusLobbyId();
-        if (!force && state.revision() == renderedRevision && lifecycle == renderedLifecycle && focus == null) return;
+        if (!force && state.revision() == renderedRevision && lifecycle == renderedLifecycle
+                && java.util.Objects.equals(service.statusMessage(), renderedStatusMessage) && focus == null) return;
         renderedRevision = state.revision();
         renderedLifecycle = lifecycle;
+        renderedStatusMessage = service.statusMessage();
         if (focus != null) {
             statusFilter = StatusFilter.ALL;
             raidFilter = RaidFilter.ALL;
@@ -257,7 +262,10 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             regionButton.setMessage(regionLabel());
         }
         boolean online = lifecycle == RaidLfgService.LifecycleState.ONLINE;
-        refreshButton.active = online;
+        refreshButton.active = lifecycle != RaidLfgService.LifecycleState.DISABLED
+                && lifecycle != RaidLfgService.LifecycleState.NOT_ON_WYNNCRAFT
+                && lifecycle != RaidLfgService.LifecycleState.OUTDATED
+                && lifecycle != RaidLfgService.LifecycleState.INELIGIBLE;
         createButton.active = online && state.capabilities() != null && state.capabilities().create() && !service.pendingCreate();
         footerStatus.text(RalleTheme.ui(Component.literal(statusText(lifecycle))));
         boolean onlineError = online && !"Live".equals(service.statusMessage());
@@ -1044,7 +1052,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         return switch (state) {
             case ONLINE -> "Live".equals(service.statusMessage())
                     ? "● Live · synchronized with Fox"
-                    : "Host action failed · " + service.statusMessage();
+                    : "Action status · " + service.statusMessage();
             case AUTHENTICATING -> "Authenticating...";
             case SYNCING -> "Synchronizing...";
             case RECONNECTING -> "Offline · reconnecting";

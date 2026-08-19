@@ -118,6 +118,21 @@ UUID `Idempotency-Key` per player action. A failed transport attempt is retried 
 key. The `WS /live` connection sends the bearer credential in its `Authorization` header and must
 deliver a complete `snapshot` frame before any `lobby.upsert` or `lobby.remove` frame.
 
+`session.expiring` starts one parallel credential renewal while the current credential and live
+projection remain usable. Repeated expiry frames do not start additional status, challenge, or
+completion requests. The replacement WebSocket must deliver its fresh snapshot before the service
+atomically swaps connections; the old socket closes only after that swap. Renewal retries use the
+same capped exponential schedule as reconnects and never run sooner than `Retry-After`. If the old
+credential expires first, mutations become read-only until a replacement snapshot is accepted.
+
+If a mutation exhausts its one same-key transport retry without a response, its idempotency key and
+pending interaction remain in memory while the client reconnects. A fresh snapshot reconciles
+create, join, leave, lock/unlock, and disband from authoritative state without resubmitting the
+mutation. Kick and ping remain explicitly unknown when the snapshot cannot prove their outcome.
+Bounded party kick and disband commands run at most once, only after a REST acceptance or a safely
+reconciled disband. A live frame arriving before its matching REST response remains valid; the
+duplicate global revision is ignored by the store.
+
 The status response contains only the feature flag and protocol version. Authentication identifies
 the client protocol but does not send or compare the mod build version. Unsupported protocol
 versions enter an incompatible client state without a release link; exact mod-version enforcement
