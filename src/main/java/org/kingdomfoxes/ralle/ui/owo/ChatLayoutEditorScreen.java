@@ -24,6 +24,7 @@ import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,11 +33,14 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
     static final int GRID_SIZE = 10;
     private static final int SNAP_DISTANCE = 4;
     private static final int RESIZE_MARGIN = 6;
-    static final int RESIZE_WINDOW_MARGIN = 4;
-    private static final int RESIZE_CORNER_LENGTH = 5;
+    static final int EDITOR_WINDOW_MARGIN = 3;
+    static final int EDITOR_OUTER_FRAME_THICKNESS = 2;
+    static final int RESIZE_CORNER_SIZE = 6;
     private static final int CHAT_FILL = 0x88243A55;
     private static final int CHAT_OUTLINE = 0xFFE5B94C;
-    private static final int RESIZE_FRAME = RalleTheme.DARK_GOLD_ARGB;
+    static final int EDITOR_OUTER_FRAME = CHAT_OUTLINE;
+    static final int EDITOR_INNER_FRAME = RalleTheme.DARK_GOLD_ARGB;
+    static final int EDITOR_LABEL = EDITOR_OUTER_FRAME;
     private static final int OTHER_FILL = 0x55263A5A;
     private static final int OTHER_OUTLINE = 0xFF66738A;
     private static final int GRID_LINE = 0x404D6380;
@@ -238,17 +242,25 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
         if (showAll) renderOtherElements(graphics);
 
         if (bounds != null) {
-            graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), CHAT_FILL);
-            if (isSelectedElementResizable()) {
-                renderResizeFrame(graphics, resizeInteractionBounds(bounds, width, height));
-            } else {
-                graphics.renderOutline(bounds.x(), bounds.y(), bounds.width(), bounds.height(), CHAT_OUTLINE);
-            }
+            var interactionBounds = editorInteractionBounds(bounds, width, height);
+            graphics.fill(
+                    interactionBounds.x(),
+                    interactionBounds.y(),
+                    interactionBounds.right(),
+                    interactionBounds.bottom(),
+                    CHAT_FILL
+            );
+            renderEditorFrame(
+                    graphics,
+                    interactionBounds,
+                    bounds,
+                    chatLayout.placementPolicy(selectedElementId)
+            );
             renderElementName(
                     graphics,
                     selectedElementId,
                     bounds,
-                    isSelectedElementResizable() ? RESIZE_FRAME : CHAT_OUTLINE,
+                    EDITOR_LABEL,
                     showPositionInfo ? -6 : 0
             );
             if (showPositionInfo) {
@@ -326,35 +338,25 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
         }
     }
 
-    /**
-     * Draws a one-pixel connected frame plus four outward L-shaped corner accents.
-     * The frame also communicates the resizable element's expanded editor hit area.
-     */
-    private void renderResizeFrame(GuiGraphics graphics, Rectangle frame) {
-        graphics.renderOutline(frame.x(), frame.y(), frame.width(), frame.height(), RESIZE_FRAME);
-
-        int left = frame.x();
-        int top = frame.y();
-        int right = frame.right();
-        int bottom = frame.bottom();
-        int horizontalLength = Math.min(RESIZE_CORNER_LENGTH, frame.width());
-        int verticalLength = Math.min(RESIZE_CORNER_LENGTH, frame.height());
-
-        if (top > 0) {
-            graphics.fill(left, top - 1, left + horizontalLength, top, RESIZE_FRAME);
-            graphics.fill(right - horizontalLength, top - 1, right, top, RESIZE_FRAME);
+    /** Draws the shared nested frame, adding tapered corners only when the element can resize. */
+    private void renderEditorFrame(
+            GuiGraphics graphics,
+            Rectangle interactionBounds,
+            Rectangle elementBounds,
+            PlacementPolicy placementPolicy
+    ) {
+        for (var segment : connectedFrameSegments(interactionBounds, EDITOR_OUTER_FRAME_THICKNESS)) {
+            graphics.fill(segment.x(), segment.y(), segment.right(), segment.bottom(), EDITOR_OUTER_FRAME);
         }
-        if (bottom < height) {
-            graphics.fill(left, bottom, left + horizontalLength, bottom + 1, RESIZE_FRAME);
-            graphics.fill(right - horizontalLength, bottom, right, bottom + 1, RESIZE_FRAME);
-        }
-        if (left > 0) {
-            graphics.fill(left - 1, top, left, top + verticalLength, RESIZE_FRAME);
-            graphics.fill(left - 1, bottom - verticalLength, left, bottom, RESIZE_FRAME);
-        }
-        if (right < width) {
-            graphics.fill(right, top, right + 1, top + verticalLength, RESIZE_FRAME);
-            graphics.fill(right, bottom - verticalLength, right + 1, bottom, RESIZE_FRAME);
+        graphics.renderOutline(
+                elementBounds.x(),
+                elementBounds.y(),
+                elementBounds.width(),
+                elementBounds.height(),
+                EDITOR_INNER_FRAME
+        );
+        for (var strip : cornerAccentStrips(elementBounds, placementPolicy)) {
+            graphics.fill(strip.x(), strip.y(), strip.right(), strip.bottom(), EDITOR_INNER_FRAME);
         }
     }
 
@@ -385,20 +387,17 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
             for (var elementId : editableElementIds) {
                 if (elementId.equals(selectedElementId)) continue;
                 var candidate = elementBounds.get(elementId);
-                if (candidate == null || !containsEditorPoint(elementId, candidate, pointerX, pointerY)) continue;
+                if (candidate == null || !containsEditorPoint(candidate, pointerX, pointerY)) continue;
                 selectedElementId = elementId;
                 bounds = candidate;
                 return true;
             }
         }
-        return bounds != null && containsEditorPoint(selectedElementId, bounds, pointerX, pointerY);
+        return bounds != null && containsEditorPoint(bounds, pointerX, pointerY);
     }
 
-    private boolean containsEditorPoint(String elementId, Rectangle candidate, double pointerX, double pointerY) {
-        Rectangle interactionBounds = chatLayout.placementPolicy(elementId) == PlacementPolicy.RESIZABLE_RECTANGLE
-                ? resizeInteractionBounds(candidate, width, height)
-                : candidate;
-        return interactionBounds.contains(pointerX, pointerY);
+    private boolean containsEditorPoint(Rectangle candidate, double pointerX, double pointerY) {
+        return editorInteractionBounds(candidate, width, height).contains(pointerX, pointerY);
     }
 
     @Override
@@ -583,12 +582,43 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
         return AxisEdge.NONE;
     }
 
-    static Rectangle resizeInteractionBounds(Rectangle bounds, int viewportWidth, int viewportHeight) {
-        int left = Math.max(0, bounds.x() - RESIZE_WINDOW_MARGIN);
-        int top = Math.max(0, bounds.y() - RESIZE_WINDOW_MARGIN);
-        int right = Math.min(viewportWidth, bounds.right() + RESIZE_WINDOW_MARGIN);
-        int bottom = Math.min(viewportHeight, bounds.bottom() + RESIZE_WINDOW_MARGIN);
+    static Rectangle editorInteractionBounds(Rectangle bounds, int viewportWidth, int viewportHeight) {
+        int left = Math.max(0, bounds.x() - EDITOR_WINDOW_MARGIN);
+        int top = Math.max(0, bounds.y() - EDITOR_WINDOW_MARGIN);
+        int right = Math.min(viewportWidth, bounds.right() + EDITOR_WINDOW_MARGIN);
+        int bottom = Math.min(viewportHeight, bounds.bottom() + EDITOR_WINDOW_MARGIN);
         return new Rectangle(left, top, right - left, bottom - top);
+    }
+
+    static List<Rectangle> connectedFrameSegments(Rectangle frame, int requestedThickness) {
+        int thickness = Math.min(Math.max(1, requestedThickness), Math.min(frame.width(), frame.height()));
+        return List.of(
+                new Rectangle(frame.x(), frame.y(), frame.width(), thickness),
+                new Rectangle(frame.x(), frame.bottom() - thickness, frame.width(), thickness),
+                new Rectangle(frame.x(), frame.y(), thickness, frame.height()),
+                new Rectangle(frame.right() - thickness, frame.y(), thickness, frame.height())
+        );
+    }
+
+    static List<Rectangle> cornerAccentStrips(Rectangle frame, int requestedSize) {
+        int size = Math.min(Math.max(1, requestedSize), Math.min(frame.width(), frame.height()));
+        var strips = new ArrayList<Rectangle>((size - 1) * 4);
+        for (int depth = 1; depth < size; depth++) {
+            int width = size - depth + 1;
+            int top = frame.y() + depth;
+            int bottom = frame.bottom() - depth - 1;
+            strips.add(new Rectangle(frame.x(), top, width, 1));
+            strips.add(new Rectangle(frame.right() - width, top, width, 1));
+            strips.add(new Rectangle(frame.x(), bottom, width, 1));
+            strips.add(new Rectangle(frame.right() - width, bottom, width, 1));
+        }
+        return List.copyOf(strips);
+    }
+
+    static List<Rectangle> cornerAccentStrips(Rectangle frame, PlacementPolicy placementPolicy) {
+        return placementPolicy == PlacementPolicy.RESIZABLE_RECTANGLE
+                ? cornerAccentStrips(frame, RESIZE_CORNER_SIZE)
+                : List.of();
     }
 
     private static int pointerOffset(double pointer, int start, int end, AxisEdge edge) {
