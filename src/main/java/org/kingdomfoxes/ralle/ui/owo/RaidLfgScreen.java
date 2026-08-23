@@ -189,10 +189,10 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         raidButton.onPress(button -> openRaidDropdown(button));
         regionButton.onPress(button -> openRegionDropdown(button));
 
-        refreshButton = UIComponents.button(Component.empty(), ignored -> service.refresh());
+        refreshButton = UIComponents.button(Component.empty(), ignored -> service.requestRefresh());
         refreshButton.sizing(Sizing.fixed(30), Sizing.fixed(20));
         refreshButton.renderer(RalleButtonRenderers.refresh());
-        refreshButton.tooltip(RalleTheme.ui(Component.literal("Request a complete fresh snapshot")));
+        refreshButton.tooltip(RalleTheme.ui(Component.literal("Retry connection or request a complete fresh snapshot")));
         filters.child(createButton).child(statusButton).child(raidButton).child(regionButton).child(refreshButton);
         panel.child(filters);
 
@@ -262,10 +262,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             regionButton.setMessage(regionLabel());
         }
         boolean online = lifecycle == RaidLfgService.LifecycleState.ONLINE;
-        refreshButton.active = lifecycle != RaidLfgService.LifecycleState.DISABLED
-                && lifecycle != RaidLfgService.LifecycleState.NOT_ON_WYNNCRAFT
-                && lifecycle != RaidLfgService.LifecycleState.OUTDATED
-                && lifecycle != RaidLfgService.LifecycleState.INELIGIBLE;
+        refreshButton.active = true;
         createButton.active = online && state.capabilities() != null && state.capabilities().create() && !service.pendingCreate();
         footerStatus.text(RalleTheme.ui(Component.literal(statusText(lifecycle))));
         boolean onlineError = online && !"Live".equals(service.statusMessage());

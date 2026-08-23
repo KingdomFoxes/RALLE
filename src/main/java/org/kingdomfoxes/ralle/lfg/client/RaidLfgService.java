@@ -205,6 +205,22 @@ public final class RaidLfgService {
         return request;
     }
 
+    /**
+     * Request fresh LFG state from the browser, retrying the connection immediately after a failure.
+     * Disabled and off-Wynncraft contexts remain inert, and an authentication or synchronization
+     * already in progress is not restarted.
+     */
+    public synchronized void requestRefresh() {
+        if (!environment.enabled() || !isWynncraft(normalizedHost(environment.serverHost()))) return;
+        if (lifecycle == LifecycleState.AUTHENTICATING || lifecycle == LifecycleState.SYNCING) return;
+        if (lifecycle == LifecycleState.ONLINE) {
+            refresh();
+            return;
+        }
+        reconnectAttempt = 0;
+        authenticate();
+    }
+
     public CompletableFuture<LfgProtocol.Mutation> create(LfgProtocol.RaidType raid,
                                                            LfgProtocol.Region region, String note) {
         final String cleaned;

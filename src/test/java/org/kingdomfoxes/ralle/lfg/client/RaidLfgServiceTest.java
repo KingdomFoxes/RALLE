@@ -110,6 +110,40 @@ class RaidLfgServiceTest {
     }
 
     @Test
+    void manualRefreshRetriesImmediatelyAfterApiFailure() {
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var service = service(gateway, env);
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+        gateway.listener.onFrame(new LfgProtocol.ErrorFrame(new LfgProtocol.Error(
+                "UPSTREAM_UNAVAILABLE", "The API is temporarily unavailable.", true, null, null)));
+        assertEquals(RaidLfgService.LifecycleState.RECONNECTING, service.lifecycle());
+        assertEquals(1, gateway.statusCalls);
+
+        service.requestRefresh();
+
+        assertEquals(2, gateway.statusCalls);
+        assertEquals(RaidLfgService.LifecycleState.SYNCING, service.lifecycle());
+    }
+
+    @Test
+    void manualRefreshRemainsInertOutsideEnabledWynncraftContext() {
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        var service = service(gateway, env);
+
+        service.requestRefresh();
+        env.enabled = true;
+        env.host = "example.org";
+        service.requestRefresh();
+
+        assertEquals(0, gateway.statusCalls);
+    }
+
+    @Test
     void disablingInvalidatesOutstandingAuthenticationCallback() {
         var gateway = new FakeGateway();
         gateway.challengeFuture = new CompletableFuture<>();
@@ -192,6 +226,44 @@ class RaidLfgServiceTest {
         gateway.listener.onFrame(ping);
         assertEquals(List.of(ping), notifications);
         assertEquals(ping.lobbyId(), service.focusLobbyId());
+    }
+
+    @Test
+    void acceptedDisbandRunsOneBoundedPartyCommandOnlyAfterBackendSuccess() {
+        var gateway = new FakeGateway();
+        gateway.disbandResult = new LfgProtocol.Mutation(1, 2, hostedLobby(false));
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var commands = new TrackingCommands();
+        var service = new RaidLfgService(
+                gateway, env, ignored -> CompletableFuture.completedFuture(null),
+                () -> 0L, () -> 0.5, LfgNotificationSink.IGNORE, commands);
+
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshotWithLobby()));
+        service.disband(hostedLobby(true).lobbyId()).join();
+
+        assertEquals(1, commands.disbands);
+    }
+
+    @Test
+    void rejectedDisbandDoesNotDisbandWynncraftParty() {
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var commands = new TrackingCommands();
+        var service = new RaidLfgService(
+                gateway, env, ignored -> CompletableFuture.completedFuture(null),
+                () -> 0L, () -> 0.5, LfgNotificationSink.IGNORE, commands);
+
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshotWithLobby()));
+        assertThrows(java.util.concurrent.CompletionException.class,
+                () -> service.disband(hostedLobby(true).lobbyId()).join());
+
+        assertEquals(0, commands.disbands);
     }
 
     @Test
@@ -469,11 +541,18 @@ class RaidLfgServiceTest {
         @Override public String ign() { return "Player01"; }
     }
 
+    private static final class TrackingCommands implements PartyCommandExecutor {
+        int disbands;
+        @Override public void kick(String ign) {}
+        @Override public void disband() { disbands++; }
+    }
+
     private static final class FakeGateway implements LfgGateway {
         int statusCalls;
         int challengeCalls;
         int completeCalls;
         CompletableFuture<LfgProtocol.Challenge> challengeFuture;
+        LfgProtocol.Mutation disbandResult;
         CompletableFuture<LfgProtocol.Mutation> createFuture;
         CompletableFuture<LfgProtocol.Mutation> disbandFuture;
         CompletableFuture<LfgProtocol.Mutation> kickFuture;
@@ -511,7 +590,8 @@ class RaidLfgServiceTest {
         @Override public CompletableFuture<LfgProtocol.Mutation> join(String bearerToken, UUID lobbyId, UUID idempotencyKey) { return unsupported(); }
         @Override public CompletableFuture<LfgProtocol.Mutation> leave(String bearerToken, UUID lobbyId, UUID idempotencyKey) { return unsupported(); }
         @Override public CompletableFuture<LfgProtocol.Mutation> disband(String bearerToken, UUID lobbyId, UUID idempotencyKey) {
-            return disbandFuture == null ? unsupported() : disbandFuture;
+            if (disbandFuture != null) return disbandFuture;
+            return disbandResult == null ? unsupported() : CompletableFuture.completedFuture(disbandResult);
         }
         @Override public CompletableFuture<LfgProtocol.Mutation> kick(String bearerToken, UUID lobbyId, UUID targetId, UUID idempotencyKey) {
             if (kickFuture != null) return kickFuture;

@@ -20,7 +20,6 @@ public final class ChatScreenshotService {
     public enum State { IDLE, DRAGGING, PREVIEW, COPYING, COPIED_FADING }
 
     private final Minecraft minecraft;
-    private final BooleanSetting chatEnabled;
     private final BooleanSetting screenshotEnabled;
     private final BooleanSetting smoothExpansion;
     private final ChatScreenshotCapture capture;
@@ -49,7 +48,6 @@ public final class ChatScreenshotService {
             ChatSelectionSoundPlayer soundPlayer
     ) {
         this.minecraft = minecraft;
-        this.chatEnabled = settings.setting("chat-enabled", BooleanSetting.class);
         this.screenshotEnabled = settings.setting("chat-screenshot-enabled", BooleanSetting.class);
         this.smoothExpansion = settings.setting("chat-screenshot-smooth-expansion", BooleanSetting.class);
         this.capture = capture;
@@ -57,7 +55,7 @@ public final class ChatScreenshotService {
     }
 
     public boolean enabled() {
-        return chatEnabled.value() && screenshotEnabled.value();
+        return screenshotEnabled.value();
     }
 
     public State state() {

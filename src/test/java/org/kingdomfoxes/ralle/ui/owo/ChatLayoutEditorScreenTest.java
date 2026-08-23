@@ -2,10 +2,37 @@ package org.kingdomfoxes.ralle.ui.owo;
 
 import org.junit.jupiter.api.Test;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
+import org.kingdomfoxes.ralle.api.hud.RalleHudElements;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ChatLayoutEditorScreenTest {
+    @Test
+    void allElementsModeOnlyEditsCurrentlyEnabledHudElements() {
+        assertEquals(
+                List.of(RalleHudElements.CHAT),
+                ChatLayoutEditorScreen.enabledEditableElementIds(false)
+        );
+        assertEquals(
+                List.of(RalleHudElements.CHAT, RalleHudElements.LFG_NOTIFICATIONS),
+                ChatLayoutEditorScreen.enabledEditableElementIds(true)
+        );
+        assertEquals(
+                List.of(RalleHudElements.CHAT, RalleHudElements.LFG_NOTIFICATIONS, RalleHudElements.LFG_ACTION_BAR),
+                ChatLayoutEditorScreen.enabledPreviewElementIds(true)
+        );
+    }
+
+    @Test
+    void selectedElementNameAndPositionUseSeparateCenteredLines() {
+        var bounds = new Rectangle(10, 20, 190, 100);
+
+        assertEquals(60, ChatLayoutEditorScreen.centeredTextY(bounds, -6));
+        assertEquals(72, ChatLayoutEditorScreen.centeredTextY(bounds, 6));
+    }
+
     @Test
     void detectsEveryResizeEdgeAndLeavesTheInteriorForMoving() {
         assertEquals(ChatLayoutEditorScreen.AxisEdge.START, ChatLayoutEditorScreen.edgeAt(10, 10, 210, 6));

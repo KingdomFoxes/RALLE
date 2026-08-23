@@ -37,6 +37,16 @@ final class RalleButtonRenderers {
         return renderer(Palette.DESTRUCTIVE, () -> false);
     }
 
+    static ButtonComponent.Renderer destructiveX() {
+        var background = destructive();
+        return (graphics, button, delta) -> {
+            background.draw(graphics, button, delta);
+            drawPixelX(graphics, button.getX(), button.getY(),
+                    button.getWidth(), button.getHeight(),
+                    button.active() ? 0xFFFFFFFF : 0xFF8D96A5);
+        };
+    }
+
     static ButtonComponent.Renderer countdown(DoubleSupplier remainingFraction) {
         var background = primary();
         return (graphics, button, delta) -> {
@@ -117,6 +127,15 @@ final class RalleButtonRenderers {
             case DESTRUCTIVE -> Palette.DESTRUCTIVE;
         };
         drawFace(graphics, x, y, width, height, palette, hovered, active);
+    }
+
+    static void drawPixelX(GuiGraphics graphics, int x, int y, int width, int height, int color) {
+        int left = x + (width - 10) / 2 - 1;
+        int top = y + (height - 10) / 2 - 1;
+        for (int step = 0; step < 9; step++) {
+            graphics.fill(left + step, top + step, left + step + 2, top + step + 2, color);
+            graphics.fill(left + 8 - step, top + step, left + 10 - step, top + step + 2, color);
+        }
     }
 
     private static void drawFace(GuiGraphics graphics, int x, int y, int width, int height,

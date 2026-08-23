@@ -19,6 +19,11 @@ public final class MinecraftPartyCommandExecutor implements PartyCommandExecutor
     }
 
     @Override
+    public void invite(String ign) {
+        send("pa ", ign);
+    }
+
+    @Override
     public void disband() {
         minecraft.execute(() -> {
             var connection = minecraft.getConnection();
@@ -26,11 +31,6 @@ public final class MinecraftPartyCommandExecutor implements PartyCommandExecutor
                 connection.sendCommand("pa disband");
             }
         });
-    }
-
-    @Override
-    public void invite(String ign) {
-        send("pa ", ign);
     }
 
     private void send(String command, String ign) {

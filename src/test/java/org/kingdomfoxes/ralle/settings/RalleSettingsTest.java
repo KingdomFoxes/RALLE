@@ -13,6 +13,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RalleSettingsTest {
     @TempDir
@@ -40,12 +41,26 @@ class RalleSettingsTest {
     }
 
     @Test
-    void chatScrollbarToggleIsDisabledByDefaultAndRequiresChatCustomization() {
+    void chatScrollbarToggleIsIndependentAndDisabledByDefault() {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);
 
         assertFalse(registry.setting("hide-chat-scrollbar", BooleanSetting.class).value());
-        assertEquals(List.of("chat-enabled"), registry.dependencies("hide-chat-scrollbar"));
+        assertEquals(List.of(), registry.dependencies("hide-chat-scrollbar"));
+    }
+
+    @Test
+    void chatFeaturesUseTheirOwnTogglesWithoutAMasterToggle() {
+        var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
+        RalleSettings.register(registry);
+
+        assertTrue(registry.entry("chat-enabled").isEmpty());
+        assertEquals(List.of("message-direction-enabled"), registry.dependencies("message-direction"));
+        assertEquals(List.of("horizontal-alignment-enabled"), registry.dependencies("horizontal-alignment"));
+        assertEquals(List.of("text-shadow-enabled"), registry.dependencies("text-shadow"));
+        assertEquals(List.of("chat-screenshot-enabled"),
+                registry.dependencies("chat-screenshot-smooth-expansion"));
+        assertEquals(List.of("chat-screenshot-enabled"), registry.dependencies("chat-selection-sounds"));
     }
 
     @Test
@@ -57,7 +72,11 @@ class RalleSettingsTest {
         assertEquals(List.of("about", "chat", "raid-lfg"), categories.stream().map(value -> value.id()).toList());
         assertEquals(List.of("interface"),
                 categories.get(0).subcategories().stream().map(value -> value.id()).toList());
-        assertEquals(List.of("general", "appearance", "message-behavior", "screenshots"),
+        assertEquals(List.of("edit-huds", RalleSettings.INTERFACE_FONT_ID),
+                categories.get(0).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
+        assertEquals(List.of(), registry.dependencies("edit-huds"));
+        assertEquals(List.of("general", "appearance", "message-direction", "horizontal-alignment", "text-shadow",
+                        "message-behavior", "screenshots"),
                 categories.get(1).subcategories().stream().map(value -> value.id()).toList());
         assertEquals(List.of("general", "notifications", "controls"),
                 categories.get(2).subcategories().stream().map(value -> value.id()).toList());
