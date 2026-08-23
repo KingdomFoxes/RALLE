@@ -9,8 +9,31 @@ class ChatLayoutEditorScreenTest {
     @Test
     void detectsEveryResizeEdgeAndLeavesTheInteriorForMoving() {
         assertEquals(ChatLayoutEditorScreen.AxisEdge.START, ChatLayoutEditorScreen.edgeAt(10, 10, 210, 6));
+        assertEquals(ChatLayoutEditorScreen.AxisEdge.START, ChatLayoutEditorScreen.edgeAt(6, 10, 210, 6));
         assertEquals(ChatLayoutEditorScreen.AxisEdge.END, ChatLayoutEditorScreen.edgeAt(209, 10, 210, 6));
+        assertEquals(ChatLayoutEditorScreen.AxisEdge.END, ChatLayoutEditorScreen.edgeAt(214, 10, 210, 6));
         assertEquals(ChatLayoutEditorScreen.AxisEdge.NONE, ChatLayoutEditorScreen.edgeAt(100, 10, 210, 6));
+    }
+
+    @Test
+    void expandsResizableEditorWindowWithoutChangingElementBounds() {
+        var element = new Rectangle(20, 30, 100, 50);
+
+        var interaction = ChatLayoutEditorScreen.resizeInteractionBounds(element, 200, 120);
+
+        assertEquals(new Rectangle(16, 26, 108, 58), interaction);
+        assertEquals(new Rectangle(20, 30, 100, 50), element);
+    }
+
+    @Test
+    void clipsExpandedEditorWindowToEveryViewportEdge() {
+        var interaction = ChatLayoutEditorScreen.resizeInteractionBounds(
+                new Rectangle(0, 0, 200, 120),
+                200,
+                120
+        );
+
+        assertEquals(new Rectangle(0, 0, 200, 120), interaction);
     }
 
     @Test

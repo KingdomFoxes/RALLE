@@ -144,7 +144,7 @@ final class RalleButtonRenderers {
     private enum Palette {
         NEUTRAL(0xFF263A5A, 0xFF324D77, TOP_LEFT_HIGHLIGHT),
         PRIMARY(0xFF238636, 0xFF2EA043, 0xFF53B564),
-        SELECTED(0xFFB8832F, 0xFFD39B3D, 0xFFE2B45F),
+        SELECTED(RalleTheme.DARK_GOLD_ARGB, 0xFFD39B3D, 0xFFE2B45F),
         DESTRUCTIVE(0xFF9F2D36, 0xFFC13B46, 0xFFE26973);
 
         private final int normal;
