@@ -54,6 +54,18 @@ class LfgNotificationOverlayTest {
     }
 
     @Test
+    void ownedPartyRosterLeavesAStableCenterGapForTheTimer() {
+        var card = new Rectangle(30, 40, 190, 100);
+
+        assertEquals(38, LfgNotificationOverlay.timerRosterSlotX(card, 0));
+        assertEquals(82, LfgNotificationOverlay.timerRosterSlotX(card, 1));
+        assertEquals(148, LfgNotificationOverlay.timerRosterSlotX(card, 2));
+        assertEquals(192, LfgNotificationOverlay.timerRosterSlotX(card, 3));
+        assertThrows(IllegalArgumentException.class,
+                () -> LfgNotificationOverlay.timerRosterSlotX(card, 4));
+    }
+
+    @Test
     void filledHostControlsKeepInviteLeftAndDisbandRight() {
         var controls = new Rectangle(38, 112, 174, 20);
 
@@ -68,6 +80,34 @@ class LfgNotificationOverlayTest {
         assertEquals(0xFF00FF55, LfgNotificationOverlay.regionColor(LfgProtocol.Region.EU));
         assertEquals(0xFFFFFF00, LfgNotificationOverlay.regionColor(LfgProtocol.Region.NA));
         assertEquals(0xFFFF3333, LfgNotificationOverlay.regionColor(LfgProtocol.Region.AS));
+    }
+
+    @Test
+    void elapsedTimerUsesRequestedFormatsAndThresholdColors() {
+        var created = Instant.parse("2026-08-24T10:00:00Z");
+
+        assertEquals(new LfgElapsedTimerComponent.Display("0:00", LfgElapsedTimerComponent.GREEN),
+                LfgElapsedTimerComponent.display(created, created));
+        assertEquals(new LfgElapsedTimerComponent.Display("4:59", LfgElapsedTimerComponent.GREEN),
+                LfgElapsedTimerComponent.display(created, created.plusSeconds(299)));
+        assertEquals(new LfgElapsedTimerComponent.Display("5:00", LfgElapsedTimerComponent.YELLOW),
+                LfgElapsedTimerComponent.display(created, created.plusSeconds(300)));
+        assertEquals(new LfgElapsedTimerComponent.Display("9:59", LfgElapsedTimerComponent.YELLOW),
+                LfgElapsedTimerComponent.display(created, created.plusSeconds(599)));
+        assertEquals(new LfgElapsedTimerComponent.Display("10:00", LfgElapsedTimerComponent.RED),
+                LfgElapsedTimerComponent.display(created, created.plusSeconds(600)));
+        assertEquals(new LfgElapsedTimerComponent.Display("1:00:00", LfgElapsedTimerComponent.RED),
+                LfgElapsedTimerComponent.display(created, created.plusSeconds(3600)));
+        assertEquals(new LfgElapsedTimerComponent.Display("12:34:56", LfgElapsedTimerComponent.RED),
+                LfgElapsedTimerComponent.display(created, created.plusSeconds(45_296)));
+    }
+
+    @Test
+    void elapsedTimerClampsFutureCreationTime() {
+        var created = Instant.parse("2026-08-24T10:00:10Z");
+
+        assertEquals("0:00", LfgElapsedTimerComponent.display(
+                created, created.minusSeconds(10)).text());
     }
 
     @Test

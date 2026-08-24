@@ -267,6 +267,10 @@ Join, Leave/Disband, and Party Filled keys appear beside their card actions; the
 is not printed beside the X. Unbound or conflicting mappings do not advertise a
 nonfunctional shortcut.
 
+The host's browser cards and persistent party-status card derive a live lobby-age timer locally
+from the synchronized lobby creation instant. The timer is never shown on another player's lobby
+and adds no stored timer state or protocol field.
+
 The only persisted LFG values are local opt-in, notification, sound, keybind,
 and HUD-placement settings. Whether a card is currently popped out remains
 session-only. Credentials, snapshots, pending actions, backend overrides, and

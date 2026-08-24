@@ -325,6 +325,9 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var spacer = UIComponents.spacer();
         spacer.verticalSizing(Sizing.fixed(0));
         summary.child(spacer);
+        if (lobby.hostedBy(viewerId())) {
+            summary.child(new LfgElapsedTimerComponent(lobby.createdAt()).margins(Insets.right(6)));
+        }
         summary.child(UIComponents.label(RalleTheme.ui(Component.literal(lobby.members().size() + "/" + lobby.capacity())))
                 .color(RalleTheme.POSITIVE).margins(Insets.right(6)));
         if (lobby.locked()) {
