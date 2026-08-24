@@ -33,7 +33,10 @@ public final class RalleSettings {
                 Component.translatable("ralle.settings.category.chat.description"),
                 List.of(
                         subcategory("general", action("edit-chat-layout")),
-                        subcategory("appearance", toggle("hide-chat-scrollbar")),
+                        subcategory("appearance",
+                                toggle("hide-chat-scrollbar"),
+                                toggle("remove-chat-system-indicators")
+                        ),
                         subcategory("message-direction",
                                 toggle("message-direction-enabled"),
                                 choice("message-direction", "bottom-up", "bottom-up", "top-down")

@@ -13,6 +13,7 @@ import org.kingdomfoxes.ralle.chat.ChatGraphicsTransform;
 import org.kingdomfoxes.ralle.chat.ChatMessageProjector;
 import org.kingdomfoxes.ralle.chat.ChatRenderLayout;
 import org.kingdomfoxes.ralle.chat.ChatScrollbarGraphics;
+import org.kingdomfoxes.ralle.chat.ChatSystemIndicators;
 import org.kingdomfoxes.ralle.chat.render.FullShadowFrameCollector;
 import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotSnapshot;
@@ -237,6 +238,10 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
 
     @Inject(method = "addMessageToDisplayQueue", at = @At("HEAD"), cancellable = true, require = 0)
     private void ralle$deferProjectedMessageDisplay(GuiMessage message, CallbackInfo callback) {
+        message = ChatSystemIndicators.withoutIndicator(
+                message,
+                RalleClient.context().chatBehavior().removeChatSystemIndicators()
+        );
         if (RalleClient.context().chatScreenshots().stabilizesIncomingMessages()) {
             callback.cancel();
             return;
@@ -252,6 +257,19 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
             }
         }
         callback.cancel();
+    }
+
+    @ModifyVariable(
+            method = "addMessageToDisplayQueue",
+            at = @At("HEAD"),
+            argsOnly = true,
+            require = 0
+    )
+    private GuiMessage ralle$removeChatSystemIndicatorBeforeWrapping(GuiMessage message) {
+        return ChatSystemIndicators.withoutIndicator(
+                message,
+                RalleClient.context().chatBehavior().removeChatSystemIndicators()
+        );
     }
 
     @Inject(
@@ -279,13 +297,16 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
         int contentWidth = ralle$contentWidth();
         for (int messageIndex = projected.size() - 1; messageIndex >= 0; messageIndex--) {
             var message = projected.get(messageIndex);
-            var displayMessage = new GuiMessage(message.addedTime(), message.content(), null, message.tag());
+            var displayMessage = ChatSystemIndicators.withoutIndicator(
+                    new GuiMessage(message.addedTime(), message.content(), null, message.tag()),
+                    behavior.removeChatSystemIndicators()
+            );
             var lines = displayMessage.splitLines(minecraft.font, contentWidth);
             for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
                 trimmedMessages.addFirst(new GuiMessage.Line(
                         message.addedTime(),
                         lines.get(lineIndex),
-                        message.tag(),
+                        displayMessage.tag(),
                         lineIndex == lines.size() - 1
                 ));
             }

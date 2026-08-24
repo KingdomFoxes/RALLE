@@ -50,6 +50,15 @@ class RalleSettingsTest {
     }
 
     @Test
+    void chatSystemIndicatorToggleIsIndependentAndDisabledByDefault() {
+        var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
+        RalleSettings.register(registry);
+
+        assertFalse(registry.setting("remove-chat-system-indicators", BooleanSetting.class).value());
+        assertEquals(List.of(), registry.dependencies("remove-chat-system-indicators"));
+    }
+
+    @Test
     void chatFeaturesUseTheirOwnTogglesWithoutAMasterToggle() {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);

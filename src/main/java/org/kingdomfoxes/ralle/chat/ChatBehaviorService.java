@@ -11,6 +11,7 @@ public final class ChatBehaviorService {
 
     private final Minecraft minecraft;
     private final BooleanSetting hideChatScrollbar;
+    private final BooleanSetting removeChatSystemIndicators;
     private final BooleanSetting compactChat;
     private final BooleanSetting stackEmptyLines;
     private final BooleanSetting messageDirectionEnabled;
@@ -19,11 +20,12 @@ public final class ChatBehaviorService {
     private final ChoiceSetting horizontalAlignment;
     private final BooleanSetting textShadowEnabled;
     private final ChoiceSetting textShadow;
-    private ProjectionSettings previousProjectionSettings;
+    private RenderedMessageSettings previousRenderedMessageSettings;
 
     public ChatBehaviorService(Minecraft minecraft, SettingsRegistry settings) {
         this.minecraft = minecraft;
         this.hideChatScrollbar = settings.setting("hide-chat-scrollbar", BooleanSetting.class);
+        this.removeChatSystemIndicators = settings.setting("remove-chat-system-indicators", BooleanSetting.class);
         this.compactChat = settings.setting("compact-chat", BooleanSetting.class);
         this.stackEmptyLines = settings.setting("stack-empty-lines", BooleanSetting.class);
         this.messageDirectionEnabled = settings.setting("message-direction-enabled", BooleanSetting.class);
@@ -32,7 +34,7 @@ public final class ChatBehaviorService {
         this.horizontalAlignment = settings.setting("horizontal-alignment", ChoiceSetting.class);
         this.textShadowEnabled = settings.setting("text-shadow-enabled", BooleanSetting.class);
         this.textShadow = settings.setting("text-shadow", ChoiceSetting.class);
-        this.previousProjectionSettings = projectionSettings();
+        this.previousRenderedMessageSettings = renderedMessageSettings();
     }
 
     public boolean projectionEnabled() {
@@ -41,6 +43,10 @@ public final class ChatBehaviorService {
 
     public boolean hideChatScrollbar() {
         return hideChatScrollbar.value();
+    }
+
+    public boolean removeChatSystemIndicators() {
+        return removeChatSystemIndicators.value();
     }
 
     public boolean compactChatEnabled() {
@@ -77,15 +83,19 @@ public final class ChatBehaviorService {
     }
 
     public void tick() {
-        var current = projectionSettings();
-        if (!current.equals(previousProjectionSettings) && minecraft.gui != null) {
+        var current = renderedMessageSettings();
+        if (!current.equals(previousRenderedMessageSettings) && minecraft.gui != null) {
             minecraft.gui.getChat().rescaleChat();
         }
-        previousProjectionSettings = current;
+        previousRenderedMessageSettings = current;
     }
 
-    private ProjectionSettings projectionSettings() {
-        return new ProjectionSettings(compactChat.value(), stackEmptyLines.value());
+    private RenderedMessageSettings renderedMessageSettings() {
+        return new RenderedMessageSettings(
+                compactChat.value(),
+                stackEmptyLines.value(),
+                removeChatSystemIndicators.value()
+        );
     }
 
     public enum MessageDirection {
@@ -105,5 +115,9 @@ public final class ChatBehaviorService {
         FULL
     }
 
-    private record ProjectionSettings(boolean compactChat, boolean stackEmptyLines) {}
+    private record RenderedMessageSettings(
+            boolean compactChat,
+            boolean stackEmptyLines,
+            boolean removeChatSystemIndicators
+    ) {}
 }
