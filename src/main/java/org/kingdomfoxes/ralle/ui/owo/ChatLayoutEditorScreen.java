@@ -151,7 +151,7 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
         }
         bounds = elementBounds.get(selectedElementId);
 
-        root.surface(Surface.VANILLA_TRANSLUCENT)
+        root.surface(Surface.BLANK)
                 .horizontalAlignment(HorizontalAlignment.CENTER)
                 .verticalAlignment(VerticalAlignment.TOP);
         root.child(UIComponents.spacer());
@@ -253,7 +253,6 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
             renderEditorFrame(
                     graphics,
                     interactionBounds,
-                    bounds,
                     chatLayout.placementPolicy(selectedElementId)
             );
             renderElementName(
@@ -342,20 +341,20 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
     private void renderEditorFrame(
             GuiGraphics graphics,
             Rectangle interactionBounds,
-            Rectangle elementBounds,
             PlacementPolicy placementPolicy
     ) {
         for (var segment : connectedFrameSegments(interactionBounds, EDITOR_OUTER_FRAME_THICKNESS)) {
             graphics.fill(segment.x(), segment.y(), segment.right(), segment.bottom(), EDITOR_OUTER_FRAME);
         }
+        var insetFrame = nestedInsetFrame(interactionBounds, EDITOR_WINDOW_MARGIN);
         graphics.renderOutline(
-                elementBounds.x(),
-                elementBounds.y(),
-                elementBounds.width(),
-                elementBounds.height(),
+                insetFrame.x(),
+                insetFrame.y(),
+                insetFrame.width(),
+                insetFrame.height(),
                 EDITOR_INNER_FRAME
         );
-        for (var strip : cornerAccentStrips(elementBounds, placementPolicy)) {
+        for (var strip : cornerAccentStrips(insetFrame, placementPolicy)) {
             graphics.fill(strip.x(), strip.y(), strip.right(), strip.bottom(), EDITOR_INNER_FRAME);
         }
     }
@@ -597,6 +596,18 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
                 new Rectangle(frame.x(), frame.bottom() - thickness, frame.width(), thickness),
                 new Rectangle(frame.x(), frame.y(), thickness, frame.height()),
                 new Rectangle(frame.right() - thickness, frame.y(), thickness, frame.height())
+        );
+    }
+
+    static Rectangle nestedInsetFrame(Rectangle outerFrame, int requestedInset) {
+        int inset = Math.max(0, requestedInset);
+        int horizontalInset = Math.min(inset, Math.max(0, (outerFrame.width() - 1) / 2));
+        int verticalInset = Math.min(inset, Math.max(0, (outerFrame.height() - 1) / 2));
+        return new Rectangle(
+                outerFrame.x() + horizontalInset,
+                outerFrame.y() + verticalInset,
+                outerFrame.width() - horizontalInset * 2,
+                outerFrame.height() - verticalInset * 2
         );
     }
 

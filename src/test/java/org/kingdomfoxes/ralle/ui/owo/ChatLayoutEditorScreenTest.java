@@ -72,6 +72,37 @@ class ChatLayoutEditorScreenTest {
     }
 
     @Test
+    void nestedInsetFrameMatchesSavedBoundsAwayFromViewportEdges() {
+        var interaction = new Rectangle(17, 27, 106, 56);
+
+        assertEquals(
+                new Rectangle(20, 30, 100, 50),
+                ChatLayoutEditorScreen.nestedInsetFrame(
+                        interaction,
+                        ChatLayoutEditorScreen.EDITOR_WINDOW_MARGIN
+                )
+        );
+    }
+
+    @Test
+    void nestedInsetFrameKeepsItsGapWhenOuterFrameIsClampedToViewportEdges() {
+        assertEquals(
+                new Rectangle(3, 3, 97, 47),
+                ChatLayoutEditorScreen.nestedInsetFrame(
+                        new Rectangle(0, 0, 103, 53),
+                        ChatLayoutEditorScreen.EDITOR_WINDOW_MARGIN
+                )
+        );
+        assertEquals(
+                new Rectangle(100, 50, 97, 47),
+                ChatLayoutEditorScreen.nestedInsetFrame(
+                        new Rectangle(97, 47, 103, 53),
+                        ChatLayoutEditorScreen.EDITOR_WINDOW_MARGIN
+                )
+        );
+    }
+
+    @Test
     void editorFrameKeepsOldGoldOutsideAndDarkGoldOnTheInsetDesign() {
         assertEquals(0xFFE5B94C, ChatLayoutEditorScreen.EDITOR_OUTER_FRAME);
         assertEquals(RalleTheme.DARK_GOLD_ARGB, ChatLayoutEditorScreen.EDITOR_INNER_FRAME);

@@ -123,6 +123,11 @@ browser does not own authentication or live synchronization. Networking starts o
 `play.wynncraft.net` entry connection may transfer the client to a regional `.com` host.
 Disconnecting, disabling the setting, or changing servers closes the WebSocket and clears the
 in-memory bearer credential and lobby projection.
+Opening an ordinary Minecraft screen, including Wynncraft's AFK blackout, does not change that
+connection context and has no LFG lifecycle effect. A transient WebSocket failure enters the
+read-only reconnect flow without clearing the last projection or issuing a party command. The Fox
+backend starts its 120-second presence grace only after the player's final authenticated socket is
+lost; reconnecting cancels that grace, while expiry closes only the synchronized LFG lobby.
 
 The packaged protocol-v1 base URL is `https://kingdomfoxes.com/api/ralle/v1`. Local development
 may explicitly override it with the `ralle.lfg.baseUrl` JVM property; the client never falls back
