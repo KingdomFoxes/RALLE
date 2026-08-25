@@ -1,10 +1,20 @@
 package org.kingdomfoxes.ralle.chat;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
+import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
+import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
+import org.kingdomfoxes.ralle.settings.RalleSettings;
+
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ChatBehaviorServiceTest {
+    @TempDir
+    Path temporaryDirectory;
+
     @Test
     void legacyFullValueRemainsThePartialFullShadow() {
         assertEquals(
@@ -19,5 +29,25 @@ class ChatBehaviorServiceTest {
                 ChatBehaviorService.TextShadow.FULL,
                 ChatBehaviorService.parseTextShadow("wrapped-full")
         );
+    }
+
+    @Test
+    void historyLimitIsVanillaUntilPersistentChatIsEnabled() {
+        var settings = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
+        RalleSettings.register(settings);
+        var behavior = new ChatBehaviorService(null, settings);
+
+        assertEquals(100, behavior.effectiveHistoryLimit());
+
+        settings.setting("persistent-chat-enabled", BooleanSetting.class).set(true);
+        assertEquals(500, behavior.effectiveHistoryLimit());
+
+        for (var expected : new int[] {300, 500, 1000, 1500}) {
+            settings.setting("persistent-chat-limit", ChoiceSetting.class).set(Integer.toString(expected));
+            assertEquals(expected, behavior.effectiveHistoryLimit());
+        }
+
+        settings.setting("persistent-chat-enabled", BooleanSetting.class).set(false);
+        assertEquals(100, behavior.effectiveHistoryLimit());
     }
 }

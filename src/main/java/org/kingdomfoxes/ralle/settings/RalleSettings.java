@@ -50,6 +50,10 @@ public final class RalleSettings {
                                 choice("text-shadow", "vanilla", "none", "vanilla", "full", "wrapped-full")
                         ),
                         subcategory("message-behavior", toggle("compact-chat"), toggle("stack-empty-lines")),
+                        subcategory("chat-history",
+                                toggle("persistent-chat-enabled"),
+                                choice("persistent-chat-limit", "500", "300", "500", "1000", "1500")
+                        ),
                         subcategory("screenshots",
                                 toggle("chat-screenshot-enabled"),
                                 toggle("chat-screenshot-smooth-expansion"),
@@ -89,6 +93,7 @@ public final class RalleSettings {
         registry.requireEnabled("message-direction", "message-direction-enabled");
         registry.requireEnabled("horizontal-alignment", "horizontal-alignment-enabled");
         registry.requireEnabled("text-shadow", "text-shadow-enabled");
+        registry.requireEnabled("persistent-chat-limit", "persistent-chat-enabled");
         registry.requireEnabled("chat-screenshot-smooth-expansion", "chat-screenshot-enabled");
         registry.requireEnabled("chat-selection-sounds", "chat-screenshot-enabled");
         registry.requireEnabled("new-party-notifications", "raid-lfg-enabled");

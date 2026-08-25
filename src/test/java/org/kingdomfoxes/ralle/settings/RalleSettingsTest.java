@@ -73,6 +73,43 @@ class RalleSettingsTest {
     }
 
     @Test
+    void persistentChatDefaultsAndLimitDependencyMatchTheSessionOnlyFeature() {
+        var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
+        RalleSettings.register(registry);
+
+        assertFalse(registry.setting("persistent-chat-enabled", BooleanSetting.class).value());
+        var limit = registry.setting("persistent-chat-limit", ChoiceSetting.class);
+        assertEquals("500", limit.value());
+        assertEquals(List.of("300", "500", "1000", "1500"), limit.choices());
+        assertEquals(List.of("persistent-chat-enabled"), registry.dependencies("persistent-chat-limit"));
+    }
+
+    @Test
+    void persistentChatSettingsPersistAndInvalidLimitFallsBackToDefault() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+        registry.setting("persistent-chat-enabled", BooleanSetting.class).set(true);
+        registry.setting("persistent-chat-limit", ChoiceSetting.class).set("1500");
+
+        var restored = new SettingsRegistry(path);
+        RalleSettings.register(restored);
+        restored.seal();
+        assertTrue(restored.setting("persistent-chat-enabled", BooleanSetting.class).value());
+        assertEquals("1500", restored.setting("persistent-chat-limit", ChoiceSetting.class).value());
+        assertTrue(Files.readString(path).contains("chat.persistent-chat-enabled=true"));
+        assertTrue(Files.readString(path).contains("chat.persistent-chat-limit=1500"));
+
+        Files.writeString(path, "chat.persistent-chat-enabled=true\nchat.persistent-chat-limit=unsupported\n");
+        var invalid = new SettingsRegistry(path);
+        RalleSettings.register(invalid);
+        invalid.seal();
+        assertTrue(invalid.setting("persistent-chat-enabled", BooleanSetting.class).value());
+        assertEquals("500", invalid.setting("persistent-chat-limit", ChoiceSetting.class).value());
+    }
+
+    @Test
     void registersApprovedSubcategoryOrderAndUnboundLfgKey() {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);
@@ -85,7 +122,7 @@ class RalleSettingsTest {
                 categories.get(0).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
         assertEquals(List.of(), registry.dependencies("edit-huds"));
         assertEquals(List.of("general", "appearance", "message-direction", "horizontal-alignment", "text-shadow",
-                        "message-behavior", "screenshots"),
+                        "message-behavior", "chat-history", "screenshots"),
                 categories.get(1).subcategories().stream().map(value -> value.id()).toList());
         assertEquals(List.of("general", "notifications", "controls"),
                 categories.get(2).subcategories().stream().map(value -> value.id()).toList());

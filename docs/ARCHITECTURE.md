@@ -29,7 +29,13 @@ platform ports. It must not depend on a concrete settings screen.
   restored after preparation. If the compositor becomes unavailable, a
   session-stable batched glyph fallback preserves the visual effect without
   affecting other chat modes or Raid LFG. Local chat customization is available
-  in singleplayer and on any multiplayer server.
+  in singleplayer and on any multiplayer server. The disabled-by-default
+  Persistent Chat option raises the in-memory logical-message and wrapped-line
+  ceilings and preserves displayed `GuiMessage` values across transition-driven
+  chat clears. Vanilla still flushes pending chat and clears delayed deletions,
+  while draft and command-entry history handling remains entirely vanilla. The
+  retained components, signatures, tags, and interaction metadata are never
+  persisted or reconstructed from logs; manual F3+D clearing remains unchanged.
 - `sound`: client-only registered UI sound events and playback adapters. Chat
   selection injects this narrow port, while its Minecraft implementation owns
   parent-setting gates, count-to-cue mapping, rate limiting, and coalescing.
@@ -71,6 +77,12 @@ choice controls depend only on their paired feature toggle. Chat settings are
 consumed by the local chat integration. The Raid LFG opt-in gates the persistent
 Fox client
 service, while its shortcut remains unbound until configured.
+
+Persistent Chat is stored only as the opt-in `chat.persistent-chat-enabled` and
+the selected `chat.persistent-chat-limit`. The displayed history itself remains
+session-only memory. Enabling starts from messages still held by Minecraft;
+disabling immediately prunes the logical and wrapped histories back to the
+vanilla 100-entry ceiling and restores normal transition clearing.
 
 Custom HUD placements are stored separately in
 `config/ralle-hud-layout.properties`. Resizable elements such as the v1 chat

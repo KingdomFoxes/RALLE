@@ -6,6 +6,7 @@ import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 
 public final class ChatBehaviorService {
+    public static final int VANILLA_HISTORY_LIMIT = ChatHistoryRetention.VANILLA_LIMIT;
     public static final int DEFAULT_COMPACT_WINDOW_SECONDS = 45;
     public static final int DEFAULT_COMPACT_WINDOW_TICKS = DEFAULT_COMPACT_WINDOW_SECONDS * 20;
 
@@ -14,6 +15,8 @@ public final class ChatBehaviorService {
     private final BooleanSetting removeChatSystemIndicators;
     private final BooleanSetting compactChat;
     private final BooleanSetting stackEmptyLines;
+    private final BooleanSetting persistentChatEnabled;
+    private final ChoiceSetting persistentChatLimit;
     private final BooleanSetting messageDirectionEnabled;
     private final ChoiceSetting messageDirection;
     private final BooleanSetting horizontalAlignmentEnabled;
@@ -28,6 +31,8 @@ public final class ChatBehaviorService {
         this.removeChatSystemIndicators = settings.setting("remove-chat-system-indicators", BooleanSetting.class);
         this.compactChat = settings.setting("compact-chat", BooleanSetting.class);
         this.stackEmptyLines = settings.setting("stack-empty-lines", BooleanSetting.class);
+        this.persistentChatEnabled = settings.setting("persistent-chat-enabled", BooleanSetting.class);
+        this.persistentChatLimit = settings.setting("persistent-chat-limit", ChoiceSetting.class);
         this.messageDirectionEnabled = settings.setting("message-direction-enabled", BooleanSetting.class);
         this.messageDirection = settings.setting("message-direction", ChoiceSetting.class);
         this.horizontalAlignmentEnabled = settings.setting("horizontal-alignment-enabled", BooleanSetting.class);
@@ -55,6 +60,14 @@ public final class ChatBehaviorService {
 
     public boolean stackEmptyLinesEnabled() {
         return stackEmptyLines.value();
+    }
+
+    public boolean persistentChatEnabled() {
+        return persistentChatEnabled.value();
+    }
+
+    public int effectiveHistoryLimit() {
+        return ChatHistoryRetention.effectiveLimit(persistentChatEnabled(), persistentChatLimit.value());
     }
 
     public MessageDirection messageDirection() {
@@ -94,7 +107,9 @@ public final class ChatBehaviorService {
         return new RenderedMessageSettings(
                 compactChat.value(),
                 stackEmptyLines.value(),
-                removeChatSystemIndicators.value()
+                removeChatSystemIndicators.value(),
+                persistentChatEnabled.value(),
+                effectiveHistoryLimit()
         );
     }
 
@@ -118,6 +133,8 @@ public final class ChatBehaviorService {
     private record RenderedMessageSettings(
             boolean compactChat,
             boolean stackEmptyLines,
-            boolean removeChatSystemIndicators
+            boolean removeChatSystemIndicators,
+            boolean persistentChat,
+            int historyLimit
     ) {}
 }

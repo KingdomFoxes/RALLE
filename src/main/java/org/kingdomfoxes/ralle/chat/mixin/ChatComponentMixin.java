@@ -10,6 +10,7 @@ import net.minecraft.util.Mth;
 import org.kingdomfoxes.ralle.RalleClient;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatGraphicsTransform;
+import org.kingdomfoxes.ralle.chat.ChatHistoryRetention;
 import org.kingdomfoxes.ralle.chat.ChatMessageProjector;
 import org.kingdomfoxes.ralle.chat.ChatRenderLayout;
 import org.kingdomfoxes.ralle.chat.ChatScrollbarGraphics;
@@ -23,12 +24,15 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Mixin(ChatComponent.class)
@@ -42,6 +46,7 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
     private boolean ralle$refreshingMessages;
     @Unique private boolean ralle$capturingClickableText;
     @Unique private FullShadowFrameCollector ralle$fullShadowCollector;
+    @Unique private List<GuiMessage> ralle$transitionMessages;
 
     @Inject(
             method = "render(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/gui/Font;IIIZZ)V",
@@ -226,6 +231,7 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
     @Inject(method = "refreshTrimmedMessages", at = @At("HEAD"), require = 0)
     private void ralle$startMessageRefresh(CallbackInfo callback) {
         ralle$refreshingMessages = true;
+        ralle$pruneHistory();
     }
 
     @Inject(method = "refreshTrimmedMessages", at = @At("TAIL"), require = 0)
@@ -234,6 +240,36 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
             ralle$refreshProjectedMessages();
         }
         ralle$refreshingMessages = false;
+    }
+
+    @Inject(method = "clearMessages", at = @At("HEAD"), require = 0)
+    private void ralle$preserveTransitionMessages(boolean clearRecentChat, CallbackInfo callback) {
+        var behavior = RalleClient.context().chatBehavior();
+        if (clearRecentChat && behavior.persistentChatEnabled()) {
+            ralle$transitionMessages = new ArrayList<>(allMessages);
+        } else {
+            ralle$transitionMessages = null;
+        }
+    }
+
+    @Inject(method = "clearMessages", at = @At("TAIL"), require = 0)
+    private void ralle$restoreTransitionMessages(boolean clearRecentChat, CallbackInfo callback) {
+        if (ralle$transitionMessages == null) return;
+
+        allMessages.addAll(ralle$transitionMessages);
+        ralle$transitionMessages = null;
+        ralle$pruneHistory();
+        ((ChatComponent) (Object) this).rescaleChat();
+    }
+
+    @ModifyConstant(method = "addMessageToQueue", constant = @Constant(intValue = 100), require = 0)
+    private int ralle$logicalMessageLimit(int vanillaLimit) {
+        return RalleClient.context().chatBehavior().effectiveHistoryLimit();
+    }
+
+    @ModifyConstant(method = "addMessageToDisplayQueue", constant = @Constant(intValue = 100), require = 0)
+    private int ralle$wrappedLineLimit(int vanillaLimit) {
+        return RalleClient.context().chatBehavior().effectiveHistoryLimit();
     }
 
     @Inject(method = "addMessageToDisplayQueue", at = @At("HEAD"), cancellable = true, require = 0)
@@ -312,9 +348,15 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
             }
         }
 
-        while (trimmedMessages.size() > 100) {
-            trimmedMessages.removeLast();
-        }
+        ChatHistoryRetention.pruneOldest(trimmedMessages, behavior.effectiveHistoryLimit());
+    }
+
+    @Unique
+    private void ralle$pruneHistory() {
+        int limit = RalleClient.context().chatBehavior().effectiveHistoryLimit();
+        ChatHistoryRetention.pruneOldest(allMessages, limit);
+        ChatHistoryRetention.pruneOldest(trimmedMessages, limit);
+        ((ChatComponent) (Object) this).scrollChat(0);
     }
 
     private int ralle$contentWidth() {
