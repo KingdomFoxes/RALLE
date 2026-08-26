@@ -36,6 +36,7 @@ class RalleSettingsTest {
         RalleSettings.register(registry);
 
         assertEquals(false, registry.setting("chat-screenshot-enabled", BooleanSetting.class).value());
+        assertEquals(false, registry.setting("chat-screenshot-snap-to-text", BooleanSetting.class).value());
         assertEquals(false, registry.setting("chat-selection-sounds", BooleanSetting.class).value());
         assertEquals(false, registry.setting("chat-screenshot-smooth-expansion", BooleanSetting.class).value());
     }
@@ -69,6 +70,8 @@ class RalleSettingsTest {
         assertEquals(List.of("text-shadow-enabled"), registry.dependencies("text-shadow"));
         assertEquals(List.of("chat-screenshot-enabled"),
                 registry.dependencies("chat-screenshot-smooth-expansion"));
+        assertEquals(List.of("chat-screenshot-enabled"),
+                registry.dependencies("chat-screenshot-snap-to-text"));
         assertEquals(List.of("chat-screenshot-enabled"), registry.dependencies("chat-selection-sounds"));
     }
 

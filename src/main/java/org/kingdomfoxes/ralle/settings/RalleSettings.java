@@ -56,6 +56,7 @@ public final class RalleSettings {
                         ),
                         subcategory("screenshots",
                                 toggle("chat-screenshot-enabled"),
+                                toggle("chat-screenshot-snap-to-text"),
                                 toggle("chat-screenshot-smooth-expansion"),
                                 toggle("chat-selection-sounds")
                         )
@@ -94,6 +95,7 @@ public final class RalleSettings {
         registry.requireEnabled("horizontal-alignment", "horizontal-alignment-enabled");
         registry.requireEnabled("text-shadow", "text-shadow-enabled");
         registry.requireEnabled("persistent-chat-limit", "persistent-chat-enabled");
+        registry.requireEnabled("chat-screenshot-snap-to-text", "chat-screenshot-enabled");
         registry.requireEnabled("chat-screenshot-smooth-expansion", "chat-screenshot-enabled");
         registry.requireEnabled("chat-selection-sounds", "chat-screenshot-enabled");
         registry.requireEnabled("new-party-notifications", "raid-lfg-enabled");

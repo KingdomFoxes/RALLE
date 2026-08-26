@@ -382,7 +382,11 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
         for (GuiMessage.Line line : trimmedMessages) {
             if (line.endOfEntry()) messageIndex++;
             if (messageIndex < 0) messageIndex = 0;
-            lines.add(new ChatScreenshotSnapshot.FrozenLine(line.content(), messageIndex));
+            lines.add(new ChatScreenshotSnapshot.FrozenLine(
+                    line.content(),
+                    messageIndex,
+                    minecraft.font.width(line.content())
+            ));
         }
 
         double scale = Math.max(0.01, minecraft.options.chatScale().get());

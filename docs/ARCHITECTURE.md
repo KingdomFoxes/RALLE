@@ -272,6 +272,11 @@ departure, kick, or disband closes the viewer's card. Every expanded browser
 card also has an explicit full-width neutral `Pop out` control which creates the
 same persistent HUD presentation and closes the browser.
 
+Closing a persistent party-status card with its X suppresses automatic presentation for
+that lobby across server switches and fresh synchronization snapshots. The suppression
+ends after an authoritative departure; explicitly choosing `Pop out` may also restore the
+card while the viewer remains in that lobby.
+
 Notification cards reserve their top-right `20 x 20` control for a destructive
 red, `10 x 10` pixel-drawn white X, optically offset one pixel up and left
 within the shaded face. It removes only that card presentation and never opens

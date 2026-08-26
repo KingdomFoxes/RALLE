@@ -1,6 +1,7 @@
 package org.kingdomfoxes.ralle.chat.screenshot;
 
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
+import org.kingdomfoxes.ralle.chat.ChatRenderLayout;
 
 import java.util.OptionalInt;
 
@@ -61,6 +62,45 @@ public final class ChatScreenshotGeometry {
         top = Math.max(snapshot.viewportTop(), top - ChatScreenshotTokens.VERTICAL_PADDING);
         bottom = Math.min(snapshot.viewportBottom(), bottom + ChatScreenshotTokens.VERTICAL_PADDING);
         return new Rectangle(snapshot.viewportLeft(), top, snapshot.viewportRight(), bottom);
+    }
+
+    public static int maximumTextWidth(ChatScreenshotSnapshot snapshot, LineRange range) {
+        int maximum = 0;
+        for (int index = range.first(); index <= range.last(); index++) {
+            maximum = Math.max(maximum, snapshot.lines().get(index).textWidth());
+        }
+        return Math.max(1, maximum);
+    }
+
+    public static Rectangle snapToTextBounds(
+            ChatScreenshotSnapshot snapshot,
+            Rectangle verticalBounds,
+            int maximumTextWidth
+    ) {
+        if (maximumTextWidth < 1) throw new IllegalArgumentException("maximumTextWidth must be positive");
+        int contentWidth = Math.max(1, (int) Math.ceil(snapshot.visualWidth() / snapshot.chatScale()));
+        int textOffset = ChatScreenshotTokens.CHAT_TEXT_OFFSET + ChatRenderLayout.horizontalOffset(
+                snapshot.alignment(), contentWidth, maximumTextWidth
+        );
+        int textLeft = snapshot.viewportLeft() + (int) Math.floor(textOffset * snapshot.chatScale());
+        int textRight = snapshot.viewportLeft()
+                + (int) Math.ceil((textOffset + maximumTextWidth) * snapshot.chatScale());
+        int left = Math.max(snapshot.viewportLeft(), textLeft - ChatScreenshotTokens.SNAP_LEFT_PADDING);
+        int right = Math.min(snapshot.viewportRight(), textRight + ChatScreenshotTokens.SNAP_OTHER_PADDING);
+        if (right <= left) right = Math.min(snapshot.viewportRight(), left + 1);
+        return new Rectangle(left, verticalBounds.top(), right, verticalBounds.bottom());
+    }
+
+    public static int snappedCaptureVisualWidth(int maximumTextWidth, double chatScale) {
+        if (maximumTextWidth < 1 || chatScale <= 0) throw new IllegalArgumentException("Invalid capture width");
+        int textOffset = snappedCaptureTextOffset(chatScale);
+        return Math.addExact((int) Math.ceil((textOffset + maximumTextWidth) * chatScale),
+                ChatScreenshotTokens.SNAP_OTHER_PADDING);
+    }
+
+    public static int snappedCaptureTextOffset(double chatScale) {
+        if (chatScale <= 0) throw new IllegalArgumentException("chatScale must be positive");
+        return Math.max(1, (int) Math.ceil(ChatScreenshotTokens.SNAP_LEFT_PADDING / chatScale));
     }
 
     public static int captureVisualHeight(int lineCount, int lineHeight, double chatScale) {

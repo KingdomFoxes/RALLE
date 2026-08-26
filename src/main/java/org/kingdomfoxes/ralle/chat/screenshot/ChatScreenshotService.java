@@ -21,6 +21,7 @@ public final class ChatScreenshotService {
 
     private final Minecraft minecraft;
     private final BooleanSetting screenshotEnabled;
+    private final BooleanSetting snapToText;
     private final BooleanSetting smoothExpansion;
     private final ChatScreenshotCapture capture;
     private final ChatSelectionSoundFeedback soundFeedback;
@@ -49,6 +50,7 @@ public final class ChatScreenshotService {
     ) {
         this.minecraft = minecraft;
         this.screenshotEnabled = settings.setting("chat-screenshot-enabled", BooleanSetting.class);
+        this.snapToText = settings.setting("chat-screenshot-snap-to-text", BooleanSetting.class);
         this.smoothExpansion = settings.setting("chat-screenshot-smooth-expansion", BooleanSetting.class);
         this.capture = capture;
         this.soundFeedback = new ChatSelectionSoundFeedback(soundPlayer);
@@ -155,9 +157,22 @@ public final class ChatScreenshotService {
         } else {
             for (int index = range.last(); index >= range.first(); index--) lines.add(snapshot.lines().get(index).content());
         }
+        int maximumTextWidth = ChatScreenshotGeometry.maximumTextWidth(snapshot, range);
+        boolean snapped = snapToText.value();
+        int visualWidth = snapped
+                ? ChatScreenshotGeometry.snappedCaptureVisualWidth(maximumTextWidth, snapshot.chatScale())
+                : snapshot.visualWidth();
+        int contentWidth = snapped
+                ? maximumTextWidth
+                : Math.max(1, (int) Math.ceil(snapshot.visualWidth() / snapshot.chatScale()));
+        int textOffset = snapped
+                ? ChatScreenshotGeometry.snappedCaptureTextOffset(snapshot.chatScale())
+                : ChatScreenshotTokens.CHAT_TEXT_OFFSET;
         capture.capture(new ChatScreenshotCapture.Request(
                 lines,
-                snapshot.visualWidth(),
+                visualWidth,
+                contentWidth,
+                textOffset,
                 snapshot.lineHeight(),
                 snapshot.textBaselineOffset(),
                 snapshot.chatScale(),
@@ -226,8 +241,11 @@ public final class ChatScreenshotService {
     public void renderLocalFill(ChatComponent.ChatGraphicsAccess graphics) {
         Rectangle bounds = currentBounds();
         if (bounds == null || bounds.height() == 0) return;
-        int left = -4;
-        int right = Math.max(left + 1, (int) Math.ceil(snapshot.visualWidth() / snapshot.chatScale()) - 4);
+        int left = (int) Math.floor((bounds.left() - snapshot.viewportLeft()) / snapshot.chatScale())
+                - ChatScreenshotTokens.CHAT_TEXT_OFFSET;
+        int right = Math.max(left + 1,
+                (int) Math.ceil((bounds.right() - snapshot.viewportLeft()) / snapshot.chatScale())
+                        - ChatScreenshotTokens.CHAT_TEXT_OFFSET);
         int top = (int) Math.floor(bounds.top() / snapshot.chatScale());
         int bottom = (int) Math.ceil(bounds.bottom() / snapshot.chatScale());
         float opacity = lifecycle.overlayOpacity(now());
@@ -268,7 +286,14 @@ public final class ChatScreenshotService {
     }
 
     private Rectangle calculateBounds() {
-        return ChatScreenshotGeometry.visibleBounds(snapshot, snapshotScroll, selectedRange());
+        LineRange range = selectedRange();
+        Rectangle bounds = ChatScreenshotGeometry.visibleBounds(snapshot, snapshotScroll, range);
+        if (!snapToText.value() || bounds.height() == 0) return bounds;
+        return ChatScreenshotGeometry.snapToTextBounds(
+                snapshot,
+                bounds,
+                ChatScreenshotGeometry.maximumTextWidth(snapshot, range)
+        );
     }
 
     private LineRange selectedRange() {

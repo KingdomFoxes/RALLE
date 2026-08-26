@@ -11,6 +11,8 @@ public interface ChatScreenshotCapture {
     record Request(
             List<FormattedCharSequence> lines,
             int visualWidth,
+            int contentWidth,
+            int textOffsetX,
             int lineHeight,
             int textBaselineOffset,
             double chatScale,
@@ -20,6 +22,7 @@ public interface ChatScreenshotCapture {
     ) {
         public Request {
             lines = List.copyOf(lines);
+            if (visualWidth < 1 || contentWidth < 1) throw new IllegalArgumentException("Capture widths must be positive");
         }
     }
 

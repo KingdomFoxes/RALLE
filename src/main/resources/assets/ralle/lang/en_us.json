@@ -55,6 +55,8 @@
   "ralle.settings.option.remove-chat-system-indicators.description": "Removes Minecraft's colored bars and icons from system-managed chat messages without reserving space for them. Message text and its interactions are unchanged.",
   "ralle.settings.option.chat-screenshot-enabled": "Chat Screenshotting",
   "ralle.settings.option.chat-screenshot-enabled.description": "While chat is open, hold either Ctrl key and left-drag across messages to prepare a transparent chat image. Ctrl+C or double-click copies it.",
+  "ralle.settings.option.chat-screenshot-snap-to-text": "Snap to Text",
+  "ralle.settings.option.chat-screenshot-snap-to-text.description": "Fits the screenshot selection and copied image to the widest selected text instead of the full chat box width.",
   "ralle.settings.option.chat-selection-sounds": "Chat Selection Sounds",
   "ralle.settings.option.chat-selection-sounds.description": "Plays intrument feedback as the selected message count changes and after a chat image is copied successfully.",
   "ralle.settings.option.chat-screenshot-smooth-expansion": "Smooth Selection",

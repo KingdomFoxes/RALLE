@@ -7,9 +7,11 @@ import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
@@ -35,6 +37,7 @@ public final class LfgNotificationManager {
     private final ArrayDeque<UUID> visible = new ArrayDeque<>();
     private final ArrayDeque<UUID> queued = new ArrayDeque<>();
     private final Map<Long, PendingSuppression> mainUiSuppressions = new LinkedHashMap<>();
+    private final Set<UUID> dismissedPersistentCards = new HashSet<>();
     private long nextSuppressionId;
 
     public LfgNotificationManager(RaidLfgService service, SettingsRegistry settings,
@@ -63,9 +66,15 @@ public final class LfgNotificationManager {
     }
 
     private synchronized void onLobbyChange(RaidLfgStore.LobbyChange change) {
+        var viewer = service.store().state().viewer();
+        if (change.current() != null && viewer != null
+                && !change.current().contains(viewer.minecraftUuid())) {
+            dismissedPersistentCards.remove(change.lobbyId());
+        }
         var card = cards.get(change.lobbyId());
         if (card != null) playObservedRosterGrowth(card, change);
         if (viewerDeparted(change)) {
+            dismissedPersistentCards.remove(change.lobbyId());
             if (card != null) beginExit(card);
             return;
         }
@@ -121,6 +130,7 @@ public final class LfgNotificationManager {
                 && change.current().contains(viewer.minecraftUuid())
                 && (change.previous() == null || !change.previous().contains(viewer.minecraftUuid()));
         if (!becameMember) return false;
+        if (dismissedPersistentCards.contains(change.lobbyId())) return false;
         if (consumeMainUiSuppression(change.lobbyId())) {
             removeCompletely(change.lobbyId());
             if (mainUiAutoPopOutEnabled.getAsBoolean()) {
@@ -223,6 +233,7 @@ public final class LfgNotificationManager {
 
     /** Explicitly keeps a live lobby card on the HUD until the player closes it. */
     public synchronized void showPersistent(LfgProtocol.Lobby lobby) {
+        dismissedPersistentCards.remove(lobby.lobbyId());
         showPersistent(lobby, DiscoveryKind.MANUAL);
     }
 
@@ -413,7 +424,10 @@ public final class LfgNotificationManager {
 
     public synchronized void close(UUID lobbyId) {
         var card = cards.get(lobbyId);
-        if (card != null) beginExit(card);
+        if (card != null) {
+            if (card.persistent) dismissedPersistentCards.add(lobbyId);
+            beginExit(card);
+        }
     }
 
     /** Newest/topmost visible card, including a card with an active Join in progress. */

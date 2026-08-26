@@ -52,6 +52,27 @@ class ChatScreenshotGeometryTest {
     }
 
     @Test
+    void snapToTextCropsToTheWidestSelectedLineForEitherAlignment() {
+        var left = snapshot(ChatBehaviorService.MessageDirection.TOP_DOWN);
+        var right = new ChatScreenshotSnapshot(
+                left.lines(), left.initialScroll(), left.linesPerPage(), left.lineHeight(),
+                left.textBaselineOffset(), left.chatScale(), left.textOpacity(), left.viewportLeft(),
+                left.viewportTop(), left.viewportRight(), left.viewportBottom(), left.direction(),
+                ChatBehaviorService.HorizontalAlignment.RIGHT, left.shadow()
+        );
+        var vertical = new ChatScreenshotGeometry.Rectangle(10, 8, 110, 32);
+
+        assertEquals(24, ChatScreenshotGeometry.maximumTextWidth(left, new ChatScreenshotGeometry.LineRange(0, 2)));
+        assertEquals(new ChatScreenshotGeometry.Rectangle(10, 8, 40, 32),
+                ChatScreenshotGeometry.snapToTextBounds(left, vertical, 24));
+        assertEquals(new ChatScreenshotGeometry.Rectangle(85, 8, 110, 32),
+                ChatScreenshotGeometry.snapToTextBounds(right, vertical, 24));
+        assertEquals(31, ChatScreenshotGeometry.snappedCaptureVisualWidth(24, 1.0));
+        assertEquals(10, ChatScreenshotGeometry.snappedCaptureTextOffset(0.5));
+        assertEquals(19, ChatScreenshotGeometry.snappedCaptureVisualWidth(24, 0.5));
+    }
+
+    @Test
     void smoothExpansionUsesCubicEaseOut() {
         assertEquals(0.0, ChatScreenshotGeometry.cubicEaseOut(0.0));
         assertEquals(0.875, ChatScreenshotGeometry.cubicEaseOut(0.5));
@@ -61,7 +82,7 @@ class ChatScreenshotGeometryTest {
 
     private static ChatScreenshotSnapshot snapshot(ChatBehaviorService.MessageDirection direction) {
         return new ChatScreenshotSnapshot(
-                List.of(line(0), line(0), line(1), line(2), line(2)),
+                List.of(line(0, 12), line(0, 18), line(1, 24), line(2, 30), line(2, 36)),
                 0,
                 5,
                 10,
@@ -78,7 +99,7 @@ class ChatScreenshotGeometryTest {
         );
     }
 
-    private static ChatScreenshotSnapshot.FrozenLine line(int message) {
-        return new ChatScreenshotSnapshot.FrozenLine(FormattedCharSequence.forward("line", Style.EMPTY), message);
+    private static ChatScreenshotSnapshot.FrozenLine line(int message, int width) {
+        return new ChatScreenshotSnapshot.FrozenLine(FormattedCharSequence.forward("line", Style.EMPTY), message, width);
     }
 }
