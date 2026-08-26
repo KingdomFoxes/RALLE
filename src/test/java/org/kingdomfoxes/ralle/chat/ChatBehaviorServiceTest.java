@@ -10,10 +10,26 @@ import org.kingdomfoxes.ralle.settings.RalleSettings;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChatBehaviorServiceTest {
     @TempDir
     Path temporaryDirectory;
+
+    @Test
+    void timestampsIndependentlyEnableTheProjectionPipeline() {
+        var settings = new SettingsRegistry(temporaryDirectory.resolve("timestamps.properties"));
+        RalleSettings.register(settings);
+        var behavior = new ChatBehaviorService(null, settings);
+
+        assertFalse(behavior.chatTimestampsEnabled());
+        assertFalse(behavior.projectionEnabled());
+
+        settings.setting("chat-timestamps", BooleanSetting.class).set(true);
+        assertTrue(behavior.chatTimestampsEnabled());
+        assertTrue(behavior.projectionEnabled());
+    }
 
     @Test
     void legacyFullValueRemainsThePartialFullShadow() {

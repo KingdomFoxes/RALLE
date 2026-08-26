@@ -60,6 +60,26 @@ class RalleSettingsTest {
     }
 
     @Test
+    void chatTimestampsDefaultOffAndPersistUnderTheChatCategory() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+
+        var timestamps = registry.setting("chat-timestamps", BooleanSetting.class);
+        assertFalse(timestamps.value());
+        assertEquals(List.of(), registry.dependencies("chat-timestamps"));
+
+        timestamps.set(true);
+        assertTrue(Files.readString(path).contains("chat.chat-timestamps=true"));
+
+        var restored = new SettingsRegistry(path);
+        RalleSettings.register(restored);
+        restored.seal();
+        assertTrue(restored.setting("chat-timestamps", BooleanSetting.class).value());
+    }
+
+    @Test
     void chatFeaturesUseTheirOwnTogglesWithoutAMasterToggle() {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);
@@ -127,6 +147,8 @@ class RalleSettingsTest {
         assertEquals(List.of("general", "appearance", "message-direction", "horizontal-alignment", "text-shadow",
                         "message-behavior", "chat-history", "screenshots"),
                 categories.get(1).subcategories().stream().map(value -> value.id()).toList());
+        assertEquals(List.of("hide-chat-scrollbar", "remove-chat-system-indicators", "chat-timestamps"),
+                categories.get(1).subcategories().get(1).entries().stream().map(value -> value.id()).toList());
         assertEquals(List.of("general", "notifications", "controls"),
                 categories.get(2).subcategories().stream().map(value -> value.id()).toList());
         for (var id : List.of(

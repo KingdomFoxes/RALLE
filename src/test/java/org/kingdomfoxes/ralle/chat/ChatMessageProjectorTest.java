@@ -7,6 +7,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
+import java.util.IdentityHashMap;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -119,6 +121,41 @@ class ChatMessageProjectorTest {
         assertNull(counter.getStyle().getHoverEvent());
         assertNull(counter.getStyle().getClickEvent());
         assertEquals(hover, displayed.getSiblings().getFirst().getStyle().getHoverEvent());
+    }
+
+    @Test
+    void compactedMessageUsesTheNewestOccurrenceReceiveTime() {
+        var newest = message(20, Component.literal("Repeated"));
+        var oldest = message(10, Component.literal("Repeated"));
+        var newestTime = LocalDateTime.of(2026, 8, 26, 12, 34, 56);
+        var oldestTime = LocalDateTime.of(2026, 8, 26, 12, 34, 1);
+        var receiveTimes = new IdentityHashMap<GuiMessage, LocalDateTime>();
+        receiveTimes.put(newest, newestTime);
+        receiveTimes.put(oldest, oldestTime);
+
+        var projected = ChatMessageProjector.project(
+                List.of(newest, oldest), true, false, 900, receiveTimes::get);
+
+        assertEquals(1, projected.size());
+        assertEquals(newestTime, projected.getFirst().receiveTime());
+    }
+
+    @Test
+    void stackedEmptyLinesUseTheNewestReceiveTime() {
+        var newest = message(20, Component.literal("   "));
+        var oldest = message(10, Component.empty());
+        var newestTime = LocalDateTime.of(2026, 8, 26, 12, 35, 2);
+        var oldestTime = LocalDateTime.of(2026, 8, 26, 12, 35, 1);
+        var receiveTimes = new IdentityHashMap<GuiMessage, LocalDateTime>();
+        receiveTimes.put(newest, newestTime);
+        receiveTimes.put(oldest, oldestTime);
+
+        var projected = ChatMessageProjector.project(
+                List.of(newest, oldest), false, true, 900, receiveTimes::get);
+
+        assertEquals(1, projected.size());
+        assertEquals("   ", projected.getFirst().content().getString());
+        assertEquals(newestTime, projected.getFirst().receiveTime());
     }
 
     private GuiMessage message(int addedTime, Component component) {

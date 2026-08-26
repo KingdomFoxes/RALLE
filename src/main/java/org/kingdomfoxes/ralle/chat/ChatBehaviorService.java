@@ -13,6 +13,7 @@ public final class ChatBehaviorService {
     private final Minecraft minecraft;
     private final BooleanSetting hideChatScrollbar;
     private final BooleanSetting removeChatSystemIndicators;
+    private final BooleanSetting chatTimestamps;
     private final BooleanSetting compactChat;
     private final BooleanSetting stackEmptyLines;
     private final BooleanSetting persistentChatEnabled;
@@ -29,6 +30,7 @@ public final class ChatBehaviorService {
         this.minecraft = minecraft;
         this.hideChatScrollbar = settings.setting("hide-chat-scrollbar", BooleanSetting.class);
         this.removeChatSystemIndicators = settings.setting("remove-chat-system-indicators", BooleanSetting.class);
+        this.chatTimestamps = settings.setting("chat-timestamps", BooleanSetting.class);
         this.compactChat = settings.setting("compact-chat", BooleanSetting.class);
         this.stackEmptyLines = settings.setting("stack-empty-lines", BooleanSetting.class);
         this.persistentChatEnabled = settings.setting("persistent-chat-enabled", BooleanSetting.class);
@@ -43,7 +45,7 @@ public final class ChatBehaviorService {
     }
 
     public boolean projectionEnabled() {
-        return compactChatEnabled() || stackEmptyLinesEnabled();
+        return compactChatEnabled() || stackEmptyLinesEnabled() || chatTimestampsEnabled();
     }
 
     public boolean hideChatScrollbar() {
@@ -52,6 +54,10 @@ public final class ChatBehaviorService {
 
     public boolean removeChatSystemIndicators() {
         return removeChatSystemIndicators.value();
+    }
+
+    public boolean chatTimestampsEnabled() {
+        return chatTimestamps.value();
     }
 
     public boolean compactChatEnabled() {
@@ -108,6 +114,7 @@ public final class ChatBehaviorService {
                 compactChat.value(),
                 stackEmptyLines.value(),
                 removeChatSystemIndicators.value(),
+                chatTimestamps.value(),
                 persistentChatEnabled.value(),
                 effectiveHistoryLimit()
         );
@@ -134,6 +141,7 @@ public final class ChatBehaviorService {
             boolean compactChat,
             boolean stackEmptyLines,
             boolean removeChatSystemIndicators,
+            boolean chatTimestamps,
             boolean persistentChat,
             int historyLimit
     ) {}

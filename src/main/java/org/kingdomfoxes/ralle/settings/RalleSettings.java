@@ -35,7 +35,8 @@ public final class RalleSettings {
                         subcategory("general", action("edit-chat-layout")),
                         subcategory("appearance",
                                 toggle("hide-chat-scrollbar"),
-                                toggle("remove-chat-system-indicators")
+                                toggle("remove-chat-system-indicators"),
+                                toggle("chat-timestamps")
                         ),
                         subcategory("message-direction",
                                 toggle("message-direction-enabled"),
