@@ -141,12 +141,11 @@ read-only reconnect flow without clearing the last projection or issuing a party
 backend starts its 120-second presence grace only after the player's final authenticated socket is
 lost; reconnecting cancels that grace, while expiry closes only the synchronized LFG lobby.
 
-The packaged protocol-v1 base URL is `https://kingdomfoxes.com/api/ralle/v1`. Local development
-may explicitly override it with the `ralle.lfg.baseUrl` JVM property; the client never falls back
-to loopback automatically. Insecure
-HTTP and WebSocket transports are accepted only for loopback hosts; this is intentionally not a
-player setting. The JDK gateway is pinned to HTTP/1.1 so local requests do not attempt an `h2c`
-upgrade that Uvicorn does not support.
+The protocol-v1 base URL is fixed to `https://kingdomfoxes.com/api/ralle/v1` in the production
+client. It has no runtime setting, JVM property, or automatic loopback fallback. Explicitly
+constructed test gateways may use insecure HTTP and WebSocket transports only for loopback hosts.
+The JDK gateway is pinned to HTTP/1.1 so test requests do not attempt an `h2c` upgrade that local
+HTTP servers do not support.
 
 Authentication uses `POST /auth/challenge`, Minecraft's session `joinServer` proof, then
 `POST /auth/complete`. The issued bearer credential is never persisted. `GET /lobbies` provides a

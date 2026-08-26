@@ -41,7 +41,7 @@ public final class HttpLfgGateway implements LfgGateway {
                         .connectTimeout(Duration.ofSeconds(8))
                         .version(HttpClient.Version.HTTP_1_1)
                         .build(),
-                System.getProperty("ralle.lfg.baseUrl", DEFAULT_BASE_URL));
+                DEFAULT_BASE_URL);
     }
 
     public HttpLfgGateway(HttpClient client, String baseUrl) {
