@@ -110,6 +110,59 @@ class RaidLfgServiceTest {
     }
 
     @Test
+    void unchangedWynncraftContextDoesNotTreatIdleTicksAsDisconnectOrDisband() {
+        var now = new long[]{0L};
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var commands = new TrackingCommands();
+        var service = new RaidLfgService(
+                gateway, env, ignored -> CompletableFuture.completedFuture(null),
+                () -> now[0], () -> 0.5, LfgNotificationSink.IGNORE, commands);
+
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshotWithLobby()));
+        now[0] = 10 * 60 * 1000L;
+        service.tick();
+
+        assertEquals(RaidLfgService.LifecycleState.ONLINE, service.lifecycle());
+        assertEquals(List.of(hostedLobby(true)), service.store().state().lobbyList());
+        assertEquals(1, gateway.challengeCalls);
+        assertEquals(0, gateway.connections.getFirst().closeCalls);
+        assertEquals(0, commands.disbands);
+    }
+
+    @Test
+    void transientSocketLossReconnectsWithoutClearingLobbyOrDisbandingParty() {
+        var now = new long[]{0L};
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var commands = new TrackingCommands();
+        var service = new RaidLfgService(
+                gateway, env, ignored -> CompletableFuture.completedFuture(null),
+                () -> now[0], () -> 0.5, LfgNotificationSink.IGNORE, commands);
+
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshotWithLobby()));
+        gateway.listener.onFailure(new java.io.IOException("socket lost"));
+
+        assertEquals(RaidLfgService.LifecycleState.RECONNECTING, service.lifecycle());
+        assertEquals(List.of(hostedLobby(true)), service.store().state().lobbyList());
+        assertEquals(0, commands.disbands);
+
+        now[0] = 1_000L;
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshotWithLobby()));
+
+        assertEquals(RaidLfgService.LifecycleState.ONLINE, service.lifecycle());
+        assertEquals(List.of(hostedLobby(true)), service.store().state().lobbyList());
+        assertEquals(0, commands.disbands);
+    }
+
+    @Test
     void manualRefreshRetriesImmediatelyAfterApiFailure() {
         var gateway = new FakeGateway();
         var env = new MutableEnvironment();

@@ -1,9 +1,10 @@
 .gradle/
 .idea/
 build/
+logs/
+node_modules/
 out/
 run/
-logs/
 *.iml
 *.ipr
 *.iws

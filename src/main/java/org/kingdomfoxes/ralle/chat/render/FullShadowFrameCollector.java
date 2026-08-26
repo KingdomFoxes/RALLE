@@ -12,7 +12,12 @@ import java.util.Objects;
 public final class FullShadowFrameCollector {
     static final float OPACITY_SCALE = 0.25F;
     static final float MIN_OPACITY = 3.0F / 255.0F;
-    private static final int PADDING = 2;
+    /**
+     * Wynncraft chat prefixes can begin with a -4 px spacing glyph before their
+     * visible bitmap glyph. Keep one additional pixel for the shader halo.
+     */
+    static final int LEFT_PADDING = 5;
+    static final int OTHER_PADDING = 2;
     private static final int MASK_COLOR = 0x000000;
 
     private final GuiGraphics graphics;
@@ -42,10 +47,10 @@ public final class FullShadowFrameCollector {
                 state = new FullShadowMaskState(
                         font,
                         new Matrix3x2f(graphics.pose()),
-                        -PADDING,
-                        localTop - PADDING,
-                        contentWidth + PADDING,
-                        localBottom + PADDING
+                        -LEFT_PADDING,
+                        localTop - OTHER_PADDING,
+                        contentWidth + OTHER_PADDING,
+                        localBottom + OTHER_PADDING
                 );
                 graphics.guiRenderState.submitPicturesInPictureState(state);
             }

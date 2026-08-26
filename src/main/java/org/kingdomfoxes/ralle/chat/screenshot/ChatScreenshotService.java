@@ -14,6 +14,7 @@ import org.kingdomfoxes.ralle.sound.ChatSelectionSoundPlayer;
 import org.kingdomfoxes.ralle.ui.owo.RalleTypography;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.OptionalInt;
 
 public final class ChatScreenshotService {
@@ -21,6 +22,7 @@ public final class ChatScreenshotService {
 
     private final Minecraft minecraft;
     private final BooleanSetting screenshotEnabled;
+    private final BooleanSetting snapToText;
     private final BooleanSetting smoothExpansion;
     private final ChatScreenshotCapture capture;
     private final ChatSelectionSoundFeedback soundFeedback;
@@ -37,6 +39,7 @@ public final class ChatScreenshotService {
     private double pointerY;
     private Rectangle animationFrom;
     private Rectangle targetBounds;
+    private LineRange animationRange;
     private long animationStarted;
     private final ChatSelectionAutoscroll autoscroll = new ChatSelectionAutoscroll();
     private long copyGeneration;
@@ -49,6 +52,7 @@ public final class ChatScreenshotService {
     ) {
         this.minecraft = minecraft;
         this.screenshotEnabled = settings.setting("chat-screenshot-enabled", BooleanSetting.class);
+        this.snapToText = settings.setting("chat-screenshot-snap-to-text", BooleanSetting.class);
         this.smoothExpansion = settings.setting("chat-screenshot-smooth-expansion", BooleanSetting.class);
         this.capture = capture;
         this.soundFeedback = new ChatSelectionSoundFeedback(soundPlayer);
@@ -90,6 +94,7 @@ public final class ChatScreenshotService {
         this.lifecycle.beginDragging();
         this.targetBounds = calculateBounds();
         this.animationFrom = targetBounds;
+        this.animationRange = selectedRange();
         this.animationStarted = now();
         soundFeedback.selectionChanged(anchorMessage, currentMessage);
         return true;
@@ -120,11 +125,12 @@ public final class ChatScreenshotService {
             lifecycle.showPreview();
             targetBounds = calculateBounds();
             animationFrom = targetBounds;
+            animationRange = selectedRange();
         }
     }
 
     public boolean previewContains(double x, double y) {
-        return state() == State.PREVIEW && targetBounds != null && targetBounds.contains(x, y);
+        return state() == State.PREVIEW && currentVisualBounds().stream().anyMatch(bounds -> bounds.contains(x, y));
     }
 
     public void cancelForManualScroll() {
@@ -139,6 +145,7 @@ public final class ChatScreenshotService {
         snapshot = null;
         targetBounds = null;
         animationFrom = null;
+        animationRange = null;
         autoscroll.reset();
         soundFeedback.reset();
         if (wasActive && minecraft.gui != null) minecraft.gui.getChat().rescaleChat();
@@ -155,9 +162,22 @@ public final class ChatScreenshotService {
         } else {
             for (int index = range.last(); index >= range.first(); index--) lines.add(snapshot.lines().get(index).content());
         }
+        int maximumTextWidth = ChatScreenshotGeometry.maximumTextWidth(snapshot, range);
+        boolean snapped = snapToText.value();
+        int visualWidth = snapped
+                ? ChatScreenshotGeometry.snappedCaptureVisualWidth(maximumTextWidth, snapshot.chatScale())
+                : snapshot.visualWidth();
+        int contentWidth = snapped
+                ? maximumTextWidth
+                : Math.max(1, (int) Math.ceil(snapshot.visualWidth() / snapshot.chatScale()));
+        int textOffset = snapped
+                ? ChatScreenshotGeometry.snappedCaptureTextOffset(snapshot.chatScale())
+                : ChatScreenshotTokens.CHAT_TEXT_OFFSET;
         capture.capture(new ChatScreenshotCapture.Request(
                 lines,
-                snapshot.visualWidth(),
+                visualWidth,
+                contentWidth,
+                textOffset,
                 snapshot.lineHeight(),
                 snapshot.textBaselineOffset(),
                 snapshot.chatScale(),
@@ -224,30 +244,40 @@ public final class ChatScreenshotService {
     }
 
     public void renderLocalFill(ChatComponent.ChatGraphicsAccess graphics) {
-        Rectangle bounds = currentBounds();
-        if (bounds == null || bounds.height() == 0) return;
-        int left = -4;
-        int right = Math.max(left + 1, (int) Math.ceil(snapshot.visualWidth() / snapshot.chatScale()) - 4);
-        int top = (int) Math.floor(bounds.top() / snapshot.chatScale());
-        int bottom = (int) Math.ceil(bounds.bottom() / snapshot.chatScale());
         float opacity = lifecycle.overlayOpacity(now());
         if (opacity <= 0.0F) return;
-        graphics.fill(left, top, right, bottom,
-                ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.SELECTION_FILL, opacity));
+        int color = ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.SELECTION_FILL, opacity);
+        for (Rectangle bounds : currentVisualBounds()) {
+            int left = (int) Math.floor((bounds.left() - snapshot.viewportLeft()) / snapshot.chatScale())
+                    - ChatScreenshotTokens.CHAT_TEXT_OFFSET;
+            int right = Math.max(left + 1,
+                    (int) Math.ceil((bounds.right() - snapshot.viewportLeft()) / snapshot.chatScale())
+                            - ChatScreenshotTokens.CHAT_TEXT_OFFSET);
+            int top = (int) Math.floor(bounds.top() / snapshot.chatScale());
+            int bottom = (int) Math.ceil(bounds.bottom() / snapshot.chatScale());
+            graphics.fill(left, top, right, bottom, color);
+        }
     }
 
     public void renderOutline(GuiGraphics graphics) {
         Rectangle bounds = currentBounds();
         if (bounds == null || bounds.height() == 0) return;
+        List<Rectangle> visualBounds = currentVisualBounds();
+        if (visualBounds.isEmpty()) return;
         long now = now();
         float opacity = lifecycle.overlayOpacity(now);
         if (opacity <= 0.0F) return;
         int outlineColor = ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.SELECTION_GOLD, opacity);
         graphics.enableScissor(snapshot.viewportLeft(), snapshot.viewportTop(), snapshot.viewportRight(), snapshot.viewportBottom());
-        if (state() == State.DRAGGING) drawSolid(graphics, bounds, outlineColor);
-        else drawDashed(graphics, bounds,
-                (int) ((now / 60L) % (ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP)),
-                outlineColor);
+        if (visualBounds.size() == 1) {
+            if (state() == State.DRAGGING) drawSolid(graphics, visualBounds.getFirst(), outlineColor);
+            else drawDashed(graphics, visualBounds.getFirst(),
+                    (int) ((now / 60L) % (ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP)),
+                    outlineColor);
+        } else {
+            int phase = (int) ((now / 60L) % (ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP));
+            drawContour(graphics, visualBounds, state() == State.DRAGGING, phase, outlineColor);
+        }
         if (state() == State.COPIED_FADING) drawCopiedConfirmation(graphics, bounds, opacity);
         graphics.disableScissor();
     }
@@ -260,7 +290,13 @@ public final class ChatScreenshotService {
         var message = ChatScreenshotGeometry.messageAt(snapshot, snapshotScroll, x, y);
         if (message.isEmpty() || message.getAsInt() == currentMessage) return;
         Rectangle before = currentBounds();
+        LineRange beforeRange = selectedRange();
         currentMessage = message.getAsInt();
+        LineRange afterRange = selectedRange();
+        animationRange = new LineRange(
+                Math.min(beforeRange.first(), afterRange.first()),
+                Math.max(beforeRange.last(), afterRange.last())
+        );
         animationFrom = before == null ? calculateBounds() : before;
         targetBounds = calculateBounds();
         animationStarted = now();
@@ -268,7 +304,14 @@ public final class ChatScreenshotService {
     }
 
     private Rectangle calculateBounds() {
-        return ChatScreenshotGeometry.visibleBounds(snapshot, snapshotScroll, selectedRange());
+        LineRange range = selectedRange();
+        Rectangle bounds = ChatScreenshotGeometry.visibleBounds(snapshot, snapshotScroll, range);
+        if (!snapToText.value() || bounds.height() == 0) return bounds;
+        return ChatScreenshotGeometry.snapToTextBounds(
+                snapshot,
+                bounds,
+                ChatScreenshotGeometry.maximumTextWidth(snapshot, range)
+        );
     }
 
     private LineRange selectedRange() {
@@ -283,6 +326,25 @@ public final class ChatScreenshotService {
         int top = interpolate(animationFrom.top(), targetBounds.top(), eased);
         int bottom = interpolate(animationFrom.bottom(), targetBounds.bottom(), eased);
         return new Rectangle(targetBounds.left(), top, targetBounds.right(), bottom);
+    }
+
+    private List<Rectangle> currentVisualBounds() {
+        Rectangle clip = currentBounds();
+        if (clip == null || clip.height() == 0) return List.of();
+        if (!snapToText.value()) return List.of(clip);
+
+        LineRange range = selectedRange();
+        if (state() == State.DRAGGING && smoothExpansion.value() && animationRange != null
+                && now() - animationStarted < ChatScreenshotTokens.EXPANSION_MILLIS) {
+            range = animationRange;
+        }
+        var result = new ArrayList<Rectangle>();
+        for (Rectangle bounds : ChatScreenshotGeometry.snappedLineBounds(snapshot, snapshotScroll, range)) {
+            int top = Math.max(bounds.top(), clip.top());
+            int bottom = Math.min(bounds.bottom(), clip.bottom());
+            if (bottom > top) result.add(new Rectangle(bounds.left(), top, bounds.right(), bottom));
+        }
+        return List.copyOf(result);
     }
 
     private static void drawSolid(GuiGraphics graphics, Rectangle bounds, int color) {
@@ -310,6 +372,77 @@ public final class ChatScreenshotService {
                 graphics.fill(bounds.left(), bounds.top() + start, bounds.left() + 1, bounds.top() + end, color);
                 graphics.fill(bounds.right() - 1, bounds.top() + start, bounds.right(), bounds.top() + end, color);
             }
+        }
+    }
+
+    private static void drawContour(
+            GuiGraphics graphics,
+            List<Rectangle> bounds,
+            boolean solid,
+            int phase,
+            int color
+    ) {
+        Rectangle first = bounds.getFirst();
+        drawHorizontalSegment(graphics, first.left(), first.right(), first.top(), solid, phase, color);
+        for (int index = 0; index < bounds.size(); index++) {
+            Rectangle current = bounds.get(index);
+            drawVerticalSegment(graphics, current.left(), current.top(), current.bottom(), solid, phase, color);
+            drawVerticalSegment(graphics, current.right() - 1, current.top(), current.bottom(), solid, phase, color);
+            if (index == 0) continue;
+            Rectangle previous = bounds.get(index - 1);
+            int boundary = current.top();
+            if (current.left() != previous.left()) {
+                drawHorizontalSegment(graphics, Math.min(current.left(), previous.left()),
+                        Math.max(current.left(), previous.left()) + 1, boundary, solid, phase, color);
+            }
+            if (current.right() != previous.right()) {
+                drawHorizontalSegment(graphics, Math.min(current.right(), previous.right()) - 1,
+                        Math.max(current.right(), previous.right()), boundary, solid, phase, color);
+            }
+        }
+        Rectangle last = bounds.getLast();
+        drawHorizontalSegment(graphics, last.left(), last.right(), last.bottom() - 1, solid, phase, color);
+    }
+
+    private static void drawHorizontalSegment(
+            GuiGraphics graphics,
+            int left,
+            int right,
+            int y,
+            boolean solid,
+            int phase,
+            int color
+    ) {
+        if (right <= left) return;
+        if (solid) {
+            graphics.fill(left, y, right, y + 1, color);
+            return;
+        }
+        for (int x = left - phase; x < right; x += ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP) {
+            int start = Math.max(left, x);
+            int end = Math.min(right, x + ChatScreenshotTokens.DASH_LENGTH);
+            if (end > start) graphics.fill(start, y, end, y + 1, color);
+        }
+    }
+
+    private static void drawVerticalSegment(
+            GuiGraphics graphics,
+            int x,
+            int top,
+            int bottom,
+            boolean solid,
+            int phase,
+            int color
+    ) {
+        if (bottom <= top) return;
+        if (solid) {
+            graphics.fill(x, top, x + 1, bottom, color);
+            return;
+        }
+        for (int y = top - phase; y < bottom; y += ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP) {
+            int start = Math.max(top, y);
+            int end = Math.min(bottom, y + ChatScreenshotTokens.DASH_LENGTH);
+            if (end > start) graphics.fill(x, start, x + 1, end, color);
         }
     }
 

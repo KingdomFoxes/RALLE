@@ -6,41 +6,58 @@ import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 
 public final class ChatBehaviorService {
+    public static final int VANILLA_HISTORY_LIMIT = ChatHistoryRetention.VANILLA_LIMIT;
     public static final int DEFAULT_COMPACT_WINDOW_SECONDS = 45;
     public static final int DEFAULT_COMPACT_WINDOW_TICKS = DEFAULT_COMPACT_WINDOW_SECONDS * 20;
 
     private final Minecraft minecraft;
     private final BooleanSetting hideChatScrollbar;
+    private final BooleanSetting removeChatSystemIndicators;
+    private final BooleanSetting chatTimestamps;
     private final BooleanSetting compactChat;
     private final BooleanSetting stackEmptyLines;
+    private final BooleanSetting persistentChatEnabled;
+    private final ChoiceSetting persistentChatLimit;
     private final BooleanSetting messageDirectionEnabled;
     private final ChoiceSetting messageDirection;
     private final BooleanSetting horizontalAlignmentEnabled;
     private final ChoiceSetting horizontalAlignment;
     private final BooleanSetting textShadowEnabled;
     private final ChoiceSetting textShadow;
-    private ProjectionSettings previousProjectionSettings;
+    private RenderedMessageSettings previousRenderedMessageSettings;
 
     public ChatBehaviorService(Minecraft minecraft, SettingsRegistry settings) {
         this.minecraft = minecraft;
         this.hideChatScrollbar = settings.setting("hide-chat-scrollbar", BooleanSetting.class);
+        this.removeChatSystemIndicators = settings.setting("remove-chat-system-indicators", BooleanSetting.class);
+        this.chatTimestamps = settings.setting("chat-timestamps", BooleanSetting.class);
         this.compactChat = settings.setting("compact-chat", BooleanSetting.class);
         this.stackEmptyLines = settings.setting("stack-empty-lines", BooleanSetting.class);
+        this.persistentChatEnabled = settings.setting("persistent-chat-enabled", BooleanSetting.class);
+        this.persistentChatLimit = settings.setting("persistent-chat-limit", ChoiceSetting.class);
         this.messageDirectionEnabled = settings.setting("message-direction-enabled", BooleanSetting.class);
         this.messageDirection = settings.setting("message-direction", ChoiceSetting.class);
         this.horizontalAlignmentEnabled = settings.setting("horizontal-alignment-enabled", BooleanSetting.class);
         this.horizontalAlignment = settings.setting("horizontal-alignment", ChoiceSetting.class);
         this.textShadowEnabled = settings.setting("text-shadow-enabled", BooleanSetting.class);
         this.textShadow = settings.setting("text-shadow", ChoiceSetting.class);
-        this.previousProjectionSettings = projectionSettings();
+        this.previousRenderedMessageSettings = renderedMessageSettings();
     }
 
     public boolean projectionEnabled() {
-        return compactChatEnabled() || stackEmptyLinesEnabled();
+        return compactChatEnabled() || stackEmptyLinesEnabled() || chatTimestampsEnabled();
     }
 
     public boolean hideChatScrollbar() {
         return hideChatScrollbar.value();
+    }
+
+    public boolean removeChatSystemIndicators() {
+        return removeChatSystemIndicators.value();
+    }
+
+    public boolean chatTimestampsEnabled() {
+        return chatTimestamps.value();
     }
 
     public boolean compactChatEnabled() {
@@ -49,6 +66,14 @@ public final class ChatBehaviorService {
 
     public boolean stackEmptyLinesEnabled() {
         return stackEmptyLines.value();
+    }
+
+    public boolean persistentChatEnabled() {
+        return persistentChatEnabled.value();
+    }
+
+    public int effectiveHistoryLimit() {
+        return ChatHistoryRetention.effectiveLimit(persistentChatEnabled(), persistentChatLimit.value());
     }
 
     public MessageDirection messageDirection() {
@@ -77,15 +102,22 @@ public final class ChatBehaviorService {
     }
 
     public void tick() {
-        var current = projectionSettings();
-        if (!current.equals(previousProjectionSettings) && minecraft.gui != null) {
+        var current = renderedMessageSettings();
+        if (!current.equals(previousRenderedMessageSettings) && minecraft.gui != null) {
             minecraft.gui.getChat().rescaleChat();
         }
-        previousProjectionSettings = current;
+        previousRenderedMessageSettings = current;
     }
 
-    private ProjectionSettings projectionSettings() {
-        return new ProjectionSettings(compactChat.value(), stackEmptyLines.value());
+    private RenderedMessageSettings renderedMessageSettings() {
+        return new RenderedMessageSettings(
+                compactChat.value(),
+                stackEmptyLines.value(),
+                removeChatSystemIndicators.value(),
+                chatTimestamps.value(),
+                persistentChatEnabled.value(),
+                effectiveHistoryLimit()
+        );
     }
 
     public enum MessageDirection {
@@ -105,5 +137,12 @@ public final class ChatBehaviorService {
         FULL
     }
 
-    private record ProjectionSettings(boolean compactChat, boolean stackEmptyLines) {}
+    private record RenderedMessageSettings(
+            boolean compactChat,
+            boolean stackEmptyLines,
+            boolean removeChatSystemIndicators,
+            boolean chatTimestamps,
+            boolean persistentChat,
+            int historyLimit
+    ) {}
 }

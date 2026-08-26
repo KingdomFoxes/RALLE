@@ -10,9 +10,13 @@ import net.minecraft.util.Mth;
 import org.kingdomfoxes.ralle.RalleClient;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatGraphicsTransform;
+import org.kingdomfoxes.ralle.chat.ChatHistoryRetention;
 import org.kingdomfoxes.ralle.chat.ChatMessageProjector;
 import org.kingdomfoxes.ralle.chat.ChatRenderLayout;
 import org.kingdomfoxes.ralle.chat.ChatScrollbarGraphics;
+import org.kingdomfoxes.ralle.chat.ChatSystemIndicators;
+import org.kingdomfoxes.ralle.chat.ChatTimestampStore;
+import org.kingdomfoxes.ralle.chat.ChatTimestamps;
 import org.kingdomfoxes.ralle.chat.render.FullShadowFrameCollector;
 import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotSnapshot;
@@ -22,12 +26,16 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 
 @Mixin(ChatComponent.class)
@@ -41,6 +49,8 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
     private boolean ralle$refreshingMessages;
     @Unique private boolean ralle$capturingClickableText;
     @Unique private FullShadowFrameCollector ralle$fullShadowCollector;
+    @Unique private List<GuiMessage> ralle$transitionMessages;
+    @Unique private final ChatTimestampStore ralle$timestampStore = new ChatTimestampStore(Clock.systemDefaultZone());
 
     @Inject(
             method = "render(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/gui/Font;IIIZZ)V",
@@ -225,6 +235,8 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
     @Inject(method = "refreshTrimmedMessages", at = @At("HEAD"), require = 0)
     private void ralle$startMessageRefresh(CallbackInfo callback) {
         ralle$refreshingMessages = true;
+        allMessages.forEach(ralle$timestampStore::record);
+        ralle$pruneHistory();
     }
 
     @Inject(method = "refreshTrimmedMessages", at = @At("TAIL"), require = 0)
@@ -235,8 +247,44 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
         ralle$refreshingMessages = false;
     }
 
+    @Inject(method = "clearMessages", at = @At("HEAD"), require = 0)
+    private void ralle$preserveTransitionMessages(boolean clearRecentChat, CallbackInfo callback) {
+        var behavior = RalleClient.context().chatBehavior();
+        if (clearRecentChat && behavior.persistentChatEnabled()) {
+            ralle$transitionMessages = new ArrayList<>(allMessages);
+        } else {
+            ralle$transitionMessages = null;
+            ralle$timestampStore.clear();
+        }
+    }
+
+    @Inject(method = "clearMessages", at = @At("TAIL"), require = 0)
+    private void ralle$restoreTransitionMessages(boolean clearRecentChat, CallbackInfo callback) {
+        if (ralle$transitionMessages == null) return;
+
+        allMessages.addAll(ralle$transitionMessages);
+        ralle$transitionMessages = null;
+        ralle$pruneHistory();
+        ((ChatComponent) (Object) this).rescaleChat();
+    }
+
+    @ModifyConstant(method = "addMessageToQueue", constant = @Constant(intValue = 100), require = 0)
+    private int ralle$logicalMessageLimit(int vanillaLimit) {
+        return RalleClient.context().chatBehavior().effectiveHistoryLimit();
+    }
+
+    @ModifyConstant(method = "addMessageToDisplayQueue", constant = @Constant(intValue = 100), require = 0)
+    private int ralle$wrappedLineLimit(int vanillaLimit) {
+        return RalleClient.context().chatBehavior().effectiveHistoryLimit();
+    }
+
     @Inject(method = "addMessageToDisplayQueue", at = @At("HEAD"), cancellable = true, require = 0)
     private void ralle$deferProjectedMessageDisplay(GuiMessage message, CallbackInfo callback) {
+        if (!ralle$refreshingMessages) ralle$timestampStore.record(message);
+        message = ChatSystemIndicators.withoutIndicator(
+                message,
+                RalleClient.context().chatBehavior().removeChatSystemIndicators()
+        );
         if (RalleClient.context().chatScreenshots().stabilizesIncomingMessages()) {
             callback.cancel();
             return;
@@ -245,13 +293,26 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
 
         if (!ralle$refreshingMessages && ((ChatComponent) (Object) this).isChatFocused()
                 && (chatScrollbarPos > 0 || RalleClient.context().chatScreenshots().stabilizesIncomingMessages())) {
-            int addedLineCount = message.splitLines(minecraft.font, ralle$contentWidth()).size();
+            int addedLineCount = message.splitLines(minecraft.font, ralle$contentWidth(message)).size();
             for (int line = 0; line < addedLineCount; line++) {
                 newMessageSinceScroll = true;
                 ((ChatComponent) (Object) this).scrollChat(1);
             }
         }
         callback.cancel();
+    }
+
+    @ModifyVariable(
+            method = "addMessageToDisplayQueue",
+            at = @At("HEAD"),
+            argsOnly = true,
+            require = 0
+    )
+    private GuiMessage ralle$removeChatSystemIndicatorBeforeWrapping(GuiMessage message) {
+        return ChatSystemIndicators.withoutIndicator(
+                message,
+                RalleClient.context().chatBehavior().removeChatSystemIndicators()
+        );
     }
 
     @Inject(
@@ -266,39 +327,78 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
         }
     }
 
+    @Inject(method = "addMessageToQueue", at = @At("TAIL"), require = 0)
+    private void ralle$recordAndPruneTimestampAfterMessageAdded(GuiMessage message, CallbackInfo callback) {
+        ralle$timestampStore.record(message);
+        ralle$timestampStore.retainAll(allMessages);
+    }
+
+    @Inject(method = "createDeletedMarker", at = @At("RETURN"), require = 0)
+    private void ralle$transferDeletedMessageTimestamp(
+            GuiMessage original,
+            CallbackInfoReturnable<GuiMessage> callback
+    ) {
+        ralle$timestampStore.transfer(original, callback.getReturnValue());
+    }
+
     private void ralle$refreshProjectedMessages() {
         var behavior = RalleClient.context().chatBehavior();
         var projected = ChatMessageProjector.project(
                 allMessages,
                 behavior.compactChatEnabled(),
                 behavior.stackEmptyLinesEnabled(),
-                ChatBehaviorService.DEFAULT_COMPACT_WINDOW_TICKS
+                ChatBehaviorService.DEFAULT_COMPACT_WINDOW_TICKS,
+                ralle$timestampStore::receiveTime
         );
 
         trimmedMessages.clear();
         int contentWidth = ralle$contentWidth();
         for (int messageIndex = projected.size() - 1; messageIndex >= 0; messageIndex--) {
             var message = projected.get(messageIndex);
-            var displayMessage = new GuiMessage(message.addedTime(), message.content(), null, message.tag());
-            var lines = displayMessage.splitLines(minecraft.font, contentWidth);
+            var displayMessage = ChatSystemIndicators.withoutIndicator(
+                    new GuiMessage(message.addedTime(), message.content(), null, message.tag()),
+                    behavior.removeChatSystemIndicators()
+            );
+            var prefix = behavior.chatTimestampsEnabled() && message.receiveTime() != null
+                    ? ChatTimestamps.prefix(message.receiveTime()).getVisualOrderText()
+                    : null;
+            int wrappedContentWidth = prefix == null
+                    ? contentWidth
+                    : Math.max(1, contentWidth - minecraft.font.width(prefix));
+            var lines = displayMessage.splitLines(minecraft.font, wrappedContentWidth);
             for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
                 trimmedMessages.addFirst(new GuiMessage.Line(
                         message.addedTime(),
-                        lines.get(lineIndex),
-                        message.tag(),
+                        prefix == null ? lines.get(lineIndex) : ChatTimestamps.prepend(prefix, lines.get(lineIndex)),
+                        displayMessage.tag(),
                         lineIndex == lines.size() - 1
                 ));
             }
         }
 
-        while (trimmedMessages.size() > 100) {
-            trimmedMessages.removeLast();
-        }
+        ChatHistoryRetention.pruneOldest(trimmedMessages, behavior.effectiveHistoryLimit());
+    }
+
+    @Unique
+    private void ralle$pruneHistory() {
+        int limit = RalleClient.context().chatBehavior().effectiveHistoryLimit();
+        ChatHistoryRetention.pruneOldest(allMessages, limit);
+        ChatHistoryRetention.pruneOldest(trimmedMessages, limit);
+        ralle$timestampStore.retainAll(allMessages);
+        ((ChatComponent) (Object) this).scrollChat(0);
     }
 
     private int ralle$contentWidth() {
         double scale = Math.max(0.01, minecraft.options.chatScale().get());
         return Math.max(1, Mth.floor(ralle$visualWidth() / scale));
+    }
+
+    private int ralle$contentWidth(GuiMessage message) {
+        int contentWidth = ralle$contentWidth();
+        var behavior = RalleClient.context().chatBehavior();
+        var receiveTime = ralle$timestampStore.receiveTime(message);
+        if (!behavior.chatTimestampsEnabled() || receiveTime == null) return contentWidth;
+        return Math.max(1, contentWidth - minecraft.font.width(ChatTimestamps.prefix(receiveTime)));
     }
 
     private int ralle$renderContentWidth() {
@@ -319,7 +419,11 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
         for (GuiMessage.Line line : trimmedMessages) {
             if (line.endOfEntry()) messageIndex++;
             if (messageIndex < 0) messageIndex = 0;
-            lines.add(new ChatScreenshotSnapshot.FrozenLine(line.content(), messageIndex));
+            lines.add(new ChatScreenshotSnapshot.FrozenLine(
+                    line.content(),
+                    messageIndex,
+                    minecraft.font.width(line.content())
+            ));
         }
 
         double scale = Math.max(0.01, minecraft.options.chatScale().get());

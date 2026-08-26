@@ -11,6 +11,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FullShadowFrameCollectorTest {
     @Test
+    void maskIncludesWynncraftLeadingPrefixOverhangAndHalo() {
+        assertEquals(5, FullShadowFrameCollector.LEFT_PADDING);
+        assertEquals(2, FullShadowFrameCollector.OTHER_PADDING);
+    }
+
+    @Test
     void visualMaskStyleKeepsGlyphGeometryAndDropsSemanticMetadata() {
         var original = Style.EMPTY
                 .withColor(0xABCDEF)

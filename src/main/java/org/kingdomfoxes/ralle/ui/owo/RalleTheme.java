@@ -5,6 +5,7 @@ import net.minecraft.network.chat.Component;
 
 final class RalleTheme {
     static final int BODY_LINE_HEIGHT = 12;
+    static final int DARK_GOLD_ARGB = 0xFFB8832F;
     static final Color TEXT = Color.WHITE;
     static final Color MUTED = Color.ofRgb(0xA9B0BE);
     static final Color ACCENT = Color.ofRgb(0xF2B84B);

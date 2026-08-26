@@ -9,8 +9,15 @@ single chat box; placements are normalized across resolution and GUI-scale
 changes and apply in singleplayer or on any server. Compact chat, empty-line
 stacking, message direction, horizontal text alignment, and text-shadow modes
 are implemented as independently disabled
-local options. Transparent chat screenshot selection also supports separately
+local options. Transparent chat screenshot selection also supports an optional
+per-line text-snapped overlay and text-width image crop, plus separately
 disabled processed-xylophone count and successful-copy feedback.
+Persistent Chat is another disabled-by-default option. When enabled, it keeps
+up to the selected 300, 500, 1000, or 1500 displayed messages and wrapped lines
+while moving between multiplayer servers and singleplayer worlds. This history
+exists only in memory, may mix messages from different worlds without labels,
+and disappears when Minecraft closes. RALLE never reloads it from logs or
+writes it to another file, and manual F3+D clearing remains permanent.
 `/ralle hud` opens the layout editor with every currently enabled editable HUD
 element available; the About page exposes the same action as `Edit HUDs`.
 `/ralle lfg` opens the live, authenticated owo-lib Raid LFG browser when the

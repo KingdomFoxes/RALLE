@@ -17,6 +17,9 @@ public final class ChatScreenshotTokens {
     public static final int CONFIRMATION_DEPTH = 2;
     public static final int EDGE_BAND = 12;
     public static final int VERTICAL_PADDING = 2;
+    public static final int SNAP_LEFT_PADDING = 5;
+    public static final int SNAP_OTHER_PADDING = 2;
+    public static final int CHAT_TEXT_OFFSET = 4;
     public static final long EDGE_DELAY_MILLIS = 250L;
     public static final long EDGE_REPEAT_MILLIS = 100L;
     public static final long EXPANSION_MILLIS = 120L;

@@ -79,20 +79,22 @@ public final class TransparentChatCapture implements ChatScreenshotCapture {
     }
 
     private void renderLines(GuiGraphics graphics, Request request) {
-        int contentWidth = Math.max(1, (int) Math.ceil(request.visualWidth() / request.chatScale()));
+        int contentWidth = request.contentWidth();
+        int canvasWidth = Math.max(1, (int) Math.ceil(request.visualWidth() / request.chatScale()));
         int textColor = ((int) (request.textOpacity() * 255.0F) << 24) | 0xFFFFFF;
         FullShadowFrameCollector fullShadow = request.shadow() == ChatBehaviorService.TextShadow.FULL
                 ? new FullShadowFrameCollector(
                         graphics,
                         minecraft.font,
-                        contentWidth,
+                        canvasWidth,
                         0,
                         request.lines().size() * request.lineHeight()
                 )
                 : null;
         for (int index = 0; index < request.lines().size(); index++) {
             FormattedCharSequence line = request.lines().get(index);
-            int x = 4 + ChatRenderLayout.horizontalOffset(request.alignment(), contentWidth, minecraft.font.width(line));
+            int x = request.textOffsetX()
+                    + ChatRenderLayout.horizontalOffset(request.alignment(), contentWidth, minecraft.font.width(line));
             int y = index * request.lineHeight() + request.textBaselineOffset();
             switch (request.shadow()) {
                 case NONE -> graphics.drawString(minecraft.font, transform(line, Style::withoutShadow), x, y, textColor, false);

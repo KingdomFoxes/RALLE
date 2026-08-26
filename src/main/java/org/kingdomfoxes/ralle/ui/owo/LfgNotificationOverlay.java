@@ -196,12 +196,20 @@ public final class LfgNotificationOverlay {
                 noteX, detailY, MUTED, false);
 
         Component hoveredRosterMember = null;
+        var viewer = service.store().state().viewer();
+        boolean showElapsedTimer = viewer != null && lobby.hostedBy(viewer.minecraftUuid());
         for (int slot = 0; slot < 4; slot++) {
-            var slotBounds = new Rectangle(rosterSlotX(bounds, slot), bounds.y() + 42, 20, 20);
+            int slotX = showElapsedTimer ? timerRosterSlotX(bounds, slot) : rosterSlotX(bounds, slot);
+            var slotBounds = new Rectangle(slotX, bounds.y() + 42, 20, 20);
             renderRosterSlot(graphics, lobby, slot, slotBounds);
             if (interactive && slot < lobby.members().size() && slotBounds.contains(mouseX, mouseY)) {
                 hoveredRosterMember = rosterTooltip(lobby.members().get(slot));
             }
+        }
+        if (showElapsedTimer) {
+            LfgElapsedTimerComponent.drawCentered(
+                    graphics, minecraft.font, bounds.x() + bounds.width() / 2, bounds.y() + 46,
+                    lobby.createdAt(), java.time.Instant.now());
         }
 
         var controls = new Rectangle(bounds.x() + 8, bounds.y() + 72, bounds.width() - 16, 20);
@@ -421,6 +429,18 @@ public final class LfgNotificationOverlay {
         int usableWidth = bounds.width() - 16;
         int travel = usableWidth - 20;
         return bounds.x() + 8 + Math.round(slot * travel / 3f);
+    }
+
+    static int timerRosterSlotX(Rectangle bounds, int slot) {
+        if (slot < 0 || slot >= 4) throw new IllegalArgumentException("Roster slot must be between 0 and 3");
+        int offset = switch (slot) {
+            case 0 -> 8;
+            case 1 -> 52;
+            case 2 -> bounds.width() - 72;
+            case 3 -> bounds.width() - 28;
+            default -> throw new AssertionError("Validated roster slot");
+        };
+        return bounds.x() + offset;
     }
 
     static Component rosterTooltip(LfgProtocol.Member member) {

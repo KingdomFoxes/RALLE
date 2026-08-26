@@ -29,7 +29,19 @@ platform ports. It must not depend on a concrete settings screen.
   restored after preparation. If the compositor becomes unavailable, a
   session-stable batched glyph fallback preserves the visual effect without
   affecting other chat modes or Raid LFG. Local chat customization is available
-  in singleplayer and on any multiplayer server.
+  in singleplayer and on any multiplayer server. The disabled-by-default
+  Persistent Chat option raises the in-memory logical-message and wrapped-line
+  ceilings and preserves displayed `GuiMessage` values across transition-driven
+  chat clears. Vanilla still flushes pending chat and clears delayed deletions,
+  while draft and command-entry history handling remains entirely vanilla. The
+  retained components, signatures, tags, and interaction metadata are never
+  persisted or reconstructed from logs; manual F3+D clearing remains unchanged.
+  The disabled-by-default `chat.chat-timestamps` projection records each logical
+  message's local receive time in session-only identity metadata even while its
+  presentation is disabled. When enabled, it reserves the `[HH:mm:ss] ` prefix
+  width before wrapping and composes the styled prefix onto every rendered line,
+  so transformations and transparent chat screenshots include timestamps without
+  changing source messages, signatures, tags, logging, or interaction metadata.
 - `sound`: client-only registered UI sound events and playback adapters. Chat
   selection injects this narrow port, while its Minecraft implementation owns
   parent-setting gates, count-to-cue mapping, rate limiting, and coalescing.
@@ -72,6 +84,18 @@ consumed by the local chat integration. The Raid LFG opt-in gates the persistent
 Fox client
 service, while its shortcut remains unbound until configured.
 
+Persistent Chat is stored only as the opt-in `chat.persistent-chat-enabled` and
+the selected `chat.persistent-chat-limit`. The displayed history itself remains
+session-only memory. Enabling starts from messages still held by Minecraft;
+disabling immediately prunes the logical and wrapped histories back to the
+vanilla 100-entry ceiling and restores normal transition clearing.
+
+Chat Timestamps is persisted only as `chat.chat-timestamps`. Receive-time
+metadata is never written or transmitted; it follows retained logical messages
+through rescaling, settings refreshes, Persistent Chat transitions, compaction,
+blank-line stacking, and deletion-marker replacement, then clears or prunes with
+the corresponding in-memory chat history.
+
 Custom HUD placements are stored separately in
 `config/ralle-hud-layout.properties`. Resizable elements such as the v1 chat
 box persist normalized coordinates and dimensions. Fixed elements such as Raid
@@ -111,13 +135,17 @@ browser does not own authentication or live synchronization. Networking starts o
 `play.wynncraft.net` entry connection may transfer the client to a regional `.com` host.
 Disconnecting, disabling the setting, or changing servers closes the WebSocket and clears the
 in-memory bearer credential and lobby projection.
+Opening an ordinary Minecraft screen, including Wynncraft's AFK blackout, does not change that
+connection context and has no LFG lifecycle effect. A transient WebSocket failure enters the
+read-only reconnect flow without clearing the last projection or issuing a party command. The Fox
+backend starts its 120-second presence grace only after the player's final authenticated socket is
+lost; reconnecting cancels that grace, while expiry closes only the synchronized LFG lobby.
 
-The packaged protocol-v1 base URL is `https://kingdomfoxes.com/api/ralle/v1`. Local development
-may explicitly override it with the `ralle.lfg.baseUrl` JVM property; the client never falls back
-to loopback automatically. Insecure
-HTTP and WebSocket transports are accepted only for loopback hosts; this is intentionally not a
-player setting. The JDK gateway is pinned to HTTP/1.1 so local requests do not attempt an `h2c`
-upgrade that Uvicorn does not support.
+The protocol-v1 base URL is fixed to `https://kingdomfoxes.com/api/ralle/v1` in the production
+client. It has no runtime setting, JVM property, or automatic loopback fallback. Explicitly
+constructed test gateways may use insecure HTTP and WebSocket transports only for loopback hosts.
+The JDK gateway is pinned to HTTP/1.1 so test requests do not attempt an `h2c` upgrade that local
+HTTP servers do not support.
 
 Authentication uses `POST /auth/challenge`, Minecraft's session `joinServer` proof, then
 `POST /auth/complete`. The issued bearer credential is never persisted. `GET /lobbies` provides a
@@ -255,6 +283,11 @@ departure, kick, or disband closes the viewer's card. Every expanded browser
 card also has an explicit full-width neutral `Pop out` control which creates the
 same persistent HUD presentation and closes the browser.
 
+Closing a persistent party-status card with its X suppresses automatic presentation for
+that lobby across server switches and fresh synchronization snapshots. The suppression
+ends after an authoritative departure; explicitly choosing `Pop out` may also restore the
+card while the viewer remains in that lobby.
+
 Notification cards reserve their top-right `20 x 20` control for a destructive
 red, `10 x 10` pixel-drawn white X, optically offset one pixel up and left
 within the shaded face. It removes only that card presentation and never opens
@@ -266,6 +299,10 @@ status, Leave, or Disband states as applicable. A full persistent host card inst
 Join, Leave/Disband, and Party Filled keys appear beside their card actions; the Close binding
 is not printed beside the X. Unbound or conflicting mappings do not advertise a
 nonfunctional shortcut.
+
+The host's browser cards and persistent party-status card derive a live lobby-age timer locally
+from the synchronized lobby creation instant. The timer is never shown on another player's lobby
+and adds no stored timer state or protocol field.
 
 The only persisted LFG values are local opt-in, notification, sound, keybind,
 and HUD-placement settings. Whether a card is currently popped out remains

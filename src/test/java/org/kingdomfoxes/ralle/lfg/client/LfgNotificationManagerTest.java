@@ -323,6 +323,51 @@ class LfgNotificationManagerTest {
     }
 
     @Test
+    void dismissedAutomaticPartyCardStaysDismissedAcrossServerResynchronization() {
+        var fixture = new Fixture();
+        fixture.partyStatusEnabled[0] = true;
+        fixture.mainUiAutoPopOutEnabled[0] = true;
+        fixture.connect();
+        var hosted = viewerHostedLobby(67, 1);
+        fixture.manager.suppressNextMainUiPartyStatus();
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, hosted));
+
+        assertEquals(LfgNotificationManager.DiscoveryKind.MAIN_UI,
+                fixture.manager.visibleCards().getFirst().kind());
+        fixture.manager.close(hosted.lobbyId());
+        fixture.now[0] += LfgNotificationManager.ANIMATION_MILLIS;
+        fixture.manager.tick();
+        assertTrue(fixture.manager.visibleCards().isEmpty());
+
+        fixture.service.store().clear();
+        fixture.service.store().replace(new LfgProtocol.Snapshot(
+                1, 2, VIEWER, new LfgProtocol.ViewerCapabilities(false, true, Map.of()),
+                List.of(viewerHostedLobby(67, 2))), RaidLfgStore.UpdateOrigin.SNAPSHOT);
+        fixture.manager.tick();
+
+        assertTrue(fixture.manager.visibleCards().isEmpty());
+    }
+
+    @Test
+    void dismissedPartyCanAutomaticallyAppearAgainAfterAuthoritativeDepartureAndRejoin() {
+        var fixture = new Fixture();
+        fixture.partyStatusEnabled[0] = true;
+        fixture.connect();
+        var hosted = viewerHostedLobby(68, 1);
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, hosted));
+        fixture.manager.close(hosted.lobbyId());
+        fixture.now[0] += LfgNotificationManager.ANIMATION_MILLIS;
+        fixture.manager.tick();
+
+        fixture.gateway.listener.onFrame(new LfgProtocol.RemoveFrame(1, 2, hosted.lobbyId()));
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(
+                1, 3, viewerHostedLobby(68, 3)));
+
+        assertEquals(LfgNotificationManager.DiscoveryKind.PARTY_STATUS,
+                fixture.manager.visibleCards().getFirst().kind());
+    }
+
+    @Test
     void explicitMainUiCreateSuppressesLiveFirstStatusButPopOutAlwaysPersists() {
         var fixture = new Fixture();
         fixture.partyStatusEnabled[0] = true;
