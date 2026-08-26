@@ -10,8 +10,8 @@ changes and apply in singleplayer or on any server. Compact chat, empty-line
 stacking, message direction, horizontal text alignment, and text-shadow modes
 are implemented as independently disabled
 local options. Transparent chat screenshot selection also supports an optional
-text-width crop plus separately disabled processed-xylophone count and
-successful-copy feedback.
+per-line text-snapped overlay and text-width image crop, plus separately
+disabled processed-xylophone count and successful-copy feedback.
 Persistent Chat is another disabled-by-default option. When enabled, it keeps
 up to the selected 300, 500, 1000, or 1500 displayed messages and wrapped lines
 while moving between multiplayer servers and singleplayer worlds. This history

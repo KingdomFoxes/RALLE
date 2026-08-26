@@ -3,6 +3,9 @@ package org.kingdomfoxes.ralle.chat.screenshot;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatRenderLayout;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.OptionalInt;
 
 /** Pure range and geometry calculations used by input, overlay, and capture code. */
@@ -89,6 +92,55 @@ public final class ChatScreenshotGeometry {
         int right = Math.min(snapshot.viewportRight(), textRight + ChatScreenshotTokens.SNAP_OTHER_PADDING);
         if (right <= left) right = Math.min(snapshot.viewportRight(), left + 1);
         return new Rectangle(left, verticalBounds.top(), right, verticalBounds.bottom());
+    }
+
+    public static List<Rectangle> snappedLineBounds(
+            ChatScreenshotSnapshot snapshot,
+            int scroll,
+            LineRange range
+    ) {
+        var bounds = new ArrayList<Rectangle>();
+        double scaledLineHeight = snapshot.lineHeight() * snapshot.chatScale();
+        for (int index = range.first(); index <= range.last(); index++) {
+            int relative = index - scroll;
+            if (relative < 0 || relative >= snapshot.linesPerPage()) continue;
+            int topSlot = snapshot.direction() == ChatBehaviorService.MessageDirection.TOP_DOWN
+                    ? relative
+                    : snapshot.linesPerPage() - 1 - relative;
+            int top = snapshot.viewportTop() + (int) Math.floor(topSlot * scaledLineHeight);
+            int bottom = snapshot.viewportTop() + (int) Math.ceil((topSlot + 1) * scaledLineHeight);
+            var vertical = new Rectangle(snapshot.viewportLeft(), top, snapshot.viewportRight(), bottom);
+            bounds.add(snapToTextBounds(snapshot, vertical,
+                    Math.max(1, snapshot.lines().get(index).textWidth())));
+        }
+        bounds.sort(Comparator.comparingInt(Rectangle::top));
+        if (bounds.isEmpty()) return List.of();
+
+        for (int index = 1; index < bounds.size(); index++) {
+            Rectangle previous = bounds.get(index - 1);
+            Rectangle current = bounds.get(index);
+            int boundary = current.top();
+            bounds.set(index - 1, new Rectangle(
+                    previous.left(), previous.top(), previous.right(), boundary
+            ));
+        }
+
+        Rectangle first = bounds.getFirst();
+        bounds.set(0, new Rectangle(
+                first.left(),
+                Math.max(snapshot.viewportTop(), first.top() - ChatScreenshotTokens.VERTICAL_PADDING),
+                first.right(),
+                first.bottom()
+        ));
+        int lastIndex = bounds.size() - 1;
+        Rectangle last = bounds.get(lastIndex);
+        bounds.set(lastIndex, new Rectangle(
+                last.left(),
+                last.top(),
+                last.right(),
+                Math.min(snapshot.viewportBottom(), last.bottom() + ChatScreenshotTokens.VERTICAL_PADDING)
+        ));
+        return List.copyOf(bounds);
     }
 
     public static int snappedCaptureVisualWidth(int maximumTextWidth, double chatScale) {
