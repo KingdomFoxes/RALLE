@@ -55,7 +55,7 @@ class ChatSelectionAutoscrollTest {
     private static ChatScreenshotSnapshot snapshot(ChatBehaviorService.MessageDirection direction) {
         return new ChatScreenshotSnapshot(
                 List.of(line(0), line(1), line(2), line(3), line(4), line(5)),
-                0, 5, 10, 2, 1.0, 1.0F,
+                0, 5, 10, 2, 1.0, 1.0F, 100,
                 10, 0, 110, 50, direction,
                 ChatBehaviorService.HorizontalAlignment.LEFT,
                 ChatBehaviorService.TextShadow.VANILLA

@@ -52,11 +52,30 @@ class ChatScreenshotGeometryTest {
     }
 
     @Test
+    void fullWidthSelectionIncludesBackgroundBeyondTheContentWidth() {
+        var contentSnapshot = snapshot(ChatBehaviorService.MessageDirection.TOP_DOWN);
+        var fullBoxSnapshot = new ChatScreenshotSnapshot(
+                contentSnapshot.lines(), contentSnapshot.initialScroll(), contentSnapshot.linesPerPage(),
+                contentSnapshot.lineHeight(), contentSnapshot.textBaselineOffset(), contentSnapshot.chatScale(),
+                contentSnapshot.textOpacity(), contentSnapshot.contentWidth(), contentSnapshot.viewportLeft(),
+                contentSnapshot.viewportTop(), 122, contentSnapshot.viewportBottom(), contentSnapshot.direction(),
+                contentSnapshot.alignment(), contentSnapshot.shadow()
+        );
+
+        assertEquals(new ChatScreenshotGeometry.Rectangle(10, 0, 122, 12),
+                ChatScreenshotGeometry.visibleBounds(
+                        fullBoxSnapshot, 0, new ChatScreenshotGeometry.LineRange(0, 0)));
+        assertEquals(new ChatScreenshotGeometry.Rectangle(10, 0, 28, 12),
+                ChatScreenshotGeometry.snappedLineBounds(
+                        fullBoxSnapshot, 0, new ChatScreenshotGeometry.LineRange(0, 0)).getFirst());
+    }
+
+    @Test
     void snapToTextCropsToTheWidestSelectedLineForEitherAlignment() {
         var left = snapshot(ChatBehaviorService.MessageDirection.TOP_DOWN);
         var right = new ChatScreenshotSnapshot(
                 left.lines(), left.initialScroll(), left.linesPerPage(), left.lineHeight(),
-                left.textBaselineOffset(), left.chatScale(), left.textOpacity(), left.viewportLeft(),
+                left.textBaselineOffset(), left.chatScale(), left.textOpacity(), left.contentWidth(), left.viewportLeft(),
                 left.viewportTop(), left.viewportRight(), left.viewportBottom(), left.direction(),
                 ChatBehaviorService.HorizontalAlignment.RIGHT, left.shadow()
         );
@@ -88,7 +107,7 @@ class ChatScreenshotGeometryTest {
 
         var scaled = new ChatScreenshotSnapshot(
                 left.lines(), left.initialScroll(), left.linesPerPage(), left.lineHeight(),
-                left.textBaselineOffset(), 0.75, left.textOpacity(), left.viewportLeft(),
+                left.textBaselineOffset(), 0.75, left.textOpacity(), left.contentWidth(), left.viewportLeft(),
                 left.viewportTop(), left.viewportRight(), 38, left.direction(), left.alignment(), left.shadow()
         );
         var scaledBounds = ChatScreenshotGeometry.snappedLineBounds(
@@ -114,6 +133,7 @@ class ChatScreenshotGeometryTest {
                 2,
                 1.0,
                 1.0F,
+                100,
                 10,
                 0,
                 110,

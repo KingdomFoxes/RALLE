@@ -47,12 +47,13 @@ public final class ChatLayoutService {
                     Math.min(viewportHeight, RalleHudElements.LFG_ACTION_BAR_HEIGHT)
             );
         }
-        return placements.resolve(
+        var contentBounds = placements.resolve(
                 CHAT_ELEMENT_ID,
                 viewportWidth,
                 viewportHeight,
                 vanillaBounds(viewportWidth, viewportHeight, true)
         );
+        return renderedEditorBounds(contentBounds, viewportWidth);
     }
 
     public void saveEditorBounds(Rectangle rectangle, int viewportWidth, int viewportHeight) {
@@ -60,7 +61,10 @@ public final class ChatLayoutService {
     }
 
     public void saveEditorBounds(String elementId, Rectangle rectangle, int viewportWidth, int viewportHeight) {
-        placements.setPixels(elementId, rectangle, viewportWidth, viewportHeight);
+        var savedBounds = CHAT_ELEMENT_ID.equals(elementId)
+                ? contentBounds(rectangle)
+                : rectangle;
+        placements.setPixels(elementId, savedBounds, viewportWidth, viewportHeight);
         if (CHAT_ELEMENT_ID.equals(elementId)) rescaleChat();
     }
 
@@ -97,8 +101,8 @@ public final class ChatLayoutService {
             return editorBounds(elementId, viewportWidth, viewportHeight);
         }
         rescaleChat();
-        return vanillaBounds(viewportWidth, viewportHeight, true)
-                .clampTo(viewportWidth, viewportHeight, MINIMUM_WIDTH, MINIMUM_HEIGHT);
+        return renderedEditorBounds(vanillaBounds(viewportWidth, viewportHeight, true), viewportWidth)
+                .clampTo(viewportWidth, viewportHeight, minimumWidth(elementId), minimumHeight(elementId));
     }
 
     public PlacementPolicy placementPolicy(String elementId) {
@@ -106,7 +110,10 @@ public final class ChatLayoutService {
     }
 
     public int minimumWidth(String elementId) {
-        return placements.definition(elementId).minimumWidth();
+        int minimumWidth = placements.definition(elementId).minimumWidth();
+        return CHAT_ELEMENT_ID.equals(elementId)
+                ? ChatBoxGeometry.renderedWidth(minimumWidth, chatScale())
+                : minimumWidth;
     }
 
     public int minimumHeight(String elementId) {
@@ -123,8 +130,11 @@ public final class ChatLayoutService {
     }
 
     public int customUnscaledHeight(Rectangle bounds) {
-        var scale = Math.max(0.01, minecraft.options.chatScale().get());
-        return Math.max(1, (int) Math.ceil(bounds.height() / scale));
+        return Math.max(1, (int) Math.ceil(bounds.height() / chatScale()));
+    }
+
+    public int renderedChatWidth(int contentWidth) {
+        return ChatBoxGeometry.renderedWidth(contentWidth, chatScale());
     }
 
     public int customRenderCanvasHeight(Rectangle bounds) {
@@ -157,6 +167,21 @@ public final class ChatLayoutService {
         var visualHeight = Math.max(1, (int) Math.floor(unscaledHeight * minecraft.options.chatScale().get()));
         var bottom = Math.max(1, viewportHeight - VANILLA_BOTTOM_MARGIN);
         return new Rectangle(0, Math.max(0, bottom - visualHeight), Math.max(1, width), visualHeight);
+    }
+
+    private Rectangle renderedEditorBounds(Rectangle contentBounds, int viewportWidth) {
+        int renderedWidth = renderedChatWidth(contentBounds.width());
+        int visibleWidth = Math.min(renderedWidth, Math.max(1, viewportWidth - contentBounds.x()));
+        return new Rectangle(contentBounds.x(), contentBounds.y(), visibleWidth, contentBounds.height());
+    }
+
+    private Rectangle contentBounds(Rectangle editorBounds) {
+        int contentWidth = ChatBoxGeometry.chatWidthForRenderedWidth(editorBounds.width(), chatScale());
+        return new Rectangle(editorBounds.x(), editorBounds.y(), contentWidth, editorBounds.height());
+    }
+
+    private double chatScale() {
+        return Math.max(0.01, minecraft.options.chatScale().get());
     }
 
     private void rescaleChat() {

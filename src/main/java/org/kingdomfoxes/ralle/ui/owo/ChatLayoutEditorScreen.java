@@ -432,7 +432,8 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
                 snapToGrid, alignmentGuides
         );
         setBounds(new Rectangle(xSnap.start(), ySnap.start(), bounds.width(), bounds.height())
-                .clampTo(width, height, ChatLayoutService.MINIMUM_WIDTH, ChatLayoutService.MINIMUM_HEIGHT));
+                .clampTo(width, height,
+                        chatLayout.minimumWidth(selectedElementId), chatLayout.minimumHeight(selectedElementId)));
         alignmentGuideX = featureMatches(bounds.x(), bounds.width(), xSnap.guide()) ? xSnap.guide() : null;
         alignmentGuideY = featureMatches(bounds.y(), bounds.height(), ySnap.guide()) ? ySnap.guide() : null;
     }
@@ -473,7 +474,9 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
                 0,
                 0,
                 width,
-                height
+                height,
+                chatLayout.minimumWidth(selectedElementId),
+                chatLayout.minimumHeight(selectedElementId)
         ));
         alignmentGuideX = resizeEdgeMatches(bounds, horizontalResizeEdge, xSnap) ? xSnap.guide() : null;
         alignmentGuideY = resizeEdgeMatches(bounds, verticalResizeEdge, ySnap) ? ySnap.guide() : null;
@@ -649,10 +652,12 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
             int pointerOffsetX,
             int pointerOffsetY,
             int viewportWidth,
-            int viewportHeight
+            int viewportHeight,
+            int requestedMinimumWidth,
+            int requestedMinimumHeight
     ) {
-        var minimumWidth = Math.min(ChatLayoutService.MINIMUM_WIDTH, viewportWidth);
-        var minimumHeight = Math.min(ChatLayoutService.MINIMUM_HEIGHT, viewportHeight);
+        var minimumWidth = Math.min(requestedMinimumWidth, viewportWidth);
+        var minimumHeight = Math.min(requestedMinimumHeight, viewportHeight);
         var left = bounds.x();
         var right = bounds.right();
         var top = bounds.y();

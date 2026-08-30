@@ -169,7 +169,7 @@ public final class ChatScreenshotService {
                 : snapshot.visualWidth();
         int contentWidth = snapped
                 ? maximumTextWidth
-                : Math.max(1, (int) Math.ceil(snapshot.visualWidth() / snapshot.chatScale()));
+                : snapshot.contentWidth();
         int textOffset = snapped
                 ? ChatScreenshotGeometry.snappedCaptureTextOffset(snapshot.chatScale())
                 : ChatScreenshotTokens.CHAT_TEXT_OFFSET;

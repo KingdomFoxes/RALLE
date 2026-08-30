@@ -141,11 +141,12 @@ read-only reconnect flow without clearing the last projection or issuing a party
 backend starts its 120-second presence grace only after the player's final authenticated socket is
 lost; reconnecting cancels that grace, while expiry closes only the synchronized LFG lobby.
 
-The protocol-v1 base URL is fixed to `https://kingdomfoxes.com/api/ralle/v1` in the production
-client. It has no runtime setting, JVM property, or automatic loopback fallback. Explicitly
-constructed test gateways may use insecure HTTP and WebSocket transports only for loopback hosts.
-The JDK gateway is pinned to HTTP/1.1 so test requests do not attempt an `h2c` upgrade that local
-HTTP servers do not support.
+During internal development, the packaged protocol-v1 base URL is fixed to
+`http://127.0.0.1:8001/api/ralle/v1`, matching the local Fox service. The intended production URL
+remains `https://kingdomfoxes.com/api/ralle/v1` as a named constant for the release switch. There is
+no runtime setting, JVM property, or automatic fallback. Insecure HTTP and WebSocket transports are
+accepted only for loopback hosts. The JDK gateway is pinned to HTTP/1.1 so local requests do not
+attempt an `h2c` upgrade that the local HTTP server does not support.
 
 Authentication uses `POST /auth/challenge`, Minecraft's session `joinServer` proof, then
 `POST /auth/complete`. The issued bearer credential is never persisted. `GET /lobbies` provides a

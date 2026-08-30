@@ -14,6 +14,7 @@ public record ChatScreenshotSnapshot(
         int textBaselineOffset,
         double chatScale,
         float textOpacity,
+        int contentWidth,
         int viewportLeft,
         int viewportTop,
         int viewportRight,
@@ -28,6 +29,7 @@ public record ChatScreenshotSnapshot(
         if (lineHeight < 1) throw new IllegalArgumentException("lineHeight must be positive");
         if (chatScale <= 0) throw new IllegalArgumentException("chatScale must be positive");
         if (textOpacity < 0 || textOpacity > 1) throw new IllegalArgumentException("textOpacity must be between zero and one");
+        if (contentWidth < 1) throw new IllegalArgumentException("contentWidth must be positive");
     }
 
     public int visualWidth() {

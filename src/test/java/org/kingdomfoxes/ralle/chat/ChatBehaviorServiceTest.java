@@ -32,6 +32,18 @@ class ChatBehaviorServiceTest {
     }
 
     @Test
+    void customizationIsInactiveUntilAChatBehaviorIsEnabled() {
+        var settings = new SettingsRegistry(temporaryDirectory.resolve("customization.properties"));
+        RalleSettings.register(settings);
+        var behavior = new ChatBehaviorService(null, settings);
+
+        assertFalse(behavior.chatCustomizationActive());
+
+        settings.setting("hide-chat-scrollbar", BooleanSetting.class).set(true);
+        assertTrue(behavior.chatCustomizationActive());
+    }
+
+    @Test
     void legacyFullValueRemainsThePartialFullShadow() {
         assertEquals(
                 ChatBehaviorService.TextShadow.PARTIAL_FULL,

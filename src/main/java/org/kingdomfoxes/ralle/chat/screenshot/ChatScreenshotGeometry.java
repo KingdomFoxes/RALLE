@@ -81,9 +81,8 @@ public final class ChatScreenshotGeometry {
             int maximumTextWidth
     ) {
         if (maximumTextWidth < 1) throw new IllegalArgumentException("maximumTextWidth must be positive");
-        int contentWidth = Math.max(1, (int) Math.ceil(snapshot.visualWidth() / snapshot.chatScale()));
         int textOffset = ChatScreenshotTokens.CHAT_TEXT_OFFSET + ChatRenderLayout.horizontalOffset(
-                snapshot.alignment(), contentWidth, maximumTextWidth
+                snapshot.alignment(), snapshot.contentWidth(), maximumTextWidth
         );
         int textLeft = snapshot.viewportLeft() + (int) Math.floor(textOffset * snapshot.chatScale());
         int textRight = snapshot.viewportLeft()

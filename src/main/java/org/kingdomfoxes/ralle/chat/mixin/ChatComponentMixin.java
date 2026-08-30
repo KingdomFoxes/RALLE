@@ -17,6 +17,7 @@ import org.kingdomfoxes.ralle.chat.ChatScrollbarGraphics;
 import org.kingdomfoxes.ralle.chat.ChatSystemIndicators;
 import org.kingdomfoxes.ralle.chat.ChatTimestampStore;
 import org.kingdomfoxes.ralle.chat.ChatTimestamps;
+import org.kingdomfoxes.ralle.chat.TemporaryGuildRankOverride;
 import org.kingdomfoxes.ralle.chat.render.FullShadowFrameCollector;
 import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotSnapshot;
@@ -341,6 +342,21 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
         ralle$timestampStore.transfer(original, callback.getReturnValue());
     }
 
+    @ModifyVariable(
+            method = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;)V",
+            at = @At("HEAD"),
+            ordinal = 0,
+            argsOnly = true,
+            require = 0
+    )
+    private net.minecraft.network.chat.Component ralle$temporarilyReplaceStrategistRank(
+            net.minecraft.network.chat.Component message
+    ) {
+        if (!RalleClient.initialized()
+                || !RalleClient.context().chatBehavior().chatCustomizationActive()) return message;
+        return TemporaryGuildRankOverride.apply(message);
+    }
+
     private void ralle$refreshProjectedMessages() {
         var behavior = RalleClient.context().chatBehavior();
         var projected = ChatMessageProjector.project(
@@ -441,7 +457,10 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
         int localBottom = Mth.floor((canvasHeight - 40) / scale);
         int viewportBottom = Mth.floor(localBottom * scale);
         int viewportTop = viewportBottom - Mth.ceil(linesPerPage * lineHeight * scale);
-        int viewportRight = viewportLeft + ralle$visualWidth();
+        int viewportRight = Math.min(
+                minecraft.getWindow().getGuiScaledWidth(),
+                viewportLeft + RalleClient.context().chatLayout().renderedChatWidth(ralle$visualWidth())
+        );
         return new ChatScreenshotSnapshot(
                 lines,
                 chatScrollbarPos,
@@ -450,6 +469,7 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
                 baselineFromTop,
                 scale,
                 minecraft.options.chatOpacity().get().floatValue() * 0.9F + 0.1F,
+                ralle$renderContentWidth(),
                 viewportLeft,
                 viewportTop,
                 viewportRight,

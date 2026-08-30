@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.PlacementPolicy;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
 import org.kingdomfoxes.ralle.api.hud.RalleHudElements;
+import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 
 import java.util.List;
 
@@ -171,7 +172,8 @@ class ChatLayoutEditorScreenTest {
                 new Rectangle(100, 80, 200, 100),
                 ChatLayoutEditorScreen.AxisEdge.START,
                 ChatLayoutEditorScreen.AxisEdge.START,
-                50, 40, 0, 0, 500, 300
+                50, 40, 0, 0, 500, 300,
+                ChatLayoutService.MINIMUM_WIDTH, ChatLayoutService.MINIMUM_HEIGHT
         );
 
         assertEquals(new Rectangle(50, 40, 250, 140), resized);
@@ -183,7 +185,8 @@ class ChatLayoutEditorScreenTest {
                 new Rectangle(100, 80, 200, 100),
                 ChatLayoutEditorScreen.AxisEdge.END,
                 ChatLayoutEditorScreen.AxisEdge.END,
-                800, 600, 0, 0, 500, 300
+                800, 600, 0, 0, 500, 300,
+                ChatLayoutService.MINIMUM_WIDTH, ChatLayoutService.MINIMUM_HEIGHT
         );
 
         assertEquals(new Rectangle(100, 80, 400, 220), resized);
@@ -195,7 +198,8 @@ class ChatLayoutEditorScreenTest {
                 new Rectangle(100, 80, 200, 100),
                 ChatLayoutEditorScreen.AxisEdge.START,
                 ChatLayoutEditorScreen.AxisEdge.END,
-                290, 90, 0, 0, 500, 300
+                290, 90, 0, 0, 500, 300,
+                ChatLayoutService.MINIMUM_WIDTH, ChatLayoutService.MINIMUM_HEIGHT
         );
 
         assertEquals(new Rectangle(180, 80, 120, 45), resized);
