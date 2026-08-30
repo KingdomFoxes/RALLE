@@ -31,6 +31,7 @@ import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.api.settings.SettingsSearch;
 import org.kingdomfoxes.ralle.api.settings.SettingsSubcategory;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
+import org.kingdomfoxes.ralle.chat.rank.GuildRankService;
 import org.kingdomfoxes.ralle.settings.RalleSettings;
 import org.lwjgl.glfw.GLFW;
 
@@ -44,6 +45,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private final SettingsRegistry settings;
     private final ChatLayoutService chatLayout;
     private final SettingsNavigationState navigation;
+    private final GuildRankService guildRanks;
     private final Map<String, UIComponent> sectionComponents = new LinkedHashMap<>();
     private FlowLayout root;
     private FlowLayout sidebarNavigation;
@@ -67,12 +69,14 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             Screen parent,
             SettingsRegistry settings,
             ChatLayoutService chatLayout,
-            SettingsNavigationState navigation
+            SettingsNavigationState navigation,
+            GuildRankService guildRanks
     ) {
         this.parent = parent;
         this.settings = settings;
         this.chatLayout = chatLayout;
         this.navigation = navigation;
+        this.guildRanks = guildRanks;
         var snapshot = navigation.snapshot();
         this.selectedCategory = snapshot.categoryId();
         this.selectedSubcategory = snapshot.subcategoryId();
@@ -327,6 +331,19 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         if (entry instanceof BooleanSetting setting) {
             button = UIComponents.button(booleanLabel(setting), pressed -> toggleBoolean(setting, pressed));
             button.renderer(RalleButtonRenderers.selectable(setting::value));
+            if (RalleSettings.INTERNAL_GUILD_RANKS_ID.equals(setting.id())) {
+                configureControlButton(entry, available, button);
+                button.horizontalSizing(Sizing.fixed(102));
+                var refresh = UIComponents.button(Component.empty(), ignored -> guildRanks.requestRefresh());
+                refresh.id("guild-ranks-refresh");
+                refresh.sizing(Sizing.fixed(20), Sizing.fixed(20));
+                refresh.renderer(RalleButtonRenderers.refresh());
+                updateGuildRankRefreshButton(refresh);
+
+                var controls = UIContainers.horizontalFlow(Sizing.fixed(126), Sizing.fixed(20));
+                controls.gap(4).child(refresh).child(button);
+                return controls;
+            }
         } else if (entry instanceof ChoiceSetting setting) {
             button = UIComponents.button(choiceLabel(setting), ignored -> openChoice(setting, buttonFor(entry.id())));
             button.renderer(RalleButtonRenderers.neutral());
@@ -554,6 +571,8 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     public void tick() {
         super.tick();
+        var rankRefresh = root.childById(ButtonComponent.class, "guild-ranks-refresh");
+        if (rankRefresh != null) updateGuildRankRefreshButton(rankRefresh);
         if (!query.isEmpty() || selectedCategory == null || sectionComponents.isEmpty()) return;
         if (updateTrailingSpace()) return;
         if (pendingScrollProgress != null) {
@@ -573,6 +592,16 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             rebuildSidebar();
         }
         if (Math.abs(scroll.progress() - lastSavedScroll) > .005) persistNavigation();
+    }
+
+    private void updateGuildRankRefreshButton(ButtonComponent button) {
+        button.active = guildRanks.canRefresh() && !guildRanks.refreshing();
+        String tooltip = guildRanks.refreshing()
+                ? "ralle.settings.guild-ranks.refreshing"
+                : guildRanks.canRefresh()
+                        ? "ralle.settings.guild-ranks.refresh"
+                        : "ralle.settings.guild-ranks.refresh-unavailable";
+        button.tooltip(RalleTheme.ui(Component.translatable(tooltip)));
     }
 
     private void persistNavigation() {

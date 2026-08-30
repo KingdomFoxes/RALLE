@@ -5,6 +5,7 @@ import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.api.settings.SettingsScreenFactory;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
+import org.kingdomfoxes.ralle.chat.rank.GuildRankService;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotService;
 import org.kingdomfoxes.ralle.lfg.client.HostPartyInviteController;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgKeybinds;
@@ -17,6 +18,7 @@ public record RalleContext(
         SettingsScreenFactory settingsScreens,
         ChatLayoutService chatLayout,
         ChatBehaviorService chatBehavior,
+        GuildRankService guildRanks,
         ChatScreenshotService chatScreenshots,
         RaidLfgService raidLfg,
         RaidLfgKeybinds raidLfgKeybinds,

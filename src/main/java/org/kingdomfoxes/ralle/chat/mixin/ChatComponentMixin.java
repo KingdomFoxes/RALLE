@@ -17,7 +17,6 @@ import org.kingdomfoxes.ralle.chat.ChatScrollbarGraphics;
 import org.kingdomfoxes.ralle.chat.ChatSystemIndicators;
 import org.kingdomfoxes.ralle.chat.ChatTimestampStore;
 import org.kingdomfoxes.ralle.chat.ChatTimestamps;
-import org.kingdomfoxes.ralle.chat.TemporaryGuildRankOverride;
 import org.kingdomfoxes.ralle.chat.render.FullShadowFrameCollector;
 import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotSnapshot;
@@ -353,12 +352,11 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
             argsOnly = true,
             require = 0
     )
-    private net.minecraft.network.chat.Component ralle$temporarilyReplaceStrategistRank(
+    private net.minecraft.network.chat.Component ralle$replaceGuildRankTitle(
             net.minecraft.network.chat.Component message
     ) {
-        if (!RalleClient.initialized()
-                || !RalleClient.context().chatBehavior().chatCustomizationActive()) return message;
-        return TemporaryGuildRankOverride.apply(message);
+        if (!RalleClient.initialized()) return message;
+        return RalleClient.context().guildRanks().apply(message);
     }
 
     private void ralle$refreshProjectedMessages() {

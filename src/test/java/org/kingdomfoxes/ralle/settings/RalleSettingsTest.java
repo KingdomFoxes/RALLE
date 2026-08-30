@@ -144,11 +144,15 @@ class RalleSettingsTest {
         assertEquals(List.of("edit-huds", RalleSettings.INTERFACE_FONT_ID),
                 categories.get(0).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
         assertEquals(List.of(), registry.dependencies("edit-huds"));
-        assertEquals(List.of("general", "appearance", "message-direction", "horizontal-alignment", "text-shadow",
+        assertEquals(List.of("general", "appearance", "guild-ranks", "message-direction", "horizontal-alignment", "text-shadow",
                         "message-behavior", "chat-history", "screenshots"),
                 categories.get(1).subcategories().stream().map(value -> value.id()).toList());
         assertEquals(List.of("hide-chat-scrollbar", "remove-chat-system-indicators", "chat-timestamps"),
                 categories.get(1).subcategories().get(1).entries().stream().map(value -> value.id()).toList());
+        assertEquals(List.of(RalleSettings.INTERNAL_GUILD_RANKS_ID),
+                categories.get(1).subcategories().get(2).entries().stream().map(value -> value.id()).toList());
+        assertFalse(registry.setting(RalleSettings.INTERNAL_GUILD_RANKS_ID, BooleanSetting.class).value());
+        assertEquals(List.of(), registry.dependencies(RalleSettings.INTERNAL_GUILD_RANKS_ID));
         assertEquals(List.of("general", "notifications", "controls"),
                 categories.get(2).subcategories().stream().map(value -> value.id()).toList());
         for (var id : List.of(

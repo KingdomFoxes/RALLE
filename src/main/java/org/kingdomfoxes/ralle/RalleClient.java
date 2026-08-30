@@ -8,9 +8,12 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import org.kingdomfoxes.ralle.api.feature.FeatureRegistry;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
+import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
+import org.kingdomfoxes.ralle.chat.rank.GuildRankService;
+import org.kingdomfoxes.ralle.chat.rank.HttpGuildRankGateway;
 import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotService;
 import org.kingdomfoxes.ralle.chat.screenshot.TransparentChatCapture;
@@ -79,6 +82,13 @@ public final class RalleClient implements ClientModInitializer {
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), placements);
         var navigation = new SettingsNavigationState(configDirectory.resolve("ralle-settings-ui.properties"), settings);
         var minecraft = Minecraft.getInstance();
+        var guildRanks = new GuildRankService(
+                new HttpGuildRankGateway(),
+                configDirectory.resolve("ralle-ranks.json"),
+                settings.setting(RalleSettings.INTERNAL_GUILD_RANKS_ID, BooleanSetting.class),
+                () -> minecraft.getCurrentServer() == null ? "" : minecraft.getCurrentServer().ip,
+                System::currentTimeMillis
+        );
         var regionDetector = new MinecraftRaidRegionDetector(minecraft);
         var lfgSounds = new MinecraftLfgSoundPlayer(minecraft, settings);
         var partyCommands = new MinecraftPartyCommandExecutor(minecraft);
@@ -121,20 +131,28 @@ public final class RalleClient implements ClientModInitializer {
         context = new RalleContext(
                 features,
                 settings,
-                new OwoSettingsScreenFactory(settings, chatLayout, navigation),
+                new OwoSettingsScreenFactory(settings, chatLayout, navigation, guildRanks),
                 chatLayout,
                 chatBehavior,
+                guildRanks,
                 chatScreenshots,
                 raidLfg,
                 lfgKeybinds,
                 hostPartyInvites,
                 lfgSounds
         );
-        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> raidLfg.connectionChanged());
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> raidLfg.connectionChanged());
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            raidLfg.connectionChanged();
+            guildRanks.connectionChanged();
+        });
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            raidLfg.connectionChanged();
+            guildRanks.connectionChanged();
+        });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             chatLayout.tick();
             chatBehavior.tick();
+            guildRanks.tick();
             chatScreenshots.tick();
             raidLfg.tick();
             lfgKeybinds.tick();
