@@ -39,7 +39,7 @@ platform ports. It must not depend on a concrete settings screen.
   The disabled-by-default `chat.chat-timestamps` projection records each logical
   message's local receive time in session-only identity metadata even while its
   presentation is disabled. When enabled, it renders `[HH:mm:ss]` flush with the
-  chat's left edge, reserves the timestamp and two-space separator width before wrapping,
+  chat's left edge, reserves the timestamp and separator width before wrapping,
   and composes the styled prefix onto every rendered line,
   so transformations and transparent chat screenshots include timestamps without
   changing source messages, signatures, tags, logging, or interaction metadata.
@@ -302,8 +302,8 @@ Join, Leave/Disband, and Party Filled keys appear beside their card actions; the
 is not printed beside the X. Unbound or conflicting mappings do not advertise a
 nonfunctional shortcut.
 
-The host's collapsed browser cards and persistent party-status card derive a live lobby-age timer
-locally from the synchronized lobby creation instant. Expanded browser cards omit the timer. The
+The host's expanded browser cards and persistent party-status card derive a live lobby-age timer
+locally from the synchronized lobby creation instant. Collapsed browser cards omit the timer. The
 timer is never shown on another player's lobby and adds no stored timer state or protocol field.
 
 The only persisted LFG values are local opt-in, notification, sound, keybind,

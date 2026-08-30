@@ -14,7 +14,7 @@ class ChatTimestampsTest {
     void formatsLeadingZeroesAndWynntilsColors() {
         var prefix = ChatTimestamps.prefix(LocalDateTime.of(2026, 1, 2, 3, 4, 5));
 
-        assertEquals("[03:04:05]  ", prefix.getString());
+        assertEquals("[03:04:05] ", prefix.getString());
         assertEquals(ChatFormatting.DARK_GRAY.getColor(),
                 prefix.getSiblings().get(0).getStyle().getColor().getValue());
         assertEquals(ChatFormatting.GRAY.getColor(),
@@ -28,7 +28,7 @@ class ChatTimestampsTest {
         var click = new ClickEvent.RunCommand("/ralle settings");
         var interactiveStyle = Style.EMPTY.withClickEvent(click);
         var composed = ChatTimestamps.prepend(
-                FormattedCharSequence.forward("[03:04:05]  ", Style.EMPTY),
+                FormattedCharSequence.forward("[03:04:05] ", Style.EMPTY),
                 FormattedCharSequence.forward("Open", interactiveStyle)
         );
         var observed = new StringBuilder();
@@ -40,7 +40,7 @@ class ChatTimestampsTest {
             return true;
         });
 
-        assertEquals("[03:04:05]  Open", observed.toString());
+        assertEquals("[03:04:05] Open", observed.toString());
         assertEquals(java.util.List.of(click, click, click, click), clickEvents);
     }
 }

@@ -411,7 +411,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     static boolean showsElapsedTimer(LfgProtocol.Lobby lobby, UUID viewerId, boolean expanded) {
-        return !expanded && viewerId != null && lobby.hostedBy(viewerId);
+        return expanded && viewerId != null && lobby.hostedBy(viewerId);
     }
 
     private FlowLayout hostControls(LfgProtocol.Lobby lobby) {

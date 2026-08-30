@@ -47,9 +47,9 @@ class RaidLfgScreenTest {
     }
 
     @Test
-    void lobbyAgeTimerOnlyAppearsForTheHostOnCollapsedCards() {
-        assertTrue(RaidLfgScreen.showsElapsedTimer(lobby(), HOST, false));
-        assertFalse(RaidLfgScreen.showsElapsedTimer(lobby(), HOST, true));
+    void lobbyAgeTimerOnlyAppearsForTheHostOnExpandedCards() {
+        assertFalse(RaidLfgScreen.showsElapsedTimer(lobby(), HOST, false));
+        assertTrue(RaidLfgScreen.showsElapsedTimer(lobby(), HOST, true));
         assertFalse(RaidLfgScreen.showsElapsedTimer(lobby(), MEMBER, false));
     }
 
