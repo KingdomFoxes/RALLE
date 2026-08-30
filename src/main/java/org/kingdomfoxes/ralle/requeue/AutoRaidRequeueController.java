@@ -44,7 +44,6 @@ public final class AutoRaidRequeueController {
     private AbstractContainerMenu menu;
     private int deadlineTick;
     private int settledTick;
-    private int finishTick;
     private WynnRaid pendingPromptRaid;
     private int pendingPromptUntilTick;
 
@@ -120,7 +119,7 @@ public final class AutoRaidRequeueController {
         }
         int now = tickNow();
         if (state == State.FINISH) {
-            if (now >= finishTick) finish();
+            if (minecraft.player.containerMenu != menu || now > deadlineTick) finish();
             return;
         }
         if (now > deadlineTick) {
@@ -173,7 +172,7 @@ public final class AutoRaidRequeueController {
         if (slot < 0) return;
         click(slot);
         state = State.FINISH;
-        finishTick = tickNow() + SETTLE_TICKS;
+        deadlineTick = tickNow() + MENU_TIMEOUT_TICKS;
         actionBar.showRaid("Requeued ", target.lfgType(), target.displayName(),
                 LfgActionBarState.Tone.ACCENT, LfgActionGlyph.REQUEUE);
     }
@@ -212,7 +211,6 @@ public final class AutoRaidRequeueController {
         menu = null;
         deadlineTick = 0;
         settledTick = 0;
-        finishTick = 0;
     }
 
     private void rememberPendingPrompt() {

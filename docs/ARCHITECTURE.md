@@ -272,8 +272,10 @@ then click a named Ready Up item in slots 33–35 (with a name-based fallback). 
 three-second timeout. A narrow `Minecraft.setScreen` interception suppresses only menus expected by
 that explicit state machine after vanilla has installed their container, allowing inventory packets
 and validated slot clicks without displaying the GUI or blocking gameplay input. Completion,
-timeout, disconnect, or context loss closes only the owned container and clears session state; there
-are no retries or command loops.
+after the Ready click, RALLE waits up to three seconds for Wynncraft to close the hidden container so
+its native queue-confirmation chat can complete, then closes that owned container only as a timeout
+fallback. Other timeouts, disconnect, or context loss close only the owned container and clear
+session state; there are no retries or command loops.
 Its `Requeue` and `Requeued` Action Bar states prepend the Vanilla-font `🔄` recognition glyph.
 
 `LfgLockDebouncer` is shared by the keybind controller and Raid LFG screen.
