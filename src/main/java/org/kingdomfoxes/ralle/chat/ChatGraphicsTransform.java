@@ -23,6 +23,7 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
     private final int contentWidth;
     private final ChatBehaviorService.HorizontalAlignment alignment;
     private final ChatBehaviorService.TextShadow shadow;
+    private final int messageOffset;
     private final boolean renderVisualShadowPasses;
     private final FullShadowFrameCollector fullShadowCollector;
     private int lastMessageOffset;
@@ -33,6 +34,7 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
             int contentWidth,
             ChatBehaviorService.HorizontalAlignment alignment,
             ChatBehaviorService.TextShadow shadow,
+            int messageOffset,
             boolean renderVisualShadowPasses,
             FullShadowFrameCollector fullShadowCollector
     ) {
@@ -41,6 +43,7 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
         this.contentWidth = contentWidth;
         this.alignment = Objects.requireNonNull(alignment, "alignment");
         this.shadow = Objects.requireNonNull(shadow, "shadow");
+        this.messageOffset = messageOffset;
         this.renderVisualShadowPasses = renderVisualShadowPasses;
         this.fullShadowCollector = fullShadowCollector;
     }
@@ -52,7 +55,7 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
             ChatBehaviorService.HorizontalAlignment alignment,
             ChatBehaviorService.TextShadow shadow
     ) {
-        return wrap(delegate, font, contentWidth, alignment, shadow, true, null);
+        return wrap(delegate, font, contentWidth, alignment, shadow, 0, true, null);
     }
 
     public static ChatComponent.ChatGraphicsAccess wrap(
@@ -63,7 +66,7 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
             ChatBehaviorService.TextShadow shadow,
             boolean renderVisualShadowPasses
     ) {
-        return wrap(delegate, font, contentWidth, alignment, shadow, renderVisualShadowPasses, null);
+        return wrap(delegate, font, contentWidth, alignment, shadow, 0, renderVisualShadowPasses, null);
     }
 
     public static ChatComponent.ChatGraphicsAccess wrap(
@@ -75,8 +78,31 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
             boolean renderVisualShadowPasses,
             FullShadowFrameCollector fullShadowCollector
     ) {
+        return wrap(
+                delegate,
+                font,
+                contentWidth,
+                alignment,
+                shadow,
+                0,
+                renderVisualShadowPasses,
+                fullShadowCollector
+        );
+    }
+
+    public static ChatComponent.ChatGraphicsAccess wrap(
+            ChatComponent.ChatGraphicsAccess delegate,
+            Font font,
+            int contentWidth,
+            ChatBehaviorService.HorizontalAlignment alignment,
+            ChatBehaviorService.TextShadow shadow,
+            int messageOffset,
+            boolean renderVisualShadowPasses,
+            FullShadowFrameCollector fullShadowCollector
+    ) {
         if (alignment == ChatBehaviorService.HorizontalAlignment.LEFT
-                && shadow == ChatBehaviorService.TextShadow.VANILLA) {
+                && shadow == ChatBehaviorService.TextShadow.VANILLA
+                && messageOffset == 0) {
             return delegate;
         }
         return new ChatGraphicsTransform(
@@ -85,6 +111,7 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
                 contentWidth,
                 alignment,
                 shadow,
+                messageOffset,
                 renderVisualShadowPasses,
                 fullShadowCollector
         );
@@ -156,7 +183,8 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
 
     @Override
     public boolean handleMessage(int y, float opacity, FormattedCharSequence content) {
-        lastMessageOffset = ChatRenderLayout.horizontalOffset(alignment, contentWidth, font.width(content));
+        lastMessageOffset = ChatRenderLayout.horizontalOffset(alignment, contentWidth, font.width(content))
+                + messageOffset;
 
         if (shadow == ChatBehaviorService.TextShadow.FULL
                 && renderVisualShadowPasses

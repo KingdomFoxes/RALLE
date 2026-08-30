@@ -20,7 +20,7 @@ public final class ChatTimestamps {
         return Component.empty()
                 .append(Component.literal("[").withStyle(ChatFormatting.DARK_GRAY))
                 .append(Component.literal(TIME_FORMAT.format(receiveTime)).withStyle(ChatFormatting.GRAY))
-                .append(Component.literal("] ").withStyle(ChatFormatting.DARK_GRAY));
+                .append(Component.literal("]  ").withStyle(ChatFormatting.DARK_GRAY));
     }
 
     public static FormattedCharSequence prepend(FormattedCharSequence prefix, FormattedCharSequence content) {

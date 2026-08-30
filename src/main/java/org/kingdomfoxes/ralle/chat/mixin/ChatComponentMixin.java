@@ -191,6 +191,10 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
                 contentWidth,
                 behavior.horizontalAlignment(),
                 behavior.textShadow(),
+                behavior.chatTimestampsEnabled()
+                        && behavior.horizontalAlignment() == ChatBehaviorService.HorizontalAlignment.LEFT
+                        ? -minecraft.font.width(" ")
+                        : 0,
                 !ralle$capturingClickableText,
                 ralle$capturingClickableText ? null : ralle$fullShadowCollector
         );
