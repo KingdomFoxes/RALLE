@@ -61,22 +61,19 @@ class RalleOnboardingNoticeTest {
     }
 
     @Test
-    void bodyUsesExactCopyAndClickableUnderlinedCommands() {
+    void bodyUsesExactCopyAndClickableSettingsLink() {
         var body = RalleOnboardingNotice.body();
 
-        assertEquals("Thank you for installing RALLE! Certain features have been enabled by default but please explore the settings with "
-                + "/ralle settings. Access the ally raid menu with /ralle lfg and edit hud elements with /ralle hud!\n\n"
-                + "We hope to see you in the queues ;).", body.getString());
+        assertEquals("Thank you for installing RALLE, all features are disabled by default so "
+                + "Click here or use /ralle settings to configure it", body.getString());
 
-        for (var command : new String[]{"/ralle settings", "/ralle lfg", "/ralle hud"}) {
-            var span = body.getSiblings().stream()
-                    .filter(component -> component.getString().equals(command))
-                    .findFirst()
-                    .orElseThrow();
-            assertTrue(span.getStyle().isUnderlined());
-            assertEquals(command,
-                    assertInstanceOf(ClickEvent.RunCommand.class, span.getStyle().getClickEvent()).command());
-        }
+        var span = body.getSiblings().stream()
+                .filter(component -> component.getString().equals("Click here"))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(span.getStyle().isUnderlined());
+        assertEquals("/ralle settings",
+                assertInstanceOf(ClickEvent.RunCommand.class, span.getStyle().getClickEvent()).command());
     }
 
 }

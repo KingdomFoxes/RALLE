@@ -66,9 +66,8 @@ platform ports. It must not depend on a concrete settings screen.
 
 ## Foundation invariants
 
-- New-install defaults enable Chat Screenshotting, Chat Selection Sounds, Raid
-  LFG, New Party Notifications, Reopened Party Notifications, Party Status
-  Notifications, Auto Pop-out, and Raid LFG Sounds. Other behavior defaults off.
+- Every feature defaults off on a new install, and every keybind defaults to
+  Unbound. Persisted settings remain authoritative for existing installs.
 - Initialization performs no network requests and changes no game behavior.
 - owo-lib is contained behind `SettingsScreenFactory`; future settings register
   through `SettingsRegistry` rather than constructing owo components directly.
@@ -84,8 +83,8 @@ values fall back to their declared defaults. Chat has no global enable setting;
 each feature toggle independently gates its behavior, and choice controls depend
 only on their paired feature toggle. Chat settings are consumed by the local
 chat integration. The Raid LFG toggle gates the persistent Fox client service.
-On new installs, the nine LFG shortcuts default in displayed order to F1 through
-F9; persisted RALLE and vanilla key changes continue to override defaults. Initial two-way keybind
+On new installs, all LFG shortcuts default to Unbound; persisted RALLE and vanilla key changes
+continue to override defaults. Initial two-way keybind
 reconciliation waits until the first client tick so Minecraft's temporary pre-`options.txt`
 `UNKNOWN` mappings cannot overwrite persisted RALLE bindings; later changes and manual unbinding
 from either settings surface remain synchronized.
@@ -153,12 +152,11 @@ read-only reconnect flow without clearing the last projection or issuing a party
 backend starts its 120-second presence grace only after the player's final authenticated socket is
 lost; reconnecting cancels that grace, while expiry closes only the synchronized LFG lobby.
 
-During internal development, the packaged protocol-v1 base URL is fixed to
-`http://127.0.0.1:8001/api/ralle/v1`, matching the local Fox service. The intended production URL
-remains `https://kingdomfoxes.com/api/ralle/v1` as a named constant for the release switch. There is
-no runtime setting, JVM property, or automatic fallback. Insecure HTTP and WebSocket transports are
-accepted only for loopback hosts. The JDK gateway is pinned to HTTP/1.1 so local requests do not
-attempt an `h2c` upgrade that the local HTTP server does not support.
+The packaged protocol-v1 base URL is fixed to
+`https://kingdomfoxes.com/api/ralle/v1`. There is no runtime setting, JVM property, or automatic
+fallback. Explicitly constructed development and test gateways may use insecure HTTP and WebSocket
+transports only for loopback hosts. The JDK gateway is pinned to HTTP/1.1 so local requests do not
+attempt an `h2c` upgrade that a local HTTP server may not support.
 
 Authentication uses `POST /auth/challenge`, Minecraft's session `joinServer` proof, then
 `POST /auth/complete`. The issued bearer credential is never persisted. `GET /lobbies` provides a
@@ -302,8 +300,8 @@ the viewer becoming a lobby member. Create and Join actions initiated by the
 Raid LFG screen explicitly register their next matching membership transition
 and retire any existing discovery card for that lobby, so REST mutation and
 live-event delivery order cannot misclassify them. Both Party Status
-Notifications and the separate `Auto Pop-out` option are enabled by default on
-new installs; Auto Pop-out turns the matching
+Notifications and the separate `Auto Pop-out` option are disabled by default on
+new installs. When enabled, Auto Pop-out turns the matching
 transition into a persistent card and closes the browser. Synchronized
 snapshots and future non-screen local actions still qualify for the external
 party-status option. This covers Discord and future keybind creation without

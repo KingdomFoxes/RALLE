@@ -28,7 +28,6 @@ import java.util.function.Function;
 
 /** JDK HTTP/WebSocket implementation with bearer headers and one safe mutation retry. */
 public final class HttpLfgGateway implements LfgGateway {
-    public static final String LOCAL_DEVELOPMENT_BASE_URL = "http://127.0.0.1:8001/api/ralle/v1";
     public static final String PRODUCTION_BASE_URL = "https://kingdomfoxes.com/api/ralle/v1";
     public static final String DEFAULT_BASE_URL = PRODUCTION_BASE_URL;
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(12);

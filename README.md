@@ -11,7 +11,7 @@ stacking, message direction, horizontal text alignment, and text-shadow modes
 are implemented as independently disabled
 local options. Transparent chat screenshot selection also supports an optional
 per-line text-snapped overlay and text-width image crop, plus processed-xylophone
-count and successful-copy feedback. Screenshotting and its sounds are enabled
+count and successful-copy feedback. Screenshotting and its sounds are disabled
 by default on new installs.
 Persistent Chat is another disabled-by-default option. When enabled, it keeps
 up to the selected 300, 500, 1000, or 1500 displayed messages and wrapped lines
@@ -38,9 +38,8 @@ remembers the fixed raid name from the local player's most recent clickable Read
 in `config/ralle-auto-requeue.properties`. Pressing it runs one bounded, headless `/pf` flow,
 selects that raid from the main Party Finder page or its Party Queue fallback, and clicks Ready Up
 while ordinary movement remains available. It does not loop or keep a menu visible.
-On new installs, Raid LFG, its discovery/status/auto-pop-out notifications, and
-its sounds default on; the original nine LFG controls default in order to F1 through F9, while
-Automatic Raid Requeue defaults to Unbound.
+On new installs, Raid LFG, its notifications, its sounds, and all ten LFG and
+Automatic Raid Requeue controls default to disabled or Unbound.
 Saved settings remain authoritative for existing users.
 
 The first connection after a new installation posts one local RALLE onboarding
