@@ -1,0 +1,139 @@
+package org.kingdomfoxes.ralle.chat.rank;
+
+import net.minecraft.network.chat.Component;
+import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.LongSupplier;
+import java.util.function.Supplier;
+
+/** Owns the opt-in, instance-local Fox-rank cache and its bounded refresh lifecycle. */
+public final class GuildRankService {
+    public static final Duration REFRESH_INTERVAL = Duration.ofMinutes(30);
+    private static final Logger LOGGER = LoggerFactory.getLogger(GuildRankService.class);
+
+    private final GuildRankGateway gateway;
+    private final GuildRankCache cache;
+    private final BooleanSetting enabled;
+    private final Supplier<String> serverHost;
+    private final LongSupplier clock;
+
+    private volatile GuildRankSnapshot snapshot;
+    private CompletableFuture<GuildRankSnapshot> refreshFuture;
+    private long nextAutomaticRefresh;
+    private boolean activeLastTick;
+    private boolean refreshOnNextJoin = true;
+    private volatile Throwable lastFailure;
+
+    public GuildRankService(
+            GuildRankGateway gateway,
+            Path cachePath,
+            BooleanSetting enabled,
+            Supplier<String> serverHost,
+            LongSupplier clock
+    ) {
+        this.gateway = Objects.requireNonNull(gateway, "gateway");
+        this.cache = new GuildRankCache(Objects.requireNonNull(cachePath, "cachePath"));
+        this.enabled = Objects.requireNonNull(enabled, "enabled");
+        this.serverHost = Objects.requireNonNull(serverHost, "serverHost");
+        this.clock = Objects.requireNonNull(clock, "clock");
+        this.snapshot = cache.load();
+        this.nextAutomaticRefresh = snapshot.fetchedAtMillis() + REFRESH_INTERVAL.toMillis();
+    }
+
+    public void connectionChanged() {
+        synchronized (this) {
+            refreshOnNextJoin = true;
+            activeLastTick = false;
+        }
+    }
+
+    /** Called from the client tick; disabled and off-Wynncraft states are network-inert. */
+    public void tick() {
+        synchronized (this) {
+            boolean active = enabled.value() && onWynncraft();
+            if (!active) {
+                activeLastTick = false;
+                return;
+            }
+            long now = clock.getAsLong();
+            boolean firstEnabledTick = !activeLastTick;
+            activeLastTick = true;
+            if (refreshOnNextJoin || firstEnabledTick || now >= nextAutomaticRefresh) {
+                refreshOnNextJoin = false;
+                beginRefresh(now);
+            }
+        }
+    }
+
+    public synchronized CompletableFuture<GuildRankSnapshot> requestRefresh() {
+        if (!enabled.value() || !onWynncraft()) return CompletableFuture.completedFuture(snapshot);
+        return beginRefresh(clock.getAsLong());
+    }
+
+    public Component apply(Component message) {
+        if (!enabled.value() || !onWynncraft()) return message;
+        return GuildRankTitleTransformer.apply(message, snapshot);
+    }
+
+    public synchronized boolean refreshing() {
+        return refreshFuture != null && !refreshFuture.isDone();
+    }
+
+    public boolean canRefresh() {
+        return enabled.value() && onWynncraft();
+    }
+
+    public Throwable lastFailure() {
+        return lastFailure;
+    }
+
+    GuildRankSnapshot snapshot() {
+        return snapshot;
+    }
+
+    private CompletableFuture<GuildRankSnapshot> beginRefresh(long now) {
+        if (refreshFuture != null && !refreshFuture.isDone()) return refreshFuture;
+        nextAutomaticRefresh = now + REFRESH_INTERVAL.toMillis();
+        refreshFuture = gateway.fetchTitles().thenApply(titles -> {
+            var refreshed = new GuildRankSnapshot(clock.getAsLong(), titles);
+            if (refreshed.empty()) throw new IllegalArgumentException("Fox rank API returned no usable Fox titles");
+            try {
+                cache.save(refreshed);
+            } catch (IOException exception) {
+                LOGGER.warn("Could not save RALLE guild-rank cache", exception);
+            }
+            snapshot = refreshed;
+            lastFailure = null;
+            return refreshed;
+        }).whenComplete((ignored, failure) -> {
+            if (failure != null) {
+                lastFailure = failure;
+                LOGGER.warn("Could not refresh RALLE guild ranks; the previous local cache remains active", failure);
+            }
+        });
+        return refreshFuture;
+    }
+
+    private boolean onWynncraft() {
+        String host = normalizedHost(serverHost.get());
+        return domainOrSubdomain(host, "wynncraft.com") || domainOrSubdomain(host, "wynncraft.net");
+    }
+
+    private static String normalizedHost(String raw) {
+        String host = raw == null ? "" : raw.strip().toLowerCase(Locale.ROOT);
+        int colon = host.indexOf(':');
+        return colon >= 0 ? host.substring(0, colon) : host;
+    }
+
+    private static boolean domainOrSubdomain(String host, String domain) {
+        return host.equals(domain) || host.endsWith("." + domain);
+    }
+}

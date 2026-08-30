@@ -21,6 +21,9 @@ class LfgKeybindHintsTest {
 
         assertEquals("Join", hints.joinLabel("Join"));
         settings.setting(RaidLfgKeybinds.JOIN_ID, KeybindSetting.class)
+                .set("key.keyboard.f2");
+        assertEquals("Join [F2]", hints.joinLabel("Join"));
+        settings.setting(RaidLfgKeybinds.JOIN_ID, KeybindSetting.class)
                 .set("key.keyboard.equal");
         assertEquals("Join [=]", hints.joinLabel("Join"));
         settings.setting(RaidLfgKeybinds.JOIN_ID, KeybindSetting.class)

@@ -48,6 +48,18 @@ public final class ChatBehaviorService {
         return compactChatEnabled() || stackEmptyLinesEnabled() || chatTimestampsEnabled();
     }
 
+    public boolean chatCustomizationActive() {
+        return hideChatScrollbar.value()
+                || removeChatSystemIndicators.value()
+                || chatTimestamps.value()
+                || compactChat.value()
+                || stackEmptyLines.value()
+                || persistentChatEnabled.value()
+                || messageDirectionEnabled.value()
+                || horizontalAlignmentEnabled.value()
+                || textShadowEnabled.value();
+    }
+
     public boolean hideChatScrollbar() {
         return hideChatScrollbar.value();
     }

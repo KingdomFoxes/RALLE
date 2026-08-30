@@ -13,6 +13,7 @@ import java.util.List;
 
 public final class RalleSettings {
     public static final String INTERFACE_FONT_ID = "interface-font";
+    public static final String INTERNAL_GUILD_RANKS_ID = "internal-guild-ranks";
 
     private RalleSettings() {}
 
@@ -38,6 +39,7 @@ public final class RalleSettings {
                                 toggle("remove-chat-system-indicators"),
                                 toggle("chat-timestamps")
                         ),
+                        subcategory("guild-ranks", toggle(INTERNAL_GUILD_RANKS_ID)),
                         subcategory("message-direction",
                                 toggle("message-direction-enabled"),
                                 choice("message-direction", "bottom-up", "bottom-up", "top-down")
@@ -87,7 +89,8 @@ public final class RalleSettings {
                                 keybind("raid-lfg-ping-keybind"),
                                 keybind("raid-lfg-lock-keybind"),
                                 keybind("raid-lfg-create-keybind"),
-                                keybind("raid-lfg-kick-keybind")
+                                keybind("raid-lfg-kick-keybind"),
+                                keybind("automatic-raid-requeue-keybind")
                         )
                 )
         ));

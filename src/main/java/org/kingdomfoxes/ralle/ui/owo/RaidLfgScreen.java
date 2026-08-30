@@ -325,7 +325,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var spacer = UIComponents.spacer();
         spacer.verticalSizing(Sizing.fixed(0));
         summary.child(spacer);
-        if (lobby.hostedBy(viewerId())) {
+        if (showsElapsedTimer(lobby, viewerId(), expanded)) {
             summary.child(new LfgElapsedTimerComponent(lobby.createdAt()).margins(Insets.right(6)));
         }
         summary.child(UIComponents.label(RalleTheme.ui(Component.literal(lobby.members().size() + "/" + lobby.capacity())))
@@ -408,6 +408,10 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     static boolean collapsedActionVisible(LfgProtocol.Lobby lobby, UUID viewerId) {
         return !lobby.locked() || viewerId != null && lobby.contains(viewerId);
+    }
+
+    static boolean showsElapsedTimer(LfgProtocol.Lobby lobby, UUID viewerId, boolean expanded) {
+        return expanded && viewerId != null && lobby.hostedBy(viewerId);
     }
 
     private FlowLayout hostControls(LfgProtocol.Lobby lobby) {

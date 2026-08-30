@@ -3,14 +3,21 @@ package org.kingdomfoxes.ralle;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import org.kingdomfoxes.ralle.api.feature.FeatureRegistry;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
+import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
+import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
+import org.kingdomfoxes.ralle.chat.RalleChatMessages;
+import org.kingdomfoxes.ralle.chat.RalleOnboardingNotice;
+import org.kingdomfoxes.ralle.chat.rank.GuildRankService;
+import org.kingdomfoxes.ralle.chat.rank.HttpGuildRankGateway;
 import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotService;
 import org.kingdomfoxes.ralle.chat.screenshot.TransparentChatCapture;
@@ -41,6 +48,8 @@ import org.kingdomfoxes.ralle.lfg.client.LfgLockDebouncer;
 import org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager;
 import org.kingdomfoxes.ralle.lfg.client.LfgRosterSoundController;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
+import org.kingdomfoxes.ralle.requeue.AutoRaidRequeueController;
+import org.kingdomfoxes.ralle.requeue.AutoRaidRequeueStore;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
@@ -56,8 +65,11 @@ public final class RalleClient implements ClientModInitializer {
 
         var features = new FeatureRegistry();
         var configDirectory = FabricLoader.getInstance().getConfigDir();
+        boolean existingInstall = RalleOnboardingNotice.hasExistingConfig(configDirectory);
         var settings = new SettingsRegistry(configDirectory.resolve("ralle.properties"));
         var placements = new HudPlacementRegistry(configDirectory.resolve("ralle-hud-layout.properties"));
+        var onboarding = new RalleOnboardingNotice(
+                configDirectory.resolve("ralle-onboarding.properties"), existingInstall);
 
         RalleSettings.register(settings);
         placements.register(new HudPlacementRegistry.ElementDefinition(
@@ -79,6 +91,13 @@ public final class RalleClient implements ClientModInitializer {
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), placements);
         var navigation = new SettingsNavigationState(configDirectory.resolve("ralle-settings-ui.properties"), settings);
         var minecraft = Minecraft.getInstance();
+        var guildRanks = new GuildRankService(
+                new HttpGuildRankGateway(),
+                configDirectory.resolve("ralle-ranks.json"),
+                settings.setting(RalleSettings.INTERNAL_GUILD_RANKS_ID, BooleanSetting.class),
+                () -> minecraft.getCurrentServer() == null ? "" : minecraft.getCurrentServer().ip,
+                System::currentTimeMillis
+        );
         var regionDetector = new MinecraftRaidRegionDetector(minecraft);
         var lfgSounds = new MinecraftLfgSoundPlayer(minecraft, settings);
         var partyCommands = new MinecraftPartyCommandExecutor(minecraft);
@@ -108,9 +127,15 @@ public final class RalleClient implements ClientModInitializer {
         var actionBarState = new LfgActionBarState();
         var actionBarOverlay = new LfgActionBarOverlay(minecraft, actionBarState);
         actionBarOverlay.register();
+        var autoRaidRequeue = new AutoRaidRequeueController(
+                minecraft,
+                settings.setting(AutoRaidRequeueController.KEYBIND_ID, KeybindSetting.class),
+                new AutoRaidRequeueStore(configDirectory.resolve("ralle-auto-requeue.properties")),
+                actionBarState
+        );
         var lfgKeybinds = new RaidLfgKeybinds(
                 minecraft, settings, raidLfg, lfgSounds, lfgNotifications, hostPartyInvites, regionDetector,
-                actionBarState, disbandConfirmation, lockDebouncer);
+                actionBarState, disbandConfirmation, lockDebouncer, autoRaidRequeue);
         var chatBehavior = new ChatBehaviorService(Minecraft.getInstance(), settings);
         var chatScreenshots = new ChatScreenshotService(
                 Minecraft.getInstance(),
@@ -121,26 +146,43 @@ public final class RalleClient implements ClientModInitializer {
         context = new RalleContext(
                 features,
                 settings,
-                new OwoSettingsScreenFactory(settings, chatLayout, navigation),
+                new OwoSettingsScreenFactory(settings, chatLayout, navigation, guildRanks),
                 chatLayout,
                 chatBehavior,
+                guildRanks,
                 chatScreenshots,
                 raidLfg,
                 lfgKeybinds,
+                autoRaidRequeue,
                 hostPartyInvites,
                 lfgSounds
         );
-        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> raidLfg.connectionChanged());
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> raidLfg.connectionChanged());
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            raidLfg.connectionChanged();
+            guildRanks.connectionChanged();
+            onboarding.postIfNeeded(body -> RalleChatMessages.post(client, body));
+        });
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            autoRaidRequeue.cancel();
+            raidLfg.connectionChanged();
+            guildRanks.connectionChanged();
+        });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             chatLayout.tick();
             chatBehavior.tick();
+            guildRanks.tick();
             chatScreenshots.tick();
             raidLfg.tick();
             lfgKeybinds.tick();
+            autoRaidRequeue.tick();
             hostPartyInvites.tick();
             lfgNotificationOverlay.tick();
         });
+        ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
+            if (!overlay) autoRaidRequeue.observeChat(message);
+        });
+        ClientReceiveMessageEvents.CHAT.register((message, signedMessage, sender, params, receptionTimestamp) ->
+                autoRaidRequeue.observeChat(message));
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
                 literal("ralle").then(literal("settings").executes(command -> {

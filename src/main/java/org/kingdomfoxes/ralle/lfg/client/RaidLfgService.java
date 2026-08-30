@@ -895,7 +895,7 @@ public final class RaidLfgService {
         return colon >= 0 ? normalized.substring(0, colon) : normalized;
     }
 
-    static boolean isWynncraft(String host) {
+    public static boolean isWynncraft(String host) {
         return isDomainOrSubdomain(host, "wynncraft.com")
                 || isDomainOrSubdomain(host, "wynncraft.net");
     }

@@ -116,6 +116,7 @@ class MinecraftChatSelectionSoundPlayerTest {
         RalleSettings.register(settings);
         var gate = MinecraftChatSelectionSoundPlayer.soundGate(settings);
 
+        settings.setting("chat-screenshot-enabled", BooleanSetting.class).set(false);
         settings.setting("chat-selection-sounds", BooleanSetting.class).set(true);
         assertFalse(gate.getAsBoolean());
         settings.setting("chat-screenshot-enabled", BooleanSetting.class).set(true);

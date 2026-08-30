@@ -7,7 +7,11 @@ public final class KeybindSetting extends Setting<String> {
     public static final String UNBOUND = "unbound";
 
     public KeybindSetting(String id, Component title, Component description) {
-        super(id, title, description, UNBOUND);
+        this(id, title, description, UNBOUND);
+    }
+
+    public KeybindSetting(String id, Component title, Component description, String defaultValue) {
+        super(id, title, description, requireValidValue(defaultValue));
     }
 
     @Override
@@ -15,6 +19,10 @@ public final class KeybindSetting extends Setting<String> {
 
     @Override
     protected String validate(String value) {
+        return requireValidValue(value);
+    }
+
+    private static String requireValidValue(String value) {
         if (value.isBlank() || value.chars().anyMatch(Character::isWhitespace)) {
             throw new IllegalArgumentException("Keybind values must be non-blank translation keys");
         }

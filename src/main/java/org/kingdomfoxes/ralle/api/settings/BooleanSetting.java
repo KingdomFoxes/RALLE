@@ -4,7 +4,11 @@ import net.minecraft.network.chat.Component;
 
 public final class BooleanSetting extends Setting<Boolean> {
     public BooleanSetting(String id, Component title, Component description) {
-        super(id, title, description, false);
+        this(id, title, description, false);
+    }
+
+    public BooleanSetting(String id, Component title, Component description, boolean defaultValue) {
+        super(id, title, description, defaultValue);
     }
 
     @Override

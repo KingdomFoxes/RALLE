@@ -51,4 +51,16 @@ class LfgActionBarStateTest {
         assertEquals("Ping", state.snapshot().text());
         assertEquals(LfgActionGlyph.PING, state.snapshot().glyph());
     }
+
+    @Test
+    void raidRequeueUsesItsDedicatedRecognitionGlyphWithoutChangingTheRaidLabel() {
+        var state = new LfgActionBarState(() -> 0);
+
+        state.showRaid("Requeue ", LfgProtocol.RaidType.NOTG, "Nest of the Grootslangs",
+                LfgActionBarState.Tone.NORMAL, LfgActionGlyph.REQUEUE);
+
+        assertEquals(LfgActionGlyph.REQUEUE, state.snapshot().glyph());
+        assertEquals("Requeue ", state.snapshot().prefix());
+        assertEquals("Nest of the Grootslangs", state.snapshot().raidLabel());
+    }
 }

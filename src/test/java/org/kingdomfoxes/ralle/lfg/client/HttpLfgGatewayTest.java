@@ -25,7 +25,7 @@ class HttpLfgGatewayTest {
     }
 
     @Test
-    void packagedBuildTargetsProductionFoxServer() {
+    void packagedBuildTargetsLocalFoxServer() {
         assertEquals("https://kingdomfoxes.com/api/ralle/v1", HttpLfgGateway.DEFAULT_BASE_URL);
     }
 

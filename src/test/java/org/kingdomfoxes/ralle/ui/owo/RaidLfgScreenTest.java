@@ -47,6 +47,13 @@ class RaidLfgScreenTest {
     }
 
     @Test
+    void lobbyAgeTimerOnlyAppearsForTheHostOnExpandedCards() {
+        assertFalse(RaidLfgScreen.showsElapsedTimer(lobby(), HOST, false));
+        assertTrue(RaidLfgScreen.showsElapsedTimer(lobby(), HOST, true));
+        assertFalse(RaidLfgScreen.showsElapsedTimer(lobby(), MEMBER, false));
+    }
+
+    @Test
     void collapsedMemberActionIsShortDestructiveLeave() {
         var action = RaidLfgScreen.collapsedActionFor(lobbyWithMember(), MEMBER);
 

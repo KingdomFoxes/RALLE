@@ -38,8 +38,9 @@ platform ports. It must not depend on a concrete settings screen.
   persisted or reconstructed from logs; manual F3+D clearing remains unchanged.
   The disabled-by-default `chat.chat-timestamps` projection records each logical
   message's local receive time in session-only identity metadata even while its
-  presentation is disabled. When enabled, it reserves the `[HH:mm:ss] ` prefix
-  width before wrapping and composes the styled prefix onto every rendered line,
+  presentation is disabled. When enabled, it renders `[HH:mm:ss]` flush with the
+  chat's left edge, reserves the timestamp and separator width before wrapping,
+  and composes the styled prefix onto every rendered line,
   so transformations and transparent chat screenshots include timestamps without
   changing source messages, signatures, tags, logging, or interaction metadata.
 - `sound`: client-only registered UI sound events and playback adapters. Chat
@@ -58,14 +59,15 @@ platform ports. It must not depend on a concrete settings screen.
   Packaged RALLE sounds use original processed-xylophone assets and perform no
   network activity.
 - `lfg`: strict Fox protocol, authentication, live connection, immutable lobby
-  projection, and Raid LFG orchestration. It remains inert until explicitly
-  enabled and connected to Wynncraft.
+  projection, and Raid LFG orchestration. It remains inert until enabled and
+  connected to Wynncraft.
 - `platform`: Fabric/Minecraft adapters such as commands, keybinds, connection
   lifecycle, local persistence, and future clickable chat notifications.
 
 ## Foundation invariants
 
-- No chat or Raid LFG behavior is enabled by this foundation.
+- Every feature defaults off on a new install, and every keybind defaults to
+  Unbound. Persisted settings remain authoritative for existing installs.
 - Initialization performs no network requests and changes no game behavior.
 - owo-lib is contained behind `SettingsScreenFactory`; future settings register
   through `SettingsRegistry` rather than constructing owo components directly.
@@ -78,11 +80,20 @@ platform ports. It must not depend on a concrete settings screen.
 `/ralle settings` opens the owo-lib adapter over RALLE-owned category and setting
 models. Values are stored in `config/ralle.properties`; invalid or obsolete
 values fall back to their declared defaults. Chat has no global enable setting;
-each disabled-by-default feature toggle independently gates its behavior, and
-choice controls depend only on their paired feature toggle. Chat settings are
-consumed by the local chat integration. The Raid LFG opt-in gates the persistent
-Fox client
-service, while its shortcut remains unbound until configured.
+each feature toggle independently gates its behavior, and choice controls depend
+only on their paired feature toggle. Chat settings are consumed by the local
+chat integration. The Raid LFG toggle gates the persistent Fox client service.
+On new installs, all LFG shortcuts default to Unbound; persisted RALLE and vanilla key changes
+continue to override defaults. Initial two-way keybind
+reconciliation waits until the first client tick so Minecraft's temporary pre-`options.txt`
+`UNKNOWN` mappings cannot overwrite persisted RALLE bindings; later changes and manual unbinding
+from either settings surface remain synchronized.
+
+The one-time installation message uses the shared local RALLE chat presentation
+and stores `message-sent=0/1` in `config/ralle-onboarding.properties`. A missing
+marker starts at `0` only when no earlier RALLE config or vanilla RALLE keybind
+entry is present; existing installs are migrated to `1`. Delivery sets it to
+`1`.
 
 Persistent Chat is stored only as the opt-in `chat.persistent-chat-enabled` and
 the selected `chat.persistent-chat-limit`. The displayed history itself remains
@@ -141,11 +152,11 @@ read-only reconnect flow without clearing the last projection or issuing a party
 backend starts its 120-second presence grace only after the player's final authenticated socket is
 lost; reconnecting cancels that grace, while expiry closes only the synchronized LFG lobby.
 
-The protocol-v1 base URL is fixed to `https://kingdomfoxes.com/api/ralle/v1` in the production
-client. It has no runtime setting, JVM property, or automatic loopback fallback. Explicitly
-constructed test gateways may use insecure HTTP and WebSocket transports only for loopback hosts.
-The JDK gateway is pinned to HTTP/1.1 so test requests do not attempt an `h2c` upgrade that local
-HTTP servers do not support.
+The packaged protocol-v1 base URL is fixed to
+`https://kingdomfoxes.com/api/ralle/v1`. There is no runtime setting, JVM property, or automatic
+fallback. Explicitly constructed development and test gateways may use insecure HTTP and WebSocket
+transports only for loopback hosts. The JDK gateway is pinned to HTTP/1.1 so local requests do not
+attempt an `h2c` upgrade that a local HTTP server may not support.
 
 Authentication uses `POST /auth/challenge`, Minecraft's session `joinServer` proof, then
 `POST /auth/complete`. The issued bearer credential is never persisted. `GET /lobbies` provides a
@@ -224,7 +235,7 @@ but cannot discover new ones. The persistent `LfgJoinController` owns the
 single three-second countdown and submission shared by the browser and HUD
 cards.
 
-`RaidLfgKeybinds` owns the nine persisted, unbound-by-default LFG mappings:
+`RaidLfgKeybinds` owns ten persisted mappings. The original nine default in order to F1 through F9:
 Open plus Join, Close, Leave/Disband, Party Filled, Ping, Lock/Unlock, Create, and Kick. The
 action mappings run only during normal gameplay after the service reaches a
 fresh online snapshot; an open screen, absent player/world, disabled service,
@@ -251,6 +262,23 @@ party, and host-only bindings distinguish that state from being a non-host
 member. Party Filled queues the synchronized non-host roster through the same bounded invitation
 controller only while the authoritative host lobby is full.
 
+Automatic Raid Requeue is the tenth mapping and defaults to Unbound. It is independent of the Fox
+LFG service toggle, but is inert unless explicitly bound and connected to Wynncraft. While bound,
+`AutoRaidRequeueController` listens for the exact fixed Wynncraft Ready Up prompt, verifies its
+speaker against the local profile, tab/display aliases, or local UUID hover metadata, and stores
+only the recognized fixed raid ID in `config/ralle-auto-requeue.properties`. Activation sends one
+`/pf` command and follows a bounded three-menu state machine: scan the main raid area through the
+first player-head listing, use the sixth-row fifth-slot Party Queue fallback when needed, select the stored raid,
+then click a named Ready Up item in slots 33–35 (with a name-based fallback). Each server menu has a
+three-second timeout. A narrow `Minecraft.setScreen` interception suppresses only menus expected by
+that explicit state machine after vanilla has installed their container, allowing inventory packets
+and validated slot clicks without displaying the GUI or blocking gameplay input. Completion,
+after the Ready click, RALLE waits up to three seconds for Wynncraft to close the hidden container so
+its native queue-confirmation chat can complete, then closes that owned container only as a timeout
+fallback. Other timeouts, disconnect, or context loss close only the owned container and clear
+session state; there are no retries or command loops.
+Its `Requeue` and `Requeued` Action Bar states prepend the Vanilla-font `🔄` recognition glyph.
+
 `LfgLockDebouncer` is shared by the keybind controller and Raid LFG screen.
 Each Lock/Unlock activation toggles a desired local state and restarts a
 one-second deadline. At the deadline it submits at most one ordinary
@@ -271,8 +299,9 @@ The optional party-status notification watches the authoritative projection for
 the viewer becoming a lobby member. Create and Join actions initiated by the
 Raid LFG screen explicitly register their next matching membership transition
 and retire any existing discovery card for that lobby, so REST mutation and
-live-event delivery order cannot misclassify them. They remain suppressed by
-default; the separate `Auto Pop-out` option instead turns the matching
+live-event delivery order cannot misclassify them. Both Party Status
+Notifications and the separate `Auto Pop-out` option are disabled by default on
+new installs. When enabled, Auto Pop-out turns the matching
 transition into a persistent card and closes the browser. Synchronized
 snapshots and future non-screen local actions still qualify for the external
 party-status option. This covers Discord and future keybind creation without
@@ -300,11 +329,12 @@ Join, Leave/Disband, and Party Filled keys appear beside their card actions; the
 is not printed beside the X. Unbound or conflicting mappings do not advertise a
 nonfunctional shortcut.
 
-The host's browser cards and persistent party-status card derive a live lobby-age timer locally
-from the synchronized lobby creation instant. The timer is never shown on another player's lobby
-and adds no stored timer state or protocol field.
+The host's expanded browser cards and persistent party-status card derive a live lobby-age timer
+locally from the synchronized lobby creation instant. Collapsed browser cards omit the timer. The
+timer is never shown on another player's lobby and adds no stored timer state or protocol field.
 
 The only persisted LFG values are local opt-in, notification, sound, keybind,
-and HUD-placement settings. Whether a card is currently popped out remains
+HUD-placement settings, and the single last-raid ID used by Automatic Raid Requeue. Whether a card
+is currently popped out remains
 session-only. Credentials, snapshots, pending actions, backend overrides, and
 connection state are memory-only.

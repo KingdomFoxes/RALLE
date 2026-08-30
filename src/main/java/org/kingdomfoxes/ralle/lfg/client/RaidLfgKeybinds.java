@@ -15,6 +15,7 @@ import org.kingdomfoxes.ralle.ui.owo.LfgActionGlyph;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionBarState;
 import org.kingdomfoxes.ralle.ui.owo.RaidPresentation;
 import org.kingdomfoxes.ralle.ui.owo.RaidLfgScreen;
+import org.kingdomfoxes.ralle.requeue.AutoRaidRequeueController;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.EnumMap;
@@ -31,6 +32,7 @@ public final class RaidLfgKeybinds {
     public static final String LOCK_ID = "raid-lfg-lock-keybind";
     public static final String CREATE_ID = "raid-lfg-create-keybind";
     public static final String KICK_ID = "raid-lfg-kick-keybind";
+    public static final String REQUEUE_ID = AutoRaidRequeueController.KEYBIND_ID;
 
     private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(
             Identifier.fromNamespaceAndPath("ralle", "controls")
@@ -55,6 +57,7 @@ public final class RaidLfgKeybinds {
     private final LfgActionBarState actionBar;
     private final LfgDisbandConfirmation disbandConfirmation;
     private final LfgLockDebouncer lockDebouncer;
+    private final AutoRaidRequeueController autoRaidRequeue;
     private final EnumMap<Action, Binding> bindings = new EnumMap<>(Action.class);
     private final LfgChordState<Selection> chordState = new LfgChordState<>();
 
@@ -65,7 +68,8 @@ public final class RaidLfgKeybinds {
                            HostPartyInviteController hostPartyInvites,
                            RaidRegionDetector regionDetector, LfgActionBarState actionBar,
                            LfgDisbandConfirmation disbandConfirmation,
-                           LfgLockDebouncer lockDebouncer) {
+                           LfgLockDebouncer lockDebouncer,
+                           AutoRaidRequeueController autoRaidRequeue) {
         this.minecraft = minecraft;
         this.service = service;
         this.sounds = sounds;
@@ -75,6 +79,7 @@ public final class RaidLfgKeybinds {
         this.actionBar = actionBar;
         this.disbandConfirmation = disbandConfirmation;
         this.lockDebouncer = lockDebouncer;
+        this.autoRaidRequeue = autoRaidRequeue;
         this.enabled = settings.setting("raid-lfg-enabled", BooleanSetting.class);
 
         register(settings, Action.OPEN, OPEN_ID, "key.ralle.raid-lfg");
@@ -86,10 +91,12 @@ public final class RaidLfgKeybinds {
         register(settings, Action.LOCK, LOCK_ID, "key.ralle.raid-lfg-lock");
         register(settings, Action.CREATE, CREATE_ID, "key.ralle.raid-lfg-create");
         register(settings, Action.KICK, KICK_ID, "key.ralle.raid-lfg-kick");
-        applyChangedSettings();
+        register(settings, Action.REQUEUE, REQUEUE_ID, "key.ralle.automatic-raid-requeue");
     }
 
     public void tick() {
+        // The first reconciliation must happen after Minecraft finishes loading options.txt.
+        // Otherwise its temporary UNKNOWN mapping can overwrite a persisted RALLE binding.
         applyChangedSettings();
         drainClicks();
         validateConfirmation();
@@ -116,6 +123,14 @@ public final class RaidLfgKeybinds {
      * digits used by an already-active, valid Create/Kick chord.
      */
     public boolean handleKeyboard(KeyEvent event, int glfwAction) {
+        if (glfwAction == GLFW.GLFW_PRESS
+                && minecraft.screen == null
+                && minecraft.level != null
+                && minecraft.player != null
+                && matches(Action.REQUEUE, event)) {
+            autoRaidRequeue.start();
+            return false;
+        }
         if (!inputAllowed()) {
             if (glfwAction == GLFW.GLFW_PRESS
                     && minecraft.screen == null
@@ -163,7 +178,8 @@ public final class RaidLfgKeybinds {
 
         if (glfwAction == GLFW.GLFW_PRESS) {
             for (var action : Action.values()) {
-                if (action == Action.CREATE || action == Action.KICK || !matches(action, event)) continue;
+                if (action == Action.CREATE || action == Action.KICK || action == Action.REQUEUE
+                        || !matches(action, event)) continue;
                 if (action == Action.OPEN) openRaidLfg();
                 else executeSimple(action);
                 break;
@@ -560,7 +576,7 @@ public final class RaidLfgKeybinds {
         return "Ping on cooldown (" + seconds + "s remaining)";
     }
 
-    private enum Action { OPEN, JOIN, CLOSE, LEAVE_DISBAND, PARTY_FILLED, PING, LOCK, CREATE, KICK }
+    private enum Action { OPEN, JOIN, CLOSE, LEAVE_DISBAND, PARTY_FILLED, PING, LOCK, CREATE, KICK, REQUEUE }
     private enum ChordMode { NONE, CREATE, KICK }
 
     private record Selection(int digit, LfgProtocol.RaidType raid, UUID targetId,
