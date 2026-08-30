@@ -89,7 +89,8 @@ public final class RalleSettings {
                                 keybind("raid-lfg-ping-keybind", "key.keyboard.f6"),
                                 keybind("raid-lfg-lock-keybind", "key.keyboard.f7"),
                                 keybind("raid-lfg-create-keybind", "key.keyboard.f8"),
-                                keybind("raid-lfg-kick-keybind", "key.keyboard.f9")
+                                keybind("raid-lfg-kick-keybind", "key.keyboard.f9"),
+                                keybind("automatic-raid-requeue-keybind", KeybindSetting.UNBOUND)
                         )
                 )
         ));

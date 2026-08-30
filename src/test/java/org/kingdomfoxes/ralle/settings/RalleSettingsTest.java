@@ -170,6 +170,9 @@ class RalleSettingsTest {
             assertEquals("key.keyboard.f" + (index + 1), registry.setting(id, KeybindSetting.class).value());
             assertEquals(List.of("raid-lfg-enabled"), registry.dependencies(id));
         }
+        assertEquals(KeybindSetting.UNBOUND,
+                registry.setting("automatic-raid-requeue-keybind", KeybindSetting.class).value());
+        assertEquals(List.of(), registry.dependencies("automatic-raid-requeue-keybind"));
     }
 
     @Test

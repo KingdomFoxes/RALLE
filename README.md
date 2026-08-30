@@ -33,8 +33,14 @@ bound keys beside their Join, Leave/Disband, and Party Filled actions. Action Ba
 pairs Vanilla-font recognition glyphs with the selected interface font,
 including a remaining-time message when Ping is on cooldown, while rapid
 Lock/Unlock toggles are coalesced for one second before any backend mutation.
+Automatic Raid Requeue is a separate, unbound-by-default Wynncraft shortcut. While bound, it
+remembers the fixed raid name from the local player's most recent clickable Ready Up chat prompt
+in `config/ralle-auto-requeue.properties`. Pressing it runs one bounded, headless `/pf` flow,
+selects that raid from the main Party Finder page or its Party Queue fallback, and clicks Ready Up
+while ordinary movement remains available. It does not loop or keep a menu visible.
 On new installs, Raid LFG, its discovery/status/auto-pop-out notifications, and
-its sounds default on; the nine LFG controls default in order to F1 through F9.
+its sounds default on; the original nine LFG controls default in order to F1 through F9, while
+Automatic Raid Requeue defaults to Unbound.
 Saved settings remain authoritative for existing users.
 
 The first connection after a new installation posts one local RALLE onboarding

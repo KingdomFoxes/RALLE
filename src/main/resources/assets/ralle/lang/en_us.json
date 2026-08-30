@@ -122,6 +122,8 @@
   "ralle.settings.option.raid-lfg-create-keybind.description": "Hold this key and release top-row 1–6 to create Dailies, NOTG, NOL, TCC, TNA, or TWP.",
   "ralle.settings.option.raid-lfg-kick-keybind": "Kick Modifier Keybind",
   "ralle.settings.option.raid-lfg-kick-keybind.description": "Hold this key and release top-row 2–4 to kick that synchronized roster slot in order of who joined.",
+  "ralle.settings.option.automatic-raid-requeue-keybind": "Automatic Raid Requeue Keybind",
+  "ralle.settings.option.automatic-raid-requeue-keybind.description": "Reopens Party Finder, selects the raid most recently detected from your own Ready Up prompt, and readies without showing the menus. Unbound by default and active only on Wynncraft.",
   "ralle.settings.option.interface-font": "Interface Font",
   "ralle.settings.option.interface-font.description": "Chooses Vanilla or Karla for RALLE interface body text and controls. Fox screen headers always use Karla.",
 
@@ -134,6 +136,7 @@
   "key.ralle.raid-lfg-lock": "Lock or unlock Raid LFG party",
   "key.ralle.raid-lfg-create": "Create Raid LFG modifier",
   "key.ralle.raid-lfg-kick": "Kick Raid LFG modifier",
+  "key.ralle.automatic-raid-requeue": "Automatically requeue last raid",
   "key.categories.ralle.controls": "RALLE",
 
   "ralle.settings.value.bottom-up": "Bottom-up",

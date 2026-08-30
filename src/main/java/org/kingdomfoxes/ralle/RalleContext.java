@@ -10,6 +10,7 @@ import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotService;
 import org.kingdomfoxes.ralle.lfg.client.HostPartyInviteController;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgKeybinds;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
+import org.kingdomfoxes.ralle.requeue.AutoRaidRequeueController;
 import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
 
 public record RalleContext(
@@ -22,6 +23,7 @@ public record RalleContext(
         ChatScreenshotService chatScreenshots,
         RaidLfgService raidLfg,
         RaidLfgKeybinds raidLfgKeybinds,
+        AutoRaidRequeueController autoRaidRequeue,
         HostPartyInviteController hostPartyInvites,
         LfgSoundPlayer lfgSounds
 ) {

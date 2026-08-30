@@ -234,7 +234,7 @@ but cannot discover new ones. The persistent `LfgJoinController` owns the
 single three-second countdown and submission shared by the browser and HUD
 cards.
 
-`RaidLfgKeybinds` owns the nine persisted LFG mappings, defaulting in order to F1 through F9:
+`RaidLfgKeybinds` owns ten persisted mappings. The original nine default in order to F1 through F9:
 Open plus Join, Close, Leave/Disband, Party Filled, Ping, Lock/Unlock, Create, and Kick. The
 action mappings run only during normal gameplay after the service reaches a
 fresh online snapshot; an open screen, absent player/world, disabled service,
@@ -260,6 +260,20 @@ Party-scoped keybinds report when the viewer has no synchronized Raid LFG
 party, and host-only bindings distinguish that state from being a non-host
 member. Party Filled queues the synchronized non-host roster through the same bounded invitation
 controller only while the authoritative host lobby is full.
+
+Automatic Raid Requeue is the tenth mapping and defaults to Unbound. It is independent of the Fox
+LFG service toggle, but is inert unless explicitly bound and connected to Wynncraft. While bound,
+`AutoRaidRequeueController` listens for the exact fixed Wynncraft Ready Up prompt, verifies its
+speaker against the local profile, tab/display aliases, or local UUID hover metadata, and stores
+only the recognized fixed raid ID in `config/ralle-auto-requeue.properties`. Activation sends one
+`/pf` command and follows a bounded three-menu state machine: scan the main raid area through the
+first player-head listing, use the sixth-row fifth-slot Party Queue fallback when needed, select the stored raid,
+then click a named Ready Up item in slots 33–35 (with a name-based fallback). Each server menu has a
+three-second timeout. A narrow `Minecraft.setScreen` interception suppresses only menus expected by
+that explicit state machine after vanilla has installed their container, allowing inventory packets
+and validated slot clicks without displaying the GUI or blocking gameplay input. Completion,
+timeout, disconnect, or context loss closes only the owned container and clears session state; there
+are no retries or command loops.
 
 `LfgLockDebouncer` is shared by the keybind controller and Raid LFG screen.
 Each Lock/Unlock activation toggles a desired local state and restarts a
@@ -316,6 +330,7 @@ locally from the synchronized lobby creation instant. Collapsed browser cards om
 timer is never shown on another player's lobby and adds no stored timer state or protocol field.
 
 The only persisted LFG values are local opt-in, notification, sound, keybind,
-and HUD-placement settings. Whether a card is currently popped out remains
+HUD-placement settings, and the single last-raid ID used by Automatic Raid Requeue. Whether a card
+is currently popped out remains
 session-only. Credentials, snapshots, pending actions, backend overrides, and
 connection state are memory-only.

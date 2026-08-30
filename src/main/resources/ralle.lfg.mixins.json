@@ -4,6 +4,7 @@
   "package": "org.kingdomfoxes.ralle.lfg.client.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "AutoRaidRequeueScreenMixin",
     "KeyboardHandlerMixin"
   ],
   "injectors": {
