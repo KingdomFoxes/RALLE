@@ -59,10 +59,6 @@ public final class RalleOnboardingNotice {
         return true;
     }
 
-    public void postPreview(Consumer<Component> delivery) {
-        Objects.requireNonNull(delivery, "delivery").accept(body());
-    }
-
     public static Component body() {
         return Component.empty()
                 .append("Thank you for installing RALLE! Certain features have been enabled by default but please explore the settings with ")

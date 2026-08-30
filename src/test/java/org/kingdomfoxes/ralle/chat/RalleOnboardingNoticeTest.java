@@ -79,16 +79,4 @@ class RalleOnboardingNoticeTest {
         }
     }
 
-    @Test
-    void previewDoesNotConsumeTheOneTimeNotice() {
-        var delivered = new ArrayList<Component>();
-        var notice = new RalleOnboardingNotice(
-                temporaryDirectory.resolve("ralle-onboarding.properties"), false);
-
-        notice.postPreview(delivered::add);
-
-        assertEquals(0, notice.messageSent());
-        assertTrue(notice.postIfNeeded(delivered::add));
-        assertEquals(2, delivered.size());
-    }
 }

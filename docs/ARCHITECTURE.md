@@ -90,9 +90,8 @@ F9; persisted RALLE and vanilla key changes continue to override defaults.
 The one-time installation message uses the shared local RALLE chat presentation
 and stores `message-sent=0/1` in `config/ralle-onboarding.properties`. A missing
 marker starts at `0` only when no earlier RALLE config or vanilla RALLE keybind
-entry is present; existing installs are migrated to `1`. Delivery sets it to `1`. The temporary
-`/ralle testmsg` command previews the same clickable message without consuming
-the automatic notice.
+entry is present; existing installs are migrated to `1`. Delivery sets it to
+`1`.
 
 Persistent Chat is stored only as the opt-in `chat.persistent-chat-enabled` and
 the selected `chat.persistent-chat-limit`. The displayed history itself remains

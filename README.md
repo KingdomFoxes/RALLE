@@ -40,8 +40,7 @@ Saved settings remain authoritative for existing users.
 The first connection after a new installation posts one local RALLE onboarding
 message with clickable settings, LFG, and HUD commands. Its numeric sent marker
 is stored in `config/ralle-onboarding.properties`; existing RALLE configs or
-saved vanilla RALLE keybinds are migrated as already seen. During development,
-`/ralle testmsg` previews the same message without changing that marker.
+saved vanilla RALLE keybinds are migrated as already seen.
 
 ## Development
 

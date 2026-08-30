@@ -182,10 +182,6 @@ public final class RalleClient implements ClientModInitializer {
                             client.screen, context().raidLfg(), regionDetector,
                             context().lfgSounds(), lfgNotifications, lockDebouncer)));
                     return 1;
-                })).then(literal("testmsg").executes(command -> {
-                    var client = Minecraft.getInstance();
-                    client.schedule(() -> onboarding.postPreview(body -> RalleChatMessages.post(client, body)));
-                    return 1;
                 }))
         ));
     }
