@@ -12,6 +12,8 @@ import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
+import org.kingdomfoxes.ralle.chat.RalleChatMessages;
+import org.kingdomfoxes.ralle.chat.RalleOnboardingNotice;
 import org.kingdomfoxes.ralle.chat.rank.GuildRankService;
 import org.kingdomfoxes.ralle.chat.rank.HttpGuildRankGateway;
 import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
@@ -59,8 +61,11 @@ public final class RalleClient implements ClientModInitializer {
 
         var features = new FeatureRegistry();
         var configDirectory = FabricLoader.getInstance().getConfigDir();
+        boolean existingInstall = RalleOnboardingNotice.hasExistingConfig(configDirectory);
         var settings = new SettingsRegistry(configDirectory.resolve("ralle.properties"));
         var placements = new HudPlacementRegistry(configDirectory.resolve("ralle-hud-layout.properties"));
+        var onboarding = new RalleOnboardingNotice(
+                configDirectory.resolve("ralle-onboarding.properties"), existingInstall);
 
         RalleSettings.register(settings);
         placements.register(new HudPlacementRegistry.ElementDefinition(
@@ -144,6 +149,7 @@ public final class RalleClient implements ClientModInitializer {
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             raidLfg.connectionChanged();
             guildRanks.connectionChanged();
+            onboarding.postIfNeeded(body -> RalleChatMessages.post(client, body));
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             raidLfg.connectionChanged();
@@ -175,6 +181,10 @@ public final class RalleClient implements ClientModInitializer {
                     client.schedule(() -> client.setScreen(new RaidLfgScreen(
                             client.screen, context().raidLfg(), regionDetector,
                             context().lfgSounds(), lfgNotifications, lockDebouncer)));
+                    return 1;
+                })).then(literal("testmsg").executes(command -> {
+                    var client = Minecraft.getInstance();
+                    client.schedule(() -> onboarding.postPreview(body -> RalleChatMessages.post(client, body)));
                     return 1;
                 }))
         ));

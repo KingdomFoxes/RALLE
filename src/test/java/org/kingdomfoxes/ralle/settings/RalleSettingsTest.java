@@ -31,13 +31,13 @@ class RalleSettingsTest {
     }
 
     @Test
-    void chatScreenshotOptionsAreIndependentlyDisabledByDefault() {
+    void approvedChatScreenshotOptionsAreEnabledByDefault() {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);
 
-        assertEquals(false, registry.setting("chat-screenshot-enabled", BooleanSetting.class).value());
+        assertTrue(registry.setting("chat-screenshot-enabled", BooleanSetting.class).value());
         assertEquals(false, registry.setting("chat-screenshot-snap-to-text", BooleanSetting.class).value());
-        assertEquals(false, registry.setting("chat-selection-sounds", BooleanSetting.class).value());
+        assertTrue(registry.setting("chat-selection-sounds", BooleanSetting.class).value());
         assertEquals(false, registry.setting("chat-screenshot-smooth-expansion", BooleanSetting.class).value());
     }
 
@@ -133,7 +133,7 @@ class RalleSettingsTest {
     }
 
     @Test
-    void registersApprovedSubcategoryOrderAndUnboundLfgKey() {
+    void registersApprovedSubcategoryOrderAndFunctionKeyDefaults() {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);
 
@@ -155,7 +155,7 @@ class RalleSettingsTest {
         assertEquals(List.of(), registry.dependencies(RalleSettings.INTERNAL_GUILD_RANKS_ID));
         assertEquals(List.of("general", "notifications", "controls"),
                 categories.get(2).subcategories().stream().map(value -> value.id()).toList());
-        for (var id : List.of(
+        var keybinds = List.of(
                 "raid-lfg-keybind",
                 "raid-lfg-join-keybind",
                 "raid-lfg-close-keybind",
@@ -164,27 +164,52 @@ class RalleSettingsTest {
                 "raid-lfg-ping-keybind",
                 "raid-lfg-lock-keybind",
                 "raid-lfg-create-keybind",
-                "raid-lfg-kick-keybind")) {
-            assertEquals(KeybindSetting.UNBOUND, registry.setting(id, KeybindSetting.class).value());
+                "raid-lfg-kick-keybind");
+        for (int index = 0; index < keybinds.size(); index++) {
+            var id = keybinds.get(index);
+            assertEquals("key.keyboard.f" + (index + 1), registry.setting(id, KeybindSetting.class).value());
             assertEquals(List.of("raid-lfg-enabled"), registry.dependencies(id));
         }
     }
 
     @Test
-    void discoveryNotificationsDefaultOffAndDependOnRaidLfg() {
+    void approvedRaidLfgOptionsDefaultOnAndDependOnRaidLfg() {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);
 
-        assertFalse(registry.setting("new-party-notifications", BooleanSetting.class).value());
-        assertFalse(registry.setting("reopened-party-notifications", BooleanSetting.class).value());
-        assertFalse(registry.setting("party-status-notifications", BooleanSetting.class).value());
-        assertFalse(registry.setting("auto-pop-out-main-ui", BooleanSetting.class).value());
-        assertFalse(registry.setting("notification-sounds", BooleanSetting.class).value());
+        assertTrue(registry.setting("raid-lfg-enabled", BooleanSetting.class).value());
+        assertTrue(registry.setting("new-party-notifications", BooleanSetting.class).value());
+        assertTrue(registry.setting("reopened-party-notifications", BooleanSetting.class).value());
+        assertTrue(registry.setting("party-status-notifications", BooleanSetting.class).value());
+        assertTrue(registry.setting("auto-pop-out-main-ui", BooleanSetting.class).value());
+        assertTrue(registry.setting("notification-sounds", BooleanSetting.class).value());
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("new-party-notifications"));
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("reopened-party-notifications"));
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("party-status-notifications"));
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("auto-pop-out-main-ui"));
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("edit-notification-position"));
+    }
+
+    @Test
+    void storedValuesContinueToOverrideNewDefaults() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        Files.writeString(path, """
+                chat.chat-screenshot-enabled=false
+                chat.chat-selection-sounds=false
+                raid-lfg.raid-lfg-enabled=false
+                raid-lfg.new-party-notifications=false
+                raid-lfg.raid-lfg-keybind=unbound
+                """);
+
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+
+        assertFalse(registry.setting("chat-screenshot-enabled", BooleanSetting.class).value());
+        assertFalse(registry.setting("chat-selection-sounds", BooleanSetting.class).value());
+        assertFalse(registry.setting("raid-lfg-enabled", BooleanSetting.class).value());
+        assertFalse(registry.setting("new-party-notifications", BooleanSetting.class).value());
+        assertEquals(KeybindSetting.UNBOUND, registry.setting("raid-lfg-keybind", KeybindSetting.class).value());
     }
 
     @Test

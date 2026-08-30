@@ -58,10 +58,10 @@ public final class RalleSettings {
                                 choice("persistent-chat-limit", "500", "300", "500", "1000", "1500")
                         ),
                         subcategory("screenshots",
-                                toggle("chat-screenshot-enabled"),
+                                toggle("chat-screenshot-enabled", true),
                                 toggle("chat-screenshot-snap-to-text"),
                                 toggle("chat-screenshot-smooth-expansion"),
-                                toggle("chat-selection-sounds")
+                                toggle("chat-selection-sounds", true)
                         )
                 )
         ));
@@ -71,25 +71,25 @@ public final class RalleSettings {
                 Component.translatable("ralle.settings.category.raid-lfg"),
                 Component.translatable("ralle.settings.category.raid-lfg.description"),
                 List.of(
-                        subcategory("general", toggle("raid-lfg-enabled")),
+                        subcategory("general", toggle("raid-lfg-enabled", true)),
                         subcategory("notifications",
-                                toggle("new-party-notifications"),
-                                toggle("reopened-party-notifications"),
-                                toggle("party-status-notifications"),
-                                toggle("auto-pop-out-main-ui"),
-                                toggle("notification-sounds"),
+                                toggle("new-party-notifications", true),
+                                toggle("reopened-party-notifications", true),
+                                toggle("party-status-notifications", true),
+                                toggle("auto-pop-out-main-ui", true),
+                                toggle("notification-sounds", true),
                                 action("edit-notification-position")
                         ),
                         subcategory("controls",
-                                keybind("raid-lfg-keybind"),
-                                keybind("raid-lfg-join-keybind"),
-                                keybind("raid-lfg-close-keybind"),
-                                keybind("raid-lfg-leave-disband-keybind"),
-                                keybind("raid-lfg-party-filled-keybind"),
-                                keybind("raid-lfg-ping-keybind"),
-                                keybind("raid-lfg-lock-keybind"),
-                                keybind("raid-lfg-create-keybind"),
-                                keybind("raid-lfg-kick-keybind")
+                                keybind("raid-lfg-keybind", "key.keyboard.f1"),
+                                keybind("raid-lfg-join-keybind", "key.keyboard.f2"),
+                                keybind("raid-lfg-close-keybind", "key.keyboard.f3"),
+                                keybind("raid-lfg-leave-disband-keybind", "key.keyboard.f4"),
+                                keybind("raid-lfg-party-filled-keybind", "key.keyboard.f5"),
+                                keybind("raid-lfg-ping-keybind", "key.keyboard.f6"),
+                                keybind("raid-lfg-lock-keybind", "key.keyboard.f7"),
+                                keybind("raid-lfg-create-keybind", "key.keyboard.f8"),
+                                keybind("raid-lfg-kick-keybind", "key.keyboard.f9")
                         )
                 )
         ));
@@ -131,12 +131,16 @@ public final class RalleSettings {
         return new BooleanSetting(id, title(id), description(id));
     }
 
+    private static BooleanSetting toggle(String id, boolean defaultValue) {
+        return new BooleanSetting(id, title(id), description(id), defaultValue);
+    }
+
     private static ActionEntry action(String id) {
         return new ActionEntry(id, title(id), description(id));
     }
 
-    private static KeybindSetting keybind(String id) {
-        return new KeybindSetting(id, title(id), description(id));
+    private static KeybindSetting keybind(String id, String defaultValue) {
+        return new KeybindSetting(id, title(id), description(id), defaultValue);
     }
 
     private static ChoiceSetting choice(String id, String defaultValue, String... choices) {

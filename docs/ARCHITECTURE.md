@@ -59,14 +59,16 @@ platform ports. It must not depend on a concrete settings screen.
   Packaged RALLE sounds use original processed-xylophone assets and perform no
   network activity.
 - `lfg`: strict Fox protocol, authentication, live connection, immutable lobby
-  projection, and Raid LFG orchestration. It remains inert until explicitly
-  enabled and connected to Wynncraft.
+  projection, and Raid LFG orchestration. It remains inert until enabled and
+  connected to Wynncraft.
 - `platform`: Fabric/Minecraft adapters such as commands, keybinds, connection
   lifecycle, local persistence, and future clickable chat notifications.
 
 ## Foundation invariants
 
-- No chat or Raid LFG behavior is enabled by this foundation.
+- New-install defaults enable Chat Screenshotting, Chat Selection Sounds, Raid
+  LFG, New Party Notifications, Reopened Party Notifications, Party Status
+  Notifications, Auto Pop-out, and Raid LFG Sounds. Other behavior defaults off.
 - Initialization performs no network requests and changes no game behavior.
 - owo-lib is contained behind `SettingsScreenFactory`; future settings register
   through `SettingsRegistry` rather than constructing owo components directly.
@@ -79,11 +81,18 @@ platform ports. It must not depend on a concrete settings screen.
 `/ralle settings` opens the owo-lib adapter over RALLE-owned category and setting
 models. Values are stored in `config/ralle.properties`; invalid or obsolete
 values fall back to their declared defaults. Chat has no global enable setting;
-each disabled-by-default feature toggle independently gates its behavior, and
-choice controls depend only on their paired feature toggle. Chat settings are
-consumed by the local chat integration. The Raid LFG opt-in gates the persistent
-Fox client
-service, while its shortcut remains unbound until configured.
+each feature toggle independently gates its behavior, and choice controls depend
+only on their paired feature toggle. Chat settings are consumed by the local
+chat integration. The Raid LFG toggle gates the persistent Fox client service.
+On new installs, the nine LFG shortcuts default in displayed order to F1 through
+F9; persisted RALLE and vanilla key changes continue to override defaults.
+
+The one-time installation message uses the shared local RALLE chat presentation
+and stores `message-sent=0/1` in `config/ralle-onboarding.properties`. A missing
+marker starts at `0` only when no earlier RALLE config or vanilla RALLE keybind
+entry is present; existing installs are migrated to `1`. Delivery sets it to `1`. The temporary
+`/ralle testmsg` command previews the same clickable message without consuming
+the automatic notice.
 
 Persistent Chat is stored only as the opt-in `chat.persistent-chat-enabled` and
 the selected `chat.persistent-chat-limit`. The displayed history itself remains
@@ -226,7 +235,7 @@ but cannot discover new ones. The persistent `LfgJoinController` owns the
 single three-second countdown and submission shared by the browser and HUD
 cards.
 
-`RaidLfgKeybinds` owns the nine persisted, unbound-by-default LFG mappings:
+`RaidLfgKeybinds` owns the nine persisted LFG mappings, defaulting in order to F1 through F9:
 Open plus Join, Close, Leave/Disband, Party Filled, Ping, Lock/Unlock, Create, and Kick. The
 action mappings run only during normal gameplay after the service reaches a
 fresh online snapshot; an open screen, absent player/world, disabled service,
@@ -273,8 +282,9 @@ The optional party-status notification watches the authoritative projection for
 the viewer becoming a lobby member. Create and Join actions initiated by the
 Raid LFG screen explicitly register their next matching membership transition
 and retire any existing discovery card for that lobby, so REST mutation and
-live-event delivery order cannot misclassify them. They remain suppressed by
-default; the separate `Auto Pop-out` option instead turns the matching
+live-event delivery order cannot misclassify them. Both Party Status
+Notifications and the separate `Auto Pop-out` option are enabled by default on
+new installs; Auto Pop-out turns the matching
 transition into a persistent card and closes the browser. Synchronized
 snapshots and future non-screen local actions still qualify for the external
 party-status option. This covers Discord and future keybind creation without
