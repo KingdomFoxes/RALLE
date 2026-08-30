@@ -92,10 +92,11 @@ public final class RaidLfgKeybinds {
         register(settings, Action.CREATE, CREATE_ID, "key.ralle.raid-lfg-create");
         register(settings, Action.KICK, KICK_ID, "key.ralle.raid-lfg-kick");
         register(settings, Action.REQUEUE, REQUEUE_ID, "key.ralle.automatic-raid-requeue");
-        applyChangedSettings();
     }
 
     public void tick() {
+        // The first reconciliation must happen after Minecraft finishes loading options.txt.
+        // Otherwise its temporary UNKNOWN mapping can overwrite a persisted RALLE binding.
         applyChangedSettings();
         drainClicks();
         validateConfirmation();

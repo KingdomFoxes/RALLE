@@ -41,6 +41,12 @@ class RaidLfgKeybindsTest {
     }
 
     @Test
+    void persistedModBindingSurvivesAnUnknownVanillaValueAtInitialSynchronization() {
+        assertEquals("key.keyboard.period", RaidLfgKeybinds.synchronizedValue(
+                "key.keyboard.period", null, "key.keyboard.unknown"));
+    }
+
+    @Test
     void vanillaMappingWinsWhenOnlyItChangedSinceTheLastSynchronization() {
         assertEquals("key.keyboard.h", RaidLfgKeybinds.synchronizedValue(
                 "key.keyboard.g", "key.keyboard.g", "key.keyboard.h"));

@@ -85,7 +85,10 @@ each feature toggle independently gates its behavior, and choice controls depend
 only on their paired feature toggle. Chat settings are consumed by the local
 chat integration. The Raid LFG toggle gates the persistent Fox client service.
 On new installs, the nine LFG shortcuts default in displayed order to F1 through
-F9; persisted RALLE and vanilla key changes continue to override defaults.
+F9; persisted RALLE and vanilla key changes continue to override defaults. Initial two-way keybind
+reconciliation waits until the first client tick so Minecraft's temporary pre-`options.txt`
+`UNKNOWN` mappings cannot overwrite persisted RALLE bindings; later changes and manual unbinding
+from either settings surface remain synchronized.
 
 The one-time installation message uses the shared local RALLE chat presentation
 and stores `message-sent=0/1` in `config/ralle-onboarding.properties`. A missing
