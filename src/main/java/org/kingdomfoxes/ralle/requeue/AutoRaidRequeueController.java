@@ -14,6 +14,7 @@ import net.minecraft.world.item.Items;
 import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionBarState;
+import org.kingdomfoxes.ralle.ui.owo.LfgActionGlyph;
 
 import java.util.LinkedHashSet;
 import java.util.Locale;
@@ -91,7 +92,8 @@ public final class AutoRaidRequeueController {
         if (connection == null) return;
         state = State.WAIT_MAIN;
         deadlineTick = tickNow() + MENU_TIMEOUT_TICKS;
-        actionBar.showRaid("Requeue ", target.lfgType(), target.displayName(), LfgActionBarState.Tone.NORMAL);
+        actionBar.showRaid("Requeue ", target.lfgType(), target.displayName(),
+                LfgActionBarState.Tone.NORMAL, LfgActionGlyph.REQUEUE);
         connection.sendCommand("pf");
     }
 
@@ -172,7 +174,8 @@ public final class AutoRaidRequeueController {
         click(slot);
         state = State.FINISH;
         finishTick = tickNow() + SETTLE_TICKS;
-        actionBar.showRaid("Requeued ", target.lfgType(), target.displayName(), LfgActionBarState.Tone.ACCENT);
+        actionBar.showRaid("Requeued ", target.lfgType(), target.displayName(),
+                LfgActionBarState.Tone.ACCENT, LfgActionGlyph.REQUEUE);
     }
 
     private void clickAndWait(int slot, State waitingState) {

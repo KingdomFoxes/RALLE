@@ -274,6 +274,7 @@ that explicit state machine after vanilla has installed their container, allowin
 and validated slot clicks without displaying the GUI or blocking gameplay input. Completion,
 timeout, disconnect, or context loss closes only the owned container and clears session state; there
 are no retries or command loops.
+Its `Requeue` and `Requeued` Action Bar states prepend the Vanilla-font `🔄` recognition glyph.
 
 `LfgLockDebouncer` is shared by the keybind controller and Raid LFG screen.
 Each Lock/Unlock activation toggles a desired local state and restarts a

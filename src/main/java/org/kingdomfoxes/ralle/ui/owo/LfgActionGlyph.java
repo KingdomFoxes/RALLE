@@ -10,6 +10,7 @@ public enum LfgActionGlyph {
     LOCK("🔒"),
     UNLOCK("🔓"),
     PING("🔔"),
+    REQUEUE("🔄"),
     LEAVE_DISBAND("❌");
 
     private final String symbol;
