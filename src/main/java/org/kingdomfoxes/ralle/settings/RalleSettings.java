@@ -40,6 +40,7 @@ public final class RalleSettings {
                                 toggle("remove-chat-system-indicators"),
                                 toggle("chat-timestamps")
                         ),
+                        subcategory("input", toggle("chat-type-tabbing")),
                         subcategory("guild-ranks", toggle(INTERNAL_GUILD_RANKS_ID)),
                         subcategory("message-direction",
                                 toggle("message-direction-enabled"),

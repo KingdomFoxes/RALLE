@@ -4,6 +4,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
+import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
@@ -16,6 +17,7 @@ import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.kingdomfoxes.ralle.chat.RalleChatMessages;
 import org.kingdomfoxes.ralle.chat.RalleOnboardingNotice;
+import org.kingdomfoxes.ralle.chat.input.ChatTypeTabService;
 import org.kingdomfoxes.ralle.chat.rank.GuildRankService;
 import org.kingdomfoxes.ralle.chat.rank.HttpGuildRankGateway;
 import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
@@ -137,6 +139,7 @@ public final class RalleClient implements ClientModInitializer {
                 minecraft, settings, raidLfg, lfgSounds, lfgNotifications, hostPartyInvites, regionDetector,
                 actionBarState, disbandConfirmation, lockDebouncer, autoRaidRequeue);
         var chatBehavior = new ChatBehaviorService(Minecraft.getInstance(), settings);
+        var chatTypeTabs = new ChatTypeTabService(configDirectory.resolve("ralle-chat-input.properties"));
         var chatScreenshots = new ChatScreenshotService(
                 Minecraft.getInstance(),
                 settings,
@@ -149,6 +152,7 @@ public final class RalleClient implements ClientModInitializer {
                 new OwoSettingsScreenFactory(settings, chatLayout, navigation, guildRanks),
                 chatLayout,
                 chatBehavior,
+                chatTypeTabs,
                 guildRanks,
                 chatScreenshots,
                 raidLfg,
@@ -182,6 +186,7 @@ public final class RalleClient implements ClientModInitializer {
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
             if (!overlay) autoRaidRequeue.observeChat(message);
         });
+        ClientSendMessageEvents.COMMAND.register(chatTypeTabs::observeSentCommand);
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
                 literal("ralle").then(literal("settings").executes(command -> {

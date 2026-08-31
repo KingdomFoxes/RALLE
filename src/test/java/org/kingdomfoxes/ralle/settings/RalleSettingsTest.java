@@ -97,6 +97,21 @@ class RalleSettingsTest {
     }
 
     @Test
+    void chatTypeTabbingDefaultsOffPersistsUnderChatAndHasNoParentDependency() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+
+        var setting = registry.setting("chat-type-tabbing", BooleanSetting.class);
+        assertFalse(setting.value());
+        assertEquals(List.of(), registry.dependencies("chat-type-tabbing"));
+
+        setting.set(true);
+        assertTrue(Files.readString(path).contains("chat.chat-type-tabbing=true"));
+    }
+
+    @Test
     void chatFeaturesUseTheirOwnTogglesWithoutAMasterToggle() {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);
@@ -161,14 +176,16 @@ class RalleSettingsTest {
         assertEquals(List.of("edit-huds", RalleSettings.INTERFACE_FONT_ID),
                 categories.get(0).entries().stream().map(value -> value.id()).toList());
         assertEquals(List.of(), registry.dependencies("edit-huds"));
-        assertEquals(List.of("appearance", "guild-ranks", "message-direction", "horizontal-alignment", "text-shadow",
+        assertEquals(List.of("appearance", "input", "guild-ranks", "message-direction", "horizontal-alignment", "text-shadow",
                         "message-behavior", "chat-history", "screenshots"),
                 categories.get(1).subcategories().stream().map(value -> value.id()).toList());
         assertEquals(List.of("edit-chat-layout"), categories.get(1).entries().stream().map(value -> value.id()).toList());
         assertEquals(List.of("hide-chat-scrollbar", "remove-chat-system-indicators", "chat-timestamps"),
                 categories.get(1).subcategories().get(0).entries().stream().map(value -> value.id()).toList());
-        assertEquals(List.of(RalleSettings.INTERNAL_GUILD_RANKS_ID),
+        assertEquals(List.of("chat-type-tabbing"),
                 categories.get(1).subcategories().get(1).entries().stream().map(value -> value.id()).toList());
+        assertEquals(List.of(RalleSettings.INTERNAL_GUILD_RANKS_ID),
+                categories.get(1).subcategories().get(2).entries().stream().map(value -> value.id()).toList());
         assertFalse(registry.setting(RalleSettings.INTERNAL_GUILD_RANKS_ID, BooleanSetting.class).value());
         assertEquals(List.of(), registry.dependencies(RalleSettings.INTERNAL_GUILD_RANKS_ID));
         assertEquals(List.of("notifications", "controls"),

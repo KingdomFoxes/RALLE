@@ -13,6 +13,11 @@ local options. Transparent chat screenshot selection also supports an optional
 per-line text-snapped overlay and text-width image crop, plus processed-xylophone
 count and successful-copy feedback. Screenshotting and its sounds are disabled
 by default on new installs.
+OW-like Chat Tabbing is another disabled-by-default local input option. In an empty
+chat, unmodified Tab prepares Guild, Party, the latest complete outgoing `/msg`
+recipient when known, and prefix-free All Chat in sequence; editing the prepared
+prefix restores vanilla autocomplete, and RALLE never sends the prepared command
+automatically. The latest valid recipient persists locally across restarts.
 Persistent Chat is another disabled-by-default option. When enabled, it keeps
 up to the selected 300, 500, 1000, or 1500 displayed messages and wrapped lines
 while moving between multiplayer servers and singleplayer worlds. This history

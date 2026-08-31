@@ -20,6 +20,8 @@
 
   "ralle.settings.subcategory.appearance": "Appearance",
   "ralle.settings.subcategory.appearance.description": "General chat presentation options.",
+  "ralle.settings.subcategory.input": "Input",
+  "ralle.settings.subcategory.input.description": "Optional shortcuts for preparing chat commands.",
   "ralle.settings.subcategory.guild-ranks": "Guild Ranks",
   "ralle.settings.subcategory.guild-ranks.description": "Optional Fox rank titles in Wynncraft guild chat.",
   "ralle.settings.subcategory.message-direction": "Message Direction",
@@ -54,6 +56,8 @@
   "ralle.settings.option.remove-chat-system-indicators.description": "Removes Minecraft's colored bars and icons from system-managed chat messages without reserving space for them. Message text and its interactions are unchanged.",
   "ralle.settings.option.chat-timestamps": "Chat Timestamps",
   "ralle.settings.option.chat-timestamps.description": "Shows the local receive time as [HH:mm:ss] on every rendered chat line, including wrapped continuations.",
+  "ralle.settings.option.chat-type-tabbing": "OW-like Chat Tabbing",
+  "ralle.settings.option.chat-type-tabbing.description": "Pressing an unmodified Tab cycles Guild, Party, your latest outgoing /msg recipient, and All Chat without sending the message.",
   "ralle.settings.option.internal-guild-ranks": "Internal Guild Ranks",
   "ralle.settings.option.internal-guild-ranks.description": "Replaces only the rank title before guild-chat messages with each member's current Fox rank. The instance-local cache refreshes on Wynncraft join and every 30 minutes.",
   "ralle.settings.guild-ranks.refresh": "Refresh the local guild-rank cache now",

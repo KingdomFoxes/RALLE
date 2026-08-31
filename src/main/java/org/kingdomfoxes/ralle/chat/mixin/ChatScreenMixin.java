@@ -3,15 +3,20 @@ package org.kingdomfoxes.ralle.chat.mixin;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
 import org.kingdomfoxes.ralle.RalleClient;
+import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
+import org.kingdomfoxes.ralle.chat.input.ChatTypeTabService;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotService;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotSource;
 import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -19,6 +24,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(ChatScreen.class)
 abstract class ChatScreenMixin extends Screen {
+    @Shadow protected EditBox input;
+    @Unique private String ralle$lastInsertedChatTypePrefix;
+
     protected ChatScreenMixin(Component title) {
         super(title);
     }
@@ -78,7 +86,23 @@ abstract class ChatScreenMixin extends Screen {
     }
 
     @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true, require = 0)
-    private void ralle$handleScreenshotKeys(KeyEvent event, CallbackInfoReturnable<Boolean> callback) {
+    private void ralle$handleChatKeys(KeyEvent event, CallbackInfoReturnable<Boolean> callback) {
+        if (event.key() == GLFW.GLFW_KEY_TAB
+                && event.modifiers() == 0
+                && RalleClient.context().settings()
+                        .setting(ChatTypeTabService.SETTING_ID, BooleanSetting.class)
+                        .value()) {
+            RalleClient.context().chatTypeTabs()
+                    .nextPrefix(this.input.getValue(), this.ralle$lastInsertedChatTypePrefix)
+                    .ifPresent(prefix -> {
+                        this.input.setValue(prefix);
+                        this.input.setCursorPosition(prefix.length());
+                        this.input.setHighlightPos(prefix.length());
+                        this.ralle$lastInsertedChatTypePrefix = prefix;
+                        callback.setReturnValue(true);
+                    });
+            if (callback.isCancelled()) return;
+        }
         var service = RalleClient.context().chatScreenshots();
         if (event.key() == GLFW.GLFW_KEY_C && ralle$controlDown() && service.copyPreview()) {
             callback.setReturnValue(true);
