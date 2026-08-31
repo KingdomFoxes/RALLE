@@ -11,6 +11,7 @@ import net.minecraft.client.Minecraft;
 import org.kingdomfoxes.ralle.api.feature.FeatureRegistry;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
+import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
 import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
@@ -97,6 +98,7 @@ public final class RalleClient implements ClientModInitializer {
                 new HttpGuildRankGateway(),
                 configDirectory.resolve("ralle-ranks.json"),
                 settings.setting(RalleSettings.INTERNAL_GUILD_RANKS_ID, BooleanSetting.class),
+                settings.setting(RalleSettings.GUILD_RANK_STYLE_ID, ChoiceSetting.class),
                 () -> minecraft.getCurrentServer() == null ? "" : minecraft.getCurrentServer().ip,
                 System::currentTimeMillis
         );
@@ -189,8 +191,8 @@ public final class RalleClient implements ClientModInitializer {
         ClientSendMessageEvents.COMMAND.register(chatTypeTabs::observeSentCommand);
         ClientSendMessageEvents.CHAT.register(chatTypeTabs::observeSentChat);
 
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
-                literal("ralle").then(literal("settings").executes(command -> {
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
+            var ralleCommand = literal("ralle").then(literal("settings").executes(command -> {
                     var client = Minecraft.getInstance();
                     client.schedule(() -> client.setScreen(context().settingsScreens().create(client.screen)));
                     return 1;
@@ -205,8 +207,17 @@ public final class RalleClient implements ClientModInitializer {
                             client.screen, context().raidLfg(), regionDetector,
                             context().lfgSounds(), lfgNotifications, lockDebouncer)));
                     return 1;
-                }))
-        ));
+                }));
+            if (FabricLoader.getInstance().isDevelopmentEnvironment()) {
+                ralleCommand.then(literal("testmsg").executes(command -> {
+                    var client = Minecraft.getInstance();
+                    client.schedule(() -> context().guildRanks().testMessages().forEach(message ->
+                            client.gui.getChat().addMessage(message, null, null)));
+                    return 1;
+                }));
+            }
+            dispatcher.register(ralleCommand);
+        });
     }
 
     public static RalleContext context() {

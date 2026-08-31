@@ -14,6 +14,7 @@ import java.util.List;
 public final class RalleSettings {
     public static final String INTERFACE_FONT_ID = "interface-font";
     public static final String INTERNAL_GUILD_RANKS_ID = "internal-guild-ranks";
+    public static final String GUILD_RANK_STYLE_ID = "guild-rank-style";
 
     private RalleSettings() {}
 
@@ -41,7 +42,10 @@ public final class RalleSettings {
                                 toggle("chat-timestamps")
                         ),
                         subcategory("input", toggle("chat-type-tabbing")),
-                        subcategory("guild-ranks", toggle(INTERNAL_GUILD_RANKS_ID)),
+                        subcategory("guild-ranks",
+                                toggle(INTERNAL_GUILD_RANKS_ID),
+                                choice(GUILD_RANK_STYLE_ID, "titles", "titles", "stars", "stars-and-titles")
+                        ),
                         subcategory("message-direction",
                                 toggle("message-direction-enabled"),
                                 choice("message-direction", "bottom-up", "bottom-up", "top-down")

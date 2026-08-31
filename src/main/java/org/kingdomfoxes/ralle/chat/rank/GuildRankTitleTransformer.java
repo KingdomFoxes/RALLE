@@ -2,17 +2,20 @@ package org.kingdomfoxes.ralle.chat.rank;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FontDescription;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.contents.PlainTextContents;
+import net.minecraft.resources.Identifier;
 
-import java.util.Objects;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-/** Replaces only Wynncraft's two rank-title glyph passes for the identified guild-chat speaker. */
+/** Rewrites only Wynncraft's rank-pill glyph passes for an identified guild-chat speaker. */
 final class GuildRankTitleTransformer {
     private static final int FOREGROUND_A = 0xE000;
     private static final int BACKGROUND_A = 0xE030;
@@ -23,6 +26,17 @@ final class GuildRankTitleTransformer {
     private static final int NEGATIVE_ONE = SPACING_ZERO - 1;
     private static final int POSITIVE_TWO = SPACING_ZERO + 2;
     private static final String FOREGROUND_TERMINATOR = Character.toString(POSITIVE_TWO);
+    private static final String STAR = "\uE100";
+    private static final String STAR_TRAILING_SPACER = "\uE101";
+    // Minecraft gives the five-pixel bitmap a six-pixel advance.
+    private static final int STAR_ADVANCE = 6;
+    private static final int FILL_ADVANCE = 4;
+    private static final FontDescription RALLE_STAR_FONT = new FontDescription.Resource(
+            Identifier.fromNamespaceAndPath("ralle", "guild_rank_star")
+    );
+    private static final FontDescription WYNN_PILL_FONT = new FontDescription.Resource(
+            Identifier.fromNamespaceAndPath("minecraft", "banner/pill")
+    );
     private static final int MAX_HOVER_COMPONENTS = 256;
     private static final Pattern NICKNAME_HOVER = Pattern.compile(
             "^(.{1,64})['’]s real name is ([A-Za-z0-9_]{1,16})$"
@@ -35,21 +49,83 @@ final class GuildRankTitleTransformer {
             "RECRUITER", encode("RECRUITER"),
             "RECRUIT", encode("RECRUIT")
     );
+    private static final Map<String, Integer> WYNN_RANK_STARS = Map.of(
+            "OWNER", 5,
+            "CHIEF", 4,
+            "STRATEGIST", 3,
+            "CAPTAIN", 2,
+            "RECRUITER", 1,
+            "RECRUIT", 0
+    );
+    private static final String TEST_GUILD_INDICATOR = new StringBuilder()
+            .appendCodePoint(0xCFFFC)
+            .appendCodePoint(0xE006)
+            .appendCodePoint(0xCFFFF)
+            .appendCodePoint(0xE002)
+            .appendCodePoint(0xCFFFE)
+            .toString();
 
     private GuildRankTitleTransformer() {}
 
     static Component apply(Component message, GuildRankSnapshot snapshot) {
+        return apply(message, snapshot, GuildRankStyle.TITLES, true);
+    }
+
+    static Component apply(
+            Component message,
+            GuildRankSnapshot snapshot,
+            GuildRankStyle rankStyle,
+            boolean useInternalRanks
+    ) {
+        return apply(message, snapshot, rankStyle, useInternalRanks, true);
+    }
+
+    private static Component apply(
+            Component message,
+            GuildRankSnapshot snapshot,
+            GuildRankStyle rankStyle,
+            boolean useInternalRanks,
+            boolean spaceBetweenStarsAndTitle
+    ) {
         Objects.requireNonNull(message, "message");
         Objects.requireNonNull(snapshot, "snapshot");
-        if (snapshot.empty()) return message;
+        Objects.requireNonNull(rankStyle, "rankStyle");
 
-        Match match = findMatch(message, snapshot);
+        Match match = findMatch(message);
         if (match == null) return message;
-        return transform(message, match.oldGlyphs(), match.newGlyphs(), match.indicator(),
+
+        Optional<String> internalTitle = Optional.empty();
+        if (useInternalRanks) {
+            internalTitle = snapshot.titleFor(match.speaker().displayName());
+            if (internalTitle.isEmpty()) {
+                String realName = hoveredRealName(message, match.speaker().displayName(),
+                        new int[]{MAX_HOVER_COMPONENTS});
+                if (realName != null) internalTitle = snapshot.titleFor(realName);
+            }
+        }
+
+        String displayedTitle = internalTitle.orElse(match.oldTitle());
+        GuildRankGlyphs replacement;
+        if (rankStyle == GuildRankStyle.TITLES) {
+            if (internalTitle.isEmpty()) return message;
+            replacement = snapshot.glyphsFor(displayedTitle);
+        } else {
+            Integer stars = WYNN_RANK_STARS.get(match.oldTitle());
+            if (stars == null) return message;
+            if (rankStyle == GuildRankStyle.STARS && stars == 0) {
+                return removeRank(message, match.removeStart(), match.removeEnd(),
+                        match.indicator(), match.messageStart(), new int[]{0});
+            }
+            replacement = rankStyle == GuildRankStyle.STARS
+                    ? encodeStars(stars)
+                    : encodeStarsAndTitle(stars, displayedTitle, spaceBetweenStarsAndTitle);
+        }
+
+        return transform(message, match.oldGlyphs(), replacement, match.indicator(),
                 match.messageStart(), new int[]{0});
     }
 
-    private static Match findMatch(Component message, GuildRankSnapshot snapshot) {
+    private static Match findMatch(Component message) {
         String text = message.getString();
         int terminatorIndex = text.indexOf(FOREGROUND_TERMINATOR);
         while (terminatorIndex >= 0) {
@@ -66,21 +142,45 @@ final class GuildRankTitleTransformer {
                         && text.regionMatches(backgroundStart, oldBackground, 0, oldBackground.length())
                         && text.regionMatches(foregroundStart, oldForeground, 0, oldForeground.length())) {
                     Speaker speaker = speakerAfter(text, foregroundEnd);
-                    Optional<String> title = speaker == null ? Optional.empty() : snapshot.titleFor(speaker.displayName());
-                    if (title.isEmpty() && speaker != null) {
-                        String realName = hoveredRealName(message, speaker.displayName(), new int[]{MAX_HOVER_COMPONENTS});
-                        if (realName != null) title = snapshot.titleFor(realName);
+                    if (speaker == null) {
+                        terminatorIndex = text.indexOf(FOREGROUND_TERMINATOR, foregroundEnd);
+                        continue;
                     }
-                    if (title.isPresent()) {
-                        GuildRankGlyphs newGlyphs = snapshot.glyphsFor(title.get());
-                        return new Match(oldGlyphs, newGlyphs, indicatorBefore(text, backgroundStart),
-                                speaker.messageStart());
+                    String indicator = indicatorBefore(text, backgroundStart);
+                    int removeStart = backgroundStart;
+                    int removeEnd = foregroundEnd;
+                    if (indicator != null && backgroundStart > 0 && text.charAt(backgroundStart - 1) == ' ') {
+                        removeStart--;
+                    } else if (foregroundEnd < text.length() && text.charAt(foregroundEnd) == ' ') {
+                        removeEnd++;
                     }
+                    return new Match(oldTitle, oldGlyphs, indicator, speaker,
+                            speaker.messageStart(), removeStart, removeEnd);
                 }
             }
             terminatorIndex = text.indexOf(FOREGROUND_TERMINATOR, foregroundEnd);
         }
         return null;
+    }
+
+    static List<Component> testMessages() {
+        return List.of(
+                testMessage(false, "no space"),
+                testMessage(true, "with space")
+        );
+    }
+
+    private static Component testMessage(boolean gap, String label) {
+        var original = Component.empty()
+                .append(Component.literal(TEST_GUILD_INDICATOR).withStyle(ChatFormatting.WHITE))
+                .append(" ")
+                .append(Component.literal(background("STRATEGIST"))
+                        .withStyle(style -> style.withFont(WYNN_PILL_FONT)))
+                .append(Component.literal(foreground("STRATEGIST")).withStyle(style -> style
+                        .withColor(ChatFormatting.BLACK)
+                        .withFont(WYNN_PILL_FONT)))
+                .append(Component.literal(" maxkarson: " + label).withStyle(ChatFormatting.AQUA));
+        return apply(original, GuildRankSnapshot.EMPTY, GuildRankStyle.STARS_AND_TITLES, false, gap);
     }
 
     private static Speaker speakerAfter(String text, int foregroundEnd) {
@@ -174,6 +274,57 @@ final class GuildRankTitleTransformer {
         return transformed;
     }
 
+    private static Component removeRank(
+            Component component,
+            int removeStart,
+            int removeEnd,
+            String indicator,
+            int messageStart,
+            int[] offset
+    ) {
+        MutableComponent replacement = null;
+        if (component.getContents() instanceof PlainTextContents.LiteralContents literal) {
+            int literalStart = offset[0];
+            int literalEnd = literalStart + literal.text().length();
+            int localMessageStart = messageStart <= literalStart
+                    ? 0 : messageStart >= literalEnd
+                    ? Integer.MAX_VALUE : messageStart - literalStart;
+            int localRemoveStart = Math.max(0, removeStart - literalStart);
+            int localRemoveEnd = Math.min(literal.text().length(), removeEnd - literalStart);
+            var rebuilt = Component.empty();
+            if (localRemoveStart >= localRemoveEnd) {
+                appendOriginal(rebuilt, literal.text(), 0, literal.text().length(),
+                        component.getStyle(), localMessageStart);
+            } else {
+                if (localRemoveStart > 0) {
+                    appendOriginal(rebuilt, literal.text(), 0, localRemoveStart,
+                            component.getStyle(), localMessageStart);
+                }
+                if (localRemoveEnd < literal.text().length()) {
+                    appendOriginal(rebuilt, literal.text(), localRemoveEnd, literal.text().length(),
+                            component.getStyle(), localMessageStart);
+                }
+            }
+            replacement = indicator != null && literal.text().equals(indicator)
+                    ? rebuilt.withStyle(component.getStyle().withColor(ChatFormatting.AQUA))
+                    : rebuilt;
+            offset[0] = literalEnd;
+        }
+
+        boolean siblingChanged = false;
+        var siblings = new Component[component.getSiblings().size()];
+        for (int index = 0; index < siblings.length; index++) {
+            var sibling = component.getSiblings().get(index);
+            siblings[index] = removeRank(sibling, removeStart, removeEnd, indicator, messageStart, offset);
+            siblingChanged |= siblings[index] != sibling;
+        }
+        if (replacement == null && !siblingChanged) return component;
+
+        MutableComponent transformed = replacement == null ? component.plainCopy() : replacement;
+        for (var sibling : siblings) transformed.append(sibling);
+        return transformed;
+    }
+
     private static MutableComponent replaceRuns(
             String text,
             Style style,
@@ -189,7 +340,7 @@ final class GuildRankTitleTransformer {
             return Component.literal(newGlyphs.background()).withStyle(style.withColor(ChatFormatting.AQUA));
         }
         if (text.equals(oldGlyphs.foreground())) {
-            return Component.literal(newGlyphs.foreground()).withStyle(style);
+            return replacementForeground(newGlyphs, style);
         }
 
         int cursor = 0;
@@ -212,13 +363,31 @@ final class GuildRankTitleTransformer {
                 result.append(Component.literal(newGlyphs.background()).withStyle(style.withColor(ChatFormatting.AQUA)));
                 cursor = index + oldGlyphs.background().length();
             } else {
-                result.append(Component.literal(newGlyphs.foreground()).withStyle(style));
+                result.append(replacementForeground(newGlyphs, style));
                 cursor = index + oldGlyphs.foreground().length();
             }
             changed = true;
         }
         if (!changed && messageStart == Integer.MAX_VALUE) return null;
         if (cursor < text.length()) appendOriginal(result, text, cursor, text.length(), style, messageStart);
+        return result;
+    }
+
+    private static MutableComponent replacementForeground(GuildRankGlyphs glyphs, Style pillStyle) {
+        String foreground = glyphs.foreground();
+        int starEnd = 0;
+        while (foreground.startsWith(STAR, starEnd)) starEnd += STAR.length();
+        if (foreground.startsWith(STAR_TRAILING_SPACER, starEnd)) {
+            starEnd += STAR_TRAILING_SPACER.length();
+        }
+        if (starEnd == 0) return Component.literal(foreground).withStyle(pillStyle);
+
+        var result = Component.empty();
+        result.append(Component.literal(foreground.substring(0, starEnd))
+                .withStyle(pillStyle.withFont(RALLE_STAR_FONT)));
+        if (starEnd < foreground.length()) {
+            result.append(Component.literal(foreground.substring(starEnd)).withStyle(pillStyle));
+        }
         return result;
     }
 
@@ -269,6 +438,50 @@ final class GuildRankTitleTransformer {
         return new GuildRankGlyphs(background(title), foreground(title));
     }
 
+    static GuildRankGlyphs encodeStars(int stars) {
+        if (stars <= 0 || stars > 5) throw new IllegalArgumentException("Stars must be between 1 and 5");
+        return encodeComposite(stars, null, false);
+    }
+
+    static GuildRankGlyphs encodeStarsAndTitle(int stars, String title, boolean gap) {
+        if (stars < 0 || stars > 5) throw new IllegalArgumentException("Stars must be between 0 and 5");
+        String normalizedTitle = GuildRankSnapshot.normalizeTitle(title);
+        if (normalizedTitle == null) throw new IllegalArgumentException("Invalid guild rank title");
+        if (stars == 0) return encode(normalizedTitle);
+        return encodeComposite(stars, normalizedTitle, gap);
+    }
+
+    private static GuildRankGlyphs encodeComposite(int stars, String title, boolean gap) {
+        int starWidth = stars * STAR_ADVANCE;
+        int trailingPadding = (FILL_ADVANCE - starWidth % FILL_ADVANCE) % FILL_ADVANCE;
+        int foregroundWidth = starWidth + trailingPadding;
+        var background = new StringBuilder().appendCodePoint(LEFT_CAP).appendCodePoint(NEGATIVE_ONE);
+        for (int index = 0; index < foregroundWidth / FILL_ADVANCE; index++) {
+            background.appendCodePoint(SPACE_FILL).appendCodePoint(NEGATIVE_ONE);
+        }
+
+        var foreground = new StringBuilder(STAR.repeat(stars));
+        if (trailingPadding > 0) foreground.append(STAR_TRAILING_SPACER);
+        if (title != null) {
+            if (gap) {
+                background.appendCodePoint(SPACE_FILL).appendCodePoint(NEGATIVE_ONE);
+                foreground.append(' ');
+                foregroundWidth += FILL_ADVANCE;
+            }
+            for (char character : title.toCharArray()) {
+                background.appendCodePoint(character == ' ' ? SPACE_FILL : BACKGROUND_A + character - 'A');
+                background.appendCodePoint(NEGATIVE_ONE);
+                if (character == ' ') foreground.append(' ');
+                else foreground.appendCodePoint(FOREGROUND_A + character - 'A');
+                foregroundWidth += advance(character);
+            }
+        }
+
+        background.appendCodePoint(RIGHT_CAP).appendCodePoint(SPACING_ZERO - (foregroundWidth + 2));
+        foreground.appendCodePoint(POSITIVE_TWO);
+        return new GuildRankGlyphs(background.toString(), foreground.toString());
+    }
+
     private static int advance(char character) {
         return character == 'I' || character == ' ' ? 4 : 6;
     }
@@ -276,9 +489,12 @@ final class GuildRankTitleTransformer {
     private record Speaker(String displayName, int messageStart) {}
 
     private record Match(
+            String oldTitle,
             GuildRankGlyphs oldGlyphs,
-            GuildRankGlyphs newGlyphs,
             String indicator,
-            int messageStart
+            Speaker speaker,
+            int messageStart,
+            int removeStart,
+            int removeEnd
     ) {}
 }

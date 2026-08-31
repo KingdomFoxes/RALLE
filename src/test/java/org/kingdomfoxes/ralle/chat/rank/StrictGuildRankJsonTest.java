@@ -21,7 +21,7 @@ class StrictGuildRankJsonTest {
                   "members": [
                     {"name":"maxkarson","ranks":[
                       {"kind":"ingame","name":"strategist"},
-                      {"kind":"fox","name":"King Cricket","section":"Court"}
+                      {"kind":"fox","name":"Sir","section":"Court"}
                     ]},
                     {"name":"Vlou_Gremlin","ranks":[
                       {"kind":"ingame","name":"strategist"},
@@ -34,17 +34,17 @@ class StrictGuildRankJsonTest {
 
         var titles = StrictGuildRankJson.decodeApi(response);
 
-        assertEquals(Map.of("maxkarson", "KING CRICKET", "Vlou_Gremlin", "KNIGHT"), titles);
+        assertEquals(Map.of("maxkarson", "SIR", "Vlou_Gremlin", "KNIGHT"), titles);
         assertFalse(titles.containsKey("NoFoxRank"));
     }
 
     @Test
     void cacheRoundTripPreservesTimestampAndNormalizedMappings() {
-        var original = new GuildRankSnapshot(1234L, Map.of("MaxKarson", "King Cricket"));
+        var original = new GuildRankSnapshot(1234L, Map.of("MaxKarson", "Sir"));
 
         var restored = StrictGuildRankJson.decodeCache(StrictGuildRankJson.encodeCache(original));
 
         assertEquals(original, restored);
-        assertEquals("KING CRICKET", restored.titleFor("MAXKARSON").orElseThrow());
+        assertEquals("SIR", restored.titleFor("MAXKARSON").orElseThrow());
     }
 }

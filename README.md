@@ -25,6 +25,12 @@ while moving between multiplayer servers and singleplayer worlds. This history
 exists only in memory, may mix messages from different worlds without labels,
 and disappears when Minecraft closes. RALLE never reloads it from logs or
 writes it to another file, and manual F3+D clearing remains permanent.
+Guild Rank Style is a local Wynncraft guild-chat choice with unchanged title
+pills as its default. It can replace the six standard ranks with zero to five
+classic stars, or render those stars and the current title inside one continuous
+cyan pill. Internal Guild Ranks remains independent: when enabled, the combined
+style keeps the stars from the player's Wynncraft guild rank and uses the
+resolved Fox title for the title portion.
 `/ralle hud` opens the layout editor with every currently enabled editable HUD
 element available; the About page exposes the same action as `Edit HUDs`.
 `/ralle lfg` opens the live, authenticated owo-lib Raid LFG browser when the
@@ -56,6 +62,11 @@ saved vanilla RALLE keybinds are migrated as already seen.
 ## Development
 
 Requirements: Java 21.
+
+Development runs additionally expose `/ralle testmsg`, which posts two local
+Strategist guild-chat samples for comparing the combined pill with and without
+a space between its stars and title. The command is not registered in release
+builds.
 
 ```text
 ./gradlew build

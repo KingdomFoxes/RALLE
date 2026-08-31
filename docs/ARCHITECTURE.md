@@ -89,6 +89,22 @@ reconciliation waits until the first client tick so Minecraft's temporary pre-`o
 `UNKNOWN` mappings cannot overwrite persisted RALLE bindings; later changes and manual unbinding
 from either settings surface remain synchronized.
 
+Guild rank presentation is stored as `chat.guild-rank-style` with `titles` as
+the unchanged default, plus opt-in `stars` and `stars-and-titles` choices. The
+star count is decoded locally from the six standard Wynncraft guild ranks and
+does not enable the Fox rank gateway. Recruit has no rank pill in stars-only
+mode. The combined mode constructs one Wynncraft-font pill: blank cyan filler
+glyphs cover compact stars from RALLE's namespaced bitmap font while the
+existing pill alphabet renders the public title or, when
+`chat.internal-guild-ranks` is enabled and resolves the speaker, the internal
+Fox title. Internal rank refreshes retain their existing Wynncraft-only,
+opt-in network lifecycle.
+
+Development environments alone register `/ralle testmsg`. It posts fixed local
+Strategist samples for `maxkarson` with and without the star/title gap and does
+not consult the internal-rank cache. Release builds continue to expose only the
+three public `/ralle` subcommands.
+
 The one-time installation message uses the shared local RALLE chat presentation
 and stores `message-sent=0/1` in `config/ralle-onboarding.properties`. A missing
 marker starts at `0` only when no earlier RALLE config or vanilla RALLE keybind

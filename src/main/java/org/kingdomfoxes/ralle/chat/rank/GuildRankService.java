@@ -2,6 +2,7 @@ package org.kingdomfoxes.ralle.chat.rank;
 
 import net.minecraft.network.chat.Component;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
+import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,7 +22,8 @@ public final class GuildRankService {
 
     private final GuildRankGateway gateway;
     private final GuildRankCache cache;
-    private final BooleanSetting enabled;
+    private final BooleanSetting internalRanksEnabled;
+    private final ChoiceSetting rankStyle;
     private final Supplier<String> serverHost;
     private final LongSupplier clock;
 
@@ -35,13 +37,15 @@ public final class GuildRankService {
     public GuildRankService(
             GuildRankGateway gateway,
             Path cachePath,
-            BooleanSetting enabled,
+            BooleanSetting internalRanksEnabled,
+            ChoiceSetting rankStyle,
             Supplier<String> serverHost,
             LongSupplier clock
     ) {
         this.gateway = Objects.requireNonNull(gateway, "gateway");
         this.cache = new GuildRankCache(Objects.requireNonNull(cachePath, "cachePath"));
-        this.enabled = Objects.requireNonNull(enabled, "enabled");
+        this.internalRanksEnabled = Objects.requireNonNull(internalRanksEnabled, "internalRanksEnabled");
+        this.rankStyle = Objects.requireNonNull(rankStyle, "rankStyle");
         this.serverHost = Objects.requireNonNull(serverHost, "serverHost");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.snapshot = cache.load();
@@ -58,7 +62,7 @@ public final class GuildRankService {
     /** Called from the client tick; disabled and off-Wynncraft states are network-inert. */
     public void tick() {
         synchronized (this) {
-            boolean active = enabled.value() && onWynncraft();
+            boolean active = internalRanksEnabled.value() && onWynncraft();
             if (!active) {
                 activeLastTick = false;
                 return;
@@ -74,13 +78,21 @@ public final class GuildRankService {
     }
 
     public synchronized CompletableFuture<GuildRankSnapshot> requestRefresh() {
-        if (!enabled.value() || !onWynncraft()) return CompletableFuture.completedFuture(snapshot);
+        if (!internalRanksEnabled.value() || !onWynncraft()) return CompletableFuture.completedFuture(snapshot);
         return beginRefresh(clock.getAsLong());
     }
 
     public Component apply(Component message) {
-        if (!enabled.value() || !onWynncraft()) return message;
-        return GuildRankTitleTransformer.apply(message, snapshot);
+        if (!onWynncraft()) return message;
+        GuildRankStyle style = GuildRankStyle.fromSetting(rankStyle.value());
+        boolean useInternalRanks = internalRanksEnabled.value();
+        if (!useInternalRanks && style == GuildRankStyle.TITLES) return message;
+        return GuildRankTitleTransformer.apply(message, snapshot, style, useInternalRanks);
+    }
+
+    /** Development-only local samples for comparing the combined-pill title gap. */
+    public java.util.List<Component> testMessages() {
+        return GuildRankTitleTransformer.testMessages();
     }
 
     public synchronized boolean refreshing() {
@@ -88,7 +100,7 @@ public final class GuildRankService {
     }
 
     public boolean canRefresh() {
-        return enabled.value() && onWynncraft();
+        return internalRanksEnabled.value() && onWynncraft();
     }
 
     public Throwable lastFailure() {

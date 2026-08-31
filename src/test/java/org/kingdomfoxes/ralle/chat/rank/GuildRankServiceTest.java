@@ -4,6 +4,7 @@ import net.minecraft.network.chat.Component;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
+import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,7 +27,8 @@ class GuildRankServiceTest {
         var now = new long[]{1_000L};
         var gateway = new TrackingGateway();
         var cachePath = temporaryDirectory.resolve("ralle-ranks.json");
-        var service = new GuildRankService(gateway, cachePath, enabled, () -> host[0], () -> now[0]);
+        var service = new GuildRankService(gateway, cachePath, enabled, styleSetting(),
+                () -> host[0], () -> now[0]);
 
         service.tick();
         assertEquals(0, gateway.calls);
@@ -34,7 +36,7 @@ class GuildRankServiceTest {
         enabled.set(true);
         service.tick();
         assertEquals(1, gateway.calls);
-        assertEquals("KING CRICKET", service.snapshot().titleFor("maxkarson").orElseThrow());
+        assertEquals("SIR", service.snapshot().titleFor("maxkarson").orElseThrow());
         assertTrue(Files.exists(cachePath));
 
         now[0] += GuildRankService.REFRESH_INTERVAL.toMillis() - 1;
@@ -60,7 +62,7 @@ class GuildRankServiceTest {
             calls[0]++;
             return calls[0] == 1 ? pending : CompletableFuture.failedFuture(new IllegalStateException("offline"));
         };
-        var service = new GuildRankService(gateway, temporaryDirectory.resolve("ranks.json"), enabled,
+        var service = new GuildRankService(gateway, temporaryDirectory.resolve("ranks.json"), enabled, styleSetting(),
                 () -> "wynncraft.com", () -> 10L);
 
         service.connectionChanged();
@@ -79,10 +81,11 @@ class GuildRankServiceTest {
     @Test
     void disabledFeatureDoesNotTransformChatEvenWhenACacheExists() throws Exception {
         var cache = new GuildRankCache(temporaryDirectory.resolve("ranks.json"));
-        cache.save(new GuildRankSnapshot(1L, Map.of("maxkarson", "King Cricket")));
+        cache.save(new GuildRankSnapshot(1L, Map.of("maxkarson", "Sir")));
         var enabled = setting();
         var service = new GuildRankService(() -> CompletableFuture.completedFuture(Map.of()),
-                temporaryDirectory.resolve("ranks.json"), enabled, () -> "wynncraft.com", () -> 2L);
+                temporaryDirectory.resolve("ranks.json"), enabled, styleSetting(),
+                () -> "wynncraft.com", () -> 2L);
         var message = Component.literal("ordinary chat");
 
         assertFalse(enabled.value());
@@ -90,12 +93,41 @@ class GuildRankServiceTest {
 
         enabled.set(true);
         var offWynncraft = new GuildRankService(() -> CompletableFuture.completedFuture(Map.of()),
-                temporaryDirectory.resolve("ranks.json"), enabled, () -> "example.org", () -> 2L);
+                temporaryDirectory.resolve("ranks.json"), enabled, styleSetting(),
+                () -> "example.org", () -> 2L);
         assertSame(message, offWynncraft.apply(message));
+    }
+
+    @Test
+    void starStyleTransformsLocallyWithoutStartingTheInternalRankGateway() {
+        var internalRanks = setting();
+        var style = styleSetting();
+        style.set("stars");
+        var gateway = new TrackingGateway();
+        var service = new GuildRankService(gateway, temporaryDirectory.resolve("ranks.json"),
+                internalRanks, style, () -> "wynncraft.com", () -> 2L);
+        var original = guildMessage("CAPTAIN", "maxkarson");
+
+        service.tick();
+
+        assertEquals(0, gateway.calls);
+        assertTrue(service.apply(original).getString().contains("\uE100\uE100"));
     }
 
     private static BooleanSetting setting() {
         return new BooleanSetting("internal-guild-ranks", Component.literal("Ranks"), Component.empty());
+    }
+
+    private static ChoiceSetting styleSetting() {
+        return new ChoiceSetting("guild-rank-style", Component.literal("Style"), Component.empty(),
+                "titles", java.util.List.of("titles", "stars", "stars-and-titles"));
+    }
+
+    private static Component guildMessage(String rank, String speaker) {
+        return Component.empty()
+                .append(Component.literal(GuildRankTitleTransformer.background(rank)))
+                .append(Component.literal(GuildRankTitleTransformer.foreground(rank)))
+                .append(Component.literal(" " + speaker + ": hello").withStyle(net.minecraft.ChatFormatting.AQUA));
     }
 
     private static final class TrackingGateway implements GuildRankGateway {
@@ -104,7 +136,7 @@ class GuildRankServiceTest {
         @Override
         public CompletableFuture<Map<String, String>> fetchTitles() {
             calls++;
-            return CompletableFuture.completedFuture(Map.of("maxkarson", "King Cricket"));
+            return CompletableFuture.completedFuture(Map.of("maxkarson", "Sir"));
         }
     }
 }

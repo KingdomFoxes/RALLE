@@ -2,8 +2,10 @@ package org.kingdomfoxes.ralle.chat.rank;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FontDescription;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.Style;
+import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -11,7 +13,9 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GuildRankTitleTransformerTest {
     @Test
@@ -30,12 +34,12 @@ class GuildRankTitleTransformerTest {
 
         var transformed = GuildRankTitleTransformer.apply(
                 original,
-                new GuildRankSnapshot(1L, Map.of("MaxKarson", "King Cricket"))
+                new GuildRankSnapshot(1L, Map.of("MaxKarson", "Sir"))
         );
 
         assertEquals(
-                strategistIndicator() + " " + GuildRankTitleTransformer.background("KING CRICKET")
-                        + GuildRankTitleTransformer.foreground("KING CRICKET") + " maxkarson: hello",
+                strategistIndicator() + " " + GuildRankTitleTransformer.background("SIR")
+                        + GuildRankTitleTransformer.foreground("SIR") + " maxkarson: hello",
                 transformed.getString()
         );
         assertEquals(ChatFormatting.AQUA.getColor(),
@@ -161,13 +165,137 @@ class GuildRankTitleTransformerTest {
     @Test
     void precomputesOneGlyphPairPerUniqueApiTitle() {
         var snapshot = new GuildRankSnapshot(1L, Map.of(
-                "maxkarson", "King Cricket",
-                "_Leoh_", "King Cricket"
+                "maxkarson", "Sir",
+                "_Leoh_", "Sir"
         ));
 
-        assertSame(snapshot.glyphsFor("KING CRICKET"), snapshot.glyphsFor("KING CRICKET"));
-        assertEquals(GuildRankTitleTransformer.background("KING CRICKET"),
-                snapshot.glyphsFor("KING CRICKET").background());
+        assertSame(snapshot.glyphsFor("SIR"), snapshot.glyphsFor("SIR"));
+        assertEquals(GuildRankTitleTransformer.background("SIR"),
+                snapshot.glyphsFor("SIR").background());
+    }
+
+    @Test
+    void mapsEveryWynncraftGuildRankToItsClassicStarCount() {
+        var ranks = Map.of(
+                "RECRUITER", 1,
+                "CAPTAIN", 2,
+                "STRATEGIST", 3,
+                "CHIEF", 4,
+                "OWNER", 5
+        );
+
+        ranks.forEach((rank, count) -> {
+            var transformed = GuildRankTitleTransformer.apply(
+                    guildMessage(rank, "maxkarson"),
+                    GuildRankSnapshot.EMPTY,
+                    GuildRankStyle.STARS,
+                    false
+            );
+            String trailingSpacer = count % 2 == 0 ? "" : "\uE101";
+            assertEquals("\uE100".repeat(count) + trailingSpacer,
+                    foregroundContentBeforeTerminator(transformed));
+        });
+    }
+
+    @Test
+    void compactStarsStayTightAndUseOnlyOneTrailingAlignmentSpacer() {
+        var encoded = GuildRankTitleTransformer.encodeStars(3);
+        int[] background = encoded.background().codePoints().toArray();
+
+        assertEquals("\uE100\uE100\uE100\uE101" + Character.toString(0xD0002), encoded.foreground());
+        assertEquals(5, encoded.background().codePoints().filter(codepoint -> codepoint == 0xE061).count());
+        assertEquals(0xE062, background[background.length - 2]);
+    }
+
+    @Test
+    void packagesTheNamespacedCompactStarFont() {
+        assertNotNull(getClass().getResource("/assets/ralle/font/guild_rank_star.json"));
+        assertNotNull(getClass().getResource("/assets/ralle/textures/font/guild_rank_star.png"));
+    }
+
+    @Test
+    void recruitStarStyleRemovesTheWholeRankPillWithoutLeavingDoubleSpacing() {
+        var transformed = GuildRankTitleTransformer.apply(
+                guildMessage("RECRUIT", "maxkarson"),
+                GuildRankSnapshot.EMPTY,
+                GuildRankStyle.STARS,
+                false
+        );
+
+        assertEquals(strategistIndicator() + " maxkarson: hello", transformed.getString());
+        assertEquals(ChatFormatting.AQUA.getColor(), transformed.getSiblings().get(0).getStyle().getColor().getValue());
+    }
+
+    @Test
+    void combinesStarsAndThePublicTitleInsideOneBackgroundAndOneForegroundPass() {
+        var transformed = GuildRankTitleTransformer.apply(
+                guildMessage("STRATEGIST", "maxkarson"),
+                GuildRankSnapshot.EMPTY,
+                GuildRankStyle.STARS_AND_TITLES,
+                false
+        );
+        var combined = GuildRankTitleTransformer.encodeStarsAndTitle(3, "STRATEGIST", true);
+
+        assertEquals(strategistIndicator() + " " + combined.background() + combined.foreground()
+                + " maxkarson: hello", transformed.getString());
+        assertEquals("\uE100\uE100\uE100\uE101 "
+                        + GuildRankTitleTransformer.foreground("STRATEGIST")
+                        .substring(0, GuildRankTitleTransformer.foreground("STRATEGIST").length() - 2),
+                combined.foreground().substring(0, combined.foreground().length() - 2));
+    }
+
+    @Test
+    void combinedPillUsesRalleFontForStarsAndKeepsTheWynnFontForItsTitle() {
+        FontDescription pillFont = new FontDescription.Resource(
+                Identifier.fromNamespaceAndPath("minecraft", "banner/pill"));
+        FontDescription starFont = new FontDescription.Resource(
+                Identifier.fromNamespaceAndPath("ralle", "guild_rank_star"));
+        var original = Component.empty()
+                .append(Component.literal(strategistIndicator()).withStyle(ChatFormatting.WHITE))
+                .append(" ")
+                .append(Component.literal(GuildRankTitleTransformer.background("STRATEGIST"))
+                        .withStyle(style -> style.withFont(pillFont)))
+                .append(Component.literal(GuildRankTitleTransformer.foreground("STRATEGIST"))
+                        .withStyle(style -> style.withColor(ChatFormatting.BLACK).withFont(pillFont)))
+                .append(Component.literal(" maxkarson: hello").withStyle(ChatFormatting.AQUA));
+
+        var transformed = GuildRankTitleTransformer.apply(
+                original, GuildRankSnapshot.EMPTY, GuildRankStyle.STARS_AND_TITLES, false);
+        var segments = renderedSegments(transformed);
+
+        assertEquals(starFont, segments.stream()
+                .filter(segment -> segment.text().equals("\uE100\uE100\uE100\uE101"))
+                .findFirst().orElseThrow().style().getFont());
+        assertEquals(pillFont, segments.stream()
+                .filter(segment -> segment.text().startsWith(" ")
+                        && segment.text().contains(Character.toString(0xE012)))
+                .findFirst().orElseThrow().style().getFont());
+    }
+
+    @Test
+    void combinesWynnStarsWithTheResolvedInternalFoxTitleInTheSamePill() {
+        var transformed = GuildRankTitleTransformer.apply(
+                guildMessage("CAPTAIN", "maxkarson"),
+                new GuildRankSnapshot(1L, Map.of("maxkarson", "Sir")),
+                GuildRankStyle.STARS_AND_TITLES,
+                true
+        );
+        var combined = GuildRankTitleTransformer.encodeStarsAndTitle(2, "SIR", true);
+
+        assertEquals(strategistIndicator() + " " + combined.background() + combined.foreground()
+                + " maxkarson: hello", transformed.getString());
+    }
+
+    @Test
+    void developmentSamplesAlwaysUsePublicStrategistAndShowBothGapVariants() {
+        var messages = GuildRankTitleTransformer.testMessages();
+        var withoutGap = GuildRankTitleTransformer.encodeStarsAndTitle(3, "STRATEGIST", false);
+        var withGap = GuildRankTitleTransformer.encodeStarsAndTitle(3, "STRATEGIST", true);
+
+        assertEquals(2, messages.size());
+        assertTrue(messages.get(0).getString().contains(withoutGap.background() + withoutGap.foreground()));
+        assertTrue(messages.get(1).getString().contains(withGap.background() + withGap.foreground()));
+        assertTrue(messages.stream().allMatch(message -> message.getString().contains(" maxkarson:")));
     }
 
     @Test
@@ -196,6 +324,23 @@ class GuildRankTitleTransformerTest {
                 .appendCodePoint(0xE002)
                 .appendCodePoint(0xCFFFE)
                 .toString();
+    }
+
+    private static Component guildMessage(String rank, String speaker) {
+        return Component.empty()
+                .append(Component.literal(strategistIndicator()).withStyle(ChatFormatting.WHITE))
+                .append(" ")
+                .append(Component.literal(GuildRankTitleTransformer.background(rank)))
+                .append(Component.literal(GuildRankTitleTransformer.foreground(rank)).withStyle(ChatFormatting.BLACK))
+                .append(Component.literal(" " + speaker + ": hello").withStyle(ChatFormatting.AQUA));
+    }
+
+    private static String foregroundContentBeforeTerminator(Component component) {
+        String text = component.getString();
+        String terminator = Character.toString(0xD0002);
+        int end = text.indexOf(terminator);
+        int star = text.indexOf("\uE100");
+        return text.substring(star, end);
     }
 
     private static ArrayList<RenderedSegment> renderedSegments(Component component) {

@@ -1,0 +1,17 @@
+{
+  "providers": [
+    {
+      "type": "bitmap",
+      "file": "ralle:font/guild_rank_star.png",
+      "height": 8,
+      "ascent": 7,
+      "chars": ["\uE100"]
+    },
+    {
+      "type": "space",
+      "advances": {
+        "\uE101": 2
+      }
+    }
+  ]
+}

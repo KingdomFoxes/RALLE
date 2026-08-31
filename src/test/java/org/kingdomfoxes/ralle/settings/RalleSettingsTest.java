@@ -184,10 +184,14 @@ class RalleSettingsTest {
                 categories.get(1).subcategories().get(0).entries().stream().map(value -> value.id()).toList());
         assertEquals(List.of("chat-type-tabbing"),
                 categories.get(1).subcategories().get(1).entries().stream().map(value -> value.id()).toList());
-        assertEquals(List.of(RalleSettings.INTERNAL_GUILD_RANKS_ID),
+        assertEquals(List.of(RalleSettings.INTERNAL_GUILD_RANKS_ID, RalleSettings.GUILD_RANK_STYLE_ID),
                 categories.get(1).subcategories().get(2).entries().stream().map(value -> value.id()).toList());
         assertFalse(registry.setting(RalleSettings.INTERNAL_GUILD_RANKS_ID, BooleanSetting.class).value());
         assertEquals(List.of(), registry.dependencies(RalleSettings.INTERNAL_GUILD_RANKS_ID));
+        var rankStyle = registry.setting(RalleSettings.GUILD_RANK_STYLE_ID, ChoiceSetting.class);
+        assertEquals("titles", rankStyle.value());
+        assertEquals(List.of("titles", "stars", "stars-and-titles"), rankStyle.choices());
+        assertEquals(List.of(), registry.dependencies(RalleSettings.GUILD_RANK_STYLE_ID));
         assertEquals(List.of("notifications", "controls"),
                 categories.get(2).subcategories().stream().map(value -> value.id()).toList());
         assertEquals(List.of("raid-lfg-enabled"), categories.get(2).entries().stream().map(value -> value.id()).toList());
@@ -271,5 +275,25 @@ class RalleSettingsTest {
         RalleSettings.register(invalid);
         invalid.seal();
         assertEquals("vanilla", invalid.setting(RalleSettings.INTERFACE_FONT_ID, ChoiceSetting.class).value());
+    }
+
+    @Test
+    void guildRankStyleDefaultsToUnchangedTitlesAndPersistsUnderChat() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+
+        var style = registry.setting(RalleSettings.GUILD_RANK_STYLE_ID, ChoiceSetting.class);
+        assertEquals("titles", style.value());
+
+        style.set("stars-and-titles");
+        assertTrue(Files.readString(path).contains("chat.guild-rank-style=stars-and-titles"));
+
+        var restored = new SettingsRegistry(path);
+        RalleSettings.register(restored);
+        restored.seal();
+        assertEquals("stars-and-titles",
+                restored.setting(RalleSettings.GUILD_RANK_STYLE_ID, ChoiceSetting.class).value());
     }
 }
