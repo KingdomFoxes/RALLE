@@ -36,9 +36,7 @@ import org.kingdomfoxes.ralle.settings.RalleSettings;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.Locale;
-import java.util.Map;
 
 public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private final Screen parent;
@@ -46,7 +44,6 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private final ChatLayoutService chatLayout;
     private final SettingsNavigationState navigation;
     private final GuildRankService guildRanks;
-    private final Map<String, UIComponent> sectionComponents = new LinkedHashMap<>();
     private FlowLayout root;
     private FlowLayout sidebarNavigation;
     private FlowLayout document;
@@ -54,14 +51,12 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private TextBoxComponent searchBox;
     private String selectedCategory;
     private String selectedSubcategory;
+    private SettingsNavigationState.Page activePage;
     private String query = "";
     private SettingsNavigationState.Snapshot preSearchSnapshot;
     private KeybindSetting capturingKeybind;
     private ButtonComponent capturingButton;
     private double lastSavedScroll = -1;
-    private FlowLayout finalSection;
-    private UIComponent trailingSpace;
-    private int appliedTrailingSpace = -1;
     private SettingsScreenLayout.Geometry geometry;
     private Double pendingScrollProgress;
 
@@ -78,6 +73,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         this.navigation = navigation;
         this.guildRanks = guildRanks;
         var snapshot = navigation.snapshot();
+        this.activePage = snapshot.page();
         this.selectedCategory = snapshot.categoryId();
         this.selectedSubcategory = snapshot.subcategoryId();
     }
@@ -133,11 +129,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
         rebuildSidebar();
         var snapshot = navigation.snapshot();
-        if (snapshot.about()) {
-            renderAbout();
-        } else {
-            renderCategory(snapshot.categoryId(), snapshot.subcategoryId(), snapshot.scrollProgress(), false);
-        }
+        renderSnapshot(snapshot);
     }
 
     private void rebuildSidebar() {
@@ -150,17 +142,19 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                 ignored -> selectAbout()
         ));
         for (var category : navigableCategories()) {
-            boolean selected = category.id().equals(selectedCategory);
+            boolean expanded = category.id().equals(selectedCategory);
+            boolean selected = expanded && activePage == SettingsNavigationState.Page.CATEGORY;
             entries.add(new NavigationEntry(
                     category.title(), selected && query.isEmpty(), false, ignored -> selectCategory(category)
             ));
-            if (!selected || !query.isEmpty()) continue;
+            if (!expanded || !query.isEmpty()) continue;
             for (var subcategory : category.subcategories()) {
                 entries.add(new NavigationEntry(
                         subcategory.title(),
-                        subcategory.id().equals(selectedSubcategory),
+                        activePage == SettingsNavigationState.Page.SUBCATEGORY
+                                && subcategory.id().equals(selectedSubcategory),
                         true,
-                        ignored -> jumpTo(subcategory)
+                        ignored -> selectSubcategory(category, subcategory)
                 ));
             }
         }
@@ -214,6 +208,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private void selectAbout() {
         if (!query.isEmpty()) searchBox.text("");
         query = "";
+        activePage = SettingsNavigationState.Page.ABOUT;
         selectedCategory = null;
         selectedSubcategory = null;
         navigation.showAbout();
@@ -223,16 +218,26 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     private void selectCategory(SettingsCategory category) {
         if (!query.isEmpty()) searchBox.text("");
-        var first = category.subcategories().getFirst();
+        activePage = SettingsNavigationState.Page.CATEGORY;
         selectedCategory = category.id();
-        selectedSubcategory = first.id();
-        navigation.showCategory(selectedCategory, selectedSubcategory, 0);
+        selectedSubcategory = null;
+        navigation.showCategory(selectedCategory, 0);
         rebuildSidebar();
-        renderCategory(selectedCategory, selectedSubcategory, 0, false);
+        renderCategoryPage(category, 0);
+    }
+
+    private void selectSubcategory(SettingsCategory category, SettingsSubcategory subcategory) {
+        if (!query.isEmpty()) searchBox.text("");
+        activePage = SettingsNavigationState.Page.SUBCATEGORY;
+        selectedCategory = category.id();
+        selectedSubcategory = subcategory.id();
+        navigation.showSubcategory(selectedCategory, selectedSubcategory, 0);
+        rebuildSidebar();
+        renderSubcategoryPage(category, subcategory, 0);
     }
 
     private void renderAbout() {
-        clearDocumentState();
+        pendingScrollProgress = null;
         document.clearChildren();
         scroll.scrollToImmediately(0);
         int textWidth = documentTextWidth();
@@ -263,38 +268,62 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         issues.renderer(RalleButtonRenderers.neutral());
         links.child(source).child(issues);
         document.child(links);
-        document.child(new SettingsSectionDivider(Component.translatable("ralle.settings.subcategory.interface")));
-        document.child(entryRow(settings.entry("edit-huds").orElseThrow()));
-        document.child(entryRow(settings.setting(RalleSettings.INTERFACE_FONT_ID, ChoiceSetting.class)));
+        var about = settings.categories().stream().filter(category -> "about".equals(category.id())).findFirst().orElseThrow();
+        for (var entry : about.entries()) document.child(entryRow(entry));
         document.child(fixedSpacer(SettingsScreenLayout.MINIMUM_DOCUMENT_BOTTOM_SPACE));
     }
 
-    private void renderCategory(String categoryId, String requestedSubcategory, double progress, boolean jump) {
-        var category = category(categoryId);
+    private void renderCategoryPage(SettingsCategory category, double progress) {
+        activePage = SettingsNavigationState.Page.CATEGORY;
+        selectedCategory = category.id();
+        selectedSubcategory = null;
+        renderEntryPage(category.title(), category.entries(), progress);
+    }
+
+    private void renderSubcategoryPage(SettingsCategory category, SettingsSubcategory subcategory, double progress) {
+        activePage = SettingsNavigationState.Page.SUBCATEGORY;
+        selectedCategory = category.id();
+        selectedSubcategory = subcategory.id();
+        renderEntryPage(subcategory.title(), subcategory.entries(), progress);
+    }
+
+    private void renderEntryPage(Component title, java.util.List<SettingsEntry> entries, double progress) {
+        document.clearChildren();
+        document.child(new SettingsSectionDivider(title));
+        var visible = SettingsPageContent.visibleEntries(settings, entries);
+        if (visible.isEmpty() && !entries.isEmpty()) {
+            var unmet = SettingsPageContent.unmetParentTitles(settings, entries);
+            document.child(UIComponents.label(RalleTheme.ui(Component.translatable(
+                            "ralle.settings.page.requires", String.join(", ", unmet))))
+                    .lineHeight(RalleTheme.BODY_LINE_HEIGHT).color(RalleTheme.ACCENT).maxWidth(documentTextWidth()));
+        } else {
+            for (var entry : visible) document.child(entryRow(entry));
+        }
+        document.child(fixedSpacer(SettingsScreenLayout.MINIMUM_DOCUMENT_BOTTOM_SPACE));
+        pendingScrollProgress = Math.clamp(progress, 0, 1);
+    }
+
+    private void renderSnapshot(SettingsNavigationState.Snapshot snapshot) {
+        if (snapshot.about()) {
+            activePage = SettingsNavigationState.Page.ABOUT;
+            selectedCategory = null;
+            selectedSubcategory = null;
+            renderAbout();
+            return;
+        }
+        var category = category(snapshot.categoryId());
         if (category == null) {
             selectAbout();
             return;
         }
-        selectedCategory = category.id();
-        selectedSubcategory = category.subcategories().stream()
-                .anyMatch(value -> value.id().equals(requestedSubcategory))
-                ? requestedSubcategory : category.subcategories().getFirst().id();
-        clearDocumentState();
-        document.clearChildren();
-        for (var subcategory : category.subcategories()) {
-            var section = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
-            section.gap(6).margins(Insets.top(SettingsScreenLayout.SECTION_TOP_MARGIN));
-            var divider = new SettingsSectionDivider(subcategory.title());
-            section.child(divider);
-            for (var entry : subcategory.entries()) section.child(entryRow(entry));
-            sectionComponents.put(subcategory.id(), divider);
-            document.child(section);
-            finalSection = section;
+        if (snapshot.categoryPage()) {
+            renderCategoryPage(category, snapshot.scrollProgress());
+            return;
         }
-        trailingSpace = fixedSpacer(SettingsScreenLayout.MINIMUM_DOCUMENT_BOTTOM_SPACE);
-        document.child(trailingSpace);
-        pendingScrollProgress = Math.clamp(progress, 0, 1);
-        if (jump) jumpToId(selectedSubcategory);
+        var subcategory = category.subcategories().stream()
+                .filter(candidate -> candidate.id().equals(snapshot.subcategoryId())).findFirst().orElse(null);
+        if (subcategory == null) selectAbout();
+        else renderSubcategoryPage(category, subcategory, snapshot.scrollProgress());
     }
 
     private FlowLayout entryRow(SettingsEntry entry) {
@@ -327,24 +356,34 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private UIComponent control(SettingsEntry entry, boolean available) {
-        ButtonComponent button;
         if (entry instanceof BooleanSetting setting) {
-            button = UIComponents.button(booleanLabel(setting), pressed -> toggleBoolean(setting, pressed));
-            button.renderer(RalleButtonRenderers.selectable(setting::value));
+            var toggle = new RalleToggleComponent(setting, pressed -> toggleBoolean(setting, pressed));
+            configureToggle(entry, available, toggle);
             if (RalleSettings.INTERNAL_GUILD_RANKS_ID.equals(setting.id())) {
-                configureControlButton(entry, available, button);
-                button.horizontalSizing(Sizing.fixed(102));
                 var refresh = UIComponents.button(Component.empty(), ignored -> guildRanks.requestRefresh());
                 refresh.id("guild-ranks-refresh");
                 refresh.sizing(Sizing.fixed(20), Sizing.fixed(20));
                 refresh.renderer(RalleButtonRenderers.refresh());
                 updateGuildRankRefreshButton(refresh);
 
-                var controls = UIContainers.horizontalFlow(Sizing.fixed(126), Sizing.fixed(20));
-                controls.gap(4).child(refresh).child(button);
+                var toggleLane = UIContainers.horizontalFlow(Sizing.fixed(102), Sizing.fixed(20));
+                toggleLane.horizontalAlignment(HorizontalAlignment.CENTER);
+                toggleLane.child(toggle);
+                var controls = UIContainers.horizontalFlow(Sizing.fixed(RalleTogglePresentation.CONTROL_LANE_WIDTH), Sizing.fixed(20));
+                controls.gap(4).child(refresh).child(toggleLane);
                 return controls;
             }
-        } else if (entry instanceof ChoiceSetting setting) {
+            var toggleLane = UIContainers.horizontalFlow(
+                    Sizing.fixed(RalleTogglePresentation.CONTROL_LANE_WIDTH),
+                    Sizing.fixed(RalleTogglePresentation.CONTROL_HEIGHT)
+            );
+            toggleLane.horizontalAlignment(HorizontalAlignment.CENTER);
+            toggleLane.child(toggle);
+            return toggleLane;
+        }
+
+        ButtonComponent button;
+        if (entry instanceof ChoiceSetting setting) {
             button = UIComponents.button(choiceLabel(setting), ignored -> openChoice(setting, buttonFor(entry.id())));
             button.renderer(RalleButtonRenderers.neutral());
         } else if (entry instanceof ActionEntry action) {
@@ -377,6 +416,12 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         return button;
     }
 
+    private void configureToggle(SettingsEntry entry, boolean available, RalleToggleComponent toggle) {
+        toggle.id("setting-control-" + entry.id());
+        toggle.sizing(Sizing.fixed(RalleTogglePresentation.TRACK_WIDTH), Sizing.fixed(RalleTogglePresentation.CONTROL_HEIGHT));
+        toggle.active = available;
+    }
+
     private void configureControlButton(SettingsEntry entry, boolean available, ButtonComponent button) {
         button.id("setting-control-" + entry.id());
         button.sizing(Sizing.fixed(126), Sizing.fixed(20));
@@ -388,11 +433,8 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         int triggerViewportOffset = trigger.y() - scroll.y();
         double fallbackProgress = scroll.progress();
         setting.set(!setting.value());
-        renderCategory(selectedCategory, selectedSubcategory, fallbackProgress, false);
-
-        // The mounted document lays out synchronously. Finalize its dynamic tail before restoring
-        // the replacement control so an intermediate zero-scroll layout is never presented.
-        updateTrailingSpace();
+        if (query.isEmpty()) rebuildCurrentPage(fallbackProgress);
+        else renderSearchResults();
         var replacement = buttonFor(setting.id());
         if (replacement == null) return;
 
@@ -420,8 +462,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                                 refreshSearchHintTypography();
                                 rebuildSidebar();
                                 if (!query.isEmpty()) renderSearchResults();
-                                else if (selectedCategory == null) renderAbout();
-                                else renderCategory(selectedCategory, selectedSubcategory, progress, false);
+                                else rebuildCurrentPage(progress);
                             } else {
                                 trigger.setMessage(choiceLabel(setting));
                             }
@@ -445,8 +486,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         double fallbackProgress = scroll.progress();
         setting.set(value);
         if (query.isEmpty()) {
-            renderCategory(selectedCategory, selectedSubcategory, fallbackProgress, false);
-            updateTrailingSpace();
+            rebuildCurrentPage(fallbackProgress);
         } else {
             renderSearchResults();
         }
@@ -504,22 +544,6 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         }
     }
 
-    private void jumpTo(SettingsSubcategory subcategory) {
-        selectedSubcategory = subcategory.id();
-        jumpToId(subcategory.id());
-        persistNavigation();
-        rebuildSidebar();
-    }
-
-    private void jumpToId(String id) {
-        var section = sectionComponents.get(id);
-        if (section == null) return;
-        int anchorOffset = section.y() - document.y();
-        scroll.scrollToOffsetImmediately(SettingsScreenLayout.jumpScrollOffset(
-                anchorOffset, scroll.maximumOffset()
-        ));
-    }
-
     private void searchChanged(String rawQuery) {
         var next = rawQuery.strip().toLowerCase(Locale.ROOT);
         if (query.isEmpty() && !next.isEmpty()) {
@@ -530,13 +554,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         if (query.isEmpty()) {
             var restore = preSearchSnapshot == null ? navigation.snapshot() : preSearchSnapshot;
             preSearchSnapshot = null;
-            if (restore.about()) {
-                selectedCategory = null;
-                selectedSubcategory = null;
-                renderAbout();
-            } else {
-                renderCategory(restore.categoryId(), restore.subcategoryId(), restore.scrollProgress(), false);
-            }
+            renderSnapshot(restore);
             rebuildSidebar();
             return;
         }
@@ -545,18 +563,22 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void renderSearchResults() {
-        clearDocumentState();
+        pendingScrollProgress = null;
         document.clearChildren();
         scroll.scrollToImmediately(0);
         int matches = 0;
         for (var result : SettingsSearch.find(settings, query)) {
                 var category = result.category();
-                var subcategory = result.subcategory();
                 var matchingEntries = result.entries();
                 var group = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
                 group.gap(5).padding(Insets.of(7)).surface(RalleSurfaces.NAVY_PANEL);
-                group.child(UIComponents.label(RalleTheme.ui(Component.empty().append(category.title()).append(" › ").append(subcategory.title())))
-                        .lineHeight(RalleTheme.BODY_LINE_HEIGHT).color(RalleTheme.ACCENT).maxWidth(documentTextWidth()));
+                var breadcrumb = result.categoryPage()
+                        ? category.title()
+                        : Component.empty().append(category.title()).append(" › ").append(result.subcategory().title());
+                var openPage = UIComponents.button(RalleTheme.ui(breadcrumb), ignored -> openSearchResult(result));
+                openPage.sizing(Sizing.fill(100), Sizing.fixed(20));
+                openPage.renderer(RalleButtonRenderers.navigation(0));
+                group.child(openPage);
                 for (var entry : matchingEntries) group.child(entryRow(entry));
                 document.child(group);
                 matches += matchingEntries.size();
@@ -568,29 +590,44 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         document.child(fixedSpacer(SettingsScreenLayout.MINIMUM_DOCUMENT_BOTTOM_SPACE));
     }
 
+    private void openSearchResult(SettingsSearch.ResultGroup result) {
+        if ("about".equals(result.category().id())) {
+            selectAbout();
+        } else if (result.categoryPage()) {
+            selectCategory(result.category());
+        } else {
+            selectSubcategory(result.category(), result.subcategory());
+        }
+    }
+
+    private void rebuildCurrentPage(double progress) {
+        if (activePage == SettingsNavigationState.Page.ABOUT) {
+            renderAbout();
+            return;
+        }
+        var category = category(selectedCategory);
+        if (category == null) {
+            selectAbout();
+        } else if (activePage == SettingsNavigationState.Page.CATEGORY) {
+            renderCategoryPage(category, progress);
+        } else {
+            var subcategory = category.subcategories().stream()
+                    .filter(candidate -> candidate.id().equals(selectedSubcategory)).findFirst().orElse(null);
+            if (subcategory == null) selectAbout();
+            else renderSubcategoryPage(category, subcategory, progress);
+        }
+    }
+
     @Override
     public void tick() {
         super.tick();
         var rankRefresh = root.childById(ButtonComponent.class, "guild-ranks-refresh");
         if (rankRefresh != null) updateGuildRankRefreshButton(rankRefresh);
-        if (!query.isEmpty() || selectedCategory == null || sectionComponents.isEmpty()) return;
-        if (updateTrailingSpace()) return;
         if (pendingScrollProgress != null) {
             scroll.scrollToImmediately(pendingScrollProgress);
             pendingScrollProgress = null;
         }
-        var sectionIds = new ArrayList<>(sectionComponents.keySet());
-        var anchorOffsets = sectionComponents.values().stream()
-                .map(section -> section.y() - document.y())
-                .toList();
-        int activeIndex = SettingsScreenLayout.activeSection(
-                anchorOffsets, (int) Math.round(scroll.offset()), scroll.maximumOffset()
-        );
-        String active = activeIndex < 0 ? selectedSubcategory : sectionIds.get(activeIndex);
-        if (!active.equals(selectedSubcategory)) {
-            selectedSubcategory = active;
-            rebuildSidebar();
-        }
+        if (!query.isEmpty() || activePage == SettingsNavigationState.Page.ABOUT) return;
         if (Math.abs(scroll.progress() - lastSavedScroll) > .005) persistNavigation();
     }
 
@@ -605,9 +642,13 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void persistNavigation() {
-        if (selectedCategory == null || selectedSubcategory == null) return;
+        if (activePage == SettingsNavigationState.Page.ABOUT || selectedCategory == null) return;
         lastSavedScroll = scroll == null ? 0 : scroll.progress();
-        navigation.showCategory(selectedCategory, selectedSubcategory, lastSavedScroll);
+        if (activePage == SettingsNavigationState.Page.CATEGORY) {
+            navigation.showCategory(selectedCategory, lastSavedScroll);
+        } else {
+            navigation.showSubcategory(selectedCategory, selectedSubcategory, lastSavedScroll);
+        }
     }
 
     private SettingsCategory category(String id) {
@@ -618,14 +659,6 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         return settings.categories().stream().filter(category -> !"about".equals(category.id())).toList();
     }
 
-    private void clearDocumentState() {
-        sectionComponents.clear();
-        finalSection = null;
-        trailingSpace = null;
-        appliedTrailingSpace = -1;
-        pendingScrollProgress = null;
-    }
-
     private UIComponent fixedSpacer(int height) {
         var spacer = UIComponents.spacer();
         spacer.sizing(Sizing.fill(100), Sizing.fixed(height));
@@ -634,22 +667,6 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     private int documentTextWidth() {
         return Math.max(120, geometry.documentWidth() - 24);
-    }
-
-    private boolean updateTrailingSpace() {
-        if (finalSection == null || trailingSpace == null || sectionComponents.isEmpty()) return false;
-        var finalAnchor = sectionComponents.values().stream().reduce((first, second) -> second).orElse(null);
-        if (finalAnchor == null || finalSection.height() <= 0) return false;
-        int contentAfterAnchor = finalSection.y() + finalSection.height() - finalAnchor.y();
-        int desired = SettingsScreenLayout.trailingDocumentSpace(scroll.height(), contentAfterAnchor);
-        if (desired == appliedTrailingSpace) return false;
-        appliedTrailingSpace = desired;
-        trailingSpace.verticalSizing(Sizing.fixed(desired));
-        return true;
-    }
-
-    private Component booleanLabel(BooleanSetting setting) {
-        return RalleTheme.ui(Component.translatable(setting.value() ? "ralle.settings.enabled" : "ralle.settings.disabled"));
     }
 
     private Component choiceLabel(ChoiceSetting setting) {

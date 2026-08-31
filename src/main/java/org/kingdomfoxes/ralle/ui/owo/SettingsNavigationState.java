@@ -1,5 +1,6 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
+import org.kingdomfoxes.ralle.api.settings.SettingsCategory;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,17 +22,20 @@ public final class SettingsNavigationState {
         this.snapshot = load(Objects.requireNonNull(registry, "registry"));
     }
 
-    public Snapshot snapshot() {
-        return snapshot;
-    }
+    public Snapshot snapshot() { return snapshot; }
 
     public void showAbout() {
         snapshot = Snapshot.aboutPage();
         save();
     }
 
-    public void showCategory(String categoryId, String subcategoryId, double scrollProgress) {
-        snapshot = new Snapshot(false, categoryId, subcategoryId, clampProgress(scrollProgress));
+    public void showCategory(String categoryId, double scrollProgress) {
+        snapshot = Snapshot.categoryPage(categoryId, scrollProgress);
+        save();
+    }
+
+    public void showSubcategory(String categoryId, String subcategoryId, double scrollProgress) {
+        snapshot = Snapshot.subcategoryPage(categoryId, subcategoryId, scrollProgress);
         save();
     }
 
@@ -44,29 +48,55 @@ public final class SettingsNavigationState {
             LOGGER.warn("Could not read RALLE settings navigation from {}", path, exception);
             return Snapshot.aboutPage();
         }
-        if (Boolean.parseBoolean(properties.getProperty("about", "true"))) return Snapshot.aboutPage();
 
         var categoryId = properties.getProperty("category", "");
         var subcategoryId = properties.getProperty("subcategory", "");
         var category = registry.categories().stream().filter(candidate -> candidate.id().equals(categoryId)).findFirst();
-        if (category.isEmpty() || category.get().subcategories().stream().noneMatch(value -> value.id().equals(subcategoryId))) {
+        double progress = parseProgress(properties.getProperty("scroll", "0"));
+
+        var pageValue = properties.getProperty("page");
+        if (pageValue == null) {
+            if (Boolean.parseBoolean(properties.getProperty("about", "true"))) return Snapshot.aboutPage();
+            return validSubcategory(category, subcategoryId)
+                    ? Snapshot.subcategoryPage(categoryId, subcategoryId, progress)
+                    : Snapshot.aboutPage();
+        }
+
+        final Page page;
+        try {
+            page = Page.valueOf(pageValue.toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
             return Snapshot.aboutPage();
         }
-        double progress;
+        return switch (page) {
+            case ABOUT -> Snapshot.aboutPage();
+            case CATEGORY -> category.isPresent() && !"about".equals(categoryId)
+                    ? Snapshot.categoryPage(categoryId, progress) : Snapshot.aboutPage();
+            case SUBCATEGORY -> validSubcategory(category, subcategoryId)
+                    ? Snapshot.subcategoryPage(categoryId, subcategoryId, progress) : Snapshot.aboutPage();
+        };
+    }
+
+    private static boolean validSubcategory(java.util.Optional<SettingsCategory> category, String subcategoryId) {
+        return category.isPresent() && !"about".equals(category.get().id())
+                && category.get().subcategories().stream().anyMatch(value -> value.id().equals(subcategoryId));
+    }
+
+    private static double parseProgress(String value) {
         try {
-            progress = Double.parseDouble(properties.getProperty("scroll", "0"));
+            return clampProgress(Double.parseDouble(value));
         } catch (NumberFormatException ignored) {
-            progress = 0;
+            return 0;
         }
-        return new Snapshot(false, categoryId, subcategoryId, clampProgress(progress));
     }
 
     private void save() {
         var properties = new Properties();
+        properties.setProperty("page", snapshot.page().name().toLowerCase(java.util.Locale.ROOT));
         properties.setProperty("about", Boolean.toString(snapshot.about()));
         if (!snapshot.about()) {
             properties.setProperty("category", snapshot.categoryId());
-            properties.setProperty("subcategory", snapshot.subcategoryId());
+            if (snapshot.subcategoryId() != null) properties.setProperty("subcategory", snapshot.subcategoryId());
             properties.setProperty("scroll", Double.toString(snapshot.scrollProgress()));
         }
         try {
@@ -83,14 +113,25 @@ public final class SettingsNavigationState {
         return Double.isFinite(value) ? Math.clamp(value, 0, 1) : 0;
     }
 
-    public record Snapshot(boolean about, String categoryId, String subcategoryId, double scrollProgress) {
+    public enum Page { ABOUT, CATEGORY, SUBCATEGORY }
+
+    public record Snapshot(Page page, String categoryId, String subcategoryId, double scrollProgress) {
         public Snapshot {
-            if (!about) {
-                Objects.requireNonNull(categoryId, "categoryId");
-                Objects.requireNonNull(subcategoryId, "subcategoryId");
-            }
+            Objects.requireNonNull(page, "page");
+            if (page != Page.ABOUT) Objects.requireNonNull(categoryId, "categoryId");
+            if (page == Page.SUBCATEGORY) Objects.requireNonNull(subcategoryId, "subcategoryId");
+            scrollProgress = clampProgress(scrollProgress);
         }
 
-        public static Snapshot aboutPage() { return new Snapshot(true, null, null, 0); }
+        public boolean about() { return page == Page.ABOUT; }
+        public boolean categoryPage() { return page == Page.CATEGORY; }
+        public boolean subcategoryPage() { return page == Page.SUBCATEGORY; }
+        public static Snapshot aboutPage() { return new Snapshot(Page.ABOUT, null, null, 0); }
+        public static Snapshot categoryPage(String categoryId, double progress) {
+            return new Snapshot(Page.CATEGORY, categoryId, null, progress);
+        }
+        public static Snapshot subcategoryPage(String categoryId, String subcategoryId, double progress) {
+            return new Snapshot(Page.SUBCATEGORY, categoryId, subcategoryId, progress);
+        }
     }
 }

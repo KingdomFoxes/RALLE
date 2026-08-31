@@ -29,12 +29,49 @@ class SettingsRegistryTest {
     }
 
     @Test
+    void acceptsDirectEntriesAndRejectsCompletelyEmptyCategories() {
+        var registry = registry();
+        registry.registerCategory(new SettingsCategory("chat", text("chat"), text("chat description"),
+                List.of(toggle("layout")), List.of()));
+
+        assertEquals(List.of("layout"), registry.entries().stream().map(SettingsEntry::id).toList());
+        assertThrows(IllegalArgumentException.class, () -> new SettingsCategory(
+                "empty", text("empty"), text("empty description"), List.of(), List.of()
+        ));
+    }
+
+    @Test
+    void directEntriesParticipateInDuplicatesDependenciesAndPersistence() throws Exception {
+        var path = directory.resolve("direct.properties");
+        Files.writeString(path, "chat.enabled=true\n");
+        var registry = new SettingsRegistry(path);
+        registry.registerCategory(new SettingsCategory("chat", text("chat"), text("chat description"),
+                List.of(toggle("enabled")), List.of(subcategory("appearance", toggle("shadow")))));
+        registry.requireEnabled("shadow", "enabled");
+        registry.seal();
+
+        assertTrue(registry.setting("enabled", BooleanSetting.class).value());
+        assertTrue(registry.available("shadow"));
+        registry.setting("enabled", BooleanSetting.class).set(false);
+        assertTrue(Files.readString(path).contains("chat.enabled=false"));
+    }
+
+    @Test
     void rejectsGloballyDuplicateEntryIds() {
         var registry = registry();
         registry.registerCategory(category("chat", subcategory("general", toggle("enabled"))));
         assertThrows(IllegalArgumentException.class, () -> registry.registerCategory(
                 category("lfg", subcategory("general", toggle("enabled")))
         ));
+    }
+
+    @Test
+    void rejectsDuplicatesAcrossDirectAndNestedEntries() {
+        var registry = registry();
+        assertThrows(IllegalArgumentException.class, () -> registry.registerCategory(new SettingsCategory(
+                "chat", text("chat"), text("chat description"), List.of(toggle("enabled")),
+                List.of(subcategory("appearance", toggle("enabled")))
+        )));
     }
 
     @Test

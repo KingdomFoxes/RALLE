@@ -16,18 +16,35 @@ class SettingsNavigationStateTest {
     @TempDir Path directory;
 
     @Test
-    void firstVisitUsesAboutAndLaterVisitsRestoreDocumentPosition() {
+    void firstVisitUsesAboutAndLaterVisitsRestoreEveryPageKind() {
         var registry = registry();
         var path = directory.resolve("ralle-settings-ui.properties");
         var first = new SettingsNavigationState(path, registry);
         assertTrue(first.snapshot().about());
 
-        first.showCategory("chat", "screenshots", .625);
+        first.showCategory("chat", .25);
         var restored = new SettingsNavigationState(path, registry).snapshot();
         assertFalse(restored.about());
+        assertTrue(restored.categoryPage());
         assertEquals("chat", restored.categoryId());
+        assertEquals(.25, restored.scrollProgress());
+
+        first.showSubcategory("chat", "screenshots", .625);
+        restored = new SettingsNavigationState(path, registry).snapshot();
+        assertTrue(restored.subcategoryPage());
         assertEquals("screenshots", restored.subcategoryId());
         assertEquals(.625, restored.scrollProgress());
+    }
+
+    @Test
+    void readsLegacySubcategoryStateCompatibly() throws Exception {
+        var path = directory.resolve("ralle-settings-ui.properties");
+        Files.writeString(path, "about=false\ncategory=chat\nsubcategory=screenshots\nscroll=.5\n");
+
+        var restored = new SettingsNavigationState(path, registry()).snapshot();
+        assertTrue(restored.subcategoryPage());
+        assertEquals("screenshots", restored.subcategoryId());
+        assertEquals(.5, restored.scrollProgress());
     }
 
     @Test

@@ -16,6 +16,8 @@ class SettingsSearchTest {
     void searchesMetadataAndGroupsResultsInRegistryOrder() {
         var registry = new SettingsRegistry(directory.resolve("settings.properties"));
         registry.registerCategory(new SettingsCategory("chat", text("Chat"), text("Local messages"), List.of(
+                toggle("layout", "Edit Chat Layout")
+        ), List.of(
                 new SettingsSubcategory("general", text("General"), text("Core"), List.of(toggle("chat-enabled", "Enable Chat"))),
                 new SettingsSubcategory("screenshots", text("Screenshots"), text("Transparent images"), List.of(toggle("sounds", "Selection Sounds")))
         )));
@@ -24,8 +26,13 @@ class SettingsSearchTest {
         assertEquals(List.of("Chat › Screenshots"), byEntry.stream()
                 .map(group -> group.category().title().getString() + " › " + group.subcategory().title().getString()).toList());
         assertEquals(List.of("sounds"), byEntry.getFirst().entries().stream().map(SettingsEntry::id).toList());
-        assertEquals(2, SettingsSearch.find(registry, "local messages").size());
+        assertEquals(3, SettingsSearch.find(registry, "local messages").size());
         assertEquals(1, SettingsSearch.find(registry, "transparent images").size());
+
+        var direct = SettingsSearch.find(registry, "layout").getFirst();
+        assertEquals("chat", direct.category().id());
+        assertEquals(true, direct.categoryPage());
+        assertEquals(List.of("layout"), direct.entries().stream().map(SettingsEntry::id).toList());
     }
 
     private static BooleanSetting toggle(String id, String title) { return new BooleanSetting(id, text(title), text(title + " description")); }

@@ -22,18 +22,19 @@ public final class RalleSettings {
                 "about",
                 Component.translatable("ralle.settings.about"),
                 Component.translatable("ralle.settings.about.description"),
-                List.of(subcategory("interface",
+                List.of(
                         action("edit-huds"),
                         choice(INTERFACE_FONT_ID, "vanilla", "vanilla", "karla")
-                ))
+                ),
+                List.of()
         ));
 
         registry.registerCategory(new SettingsCategory(
                 "chat",
                 Component.translatable("ralle.settings.category.chat"),
                 Component.translatable("ralle.settings.category.chat.description"),
+                List.of(action("edit-chat-layout")),
                 List.of(
-                        subcategory("general", action("edit-chat-layout")),
                         subcategory("appearance",
                                 toggle("hide-chat-scrollbar"),
                                 toggle("remove-chat-system-indicators"),
@@ -70,8 +71,8 @@ public final class RalleSettings {
                 "raid-lfg",
                 Component.translatable("ralle.settings.category.raid-lfg"),
                 Component.translatable("ralle.settings.category.raid-lfg.description"),
+                List.of(toggle("raid-lfg-enabled")),
                 List.of(
-                        subcategory("general", toggle("raid-lfg-enabled")),
                         subcategory("notifications",
                                 toggle("new-party-notifications"),
                                 toggle("reopened-party-notifications"),
@@ -117,6 +118,7 @@ public final class RalleSettings {
         registry.requireEnabled("raid-lfg-lock-keybind", "raid-lfg-enabled");
         registry.requireEnabled("raid-lfg-create-keybind", "raid-lfg-enabled");
         registry.requireEnabled("raid-lfg-kick-keybind", "raid-lfg-enabled");
+        registry.requireEnabled("automatic-raid-requeue-keybind", "raid-lfg-enabled");
     }
 
     private static SettingsSubcategory subcategory(String id, org.kingdomfoxes.ralle.api.settings.SettingsEntry... entries) {

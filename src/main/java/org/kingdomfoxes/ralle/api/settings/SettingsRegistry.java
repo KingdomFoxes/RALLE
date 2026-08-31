@@ -39,6 +39,11 @@ public final class SettingsRegistry {
 
         var entryIds = new HashSet<String>();
         entries().stream().map(SettingsEntry::id).forEach(entryIds::add);
+        for (var entry : category.entries()) {
+            if (!entryIds.add(entry.id())) {
+                throw new IllegalArgumentException("Duplicate settings entry id: " + entry.id());
+            }
+        }
         var subcategoryIds = new HashSet<String>();
         for (var subcategory : category.subcategories()) {
             if (!subcategoryIds.add(subcategory.id())) {
@@ -69,8 +74,10 @@ public final class SettingsRegistry {
 
     public List<SettingsEntry> entries() {
         return categories.values().stream()
-                .flatMap(category -> category.subcategories().stream())
-                .flatMap(subcategory -> subcategory.entries().stream())
+                .flatMap(category -> java.util.stream.Stream.concat(
+                        category.entries().stream(),
+                        category.subcategories().stream().flatMap(subcategory -> subcategory.entries().stream())
+                ))
                 .toList();
     }
 
@@ -166,6 +173,9 @@ public final class SettingsRegistry {
 
     private void forEachSetting(java.util.function.BiConsumer<SettingsCategory, Setting<?>> consumer) {
         for (var category : categories.values()) {
+            for (var entry : category.entries()) {
+                if (entry instanceof Setting<?> setting) consumer.accept(category, setting);
+            }
             for (var subcategory : category.subcategories()) {
                 for (var entry : subcategory.entries()) {
                     if (entry instanceof Setting<?> setting) consumer.accept(category, setting);

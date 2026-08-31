@@ -156,22 +156,24 @@ class RalleSettingsTest {
 
         var categories = registry.categories().stream().toList();
         assertEquals(List.of("about", "chat", "raid-lfg"), categories.stream().map(value -> value.id()).toList());
-        assertEquals(List.of("interface"),
+        assertEquals(List.of(),
                 categories.get(0).subcategories().stream().map(value -> value.id()).toList());
         assertEquals(List.of("edit-huds", RalleSettings.INTERFACE_FONT_ID),
-                categories.get(0).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
+                categories.get(0).entries().stream().map(value -> value.id()).toList());
         assertEquals(List.of(), registry.dependencies("edit-huds"));
-        assertEquals(List.of("general", "appearance", "guild-ranks", "message-direction", "horizontal-alignment", "text-shadow",
+        assertEquals(List.of("appearance", "guild-ranks", "message-direction", "horizontal-alignment", "text-shadow",
                         "message-behavior", "chat-history", "screenshots"),
                 categories.get(1).subcategories().stream().map(value -> value.id()).toList());
+        assertEquals(List.of("edit-chat-layout"), categories.get(1).entries().stream().map(value -> value.id()).toList());
         assertEquals(List.of("hide-chat-scrollbar", "remove-chat-system-indicators", "chat-timestamps"),
-                categories.get(1).subcategories().get(1).entries().stream().map(value -> value.id()).toList());
+                categories.get(1).subcategories().get(0).entries().stream().map(value -> value.id()).toList());
         assertEquals(List.of(RalleSettings.INTERNAL_GUILD_RANKS_ID),
-                categories.get(1).subcategories().get(2).entries().stream().map(value -> value.id()).toList());
+                categories.get(1).subcategories().get(1).entries().stream().map(value -> value.id()).toList());
         assertFalse(registry.setting(RalleSettings.INTERNAL_GUILD_RANKS_ID, BooleanSetting.class).value());
         assertEquals(List.of(), registry.dependencies(RalleSettings.INTERNAL_GUILD_RANKS_ID));
-        assertEquals(List.of("general", "notifications", "controls"),
+        assertEquals(List.of("notifications", "controls"),
                 categories.get(2).subcategories().stream().map(value -> value.id()).toList());
+        assertEquals(List.of("raid-lfg-enabled"), categories.get(2).entries().stream().map(value -> value.id()).toList());
         var keybinds = List.of(
                 "raid-lfg-keybind",
                 "raid-lfg-join-keybind",
@@ -188,7 +190,7 @@ class RalleSettingsTest {
         }
         assertEquals(KeybindSetting.UNBOUND,
                 registry.setting("automatic-raid-requeue-keybind", KeybindSetting.class).value());
-        assertEquals(List.of(), registry.dependencies("automatic-raid-requeue-keybind"));
+        assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("automatic-raid-requeue-keybind"));
     }
 
     @Test

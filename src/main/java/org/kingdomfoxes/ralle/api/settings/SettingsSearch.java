@@ -12,7 +12,15 @@ public final class SettingsSearch {
         if (query.isEmpty()) return List.of();
         return registry.categories().stream().flatMap(category -> {
             boolean categoryMatches = matches(category.id(), category.title().getString(), category.description().getString(), query);
-            return category.subcategories().stream().map(subcategory -> {
+            var directEntries = category.entries().stream()
+                    .filter(entry -> categoryMatches || matches(
+                            entry.id(), entry.title().getString(), entry.description().getString(), query
+                    ))
+                    .toList();
+            var direct = directEntries.isEmpty()
+                    ? java.util.stream.Stream.<ResultGroup>empty()
+                    : java.util.stream.Stream.of(new ResultGroup(category, null, directEntries));
+            var nested = category.subcategories().stream().map(subcategory -> {
                 boolean groupMatches = categoryMatches || matches(
                         subcategory.id(), subcategory.title().getString(), subcategory.description().getString(), query
                 );
@@ -22,8 +30,9 @@ public final class SettingsSearch {
                         ))
                         .toList();
                 return new ResultGroup(category, subcategory, entries);
-            });
-        }).filter(group -> !group.entries().isEmpty()).toList();
+            }).filter(group -> !group.entries().isEmpty());
+            return java.util.stream.Stream.concat(direct, nested);
+        }).toList();
     }
 
     private static boolean matches(String id, String title, String description, String query) {
@@ -36,5 +45,7 @@ public final class SettingsSearch {
             SettingsCategory category,
             SettingsSubcategory subcategory,
             List<SettingsEntry> entries
-    ) {}
+    ) {
+        public boolean categoryPage() { return subcategory == null; }
+    }
 }
