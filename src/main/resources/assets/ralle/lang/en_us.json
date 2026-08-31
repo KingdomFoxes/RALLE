@@ -57,7 +57,7 @@
   "ralle.settings.option.chat-timestamps": "Chat Timestamps",
   "ralle.settings.option.chat-timestamps.description": "Shows the local receive time as [HH:mm:ss] on every rendered chat line, including wrapped continuations.",
   "ralle.settings.option.chat-type-tabbing": "OW-like Chat Tabbing",
-  "ralle.settings.option.chat-type-tabbing.description": "Pressing an unmodified Tab cycles Guild, Party, your latest outgoing /msg recipient, and All Chat without sending the message.",
+  "ralle.settings.option.chat-type-tabbing.description": "Pressing an unmodified Tab cycles Guild, Party, your latest outgoing /msg recipient, and All Chat without sending the message. New chat screens keep the last selected type.",
   "ralle.settings.option.internal-guild-ranks": "Internal Guild Ranks",
   "ralle.settings.option.internal-guild-ranks.description": "Replaces only the rank title before guild-chat messages with each member's current Fox rank. The instance-local cache refreshes on Wynncraft join and every 30 minutes.",
   "ralle.settings.guild-ranks.refresh": "Refresh the local guild-rank cache now",

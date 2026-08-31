@@ -110,11 +110,13 @@ the corresponding in-memory chat history.
 OW-like Chat Tabbing is gated only by the opt-in `chat.chat-type-tabbing` setting.
 Its latest valid outgoing `/msg` recipient is stored locally in
 `config/ralle-chat-input.properties`; each chat screen's inserted prefix remains
-session-only. The Fabric outgoing-command observer does not mutate or resend
-commands. The ChatScreen integration cycles Guild, Party, the latest DM when
-known, and prefix-free All Chat, consuming only an unmodified Tab on an empty
-input or an exact RALLE-inserted prefix and leaving edited drafts and normal
-command completion to Minecraft.
+session-only. The same file stores the last selected stable chat type, which a
+new empty ChatScreen restores without overriding command-key input or drafts.
+The Fabric outgoing-command observer does not mutate or resend commands. The
+ChatScreen integration cycles Guild, Party, the latest DM when known, and
+prefix-free All Chat, consuming only an unmodified Tab on an empty input or an
+exact RALLE-inserted prefix and leaving edited drafts and normal command
+completion to Minecraft.
 
 Custom HUD placements are stored separately in
 `config/ralle-hud-layout.properties`. Resizable elements such as the v1 chat

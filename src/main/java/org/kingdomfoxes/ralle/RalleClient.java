@@ -187,6 +187,7 @@ public final class RalleClient implements ClientModInitializer {
             if (!overlay) autoRaidRequeue.observeChat(message);
         });
         ClientSendMessageEvents.COMMAND.register(chatTypeTabs::observeSentCommand);
+        ClientSendMessageEvents.CHAT.register(chatTypeTabs::observeSentChat);
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
                 literal("ralle").then(literal("settings").executes(command -> {

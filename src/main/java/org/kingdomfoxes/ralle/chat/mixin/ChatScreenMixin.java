@@ -31,6 +31,17 @@ abstract class ChatScreenMixin extends Screen {
         super(title);
     }
 
+    @Inject(method = "init", at = @At("TAIL"), require = 0)
+    private void ralle$restoreChatType(CallbackInfo callback) {
+        if (!this.input.getValue().isEmpty()
+                || !RalleClient.context().settings()
+                        .setting(ChatTypeTabService.SETTING_ID, BooleanSetting.class)
+                        .value()) {
+            return;
+        }
+        RalleClient.context().chatTypeTabs().prefixForNewChat().ifPresent(this::ralle$setChatTypePrefix);
+    }
+
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true, require = 0)
     private void ralle$selectChatMessages(MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> callback) {
         if (event.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT) return;
@@ -95,10 +106,8 @@ abstract class ChatScreenMixin extends Screen {
             RalleClient.context().chatTypeTabs()
                     .nextPrefix(this.input.getValue(), this.ralle$lastInsertedChatTypePrefix)
                     .ifPresent(prefix -> {
-                        this.input.setValue(prefix);
-                        this.input.setCursorPosition(prefix.length());
-                        this.input.setHighlightPos(prefix.length());
-                        this.ralle$lastInsertedChatTypePrefix = prefix;
+                        this.ralle$setChatTypePrefix(prefix);
+                        RalleClient.context().chatTypeTabs().rememberPrefix(prefix);
                         callback.setReturnValue(true);
                     });
             if (callback.isCancelled()) return;
@@ -140,5 +149,13 @@ abstract class ChatScreenMixin extends Screen {
         var window = net.minecraft.client.Minecraft.getInstance().getWindow();
         return InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_CONTROL)
                 || InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_CONTROL);
+    }
+
+    @Unique
+    private void ralle$setChatTypePrefix(String prefix) {
+        this.input.setValue(prefix);
+        this.input.setCursorPosition(prefix.length());
+        this.input.setHighlightPos(prefix.length());
+        this.ralle$lastInsertedChatTypePrefix = prefix;
     }
 }

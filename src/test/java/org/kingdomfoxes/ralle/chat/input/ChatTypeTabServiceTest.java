@@ -98,4 +98,71 @@ class ChatTypeTabServiceTest {
 
         assertEquals(Optional.of(""), new ChatTypeTabService(path).nextPrefix("/p ", "/p "));
     }
+
+    @Test
+    void selectedChatTypeIsRestoredForTheNextChatScreen() {
+        var service = new ChatTypeTabService();
+
+        assertEquals(Optional.empty(), service.prefixForNewChat());
+        service.rememberPrefix("/p ");
+        assertEquals(Optional.of("/p "), service.prefixForNewChat());
+        service.rememberPrefix("");
+        assertEquals(Optional.of(""), service.prefixForNewChat());
+    }
+
+    @Test
+    void selectedDirectMessageTypeUsesTheLatestRecipient() {
+        var service = new ChatTypeTabService();
+        service.observeSentCommand("msg FirstFox hello");
+        service.rememberPrefix("/msg FirstFox ");
+        service.observeSentCommand("msg NewFox hello");
+
+        assertEquals(Optional.of("/msg NewFox "), service.prefixForNewChat());
+    }
+
+    @Test
+    void successfullySentChatAndSupportedCommandsBecomeTheLastUsedType() {
+        var service = new ChatTypeTabService();
+
+        service.observeSentCommand("g guild message");
+        assertEquals(Optional.of("/g "), service.prefixForNewChat());
+        service.observeSentCommand("P party message");
+        assertEquals(Optional.of("/p "), service.prefixForNewChat());
+        service.observeSentCommand("msg FriendFox direct message");
+        assertEquals(Optional.of("/msg FriendFox "), service.prefixForNewChat());
+        service.observeSentChat("all chat message");
+        assertEquals(Optional.of(""), service.prefixForNewChat());
+    }
+
+    @Test
+    void incompleteOrUnrelatedCommandsDoNotReplaceTheLastUsedType() {
+        var service = new ChatTypeTabService();
+        service.rememberPrefix("/p ");
+
+        service.observeSentCommand("g    ");
+        service.observeSentCommand("help");
+        service.observeSentChat("   ");
+
+        assertEquals(Optional.of("/p "), service.prefixForNewChat());
+    }
+
+    @Test
+    void selectedChatTypePersistsAcrossServiceInstances() throws Exception {
+        var path = temporaryDirectory.resolve("ralle-chat-input.properties");
+        var service = new ChatTypeTabService(path);
+        service.rememberPrefix("/p ");
+
+        assertEquals(Optional.of("/p "), new ChatTypeTabService(path).prefixForNewChat());
+        assertEquals(true, Files.readString(path).contains("last-chat-type=party"));
+    }
+
+    @Test
+    void invalidOrRecipientlessPersistedChatTypeIsIgnored() throws Exception {
+        var path = temporaryDirectory.resolve("ralle-chat-input.properties");
+        Files.writeString(path, "last-chat-type=direct_message\n");
+        assertEquals(Optional.empty(), new ChatTypeTabService(path).prefixForNewChat());
+
+        Files.writeString(path, "last-chat-type=unknown\n");
+        assertEquals(Optional.empty(), new ChatTypeTabService(path).prefixForNewChat());
+    }
 }
