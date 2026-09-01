@@ -1,18 +1,12 @@
 package org.kingdomfoxes.ralle.chat.input;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ChatTypeTabServiceTest {
-    @TempDir
-    Path temporaryDirectory;
-
     @Test
     void cyclesGuildPartyAndAllChatWithoutADirectMessageRecipient() {
         var service = new ChatTypeTabService();
@@ -81,25 +75,6 @@ class ChatTypeTabServiceTest {
     }
 
     @Test
-    void lastDirectMessageRecipientPersistsAcrossServiceInstances() throws Exception {
-        var path = temporaryDirectory.resolve("ralle-chat-input.properties");
-        var service = new ChatTypeTabService(path);
-        service.observeSentCommand("msg PersistedFox hello");
-
-        assertEquals(Optional.of("/msg PersistedFox "),
-                new ChatTypeTabService(path).nextPrefix("/p ", "/p "));
-        assertEquals(true, Files.readString(path).contains("last-direct-message-recipient=PersistedFox"));
-    }
-
-    @Test
-    void invalidPersistedRecipientIsIgnored() throws Exception {
-        var path = temporaryDirectory.resolve("ralle-chat-input.properties");
-        Files.writeString(path, "last-direct-message-recipient=not-valid!\n");
-
-        assertEquals(Optional.of(""), new ChatTypeTabService(path).nextPrefix("/p ", "/p "));
-    }
-
-    @Test
     void selectedChatTypeIsRestoredForTheNextChatScreen() {
         var service = new ChatTypeTabService();
 
@@ -147,22 +122,14 @@ class ChatTypeTabServiceTest {
     }
 
     @Test
-    void selectedChatTypePersistsAcrossServiceInstances() throws Exception {
-        var path = temporaryDirectory.resolve("ralle-chat-input.properties");
-        var service = new ChatTypeTabService(path);
-        service.rememberPrefix("/p ");
+    void disconnectResetClearsSelectedTypeAndDirectMessageRecipient() {
+        var service = new ChatTypeTabService();
+        service.observeSentCommand("msg SessionFox hello");
+        assertEquals(Optional.of("/msg SessionFox "), service.prefixForNewChat());
 
-        assertEquals(Optional.of("/p "), new ChatTypeTabService(path).prefixForNewChat());
-        assertEquals(true, Files.readString(path).contains("last-chat-type=party"));
-    }
+        service.resetSession();
 
-    @Test
-    void invalidOrRecipientlessPersistedChatTypeIsIgnored() throws Exception {
-        var path = temporaryDirectory.resolve("ralle-chat-input.properties");
-        Files.writeString(path, "last-chat-type=direct_message\n");
-        assertEquals(Optional.empty(), new ChatTypeTabService(path).prefixForNewChat());
-
-        Files.writeString(path, "last-chat-type=unknown\n");
-        assertEquals(Optional.empty(), new ChatTypeTabService(path).prefixForNewChat());
+        assertEquals(Optional.empty(), service.prefixForNewChat());
+        assertEquals(Optional.of(""), service.nextPrefix("/p ", "/p "));
     }
 }

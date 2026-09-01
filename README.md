@@ -18,7 +18,7 @@ chat, unmodified Tab prepares Guild, Party, the latest complete outgoing `/msg`
 recipient when known, and prefix-free All Chat in sequence; editing the prepared
 prefix restores vanilla autocomplete, and RALLE never sends the prepared command
 automatically. New empty chat screens restore the last selected type. That type
-and the latest valid recipient persist locally across restarts.
+and the latest valid recipient reset when disconnecting and are never saved to disk.
 Persistent Chat is another disabled-by-default option. When enabled, it keeps
 up to the selected 300, 500, 1000, or 1500 displayed messages and wrapped lines
 while moving between multiplayer servers and singleplayer worlds. This history

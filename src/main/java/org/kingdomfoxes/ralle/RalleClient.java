@@ -141,7 +141,7 @@ public final class RalleClient implements ClientModInitializer {
                 minecraft, settings, raidLfg, lfgSounds, lfgNotifications, hostPartyInvites, regionDetector,
                 actionBarState, disbandConfirmation, lockDebouncer, autoRaidRequeue);
         var chatBehavior = new ChatBehaviorService(Minecraft.getInstance(), settings);
-        var chatTypeTabs = new ChatTypeTabService(configDirectory.resolve("ralle-chat-input.properties"));
+        var chatTypeTabs = new ChatTypeTabService();
         var chatScreenshots = new ChatScreenshotService(
                 Minecraft.getInstance(),
                 settings,
@@ -170,6 +170,7 @@ public final class RalleClient implements ClientModInitializer {
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             autoRaidRequeue.cancel();
+            chatTypeTabs.resetSession();
             raidLfg.connectionChanged();
             guildRanks.connectionChanged();
         });

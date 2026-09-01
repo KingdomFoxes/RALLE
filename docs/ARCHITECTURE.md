@@ -124,10 +124,9 @@ blank-line stacking, and deletion-marker replacement, then clears or prunes with
 the corresponding in-memory chat history.
 
 OW-like Chat Tabbing is gated only by the opt-in `chat.chat-type-tabbing` setting.
-Its latest valid outgoing `/msg` recipient is stored locally in
-`config/ralle-chat-input.properties`; each chat screen's inserted prefix remains
-session-only. The same file stores the last selected stable chat type, which a
-new empty ChatScreen restores without overriding command-key input or drafts.
+Its latest valid outgoing `/msg` recipient and last selected stable chat type are
+connection-local memory only. A new empty ChatScreen restores that type without
+overriding command-key input or drafts, while disconnecting clears both values.
 The Fabric outgoing-command observer does not mutate or resend commands. The
 ChatScreen integration cycles Guild, Party, the latest DM when known, and
 prefix-free All Chat, consuming only an unmodified Tab on an empty input or an
