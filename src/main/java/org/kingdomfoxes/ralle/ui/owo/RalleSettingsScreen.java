@@ -366,11 +366,14 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                 refresh.renderer(RalleButtonRenderers.refresh());
                 updateGuildRankRefreshButton(refresh);
 
-                var toggleLane = UIContainers.horizontalFlow(Sizing.fixed(102), Sizing.fixed(20));
-                toggleLane.horizontalAlignment(HorizontalAlignment.CENTER);
+                var refreshLane = UIContainers.horizontalFlow(Sizing.fixed(40), Sizing.fixed(20));
+                refreshLane.horizontalAlignment(HorizontalAlignment.RIGHT);
+                refreshLane.child(refresh);
+
+                var toggleLane = UIContainers.horizontalFlow(Sizing.fixed(83), Sizing.fixed(20));
                 toggleLane.child(toggle);
                 var controls = UIContainers.horizontalFlow(Sizing.fixed(RalleTogglePresentation.CONTROL_LANE_WIDTH), Sizing.fixed(20));
-                controls.gap(4).child(refresh).child(toggleLane);
+                controls.gap(3).child(refreshLane).child(toggleLane);
                 return controls;
             }
             var toggleLane = UIContainers.horizontalFlow(
