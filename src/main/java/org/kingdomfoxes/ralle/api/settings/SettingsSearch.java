@@ -13,6 +13,7 @@ public final class SettingsSearch {
         return registry.categories().stream().flatMap(category -> {
             boolean categoryMatches = matches(category.id(), category.title().getString(), category.description().getString(), query);
             var directEntries = category.entries().stream()
+                    .filter(entry -> !(entry instanceof CustomPanelEntry))
                     .filter(entry -> categoryMatches || matches(
                             entry.id(), entry.title().getString(), entry.description().getString(), query
                     ))
@@ -25,6 +26,7 @@ public final class SettingsSearch {
                         subcategory.id(), subcategory.title().getString(), subcategory.description().getString(), query
                 );
                 var entries = subcategory.entries().stream()
+                        .filter(entry -> !(entry instanceof CustomPanelEntry))
                         .filter(entry -> groupMatches || matches(
                                 entry.id(), entry.title().getString(), entry.description().getString(), query
                         ))

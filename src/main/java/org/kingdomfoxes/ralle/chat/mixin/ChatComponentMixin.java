@@ -11,7 +11,6 @@ import org.kingdomfoxes.ralle.RalleClient;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatGraphicsTransform;
 import org.kingdomfoxes.ralle.chat.ChatHistoryRetention;
-import org.kingdomfoxes.ralle.chat.ChatMessageProjector;
 import org.kingdomfoxes.ralle.chat.ChatRenderLayout;
 import org.kingdomfoxes.ralle.chat.ChatScrollbarGraphics;
 import org.kingdomfoxes.ralle.chat.ChatSystemIndicators;
@@ -361,24 +360,17 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
 
     private void ralle$refreshProjectedMessages() {
         var behavior = RalleClient.context().chatBehavior();
-        var projected = ChatMessageProjector.project(
-                allMessages,
-                behavior.compactChatEnabled(),
-                behavior.stackEmptyLinesEnabled(),
-                ChatBehaviorService.DEFAULT_COMPACT_WINDOW_TICKS,
-                ralle$timestampStore::receiveTime
-        );
-
         trimmedMessages.clear();
         int contentWidth = ralle$contentWidth();
-        for (int messageIndex = projected.size() - 1; messageIndex >= 0; messageIndex--) {
-            var message = projected.get(messageIndex);
+        for (int messageIndex = allMessages.size() - 1; messageIndex >= 0; messageIndex--) {
+            var message = allMessages.get(messageIndex);
             var displayMessage = ChatSystemIndicators.withoutIndicator(
                     new GuiMessage(message.addedTime(), message.content(), null, message.tag()),
                     behavior.removeChatSystemIndicators()
             );
-            var prefix = behavior.chatTimestampsEnabled() && message.receiveTime() != null
-                    ? ChatTimestamps.prefix(message.receiveTime()).getVisualOrderText()
+            var receiveTime = ralle$timestampStore.receiveTime(message);
+            var prefix = behavior.chatTimestampsEnabled() && receiveTime != null
+                    ? ChatTimestamps.prefix(receiveTime).getVisualOrderText()
                     : null;
             int wrappedContentWidth = prefix == null
                     ? contentWidth

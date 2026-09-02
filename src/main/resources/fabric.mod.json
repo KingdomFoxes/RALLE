@@ -16,7 +16,8 @@
   },
   "mixins": [
     "ralle.mixins.json",
-    "ralle.lfg.mixins.json"
+    "ralle.lfg.mixins.json",
+    "ralle.consumables.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.19.3",

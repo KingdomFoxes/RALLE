@@ -106,16 +106,30 @@ class SettingsRegistryTest {
     }
 
     @Test
-    void loadsAndSavesLegacyCategorySettingKeysAcrossSubcategories() throws Exception {
+    void loadsAndSavesCategorySettingKeysAcrossSubcategories() throws Exception {
         var path = directory.resolve("ralle.properties");
-        Files.writeString(path, "chat.compact-chat=true\n");
+        Files.writeString(path, "chat.chat-timestamps=true\n");
         var registry = new SettingsRegistry(path);
-        registry.registerCategory(category("chat", subcategory("message-behavior", toggle("compact-chat"))));
+        registry.registerCategory(category("chat", subcategory("appearance", toggle("chat-timestamps"))));
         registry.seal();
 
-        assertTrue(registry.setting("compact-chat", BooleanSetting.class).value());
-        registry.setting("compact-chat", BooleanSetting.class).set(false);
-        assertTrue(Files.readString(path).contains("chat.compact-chat=false"));
+        assertTrue(registry.setting("chat-timestamps", BooleanSetting.class).value());
+        registry.setting("chat-timestamps", BooleanSetting.class).set(false);
+        assertTrue(Files.readString(path).contains("chat.chat-timestamps=false"));
+    }
+
+    @Test
+    void customPanelRegistryKeepsMetadataIndependentAndRejectsDuplicateProviders() {
+        var panels = new CustomSettingsPanelRegistry<String, String>();
+        CustomSettingsPanelProvider<String, String> provider = new CustomSettingsPanelProvider<>() {
+            @Override public String id() { return "rules"; }
+            @Override public String render(String context) { return "rendered:" + context; }
+        };
+        panels.register(provider);
+        assertTrue(panels.contains("rules"));
+        assertEquals("rendered:context", panels.render("rules", "context"));
+        assertThrows(IllegalArgumentException.class, () -> panels.register(provider));
+        assertThrows(IllegalArgumentException.class, () -> panels.render("missing", "context"));
     }
 
     private SettingsRegistry registry() { return new SettingsRegistry(directory.resolve("settings.properties")); }

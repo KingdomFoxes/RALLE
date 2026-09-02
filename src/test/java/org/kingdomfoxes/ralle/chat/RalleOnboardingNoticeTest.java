@@ -38,7 +38,7 @@ class RalleOnboardingNoticeTest {
 
     @Test
     void existingInstallIsMigratedWithoutShowingTheNotice() throws Exception {
-        Files.writeString(temporaryDirectory.resolve("ralle.properties"), "chat.compact-chat=true\n");
+        Files.writeString(temporaryDirectory.resolve("ralle.properties"), "chat.chat-timestamps=true\n");
         assertTrue(RalleOnboardingNotice.hasExistingConfig(temporaryDirectory));
 
         var statePath = temporaryDirectory.resolve("ralle-onboarding.properties");

@@ -53,6 +53,8 @@ import org.kingdomfoxes.ralle.lfg.client.LfgRosterSoundController;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.requeue.AutoRaidRequeueController;
 import org.kingdomfoxes.ralle.requeue.AutoRaidRequeueStore;
+import org.kingdomfoxes.ralle.war.consumables.ConsumableHighlightService;
+import org.kingdomfoxes.ralle.war.consumables.ConsumableHighlightStore;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
@@ -94,6 +96,12 @@ public final class RalleClient implements ClientModInitializer {
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), placements);
         var navigation = new SettingsNavigationState(configDirectory.resolve("ralle-settings-ui.properties"), settings);
         var minecraft = Minecraft.getInstance();
+        var consumableHighlights = new ConsumableHighlightService(
+                minecraft,
+                settings.setting(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID, BooleanSetting.class),
+                new ConsumableHighlightStore(configDirectory.resolve("ralle-consumable-highlights.json")),
+                System::currentTimeMillis
+        );
         var guildRanks = new GuildRankService(
                 new HttpGuildRankGateway(),
                 configDirectory.resolve("ralle-ranks.json"),
@@ -151,7 +159,7 @@ public final class RalleClient implements ClientModInitializer {
         context = new RalleContext(
                 features,
                 settings,
-                new OwoSettingsScreenFactory(settings, chatLayout, navigation, guildRanks),
+                new OwoSettingsScreenFactory(settings, chatLayout, navigation, guildRanks, consumableHighlights.store()),
                 chatLayout,
                 chatBehavior,
                 chatTypeTabs,
@@ -161,7 +169,8 @@ public final class RalleClient implements ClientModInitializer {
                 lfgKeybinds,
                 autoRaidRequeue,
                 hostPartyInvites,
-                lfgSounds
+                lfgSounds,
+                consumableHighlights
         );
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             raidLfg.connectionChanged();

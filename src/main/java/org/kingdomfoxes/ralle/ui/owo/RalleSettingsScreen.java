@@ -7,6 +7,7 @@ import io.wispforest.owo.ui.component.DropdownComponent;
 import io.wispforest.owo.ui.component.TextBoxComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.HorizontalAlignment;
 import io.wispforest.owo.ui.core.Insets;
@@ -30,6 +31,8 @@ import org.kingdomfoxes.ralle.api.settings.SettingsEntry;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.api.settings.SettingsSearch;
 import org.kingdomfoxes.ralle.api.settings.SettingsSubcategory;
+import org.kingdomfoxes.ralle.api.settings.CustomPanelEntry;
+import org.kingdomfoxes.ralle.api.settings.CustomSettingsPanelRegistry;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.kingdomfoxes.ralle.chat.rank.GuildRankService;
 import org.kingdomfoxes.ralle.settings.RalleSettings;
@@ -44,6 +47,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private final ChatLayoutService chatLayout;
     private final SettingsNavigationState navigation;
     private final GuildRankService guildRanks;
+    private final CustomSettingsPanelRegistry<OwoCustomSettingsPanelContext, UIComponent> customPanels;
     private FlowLayout root;
     private FlowLayout sidebarNavigation;
     private FlowLayout document;
@@ -65,13 +69,15 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             SettingsRegistry settings,
             ChatLayoutService chatLayout,
             SettingsNavigationState navigation,
-            GuildRankService guildRanks
+            GuildRankService guildRanks,
+            CustomSettingsPanelRegistry<OwoCustomSettingsPanelContext, UIComponent> customPanels
     ) {
         this.parent = parent;
         this.settings = settings;
         this.chatLayout = chatLayout;
         this.navigation = navigation;
         this.guildRanks = guildRanks;
+        this.customPanels = customPanels;
         var snapshot = navigation.snapshot();
         this.activePage = snapshot.page();
         this.selectedCategory = snapshot.categoryId();
@@ -326,7 +332,19 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         else renderSubcategoryPage(category, subcategory, snapshot.scrollProgress());
     }
 
+    OverlayContainer<UIComponent> showModal(UIComponent content) {
+        var overlay = UIContainers.overlay(content).closeOnClick(false);
+        root.child(overlay);
+        return overlay;
+    }
+
     private FlowLayout entryRow(SettingsEntry entry) {
+        if (entry instanceof CustomPanelEntry panel) {
+            var wrapper = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+            wrapper.child(customPanels.render(panel.providerId(),
+                    new OwoCustomSettingsPanelContext(this, documentTextWidth())));
+            return wrapper;
+        }
         boolean available = settings.available(entry.id());
         boolean stacked = width < 540;
         var row = stacked

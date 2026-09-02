@@ -5,6 +5,7 @@ import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.kingdomfoxes.ralle.client.WynncraftHost;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -135,17 +136,6 @@ public final class GuildRankService {
     }
 
     private boolean onWynncraft() {
-        String host = normalizedHost(serverHost.get());
-        return domainOrSubdomain(host, "wynncraft.com") || domainOrSubdomain(host, "wynncraft.net");
-    }
-
-    private static String normalizedHost(String raw) {
-        String host = raw == null ? "" : raw.strip().toLowerCase(Locale.ROOT);
-        int colon = host.indexOf(':');
-        return colon >= 0 ? host.substring(0, colon) : host;
-    }
-
-    private static boolean domainOrSubdomain(String host, String domain) {
-        return host.equals(domain) || host.endsWith("." + domain);
+        return WynncraftHost.matches(serverHost.get());
     }
 }

@@ -15,10 +15,8 @@ platform ports. It must not depend on a concrete settings screen.
 - `api.hud`: normalized, resolution-independent HUD element placement and local
   persistence owned by RALLE.
 - `ui.owo`: the owo-lib adapter that renders the settings registry.
-- `chat`: Minecraft chat integration and Wynntils compatibility boundary. The
-  opted-in display projection implements the 45-second compact-chat window and
-  consecutive blank-line stacking without replacing vanilla source messages or
-  signatures. Narrow graphics transforms implement message direction,
+- `chat`: Minecraft chat integration and Wynntils compatibility boundary.
+  Narrow graphics transforms implement message direction,
   horizontal alignment, and four shadow styles while retaining vanilla chat
   scale, opacity, spacing, timing, scrolling, and interaction metadata. The
   wrapped Full shadow collects every visible line into one fixed-resolution 2x
@@ -61,6 +59,9 @@ platform ports. It must not depend on a concrete settings screen.
 - `lfg`: strict Fox protocol, authentication, live connection, immutable lobby
   projection, and Raid LFG orchestration. It remains inert until enabled and
   connected to Wynncraft.
+- `war.consumables`: local, immutable ordered displayed-name rules and the
+  container-slot highlight service. The service is inert unless its setting is
+  enabled, a play connection exists, and the host is a real Wynncraft domain.
 - `platform`: Fabric/Minecraft adapters such as commands, keybinds, connection
   lifecycle, local persistence, and future clickable chat notifications.
 
@@ -74,6 +75,39 @@ platform ports. It must not depend on a concrete settings screen.
 - Feature IDs and setting/category IDs are validated and unique.
 - Registries are sealed after bootstrap to catch accidental late mutation.
 - Minecraft-specific hooks should use supported APIs before mixins.
+
+## Consumable highlights
+
+`war.consumable-highlights-enabled` defaults to false and is persisted in
+`config/ralle.properties`. The ordered rule document is independent of that
+toggle and lives in `config/ralle-consumable-highlights.json` with
+`schemaVersion: 1`. Missing files are seeded with the nine WynnColour semantic
+groups; the original primary name is not repeated as an alias. Rule mutations
+validate the complete next list, write a sibling temporary file, replace the
+document atomically when supported, and only then publish an immutable snapshot.
+Normalized primary words and aliases must be unique across the whole document.
+
+Matching uses only `ItemStack#getHoverName().getString()`. It performs
+Unicode-aware case folding, turns punctuation and formatting separators into
+spaces, collapses whitespace, and compares complete words or phrases. It never
+reads lore or infers singular/plural variants. The first rule in stored order
+wins, and a bounded displayed-name cache is cleared whenever a new snapshot is
+published.
+
+An optional tail injection into `AbstractContainerScreen#renderSlot` draws a
+single full-opacity, one-pixel border outside the 18-by-18 slot after its item
+and decorations. This covers vanilla container screens and compatible derived
+Wynntils screens without special overlay arbitration. Solid rules use stored
+RGB; rainbow rules retain that RGB while rendering the fixed 0.0004-speed,
+0.85-saturation positional perimeter animation.
+
+The Consumables editor remains available while highlighting is disabled.
+Import reads at most 1 MiB and transactionally appends a complete versioned
+document; malformed, unsupported, internally duplicate, or conflicting imports
+change nothing. Export writes the complete list, including a valid empty list,
+and asks before overwriting. Both use native dialogs with blocking dialog and
+file work off the render thread. Reset replaces only the rule list and never
+changes the master toggle.
 
 ## Local settings
 
@@ -119,9 +153,9 @@ vanilla 100-entry ceiling and restores normal transition clearing.
 
 Chat Timestamps is persisted only as `chat.chat-timestamps`. Receive-time
 metadata is never written or transmitted; it follows retained logical messages
-through rescaling, settings refreshes, Persistent Chat transitions, compaction,
-blank-line stacking, and deletion-marker replacement, then clears or prunes with
-the corresponding in-memory chat history.
+through rescaling, settings refreshes, Persistent Chat transitions, and
+deletion-marker replacement, then clears or prunes with the corresponding
+in-memory chat history.
 
 OW-like Chat Tabbing is gated only by the opt-in `chat.chat-type-tabbing` setting.
 Its latest valid outgoing `/msg` recipient and last selected stable chat type are

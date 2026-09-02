@@ -6,10 +6,9 @@ RALLE-owned feature and settings registry, local settings persistence, and a
 searchable owo-lib settings screen opened with `/ralle settings`. Its chat
 section includes a dedicated editor for moving, resizing, and restoring the
 single chat box; placements are normalized across resolution and GUI-scale
-changes and apply in singleplayer or on any server. Compact chat, empty-line
-stacking, message direction, horizontal text alignment, and text-shadow modes
-are implemented as independently disabled
-local options. Transparent chat screenshot selection also supports an optional
+changes and apply in singleplayer or on any server. Message direction,
+horizontal text alignment, and text-shadow modes are implemented as
+independently disabled local options. Transparent chat screenshot selection also supports an optional
 per-line text-snapped overlay and text-width image crop, plus processed-xylophone
 count and successful-copy feedback. Screenshotting and its sounds are disabled
 by default on new installs.
@@ -53,6 +52,14 @@ while ordinary movement remains available. It does not loop or keep a menu visib
 On new installs, Raid LFG, its notifications, its sounds, and all ten LFG and
 Automatic Raid Requeue controls default to disabled or Unbound.
 Saved settings remain authoritative for existing users.
+
+The War → Consumables settings page includes a disabled-by-default Wynncraft-only
+container-slot highlighter. It matches complete words or phrases in displayed
+item names (never lore) against an ordered local rule list, supports solid and
+animated rainbow one-pixel borders, and updates open containers immediately.
+The versioned list is stored in `config/ralle-consumable-highlights.json` and can
+be imported, exported, edited, emptied, or reset independently of the master
+toggle.
 
 The first connection after a new installation posts one local RALLE onboarding
 message with clickable settings, LFG, and HUD commands. Its numeric sent marker

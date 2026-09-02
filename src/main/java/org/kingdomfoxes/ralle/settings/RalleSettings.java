@@ -8,6 +8,7 @@ import org.kingdomfoxes.ralle.api.settings.SettingsCategory;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.api.settings.SettingsSubcategory;
 import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
+import org.kingdomfoxes.ralle.api.settings.CustomPanelEntry;
 
 import java.util.List;
 
@@ -15,6 +16,9 @@ public final class RalleSettings {
     public static final String INTERFACE_FONT_ID = "interface-font";
     public static final String INTERNAL_GUILD_RANKS_ID = "internal-guild-ranks";
     public static final String GUILD_RANK_STYLE_ID = "guild-rank-style";
+    public static final String CONSUMABLE_HIGHLIGHTS_ENABLED_ID = "consumable-highlights-enabled";
+    public static final String CONSUMABLE_HIGHLIGHT_RULES_ID = "consumable-highlight-rules";
+    public static final String CONSUMABLE_HIGHLIGHT_PROVIDER_ID = "consumable-highlight-editor";
 
     private RalleSettings() {}
 
@@ -58,7 +62,6 @@ public final class RalleSettings {
                                 toggle("text-shadow-enabled"),
                                 choice("text-shadow", "vanilla", "none", "vanilla", "full", "wrapped-full")
                         ),
-                        subcategory("message-behavior", toggle("compact-chat"), toggle("stack-empty-lines")),
                         subcategory("chat-history",
                                 toggle("persistent-chat-enabled"),
                                 choice("persistent-chat-limit", "500", "300", "500", "1000", "1500")
@@ -101,6 +104,17 @@ public final class RalleSettings {
                 )
         ));
 
+        registry.registerCategory(new SettingsCategory(
+                "war",
+                Component.translatable("ralle.settings.category.war"),
+                Component.translatable("ralle.settings.category.war.description"),
+                List.of(),
+                List.of(subcategory("consumables",
+                        toggle(CONSUMABLE_HIGHLIGHTS_ENABLED_ID),
+                        customPanel(CONSUMABLE_HIGHLIGHT_RULES_ID, CONSUMABLE_HIGHLIGHT_PROVIDER_ID)
+                ))
+        ));
+
         registry.requireEnabled("message-direction", "message-direction-enabled");
         registry.requireEnabled("horizontal-alignment", "horizontal-alignment-enabled");
         registry.requireEnabled("text-shadow", "text-shadow-enabled");
@@ -141,6 +155,10 @@ public final class RalleSettings {
 
     private static ActionEntry action(String id) {
         return new ActionEntry(id, title(id), description(id));
+    }
+
+    private static CustomPanelEntry customPanel(String id, String providerId) {
+        return new CustomPanelEntry(id, title(id), description(id), providerId);
     }
 
     private static KeybindSetting keybind(String id) {

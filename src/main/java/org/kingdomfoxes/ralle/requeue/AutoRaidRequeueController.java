@@ -11,6 +11,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
+import org.kingdomfoxes.ralle.client.WynncraftHost;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionBarState;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionGlyph;
 
@@ -208,7 +209,7 @@ public final class AutoRaidRequeueController {
     private boolean normalWynncraftConnection() {
         var server = minecraft.getCurrentServer();
         return server != null
-                && RaidLfgService.isWynncraft(server.ip.strip().toLowerCase(Locale.ROOT).split(":", 2)[0])
+                && WynncraftHost.matches(server.ip)
                 && minecraft.level != null
                 && minecraft.player != null;
     }

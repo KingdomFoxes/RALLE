@@ -1,6 +1,7 @@
 package org.kingdomfoxes.ralle.lfg.client;
 
 import org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException;
+import org.kingdomfoxes.ralle.client.WynncraftHost;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgNoteText;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocolException;
@@ -885,23 +886,12 @@ public final class RaidLfgService {
     }
 
     private static String normalizedHost(String host) {
-        if (host == null) return "";
-        var normalized = host.strip().toLowerCase(Locale.ROOT);
-        if (normalized.startsWith("[")) {
-            int close = normalized.indexOf(']');
-            return close >= 0 ? normalized.substring(1, close) : normalized;
-        }
-        int colon = normalized.indexOf(':');
-        return colon >= 0 ? normalized.substring(0, colon) : normalized;
+        return WynncraftHost.normalize(host);
     }
 
+    /** Compatibility delegate retained for existing LFG callers. */
     public static boolean isWynncraft(String host) {
-        return isDomainOrSubdomain(host, "wynncraft.com")
-                || isDomainOrSubdomain(host, "wynncraft.net");
-    }
-
-    private static boolean isDomainOrSubdomain(String host, String domain) {
-        return host.equals(domain) || host.endsWith("." + domain);
+        return WynncraftHost.matches(host);
     }
 
     private static String pendingKey(UUID lobbyId, String action) {

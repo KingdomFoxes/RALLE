@@ -7,15 +7,11 @@ import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 
 public final class ChatBehaviorService {
     public static final int VANILLA_HISTORY_LIMIT = ChatHistoryRetention.VANILLA_LIMIT;
-    public static final int DEFAULT_COMPACT_WINDOW_SECONDS = 45;
-    public static final int DEFAULT_COMPACT_WINDOW_TICKS = DEFAULT_COMPACT_WINDOW_SECONDS * 20;
 
     private final Minecraft minecraft;
     private final BooleanSetting hideChatScrollbar;
     private final BooleanSetting removeChatSystemIndicators;
     private final BooleanSetting chatTimestamps;
-    private final BooleanSetting compactChat;
-    private final BooleanSetting stackEmptyLines;
     private final BooleanSetting persistentChatEnabled;
     private final ChoiceSetting persistentChatLimit;
     private final BooleanSetting messageDirectionEnabled;
@@ -31,8 +27,6 @@ public final class ChatBehaviorService {
         this.hideChatScrollbar = settings.setting("hide-chat-scrollbar", BooleanSetting.class);
         this.removeChatSystemIndicators = settings.setting("remove-chat-system-indicators", BooleanSetting.class);
         this.chatTimestamps = settings.setting("chat-timestamps", BooleanSetting.class);
-        this.compactChat = settings.setting("compact-chat", BooleanSetting.class);
-        this.stackEmptyLines = settings.setting("stack-empty-lines", BooleanSetting.class);
         this.persistentChatEnabled = settings.setting("persistent-chat-enabled", BooleanSetting.class);
         this.persistentChatLimit = settings.setting("persistent-chat-limit", ChoiceSetting.class);
         this.messageDirectionEnabled = settings.setting("message-direction-enabled", BooleanSetting.class);
@@ -45,15 +39,13 @@ public final class ChatBehaviorService {
     }
 
     public boolean projectionEnabled() {
-        return compactChatEnabled() || stackEmptyLinesEnabled() || chatTimestampsEnabled();
+        return chatTimestampsEnabled();
     }
 
     public boolean chatCustomizationActive() {
         return hideChatScrollbar.value()
                 || removeChatSystemIndicators.value()
                 || chatTimestamps.value()
-                || compactChat.value()
-                || stackEmptyLines.value()
                 || persistentChatEnabled.value()
                 || messageDirectionEnabled.value()
                 || horizontalAlignmentEnabled.value()
@@ -70,14 +62,6 @@ public final class ChatBehaviorService {
 
     public boolean chatTimestampsEnabled() {
         return chatTimestamps.value();
-    }
-
-    public boolean compactChatEnabled() {
-        return compactChat.value();
-    }
-
-    public boolean stackEmptyLinesEnabled() {
-        return stackEmptyLines.value();
     }
 
     public boolean persistentChatEnabled() {
@@ -123,8 +107,6 @@ public final class ChatBehaviorService {
 
     private RenderedMessageSettings renderedMessageSettings() {
         return new RenderedMessageSettings(
-                compactChat.value(),
-                stackEmptyLines.value(),
                 removeChatSystemIndicators.value(),
                 chatTimestamps.value(),
                 persistentChatEnabled.value(),
@@ -150,8 +132,6 @@ public final class ChatBehaviorService {
     }
 
     private record RenderedMessageSettings(
-            boolean compactChat,
-            boolean stackEmptyLines,
             boolean removeChatSystemIndicators,
             boolean chatTimestamps,
             boolean persistentChat,

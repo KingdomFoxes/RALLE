@@ -170,15 +170,17 @@ class RalleSettingsTest {
         RalleSettings.register(registry);
 
         var categories = registry.categories().stream().toList();
-        assertEquals(List.of("about", "chat", "raid-lfg"), categories.stream().map(value -> value.id()).toList());
+        assertEquals(List.of("about", "chat", "raid-lfg", "war"), categories.stream().map(value -> value.id()).toList());
         assertEquals(List.of(),
                 categories.get(0).subcategories().stream().map(value -> value.id()).toList());
         assertEquals(List.of("edit-huds", RalleSettings.INTERFACE_FONT_ID),
                 categories.get(0).entries().stream().map(value -> value.id()).toList());
         assertEquals(List.of(), registry.dependencies("edit-huds"));
         assertEquals(List.of("appearance", "input", "guild-ranks", "message-direction", "horizontal-alignment", "text-shadow",
-                        "message-behavior", "chat-history", "screenshots"),
+                        "chat-history", "screenshots"),
                 categories.get(1).subcategories().stream().map(value -> value.id()).toList());
+        assertTrue(registry.entry("compact-chat").isEmpty());
+        assertTrue(registry.entry("stack-empty-lines").isEmpty());
         assertEquals(List.of("edit-chat-layout"), categories.get(1).entries().stream().map(value -> value.id()).toList());
         assertEquals(List.of("hide-chat-scrollbar", "remove-chat-system-indicators", "chat-timestamps"),
                 categories.get(1).subcategories().get(0).entries().stream().map(value -> value.id()).toList());
@@ -212,6 +214,25 @@ class RalleSettingsTest {
         assertEquals(KeybindSetting.UNBOUND,
                 registry.setting("automatic-raid-requeue-keybind", KeybindSetting.class).value());
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("automatic-raid-requeue-keybind"));
+        assertEquals(List.of("consumables"),
+                categories.get(3).subcategories().stream().map(value -> value.id()).toList());
+        assertEquals(List.of(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID,
+                        RalleSettings.CONSUMABLE_HIGHLIGHT_RULES_ID),
+                categories.get(3).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
+        assertFalse(registry.setting(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID, BooleanSetting.class).value());
+        assertEquals(List.of(), registry.dependencies(RalleSettings.CONSUMABLE_HIGHLIGHT_RULES_ID));
+    }
+
+    @Test
+    void consumableHighlightTogglePersistsUnderWarWithoutGatingTheEditor() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+        registry.setting(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID, BooleanSetting.class).set(true);
+
+        assertTrue(Files.readString(path).contains("war.consumable-highlights-enabled=true"));
+        assertTrue(registry.available(RalleSettings.CONSUMABLE_HIGHLIGHT_RULES_ID));
     }
 
     @Test

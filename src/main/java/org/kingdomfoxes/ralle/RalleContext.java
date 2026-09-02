@@ -13,6 +13,7 @@ import org.kingdomfoxes.ralle.lfg.client.RaidLfgKeybinds;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.requeue.AutoRaidRequeueController;
 import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
+import org.kingdomfoxes.ralle.war.consumables.ConsumableHighlightService;
 
 public record RalleContext(
         FeatureRegistry features,
@@ -27,6 +28,7 @@ public record RalleContext(
         RaidLfgKeybinds raidLfgKeybinds,
         AutoRaidRequeueController autoRaidRequeue,
         HostPartyInviteController hostPartyInvites,
-        LfgSoundPlayer lfgSounds
+        LfgSoundPlayer lfgSounds,
+        ConsumableHighlightService consumableHighlights
 ) {
 }
