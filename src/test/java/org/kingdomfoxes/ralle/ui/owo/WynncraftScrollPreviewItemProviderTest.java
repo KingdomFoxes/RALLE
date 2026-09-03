@@ -8,15 +8,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WynncraftScrollPreviewItemProviderTest {
-    @Test void requiresTheExactTeleportScrollSelectorAt1495() {
-        assertTrue(WynncraftScrollPreviewItemProvider.usesTeleportScroll(JsonParser.parseString("""
-                {"model":{"entries":[{"threshold":1495,"model":{"model":"item/wynn/scroll/scroll_teleport"}}]}}
+    @Test void requiresTheExactWhiteConsumableScrollSelectorAt1459() {
+        assertTrue(WynncraftScrollPreviewItemProvider.usesConsumableScroll(JsonParser.parseString("""
+                {"model":{"entries":[{"threshold":1459,"model":{"model":"item/wynn/economy/woodcutting/scroll_white"}}]}}
                 """)));
-        assertFalse(WynncraftScrollPreviewItemProvider.usesTeleportScroll(JsonParser.parseString("""
-                {"model":{"entries":[{"threshold":1494,"model":{"model":"item/wynn/scroll/scroll_teleport"}}]}}
+        assertFalse(WynncraftScrollPreviewItemProvider.usesConsumableScroll(JsonParser.parseString("""
+                {"model":{"entries":[{"threshold":1458,"model":{"model":"item/wynn/economy/woodcutting/scroll_white"}}]}}
                 """)));
-        assertFalse(WynncraftScrollPreviewItemProvider.usesTeleportScroll(JsonParser.parseString("""
-                {"model":{"entries":[{"threshold":1495,"model":{"model":"item/potion"}}]}}
+        assertFalse(WynncraftScrollPreviewItemProvider.usesConsumableScroll(JsonParser.parseString("""
+                {"model":{"entries":[{"threshold":1459,"model":{"model":"item/potion"}}]}}
                 """)));
     }
 
@@ -33,7 +33,7 @@ class WynncraftScrollPreviewItemProviderTest {
         assertTrue(WynncraftScrollPreviewItemProvider.usesSelector(
                 definition, 1461, "item/wynn/economy/meals/generic_item"));
         assertFalse(WynncraftScrollPreviewItemProvider.usesSelector(
-                definition, 1495, "item/wynn/scroll/scroll_teleport"));
+                definition, 1459, "item/wynn/economy/woodcutting/scroll_white"));
     }
 
     @Test void discoversTheActivePackSelectorInsteadOfAssumingItsNumber() {

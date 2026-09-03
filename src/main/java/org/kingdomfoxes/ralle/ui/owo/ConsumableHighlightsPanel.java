@@ -114,7 +114,8 @@ final class ConsumableHighlightsPanel extends FlowLayout {
     }
 
     private FlowLayout aliasRow(int ruleIndex, int aliasIndex, ConsumableHighlightRule rule) {
-        var row = new HoverActionRow(Sizing.fill(100), Sizing.fixed(22));
+        // Match the parent-row height so the fixed 20px action button is never clipped by padding.
+        var row = new HoverActionRow(Sizing.fill(100), Sizing.fixed(24));
         row.verticalAlignment(VerticalAlignment.CENTER).padding(Insets.of(2));
         row.surface((graphics, component) -> {
             int color = rule.style().rainbow()

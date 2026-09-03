@@ -16,7 +16,8 @@ public final class WynncraftScrollPreviewItemProvider implements PreviewItemProv
     private static final Identifier POTION_ITEM_DEFINITION =
             Identifier.fromNamespaceAndPath("minecraft", "items/potion.json");
     private static final PreviewKind[] PREVIEWS = {
-            new PreviewKind("item/wynn/scroll/scroll_teleport", "item/wynn/scroll/", Fallback.PAPER),
+            new PreviewKind("item/wynn/economy/woodcutting/scroll_white",
+                    "item/wynn/economy/woodcutting/scroll_", Fallback.PAPER),
             new PreviewKind("item/wynn/potion/healing_full", "item/wynn/potion/", Fallback.POTION),
             new PreviewKind("item/wynn/economy/meals/generic_item", "item/wynn/economy/meals/", Fallback.FOOD)
     };
@@ -55,8 +56,8 @@ public final class WynncraftScrollPreviewItemProvider implements PreviewItemProv
         return resolved;
     }
 
-    static boolean usesTeleportScroll(JsonElement element) {
-        return usesSelector(element, 1495, "item/wynn/scroll/scroll_teleport");
+    static boolean usesConsumableScroll(JsonElement element) {
+        return usesSelector(element, 1459, "item/wynn/economy/woodcutting/scroll_white");
     }
 
     static boolean usesSelector(JsonElement element, int selector, String modelId) {

@@ -18,6 +18,13 @@ import java.io.IOException;
 
 /** Shared in-screen create/edit color modal with synchronized HSV, hex, rainbow, and preview state. */
 final class ConsumableColorDialogScreen {
+    private static final int ADD_DIALOG_WIDTH = 420;
+    private static final int EDIT_DIALOG_WIDTH = 310;
+    // The controls consume 130px; retain a two-pixel gutter so the preview's right edge survives row clipping.
+    private static final int EDIT_FIELDS_WIDTH = 132;
+    private static final int PICKER_SIZE = 150;
+    private static final int DIALOG_PADDING = 10;
+
     private ConsumableColorDialogScreen() {}
 
     static void openAdd(RalleSettingsScreen screen, ConsumableHighlightStore store) {
@@ -35,14 +42,18 @@ final class ConsumableColorDialogScreen {
             HighlightStyle initial
     ) {
         var draft = new ColorStyleDraft(initial);
-        var content = UIContainers.verticalFlow(Sizing.fixed(420), Sizing.content());
-        content.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
-        content.child(UIComponents.label(RalleTheme.ui(Component.translatable(editingIndex == null
+        boolean editing = editingIndex != null;
+        int dialogWidth = editing ? EDIT_DIALOG_WIDTH : ADD_DIALOG_WIDTH;
+        int innerWidth = dialogWidth - DIALOG_PADDING * 2;
+        var content = UIContainers.verticalFlow(Sizing.fixed(dialogWidth), Sizing.content());
+        content.gap(6).padding(Insets.of(DIALOG_PADDING)).surface(RalleSurfaces.FRAMED_NAVY);
+
+        var body = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content()).gap(8);
+        var fields = UIContainers.verticalFlow(
+                editing ? Sizing.fixed(EDIT_FIELDS_WIDTH) : Sizing.expand(100), Sizing.content()).gap(5);
+        fields.child(UIComponents.label(RalleTheme.ui(Component.translatable(editingIndex == null
                         ? "ralle.consumables.dialog.add.title" : "ralle.consumables.dialog.color.title")))
                 .color(RalleTheme.ACCENT));
-
-        var body = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content()).gap(12);
-        var fields = UIContainers.verticalFlow(Sizing.expand(100), Sizing.content()).gap(5);
         TextBoxComponent name = editingIndex == null ? UIComponents.textBox(Sizing.fill(100)) : null;
         TextBoxComponent aliases = editingIndex == null ? UIComponents.textBox(Sizing.fill(100)) : null;
         if (name != null) {
@@ -67,7 +78,7 @@ final class ConsumableColorDialogScreen {
         rainbow.onChanged(draft::rainbow);
         fields.child(rainbow);
 
-        var picker = new HsvWheelTrianglePicker(150, draft.rgb());
+        var picker = new HsvWheelTrianglePicker(PICKER_SIZE, draft.rgb());
         var syncingHex = new boolean[1];
         picker.onChanged(rgb -> {
             draft.rgb(rgb);
@@ -75,7 +86,7 @@ final class ConsumableColorDialogScreen {
             hex.text(draft.hex());
             syncingHex[0] = false;
         });
-        var error = UIComponents.label(Component.empty()).color(Color.ofRgb(0xFF6B6B)).maxWidth(396);
+        var error = UIComponents.label(Component.empty()).color(Color.ofRgb(0xFF6B6B)).maxWidth(innerWidth);
         hex.onChanged().subscribe(value -> {
             if (syncingHex[0] || !value.matches("#[0-9A-Fa-f]{6}")) return;
             draft.hex(value);

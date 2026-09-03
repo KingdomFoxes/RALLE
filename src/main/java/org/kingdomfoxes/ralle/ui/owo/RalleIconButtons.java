@@ -30,8 +30,9 @@ public final class RalleIconButtons {
         var button = base(accessibleLabel, pressed);
         button.renderer((graphics, control, delta) -> {
             RalleButtonRenderers.neutral().draw(graphics, control, delta);
-            int cx = control.getX() + control.getWidth() / 2;
-            int cy = control.getY() + control.getHeight() / 2;
+            // Center against the visible face, which excludes the two-pixel bottom/right depth.
+            int cx = control.getX() + (control.getWidth() - 2) / 2;
+            int cy = control.getY() + (control.getHeight() - 2) / 2;
             graphics.fill(cx - 4, cy, cx + 5, cy + 1, 0xFFFFFFFF);
             graphics.fill(cx, cy - 4, cx + 1, cy + 5, 0xFFFFFFFF);
         });
