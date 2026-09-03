@@ -34,4 +34,18 @@ class HsvColorModelTest {
         assertEquals(original.saturation(), sampled.saturation(), .0001f);
         assertEquals(original.value(), sampled.value(), .0001f);
     }
+
+    @Test void triangleIsCenteredAndSymmetric() {
+        var triangle = HsvColorModel.triangle(150);
+        double center = 75;
+        assertEquals(center, triangle.hue().x(), .0001);
+        assertEquals(center, (triangle.white().x() + triangle.black().x()) / 2, .0001);
+        assertEquals(triangle.white().y(), triangle.black().y(), .0001);
+        assertEquals(HsvColorModel.innerRadius(150),
+                Math.hypot(triangle.hue().x() - center, triangle.hue().y() - center), .0001);
+        assertEquals(HsvColorModel.innerRadius(150),
+                Math.hypot(triangle.white().x() - center, triangle.white().y() - center), .0001);
+        assertEquals(HsvColorModel.innerRadius(150),
+                Math.hypot(triangle.black().x() - center, triangle.black().y() - center), .0001);
+    }
 }

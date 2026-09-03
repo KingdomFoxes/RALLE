@@ -7,6 +7,7 @@ import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.Color;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.Sizing;
+import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.network.chat.Component;
 import org.kingdomfoxes.ralle.war.consumables.ConsumableHighlightRule;
 import org.kingdomfoxes.ralle.war.consumables.ConsumableHighlightStore;
@@ -56,12 +57,15 @@ final class ConsumableColorDialogScreen {
         fields.child(label("ralle.consumables.field.hex"));
         var hex = UIComponents.textBox(Sizing.fixed(104)).text(draft.hex());
         hex.setMaxLength(7);
-        fields.child(hex);
+        var hexRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(20)).gap(6);
+        hexRow.verticalAlignment(VerticalAlignment.CENTER);
+        hexRow.child(hex);
+        hexRow.child(new HighlightedSlotPreviewComponent(new WynncraftScrollPreviewItemProvider(), draft::style));
+        fields.child(hexRow);
         var rainbow = UIComponents.checkbox(RalleTheme.ui(Component.translatable("ralle.consumables.field.rainbow")));
         rainbow.checked(draft.rainbow());
         rainbow.onChanged(draft::rainbow);
         fields.child(rainbow);
-        fields.child(new HighlightedSlotPreviewComponent(new WynncraftScrollPreviewItemProvider(), draft::style));
 
         var picker = new HsvWheelTrianglePicker(150, draft.rgb());
         var syncingHex = new boolean[1];
@@ -78,9 +82,6 @@ final class ConsumableColorDialogScreen {
             picker.rgb(draft.rgb());
             error.text(Component.empty());
         });
-        body.child(fields).child(picker);
-        content.child(body).child(error);
-
         @SuppressWarnings("rawtypes")
         var overlayHolder = new OverlayContainer[1];
         var submit = UIComponents.button(RalleTheme.ui(Component.translatable(editingIndex == null
@@ -106,7 +107,8 @@ final class ConsumableColorDialogScreen {
         });
         submit.sizing(Sizing.fill(100), Sizing.fixed(20));
         submit.renderer(RalleButtonRenderers.primary());
-        content.child(submit);
+        body.child(fields).child(picker);
+        content.child(body).child(error).child(submit);
         overlayHolder[0] = screen.showModal(content);
     }
 

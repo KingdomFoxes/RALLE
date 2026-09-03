@@ -109,6 +109,11 @@ and asks before overwriting. Both use native dialogs with blocking dialog and
 file work off the render thread. Reset replaces only the rule list and never
 changes the master toggle.
 
+The color dialog's scroll, potion, and food slot preview resolves custom-model-data
+selectors and models from the active Wynncraft resource pack. RALLE does not ship
+copies of those textures; missing or incompatible pack entries fall back to
+recognizable vanilla items without affecting highlight configuration.
+
 ## Local settings
 
 `/ralle settings` opens the owo-lib adapter over RALLE-owned category and setting

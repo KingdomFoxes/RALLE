@@ -147,6 +147,7 @@
   "ralle.consumables.field.aliases": "Aliases (comma-separated)",
   "ralle.consumables.field.hex": "Hex color",
   "ralle.consumables.field.rainbow": "Rainbow",
+  "ralle.consumables.preview.tooltip": "Click to preview scroll, potion, and food",
   "ralle.consumables.access.expand": "Expand or collapse aliases for %s",
   "ralle.consumables.access.color": "Change color for %s",
   "ralle.consumables.access.add-alias": "Add aliases to %s",

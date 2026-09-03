@@ -20,8 +20,8 @@ public final class HsvColorModel {
         double dx = x - center;
         double dy = y - center;
         double radius = Math.hypot(dx, dy);
-        double outer = Math.max(1, size / 2d - 1);
-        double inner = outer * .72;
+        double outer = outerRadius(size);
+        double inner = innerRadius(size);
         if (radius >= inner && radius <= outer) return Hit.WHEEL;
         return insideTriangle(x, y, size) ? Hit.TRIANGLE : Hit.NONE;
     }
@@ -61,12 +61,24 @@ public final class HsvColorModel {
 
     static Triangle triangle(int size) {
         double center = size / 2d;
-        double radius = size * .30;
+        double radius = innerRadius(size);
         return new Triangle(
                 point(center, center, radius, -Math.PI / 2),
                 point(center, center, radius, -Math.PI / 2 - Math.PI * 2 / 3),
                 point(center, center, radius, -Math.PI / 2 + Math.PI * 2 / 3)
         );
+    }
+
+    static double outerRadius(int size) {
+        return Math.max(1, size / 2d - .5);
+    }
+
+    static double coloredOuterRadius(int size) {
+        return Math.max(1, outerRadius(size) - 2);
+    }
+
+    static double innerRadius(int size) {
+        return coloredOuterRadius(size) * .72;
     }
 
     private static Weights barycentric(double x, double y, Triangle triangle) {

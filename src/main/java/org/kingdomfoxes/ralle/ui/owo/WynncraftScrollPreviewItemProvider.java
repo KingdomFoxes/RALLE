@@ -11,46 +11,59 @@ import net.minecraft.world.item.component.CustomModelData;
 
 import java.util.List;
 
-/** Uses Wynncraft's potion selector 1495 only when a non-vanilla potion model resource is active. */
+/** Cycles through representative models discovered from the active Wynncraft resource pack. */
 public final class WynncraftScrollPreviewItemProvider implements PreviewItemProvider {
     private static final Identifier POTION_ITEM_DEFINITION =
             Identifier.fromNamespaceAndPath("minecraft", "items/potion.json");
-    private static final Identifier TELEPORT_SCROLL_MODEL =
-            Identifier.fromNamespaceAndPath("minecraft", "models/item/wynn/scroll/scroll_teleport.json");
-    private static final String TELEPORT_SCROLL_MODEL_ID = "item/wynn/scroll/scroll_teleport";
-    private final ItemStack preview = resolvePreviewItem();
+    private static final PreviewKind[] PREVIEWS = {
+            new PreviewKind("item/wynn/scroll/scroll_teleport", "item/wynn/scroll/", Fallback.PAPER),
+            new PreviewKind("item/wynn/potion/healing_full", "item/wynn/potion/", Fallback.POTION),
+            new PreviewKind("item/wynn/economy/meals/generic_item", "item/wynn/economy/meals/", Fallback.FOOD)
+    };
+    private int selected;
+    private final ItemStack[] previews = resolvePreviewItems();
 
     @Override
     public ItemStack previewItem() {
-        return preview;
+        return previews[selected];
     }
 
-    private static ItemStack resolvePreviewItem() {
-        var fallback = new ItemStack(Items.PAPER);
+    @Override
+    public boolean advance() {
+        selected = (selected + 1) % previews.length;
+        return true;
+    }
+
+    private static ItemStack[] resolvePreviewItems() {
+        var resolved = new ItemStack[PREVIEWS.length];
         var resources = Minecraft.getInstance().getResourceManager();
         var itemDefinition = resources.getResource(POTION_ITEM_DEFINITION).orElse(null);
-        if (itemDefinition == null || "vanilla".equals(itemDefinition.sourcePackId())
-                || "fabric".equals(itemDefinition.sourcePackId())
-                || resources.getResource(TELEPORT_SCROLL_MODEL).isEmpty()) {
-            return fallback;
-        }
+        if (itemDefinition == null) return fallbacks();
+        JsonElement definition;
         try (var reader = itemDefinition.openAsReader()) {
-            if (!usesTeleportScroll(JsonParser.parseReader(reader))) return fallback;
+            definition = JsonParser.parseReader(reader);
         } catch (Exception ignored) {
-            return fallback;
+            return fallbacks();
         }
-        var stack = new ItemStack(Items.POTION);
-        stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(
-                List.of(1495f), List.of(), List.of(), List.of()
-        ));
-        return stack;
+        for (int index = 0; index < PREVIEWS.length; index++) {
+            var kind = PREVIEWS[index];
+            var selection = findSelector(definition, kind.preferredModel(), kind.modelPathPrefix());
+            resolved[index] = selection != null && resources.getResource(modelResource(selection.modelId())).isPresent()
+                    ? modeledPotion(selection.selector())
+                    : fallbackStack(kind.fallback());
+        }
+        return resolved;
     }
 
     static boolean usesTeleportScroll(JsonElement element) {
+        return usesSelector(element, 1495, "item/wynn/scroll/scroll_teleport");
+    }
+
+    static boolean usesSelector(JsonElement element, int selector, String modelId) {
         if (element == null || element.isJsonNull()) return false;
         if (element.isJsonArray()) {
             for (var child : element.getAsJsonArray()) {
-                if (usesTeleportScroll(child)) return true;
+                if (usesSelector(child, selector, modelId)) return true;
             }
             return false;
         }
@@ -58,32 +71,127 @@ public final class WynncraftScrollPreviewItemProvider implements PreviewItemProv
         var object = element.getAsJsonObject();
         var threshold = object.get("threshold");
         if (threshold != null && threshold.isJsonPrimitive() && threshold.getAsJsonPrimitive().isNumber()
-                && threshold.getAsDouble() == 1495d && containsTeleportScrollModel(object.get("model"))) {
+                && threshold.getAsDouble() == selector && containsModel(object.get("model"), modelId)) {
             return true;
         }
         for (var child : object.entrySet()) {
-            if (usesTeleportScroll(child.getValue())) return true;
+            if (usesSelector(child.getValue(), selector, modelId)) return true;
         }
         return false;
     }
 
-    private static boolean containsTeleportScrollModel(JsonElement element) {
-        if (element == null || element.isJsonNull()) return false;
+    static Float selectorForModel(JsonElement element, String modelId) {
+        var selection = findSelector(element, normalizeModelId(modelId), null);
+        return selection == null ? null : selection.selector();
+    }
+
+    private static ModelSelector findSelector(JsonElement element, String preferredModel, String modelPathPrefix) {
+        var preferred = findSelector(element, modelId -> preferredModel.equals(normalizeModelId(modelId)));
+        return preferred != null || modelPathPrefix == null
+                ? preferred
+                : findSelector(element, modelId -> normalizeModelId(modelId).startsWith(modelPathPrefix));
+    }
+
+    private static ModelSelector findSelector(JsonElement element, java.util.function.Predicate<String> acceptsModel) {
+        if (element == null || element.isJsonNull()) return null;
+        if (element.isJsonArray()) {
+            for (var child : element.getAsJsonArray()) {
+                var selection = findSelector(child, acceptsModel);
+                if (selection != null) return selection;
+            }
+            return null;
+        }
+        if (!element.isJsonObject()) return null;
+        var object = element.getAsJsonObject();
+        var threshold = object.get("threshold");
+        if (threshold != null && threshold.isJsonPrimitive() && threshold.getAsJsonPrimitive().isNumber()) {
+            var modelId = findModelId(object.get("model"), acceptsModel);
+            if (modelId != null) return new ModelSelector(threshold.getAsFloat(), normalizeModelId(modelId));
+        }
+        for (var child : object.entrySet()) {
+            var selection = findSelector(child.getValue(), acceptsModel);
+            if (selection != null) return selection;
+        }
+        return null;
+    }
+
+    private static String findModelId(JsonElement element, java.util.function.Predicate<String> acceptsModel) {
+        if (element == null || element.isJsonNull()) return null;
         if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isString()) {
             var value = element.getAsString();
-            return TELEPORT_SCROLL_MODEL_ID.equals(value)
-                    || ("minecraft:" + TELEPORT_SCROLL_MODEL_ID).equals(value);
+            return acceptsModel.test(value) ? value : null;
         }
         if (element.isJsonArray()) {
             for (var child : element.getAsJsonArray()) {
-                if (containsTeleportScrollModel(child)) return true;
+                var modelId = findModelId(child, acceptsModel);
+                if (modelId != null) return modelId;
+            }
+            return null;
+        }
+        if (!element.isJsonObject()) return null;
+        for (var child : element.getAsJsonObject().entrySet()) {
+            var modelId = findModelId(child.getValue(), acceptsModel);
+            if (modelId != null) return modelId;
+        }
+        return null;
+    }
+
+    private static boolean containsModel(JsonElement element, String modelId) {
+        if (element == null || element.isJsonNull()) return false;
+        if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isString()) {
+            var value = element.getAsString();
+            return modelId.equals(value) || ("minecraft:" + modelId).equals(value);
+        }
+        if (element.isJsonArray()) {
+            for (var child : element.getAsJsonArray()) {
+                if (containsModel(child, modelId)) return true;
             }
             return false;
         }
         if (!element.isJsonObject()) return false;
         for (var child : element.getAsJsonObject().entrySet()) {
-            if (containsTeleportScrollModel(child.getValue())) return true;
+            if (containsModel(child.getValue(), modelId)) return true;
         }
         return false;
     }
+
+    private static ItemStack modeledPotion(float selector) {
+        var stack = new ItemStack(Items.POTION);
+        stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(
+                List.of(selector), List.of(), List.of(), List.of()
+        ));
+        return stack;
+    }
+
+    private static Identifier modelResource(String modelId) {
+        var normalized = normalizeModelId(modelId);
+        int separator = normalized.indexOf(':');
+        String namespace = separator < 0 ? "minecraft" : normalized.substring(0, separator);
+        String path = separator < 0 ? normalized : normalized.substring(separator + 1);
+        return Identifier.fromNamespaceAndPath(namespace, "models/" + path + ".json");
+    }
+
+    private static String normalizeModelId(String modelId) {
+        return modelId.startsWith("minecraft:") ? modelId.substring("minecraft:".length()) : modelId;
+    }
+
+    private static ItemStack[] fallbacks() {
+        var fallbacks = new ItemStack[PREVIEWS.length];
+        for (int index = 0; index < PREVIEWS.length; index++) {
+            fallbacks[index] = fallbackStack(PREVIEWS[index].fallback());
+        }
+        return fallbacks;
+    }
+
+    private static ItemStack fallbackStack(Fallback fallback) {
+        return new ItemStack(switch (fallback) {
+            case PAPER -> Items.PAPER;
+            case POTION -> Items.POTION;
+            case FOOD -> Items.COOKED_BEEF;
+        });
+    }
+
+    private record PreviewKind(String preferredModel, String modelPathPrefix, Fallback fallback) {}
+    private record ModelSelector(float selector, String modelId) {}
+    private enum Fallback { PAPER, POTION, FOOD }
 }
