@@ -101,7 +101,8 @@ Wynntils screens without special overlay arbitration. Solid rules use stored
 RGB; rainbow rules retain that RGB while rendering the fixed 0.0004-speed,
 0.85-saturation positional perimeter animation.
 
-The Consumables editor remains available while highlighting is disabled.
+The Consumables editor is hidden while highlighting is disabled and appears
+immediately below the master toggle when highlighting is enabled.
 Import reads at most 1 MiB and transactionally appends a complete versioned
 document; malformed, unsupported, internally duplicate, or conflicting imports
 change nothing. Export writes the complete list, including a valid empty list,

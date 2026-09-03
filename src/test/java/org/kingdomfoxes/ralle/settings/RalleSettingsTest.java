@@ -220,15 +220,18 @@ class RalleSettingsTest {
                         RalleSettings.CONSUMABLE_HIGHLIGHT_RULES_ID),
                 categories.get(3).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
         assertFalse(registry.setting(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID, BooleanSetting.class).value());
-        assertEquals(List.of(), registry.dependencies(RalleSettings.CONSUMABLE_HIGHLIGHT_RULES_ID));
+        assertEquals(List.of(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID),
+                registry.dependencies(RalleSettings.CONSUMABLE_HIGHLIGHT_RULES_ID));
     }
 
     @Test
-    void consumableHighlightTogglePersistsUnderWarWithoutGatingTheEditor() throws Exception {
+    void consumableHighlightTogglePersistsUnderWarAndGatesTheEditor() throws Exception {
         var path = temporaryDirectory.resolve("ralle.properties");
         var registry = new SettingsRegistry(path);
         RalleSettings.register(registry);
         registry.seal();
+
+        assertFalse(registry.available(RalleSettings.CONSUMABLE_HIGHLIGHT_RULES_ID));
         registry.setting(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID, BooleanSetting.class).set(true);
 
         assertTrue(Files.readString(path).contains("war.consumable-highlights-enabled=true"));

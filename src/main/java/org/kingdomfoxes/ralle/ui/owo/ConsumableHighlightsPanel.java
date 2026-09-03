@@ -25,6 +25,7 @@ import java.util.Set;
 /** Framed, internally scrolling ordered rule editor with a fixed right action lane. */
 final class ConsumableHighlightsPanel extends FlowLayout {
     private static final int ACTION_LANE_WIDTH = 104;
+    private static final int RULE_ROW_GAP = 2;
     private final RalleSettingsScreen screen;
     private final ConsumableHighlightStore store;
     private final ExpandableParentChildListPanel list;
@@ -42,7 +43,7 @@ final class ConsumableHighlightsPanel extends FlowLayout {
         listContent = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
         listContent.gap(2).padding(Insets.of(4));
         list = new ExpandableParentChildListPanel(Sizing.fill(100), Sizing.content(), expanded);
-        list.gap(2);
+        list.gap(RULE_ROW_GAP);
         listContent.child(list);
         var listScroll = new RalleScrollContainer(Sizing.expand(100), Sizing.fixed(220), listContent);
         listScroll.wheelStep(18).scrollbarThiccness(3).surface(RalleSurfaces.NAVY_PANEL);
@@ -122,8 +123,10 @@ final class ConsumableHighlightsPanel extends FlowLayout {
                     ? org.kingdomfoxes.ralle.war.consumables.ConsumableSlotBorder.rainbowColor(
                             (component.x() + component.y()) * .01f, System.currentTimeMillis())
                     : 0xFF000000 | rule.style().rgb();
-            graphics.fill(component.x() + 11, component.y(), component.x() + 12, component.y() + component.height(),
-                    color);
+            // Extend through the list gap so aliases read as one connected tree instead of
+            // a stack of unrelated branch fragments.
+            graphics.fill(component.x() + 11, component.y() - RULE_ROW_GAP,
+                    component.x() + 12, component.y() + component.height(), color);
             graphics.fill(component.x() + 11, component.y() + 10, component.x() + 18, component.y() + 11,
                     color);
         });

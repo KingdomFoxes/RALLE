@@ -122,6 +122,7 @@ public final class RalleSettings {
         registry.requireEnabled("chat-screenshot-snap-to-text", "chat-screenshot-enabled");
         registry.requireEnabled("chat-screenshot-smooth-expansion", "chat-screenshot-enabled");
         registry.requireEnabled("chat-selection-sounds", "chat-screenshot-enabled");
+        registry.requireEnabled(CONSUMABLE_HIGHLIGHT_RULES_ID, CONSUMABLE_HIGHLIGHTS_ENABLED_ID);
         registry.requireEnabled("new-party-notifications", "raid-lfg-enabled");
         registry.requireEnabled("reopened-party-notifications", "raid-lfg-enabled");
         registry.requireEnabled("party-status-notifications", "raid-lfg-enabled");

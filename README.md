@@ -59,7 +59,7 @@ item names (never lore) against an ordered local rule list, supports solid and
 animated rainbow one-pixel borders, and updates open containers immediately.
 The versioned list is stored in `config/ralle-consumable-highlights.json` and can
 be imported, exported, edited, emptied, or reset independently of the master
-toggle.
+toggle. Its editor is shown only while the master toggle is enabled.
 
 The first connection after a new installation posts one local RALLE onboarding
 message with clickable settings, LFG, and HUD commands. Its numeric sent marker
