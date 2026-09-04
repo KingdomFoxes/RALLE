@@ -87,12 +87,15 @@ validate the complete next list, write a sibling temporary file, replace the
 document atomically when supported, and only then publish an immutable snapshot.
 Normalized primary words and aliases must be unique across the whole document.
 
-Matching uses only `ItemStack#getHoverName().getString()`. It performs
-Unicode-aware case folding, turns punctuation and formatting separators into
-spaces, collapses whitespace, and compares complete words or phrases. It never
-reads lore or infers singular/plural variants. The first rule in stored order
-wins, and a bounded displayed-name cache is cleared whenever a new snapshot is
-published.
+Before matching a name, the highlighter requires one of Wynncraft's exact
+styled tooltip-emblem markers for Potion, Food, or Scroll. It reads only that
+structured marker from the lore component; it never name-matches lore text or
+uses the vanilla backing item as proof of type. Matching then uses only
+`ItemStack#getHoverName().getString()`. It performs Unicode-aware case folding,
+turns punctuation and formatting separators into spaces, collapses whitespace,
+and compares complete words or phrases. It does not infer singular/plural
+variants. The first rule in stored order wins, and a bounded displayed-name
+cache is cleared whenever a new snapshot is published.
 
 An optional tail injection into `AbstractContainerScreen#renderSlot` draws a
 single full-opacity, one-pixel border outside the 18-by-18 slot after its item

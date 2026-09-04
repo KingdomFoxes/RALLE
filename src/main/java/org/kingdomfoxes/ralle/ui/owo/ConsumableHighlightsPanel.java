@@ -19,6 +19,7 @@ import org.lwjgl.system.MemoryStack;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.Set;
 
@@ -71,24 +72,26 @@ final class ConsumableHighlightsPanel extends FlowLayout {
     }
 
     void rebuild() {
-        list.clearChildren();
+        var rows = new ArrayList<io.wispforest.owo.ui.core.UIComponent>();
         var rules = store.snapshot();
         if (rules.isEmpty()) {
             var empty = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(198));
             empty.horizontalAlignment(HorizontalAlignment.CENTER).verticalAlignment(VerticalAlignment.CENTER);
             empty.child(UIComponents.label(RalleTheme.ui(Component.translatable("ralle.consumables.empty")))
                     .color(RalleTheme.MUTED));
-            list.child(empty);
+            rows.add(empty);
+            list.replaceChildren(rows);
             return;
         }
         for (int ruleIndex = 0; ruleIndex < rules.size(); ruleIndex++) {
             var rule = rules.get(ruleIndex);
-            list.child(parentRow(ruleIndex, rule));
+            rows.add(parentRow(ruleIndex, rule));
             if (!list.expanded(ruleIndex)) continue;
             for (int aliasIndex = 0; aliasIndex < rule.aliases().size(); aliasIndex++) {
-                list.child(aliasRow(ruleIndex, aliasIndex, rule));
+                rows.add(aliasRow(ruleIndex, aliasIndex, rule));
             }
         }
+        list.replaceChildren(rows);
     }
 
     private FlowLayout parentRow(int index, ConsumableHighlightRule rule) {
@@ -118,11 +121,13 @@ final class ConsumableHighlightsPanel extends FlowLayout {
         // Match the parent-row height so the fixed 20px action button is never clipped by padding.
         var row = new HoverActionRow(Sizing.fill(100), Sizing.fixed(24));
         row.verticalAlignment(VerticalAlignment.CENTER).padding(Insets.of(2));
+        var label = new DynamicRuleLabelComponent(Component.literal(rule.aliases().get(aliasIndex)),
+                rule.style(), 144, false, false, () -> {});
+        label.horizontalSizing(Sizing.expand(100));
+        label.margins(Insets.left(20));
         row.surface((graphics, component) -> {
-            int color = rule.style().rainbow()
-                    ? org.kingdomfoxes.ralle.war.consumables.ConsumableSlotBorder.rainbowColor(
-                            (component.x() + component.y()) * .01f, System.currentTimeMillis())
-                    : 0xFF000000 | rule.style().rgb();
+            int color = DynamicRuleLabelComponent.colorAt(
+                    rule.style(), label.x(), label.y(), System.currentTimeMillis());
             // Extend through the list gap so aliases read as one connected tree instead of
             // a stack of unrelated branch fragments.
             graphics.fill(component.x() + 11, component.y() - RULE_ROW_GAP,
@@ -130,10 +135,6 @@ final class ConsumableHighlightsPanel extends FlowLayout {
             graphics.fill(component.x() + 11, component.y() + 10, component.x() + 18, component.y() + 11,
                     color);
         });
-        var label = new DynamicRuleLabelComponent(Component.literal(rule.aliases().get(aliasIndex)),
-                rule.style(), 144, false, false, () -> {});
-        label.horizontalSizing(Sizing.expand(100));
-        label.margins(Insets.left(20));
         row.child(label);
         var lane = UIContainers.horizontalFlow(Sizing.fixed(64), Sizing.fixed(20));
         lane.horizontalAlignment(HorizontalAlignment.RIGHT);

@@ -37,7 +37,9 @@ public final class ConsumableHighlightService {
 
     public Optional<HighlightStyle> style(ItemStack stack) {
         if (stack == null || stack.isEmpty() || !active()) return Optional.empty();
-        return matcher.match(stack.getHoverName().getString());
+        var style = matcher.match(stack.getHoverName().getString());
+        if (style.isEmpty() || !WynncraftConsumableMarker.matches(stack)) return Optional.empty();
+        return style;
     }
 
     public long timeMillis() {

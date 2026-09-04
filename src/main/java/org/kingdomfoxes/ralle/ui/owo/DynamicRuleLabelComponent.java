@@ -47,15 +47,19 @@ final class DynamicRuleLabelComponent extends BaseUIComponent {
     }
 
     @Override public void draw(OwoUIGraphics graphics, int mouseX, int mouseY, float partialTicks, float delta) {
-        int color = style.rainbow()
-                ? ConsumableSlotBorder.rainbowColor((x + y) * .01f, System.currentTimeMillis())
-                : 0xFF000000 | style.rgb();
+        int color = colorAt(style, x, y, System.currentTimeMillis());
         if (swatch) {
             graphics.fill(x, y + 5, x + 8, y + 13, color);
             graphics.drawRectOutline(x, y + 5, 8, 8, 0xFF080D16);
         }
         graphics.drawString(Minecraft.getInstance().font, RalleTheme.ui(text),
                 x + (swatch ? 12 : 0), y + 5, color, false);
+    }
+
+    static int colorAt(HighlightStyle style, int x, int y, long timeMillis) {
+        return style.rainbow()
+                ? ConsumableSlotBorder.rainbowColor((x + y) * .01f, timeMillis)
+                : 0xFF000000 | style.rgb();
     }
 
     @Override public boolean onMouseDown(MouseButtonEvent click, boolean doubled) {

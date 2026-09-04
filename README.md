@@ -55,8 +55,10 @@ Saved settings remain authoritative for existing users.
 
 The War → Consumables settings page includes a disabled-by-default Wynncraft-only
 container-slot highlighter. It matches complete words or phrases in displayed
-item names (never lore) against an ordered local rule list, supports solid and
-animated rainbow one-pixel borders, and updates open containers immediately.
+item names against an ordered local rule list only after an exact Wynncraft
+Potion, Food, or Scroll tooltip marker is present. It never matches lore text or
+assumes the vanilla backing item proves the type. It supports solid and animated
+rainbow one-pixel borders and updates open containers immediately.
 The versioned list is stored in `config/ralle-consumable-highlights.json` and can
 be imported, exported, edited, emptied, or reset independently of the master
 toggle. Its editor is shown only while the master toggle is enabled.
