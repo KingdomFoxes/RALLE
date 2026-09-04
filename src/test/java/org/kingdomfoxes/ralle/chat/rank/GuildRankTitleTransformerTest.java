@@ -9,6 +9,7 @@ import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -287,6 +288,60 @@ class GuildRankTitleTransformerTest {
     }
 
     @Test
+    void addsExpandedGuildAndFoxRanksToTheWholePillHover() {
+        var transformed = GuildRankTitleTransformer.apply(
+                guildMessage("STRATEGIST", "maxkarson"),
+                new GuildRankSnapshot(1L, Map.of("maxkarson", "Liege")),
+                GuildRankStyle.STARS_AND_TITLES,
+                true
+        );
+
+        var pillSegments = renderedSegments(transformed).stream()
+                .filter(segment -> segment.style().getHoverEvent() != null)
+                .toList();
+        assertEquals(3, pillSegments.size());
+        assertTrue(pillSegments.stream().allMatch(segment ->
+                segment.style().getHoverEvent() instanceof HoverEvent.ShowText showText
+                        && showText.value().getString().equals("STRATEGIST - Lord/Lady/Liege")));
+    }
+
+    @Test
+    void enabledInternalRankPathAddsGuildOnlyHoverWhenNoFoxRankResolves() {
+        var original = guildMessage("CAPTAIN", "maxkarson");
+
+        var transformed = GuildRankTitleTransformer.apply(
+                original, GuildRankSnapshot.EMPTY, GuildRankStyle.TITLES, true);
+
+        assertEquals(original.getString(), transformed.getString());
+        var pillSegments = renderedSegments(transformed).stream()
+                .filter(segment -> segment.text().equals(GuildRankTitleTransformer.background("CAPTAIN"))
+                        || segment.text().equals(GuildRankTitleTransformer.foreground("CAPTAIN")))
+                .toList();
+        assertEquals(2, pillSegments.size());
+        assertTrue(pillSegments.stream().allMatch(segment ->
+                segment.style().getHoverEvent() instanceof HoverEvent.ShowText showText
+                        && showText.value().getString().equals("CAPTAIN")));
+    }
+
+    @Test
+    void expandsEveryGroupedFoxRankVariantToItsCanonicalLabel() {
+        assertEquals("CHIEF - Sir/Madam/Knight",
+                GuildRankTitleTransformer.rankHoverText("chief", Optional.of("MADAM")));
+        assertEquals("STRATEGIST - Lord/Lady/Liege",
+                GuildRankTitleTransformer.rankHoverText("strategist", Optional.of("LIEGE")));
+        assertEquals("CHIEF - Baron/Baroness/Baronx",
+                GuildRankTitleTransformer.rankHoverText("chief", Optional.of("BARONESS")));
+        assertEquals("CHIEF - Viscount/Viscountess/Viscountx",
+                GuildRankTitleTransformer.rankHoverText("chief", Optional.of("VISCOUNTX")));
+        assertEquals("CHIEF - Count/Countess/Countx",
+                GuildRankTitleTransformer.rankHoverText("chief", Optional.of("COUNT")));
+        assertEquals("CHIEF - Marquis/Marchioness/Marqix",
+                GuildRankTitleTransformer.rankHoverText("chief", Optional.of("MARCHIONESS")));
+        assertEquals("RECRUIT - Page",
+                GuildRankTitleTransformer.rankHoverText("recruit", Optional.of("PAGE")));
+    }
+
+    @Test
     void developmentSamplesAlwaysUsePublicStrategistAndShowBothGapVariants() {
         var messages = GuildRankTitleTransformer.testMessages();
         var withoutGap = GuildRankTitleTransformer.encodeStarsAndTitle(3, "STRATEGIST", false);
@@ -299,7 +354,7 @@ class GuildRankTitleTransformerTest {
     }
 
     @Test
-    void ignoresUnknownSpeakersAndOrdinaryMentions() {
+    void doesNotUseAnOrdinaryMentionAsTheSpeakersFoxRank() {
         var guildMessage = Component.literal(
                 GuildRankTitleTransformer.background("CAPTAIN")
                         + GuildRankTitleTransformer.foreground("CAPTAIN")
@@ -307,7 +362,17 @@ class GuildRankTitleTransformerTest {
         );
         var snapshot = new GuildRankSnapshot(1L, Map.of("maxkarson", "Knight"));
 
-        assertSame(guildMessage, GuildRankTitleTransformer.apply(guildMessage, snapshot));
+        var transformed = GuildRankTitleTransformer.apply(guildMessage, snapshot);
+
+        assertEquals(guildMessage.getString(), transformed.getString());
+        var pillHovers = renderedSegments(transformed).stream()
+                .map(RenderedSegment::style)
+                .map(Style::getHoverEvent)
+                .filter(HoverEvent.ShowText.class::isInstance)
+                .map(HoverEvent.ShowText.class::cast)
+                .map(hover -> hover.value().getString())
+                .toList();
+        assertEquals(List.of("CAPTAIN", "CAPTAIN"), pillHovers);
     }
 
     @Test

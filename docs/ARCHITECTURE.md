@@ -106,6 +106,10 @@ RGB; rainbow rules retain that RGB while rendering the fixed 0.0004-speed,
 
 The Consumables editor is hidden while highlighting is disabled and appears
 immediately below the master toggle when highlighting is enabled.
+As a toolkit-neutral custom settings panel, it participates in global settings
+search through its registry metadata and renders the complete editor in matching
+results. Unmet dependencies still hide custom panels; future special settings
+containers inherit the same search behavior without screen-specific handling.
 Import reads at most 1 MiB and transactionally appends a complete versioned
 document; malformed, unsupported, internally duplicate, or conflicting imports
 change nothing. Export writes the complete list, including a valid empty list,
@@ -141,7 +145,12 @@ glyphs cover compact stars from RALLE's namespaced bitmap font while the
 existing pill alphabet renders the public title or, when
 `chat.internal-guild-ranks` is enabled and resolves the speaker, the internal
 Fox title. Internal rank refreshes retain their existing Wynncraft-only,
-opt-in network lifecycle.
+opt-in network lifecycle. While either rank-presentation path is active,
+hovering any retained rank pill shows the uppercase Wynncraft guild rank,
+followed by the resolved Fox title when available. Gendered or neutral variants
+use the complete canonical group label, such as `Lord/Lady/Liege`, instead of
+only the member's selected form. The default titles style with Internal Guild
+Ranks disabled remains inert.
 
 Development environments alone register `/ralle testmsg`. It posts fixed local
 Strategist samples for `maxkarson` with and without the star/title gap and does

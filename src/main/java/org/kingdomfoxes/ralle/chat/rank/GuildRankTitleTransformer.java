@@ -10,6 +10,7 @@ import net.minecraft.network.chat.contents.PlainTextContents;
 import net.minecraft.resources.Identifier;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -56,6 +57,26 @@ final class GuildRankTitleTransformer {
             "CAPTAIN", 2,
             "RECRUITER", 1,
             "RECRUIT", 0
+    );
+    private static final Map<String, String> FOX_RANK_LABELS = Map.ofEntries(
+            Map.entry("SIR", "Sir/Madam/Knight"),
+            Map.entry("MADAM", "Sir/Madam/Knight"),
+            Map.entry("KNIGHT", "Sir/Madam/Knight"),
+            Map.entry("LORD", "Lord/Lady/Liege"),
+            Map.entry("LADY", "Lord/Lady/Liege"),
+            Map.entry("LIEGE", "Lord/Lady/Liege"),
+            Map.entry("BARON", "Baron/Baroness/Baronx"),
+            Map.entry("BARONESS", "Baron/Baroness/Baronx"),
+            Map.entry("BARONX", "Baron/Baroness/Baronx"),
+            Map.entry("VISCOUNT", "Viscount/Viscountess/Viscountx"),
+            Map.entry("VISCOUNTESS", "Viscount/Viscountess/Viscountx"),
+            Map.entry("VISCOUNTX", "Viscount/Viscountess/Viscountx"),
+            Map.entry("COUNT", "Count/Countess/Countx"),
+            Map.entry("COUNTESS", "Count/Countess/Countx"),
+            Map.entry("COUNTX", "Count/Countess/Countx"),
+            Map.entry("MARQUIS", "Marquis/Marchioness/Marqix"),
+            Map.entry("MARCHIONESS", "Marquis/Marchioness/Marqix"),
+            Map.entry("MARQIX", "Marquis/Marchioness/Marqix")
     );
     private static final String TEST_GUILD_INDICATOR = new StringBuilder()
             .appendCodePoint(0xCFFFC)
@@ -105,10 +126,10 @@ final class GuildRankTitleTransformer {
         }
 
         String displayedTitle = internalTitle.orElse(match.oldTitle());
+        var rankHover = new HoverEvent.ShowText(Component.literal(rankHoverText(match.oldTitle(), internalTitle)));
         GuildRankGlyphs replacement;
         if (rankStyle == GuildRankStyle.TITLES) {
-            if (internalTitle.isEmpty()) return message;
-            replacement = snapshot.glyphsFor(displayedTitle);
+            replacement = internalTitle.isEmpty() ? match.oldGlyphs() : snapshot.glyphsFor(displayedTitle);
         } else {
             Integer stars = WYNN_RANK_STARS.get(match.oldTitle());
             if (stars == null) return message;
@@ -121,8 +142,27 @@ final class GuildRankTitleTransformer {
                     : encodeStarsAndTitle(stars, displayedTitle, spaceBetweenStarsAndTitle);
         }
 
-        return transform(message, match.oldGlyphs(), replacement, match.indicator(),
+        return transform(message, match.oldGlyphs(), replacement, rankHover, match.indicator(),
                 match.messageStart(), new int[]{0});
+    }
+
+    static String rankHoverText(String guildRank, Optional<String> internalTitle) {
+        String normalizedGuildRank = GuildRankSnapshot.normalizeTitle(guildRank);
+        if (normalizedGuildRank == null) throw new IllegalArgumentException("Invalid Wynncraft guild rank");
+        return internalTitle.map(title -> normalizedGuildRank + " - " + foxRankLabel(title))
+                .orElse(normalizedGuildRank);
+    }
+
+    private static String foxRankLabel(String title) {
+        String normalized = GuildRankSnapshot.normalizeTitle(title);
+        if (normalized == null) throw new IllegalArgumentException("Invalid Fox rank");
+        String grouped = FOX_RANK_LABELS.get(normalized);
+        if (grouped != null) return grouped;
+        var words = normalized.toLowerCase(Locale.ROOT).split(" ");
+        for (int index = 0; index < words.length; index++) {
+            words[index] = Character.toUpperCase(words[index].charAt(0)) + words[index].substring(1);
+        }
+        return String.join(" ", words);
     }
 
     private static Match findMatch(Component message) {
@@ -246,6 +286,7 @@ final class GuildRankTitleTransformer {
             Component component,
             GuildRankGlyphs oldGlyphs,
             GuildRankGlyphs newGlyphs,
+            HoverEvent.ShowText rankHover,
             String indicator,
             int messageStart,
             int[] offset
@@ -256,7 +297,7 @@ final class GuildRankTitleTransformer {
                     ? 0 : messageStart >= offset[0] + literal.text().length()
                     ? Integer.MAX_VALUE : messageStart - offset[0];
             replacement = replaceRuns(literal.text(), component.getStyle(),
-                    oldGlyphs, newGlyphs, indicator, localMessageStart);
+                    oldGlyphs, newGlyphs, rankHover, indicator, localMessageStart);
             offset[0] += literal.text().length();
         }
 
@@ -264,7 +305,8 @@ final class GuildRankTitleTransformer {
         var siblings = new Component[component.getSiblings().size()];
         for (int index = 0; index < siblings.length; index++) {
             var sibling = component.getSiblings().get(index);
-            siblings[index] = transform(sibling, oldGlyphs, newGlyphs, indicator, messageStart, offset);
+            siblings[index] = transform(sibling, oldGlyphs, newGlyphs, rankHover,
+                    indicator, messageStart, offset);
             siblingChanged |= siblings[index] != sibling;
         }
         if (replacement == null && !siblingChanged) return component;
@@ -330,6 +372,7 @@ final class GuildRankTitleTransformer {
             Style style,
             GuildRankGlyphs oldGlyphs,
             GuildRankGlyphs newGlyphs,
+            HoverEvent.ShowText rankHover,
             String indicator,
             int messageStart
     ) {
@@ -337,10 +380,11 @@ final class GuildRankTitleTransformer {
             return Component.literal(indicator).withStyle(style.withColor(ChatFormatting.AQUA));
         }
         if (text.equals(oldGlyphs.background())) {
-            return Component.literal(newGlyphs.background()).withStyle(style.withColor(ChatFormatting.AQUA));
+            return Component.literal(newGlyphs.background()).withStyle(style
+                    .withColor(ChatFormatting.AQUA).withHoverEvent(rankHover));
         }
         if (text.equals(oldGlyphs.foreground())) {
-            return replacementForeground(newGlyphs, style);
+            return replacementForeground(newGlyphs, style.withHoverEvent(rankHover));
         }
 
         int cursor = 0;
@@ -360,10 +404,11 @@ final class GuildRankTitleTransformer {
                 result.append(Component.literal(indicator).withStyle(style.withColor(ChatFormatting.AQUA)));
                 cursor = index + indicator.length();
             } else if (index == backgroundIndex) {
-                result.append(Component.literal(newGlyphs.background()).withStyle(style.withColor(ChatFormatting.AQUA)));
+                result.append(Component.literal(newGlyphs.background()).withStyle(style
+                        .withColor(ChatFormatting.AQUA).withHoverEvent(rankHover)));
                 cursor = index + oldGlyphs.background().length();
             } else {
-                result.append(replacementForeground(newGlyphs, style));
+                result.append(replacementForeground(newGlyphs, style.withHoverEvent(rankHover)));
                 cursor = index + oldGlyphs.foreground().length();
             }
             changed = true;

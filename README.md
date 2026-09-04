@@ -30,6 +30,9 @@ classic stars, or render those stars and the current title inside one continuous
 cyan pill. Internal Guild Ranks remains independent: when enabled, the combined
 style keeps the stars from the player's Wynncraft guild rank and uses the
 resolved Fox title for the title portion.
+While rank customization is active, hovering a retained rank pill shows the
+uppercase Wynncraft guild rank and, when available, the member's fully
+disambiguated Fox rank group.
 `/ralle hud` opens the layout editor with every currently enabled editable HUD
 element available; the About page exposes the same action as `Edit HUDs`.
 `/ralle lfg` opens the live, authenticated owo-lib Raid LFG browser when the
@@ -62,6 +65,8 @@ rainbow one-pixel borders and updates open containers immediately.
 The versioned list is stored in `config/ralle-consumable-highlights.json` and can
 be imported, exported, edited, emptied, or reset independently of the master
 toggle. Its editor is shown only while the master toggle is enabled.
+The complete editor also appears in matching settings-search results and follows
+the same searchable-container contract as future full-width settings panels.
 
 The first connection after a new installation posts one local RALLE onboarding
 message with clickable settings, LFG, and HUD commands. Its numeric sent marker

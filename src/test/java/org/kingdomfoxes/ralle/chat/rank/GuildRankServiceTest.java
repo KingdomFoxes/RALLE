@@ -86,7 +86,7 @@ class GuildRankServiceTest {
         var service = new GuildRankService(() -> CompletableFuture.completedFuture(Map.of()),
                 temporaryDirectory.resolve("ranks.json"), enabled, styleSetting(),
                 () -> "wynncraft.com", () -> 2L);
-        var message = Component.literal("ordinary chat");
+        var message = guildMessage("CAPTAIN", "maxkarson");
 
         assertFalse(enabled.value());
         assertSame(message, service.apply(message));

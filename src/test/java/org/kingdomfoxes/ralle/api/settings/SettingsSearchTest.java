@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SettingsSearchTest {
     @TempDir Path directory;
@@ -33,6 +34,32 @@ class SettingsSearchTest {
         assertEquals("chat", direct.category().id());
         assertEquals(true, direct.categoryPage());
         assertEquals(List.of("layout"), direct.entries().stream().map(SettingsEntry::id).toList());
+    }
+
+    @Test
+    void includesAvailableCustomPanelsAndHidesThemWhenTheirDependencyIsUnmet() {
+        var registry = new SettingsRegistry(directory.resolve("settings.properties"));
+        var enabled = toggle("consumable-highlights-enabled", "Highlight Consumables");
+        var rules = new CustomPanelEntry(
+                "consumable-highlight-rules",
+                text("Highlight Rules"),
+                text("Ordered local consumable rules"),
+                "consumable-highlight-editor"
+        );
+        registry.registerCategory(new SettingsCategory("war", text("War"), text("War tools"), List.of(), List.of(
+                new SettingsSubcategory("consumables", text("Consumables"), text("Potion, food, and scroll tools"),
+                        List.of(enabled, rules))
+        )));
+        registry.requireEnabled(rules.id(), enabled.id());
+
+        assertTrue(SettingsSearch.find(registry, "ordered local").isEmpty());
+
+        enabled.set(true);
+        assertEquals(List.of("consumable-highlight-rules"), SettingsSearch.find(registry, "ordered local")
+                .getFirst().entries().stream().map(SettingsEntry::id).toList());
+        assertEquals(List.of("consumable-highlights-enabled", "consumable-highlight-rules"),
+                SettingsSearch.find(registry, "consumables").getFirst().entries().stream()
+                        .map(SettingsEntry::id).toList());
     }
 
     private static BooleanSetting toggle(String id, String title) { return new BooleanSetting(id, text(title), text(title + " description")); }
