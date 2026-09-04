@@ -326,19 +326,19 @@ class GuildRankTitleTransformerTest {
     @Test
     void expandsEveryGroupedFoxRankVariantToItsCanonicalLabel() {
         assertEquals("CHIEF - Sir/Madam/Knight",
-                GuildRankTitleTransformer.rankHoverText("chief", Optional.of("MADAM")));
+                GuildRankTitleTransformer.rankHoverText("chief", Optional.of("MADAM")).getString());
         assertEquals("STRATEGIST - Lord/Lady/Liege",
-                GuildRankTitleTransformer.rankHoverText("strategist", Optional.of("LIEGE")));
+                GuildRankTitleTransformer.rankHoverText("strategist", Optional.of("LIEGE")).getString());
         assertEquals("CHIEF - Baron/Baroness/Baronx",
-                GuildRankTitleTransformer.rankHoverText("chief", Optional.of("BARONESS")));
+                GuildRankTitleTransformer.rankHoverText("chief", Optional.of("BARONESS")).getString());
         assertEquals("CHIEF - Viscount/Viscountess/Viscountx",
-                GuildRankTitleTransformer.rankHoverText("chief", Optional.of("VISCOUNTX")));
+                GuildRankTitleTransformer.rankHoverText("chief", Optional.of("VISCOUNTX")).getString());
         assertEquals("CHIEF - Count/Countess/Countx",
-                GuildRankTitleTransformer.rankHoverText("chief", Optional.of("COUNT")));
+                GuildRankTitleTransformer.rankHoverText("chief", Optional.of("COUNT")).getString());
         assertEquals("CHIEF - Marquis/Marchioness/Marqix",
-                GuildRankTitleTransformer.rankHoverText("chief", Optional.of("MARCHIONESS")));
+                GuildRankTitleTransformer.rankHoverText("chief", Optional.of("MARCHIONESS")).getString());
         assertEquals("RECRUIT - Page",
-                GuildRankTitleTransformer.rankHoverText("recruit", Optional.of("PAGE")));
+                GuildRankTitleTransformer.rankHoverText("recruit", Optional.of("PAGE")).getString());
     }
 
     @Test

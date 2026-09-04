@@ -126,7 +126,7 @@ final class GuildRankTitleTransformer {
         }
 
         String displayedTitle = internalTitle.orElse(match.oldTitle());
-        var rankHover = new HoverEvent.ShowText(Component.literal(rankHoverText(match.oldTitle(), internalTitle)));
+        var rankHover = new HoverEvent.ShowText(rankHoverText(match.oldTitle(), internalTitle));
         GuildRankGlyphs replacement;
         if (rankStyle == GuildRankStyle.TITLES) {
             replacement = internalTitle.isEmpty() ? match.oldGlyphs() : snapshot.glyphsFor(displayedTitle);
@@ -146,11 +146,22 @@ final class GuildRankTitleTransformer {
                 match.messageStart(), new int[]{0});
     }
 
-    static String rankHoverText(String guildRank, Optional<String> internalTitle) {
+    static Component rankHoverText(String guildRank, Optional<String> internalTitle) {
         String normalizedGuildRank = GuildRankSnapshot.normalizeTitle(guildRank);
         if (normalizedGuildRank == null) throw new IllegalArgumentException("Invalid Wynncraft guild rank");
-        return internalTitle.map(title -> normalizedGuildRank + " - " + foxRankLabel(title))
-                .orElse(normalizedGuildRank);
+        var result = Component.literal(normalizedGuildRank).withStyle(ChatFormatting.WHITE);
+        internalTitle.ifPresent(title -> {
+            result.append(" - ");
+            String currentTitle = GuildRankSnapshot.normalizeTitle(title);
+            String[] alternatives = foxRankLabel(title).split("/");
+            for (int index = 0; index < alternatives.length; index++) {
+                if (index > 0) result.append(Component.literal("/").withStyle(ChatFormatting.GRAY));
+                result.append(Component.literal(alternatives[index]).withStyle(
+                        alternatives[index].equalsIgnoreCase(currentTitle)
+                                ? ChatFormatting.WHITE : ChatFormatting.GRAY));
+            }
+        });
+        return result;
     }
 
     private static String foxRankLabel(String title) {

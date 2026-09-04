@@ -149,7 +149,8 @@ opt-in network lifecycle. While either rank-presentation path is active,
 hovering any retained rank pill shows the uppercase Wynncraft guild rank,
 followed by the resolved Fox title when available. Gendered or neutral variants
 use the complete canonical group label, such as `Lord/Lady/Liege`, instead of
-only the member's selected form. The default titles style with Internal Guild
+only the member's selected form. The member's selected Fox title stays white;
+alternative titles and slash separators are gray. The default titles style with Internal Guild
 Ranks disabled remains inert.
 
 Development environments alone register `/ralle testmsg`. It posts fixed local
