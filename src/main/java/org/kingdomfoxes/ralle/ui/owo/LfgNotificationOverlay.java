@@ -197,7 +197,8 @@ public final class LfgNotificationOverlay {
 
         Component hoveredRosterMember = null;
         var viewer = service.store().state().viewer();
-        boolean showElapsedTimer = viewer != null && lobby.hostedBy(viewer.minecraftUuid());
+        boolean showElapsedTimer = card.presentedMode() == LfgNotificationManager.CardMode.TIMED_OUT
+                || viewer != null && lobby.hostedBy(viewer.minecraftUuid());
         for (int slot = 0; slot < 4; slot++) {
             int slotX = showElapsedTimer ? timerRosterSlotX(bounds, slot) : rosterSlotX(bounds, slot);
             var slotBounds = new Rectangle(slotX, bounds.y() + 42, 20, 20);
@@ -209,7 +210,7 @@ public final class LfgNotificationOverlay {
         if (showElapsedTimer) {
             LfgElapsedTimerComponent.drawCentered(
                     graphics, minecraft.font, bounds.x() + bounds.width() / 2, bounds.y() + 46,
-                    lobby.createdAt(), java.time.Instant.now());
+                    lobby.createdAt(), timerNow(card, java.time.Instant.now()));
         }
 
         var controls = new Rectangle(bounds.x() + 8, bounds.y() + 72, bounds.width() - 16, 20);
@@ -236,6 +237,10 @@ public final class LfgNotificationOverlay {
                                 Rectangle controls, int mouseX, int mouseY, boolean interactive,
                                 List<HitRegion> hits) {
         var id = card.lobby().lobbyId();
+        if (card.presentedMode() == LfgNotificationManager.CardMode.TIMED_OUT) {
+            drawButton(graphics, controls, "Timed out!", RalleButtonRenderers.Kind.NEUTRAL, -1, -1, true);
+            return;
+        }
         var viewer = service.store().state().viewer();
         String disbandPrompt = disbandConfirmation.promptFor(id);
         boolean partyFilledControl = showsPartyFilledControl(
@@ -449,7 +454,12 @@ public final class LfgNotificationOverlay {
     }
 
     static int rosterBorderColor(LfgProtocol.Member member) {
-        return GuildTerritoryColors.parse(member.guild().color());
+        return GuildTerritoryColors.forGuild(member.guild().tag(), member.guild().color());
+    }
+
+    static java.time.Instant timerNow(LfgNotificationManager.CardSnapshot card, java.time.Instant now) {
+        return card.presentedMode() == LfgNotificationManager.CardMode.TIMED_OUT
+                ? card.lobby().createdAt().plusSeconds(30 * 60) : now;
     }
 
     static int regionColor(LfgProtocol.Region region) {

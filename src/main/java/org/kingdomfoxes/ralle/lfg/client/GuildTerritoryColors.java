@@ -8,7 +8,8 @@ import java.util.Map;
  *
  * <p>The Wynncraft API is authoritative for guild identity and alliance eligibility, but it does
  * not expose territory-map colors. Keep this small presentation lookup synchronized with the
- * backend's configured alliance guilds.</p>
+ * Fox's {@code assets/territory/guild-colors.json} territory lookup. The LFG service currently
+ * sends UUID-hashed colors, so known territory entries override that presentation fallback.</p>
  */
 public final class GuildTerritoryColors {
     private static final int UNKNOWN_GUILD = 0xFF657087;
@@ -23,6 +24,12 @@ public final class GuildTerritoryColors {
     );
 
     private GuildTerritoryColors() {}
+
+    /** Known territory colors take precedence over the service's UUID-derived fallback. */
+    public static int forGuild(String prefix, String fallbackColor) {
+        return prefix == null ? parse(fallbackColor)
+                : BY_PREFIX.getOrDefault(prefix.strip().toLowerCase(Locale.ROOT), parse(fallbackColor));
+    }
 
     public static int forPrefix(String prefix) {
         if (prefix == null) return UNKNOWN_GUILD;

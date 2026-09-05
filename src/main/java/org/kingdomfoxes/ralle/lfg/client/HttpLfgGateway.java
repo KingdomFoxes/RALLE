@@ -170,6 +170,7 @@ public final class HttpLfgGateway implements LfgGateway {
         return client.newWebSocketBuilder()
                 .connectTimeout(REQUEST_TIMEOUT)
                 .header("Authorization", "Bearer " + bearerToken)
+                .header("X-Ralle-Removal-Reasons", "1")
                 .buildAsync(uri, adapter)
                 .thenApply(socket -> (LiveConnection) () -> socket.sendClose(1000, "client lifecycle changed"))
                 .exceptionallyCompose(failure -> CompletableFuture.failedFuture(websocketFailure(failure)));

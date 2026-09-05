@@ -534,6 +534,61 @@ class LfgNotificationManagerTest {
         return UUID.fromString("00000000-0000-0000-0000-" + String.format("%012d", suffix));
     }
 
+    @Test
+    void authoritativeTimeoutHoldsFeedbackThenExitsWithoutBeingResetByTicksOrDuplicateEvents() {
+        var fixture = new Fixture();
+        fixture.connect();
+        var hosted = viewerHostedLobby(90, 1);
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, hosted));
+        fixture.manager.showPersistent(hosted);
+        fixture.now[0] += 1_800_500;
+        fixture.manager.tick();
+        assertEquals(LfgNotificationManager.CardMode.READY, fixture.manager.visibleCards().getFirst().mode());
+        var expired = new LfgProtocol.RemoveFrame(1, 2, hosted.lobbyId(), "lobby_expired");
+        fixture.gateway.listener.onFrame(expired);
+        fixture.manager.tick();
+        assertEquals(LfgNotificationManager.CardMode.TIMED_OUT, fixture.manager.visibleCards().getFirst().mode());
+        assertTrue(!fixture.manager.join(hosted.lobbyId()));
+        fixture.now[0] += LfgNotificationManager.FEEDBACK_MILLIS - 1;
+        fixture.gateway.listener.onFrame(expired);
+        fixture.manager.tick();
+        assertEquals(LfgNotificationManager.CardMode.TIMED_OUT, fixture.manager.visibleCards().getFirst().mode());
+        fixture.now[0]++;
+        fixture.manager.tick();
+        assertEquals(LfgNotificationManager.CardMode.EXITING, fixture.manager.visibleCards().getFirst().mode());
+        assertEquals(LfgNotificationManager.CardMode.TIMED_OUT, fixture.manager.visibleCards().getFirst().presentedMode());
+        fixture.now[0] += LfgNotificationManager.ANIMATION_MILLIS;
+        fixture.manager.tick();
+        assertTrue(fixture.manager.visibleCards().isEmpty());
+    }
+
+    @Test
+    void partiallyFilledPartyAlsoShowsTimeoutFeedback() {
+        var fixture = new Fixture();
+        fixture.connect();
+        var party = joinedLobby(lobby(92, false, 1));
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, party));
+        fixture.manager.showPersistent(party);
+        fixture.gateway.listener.onFrame(new LfgProtocol.RemoveFrame(1, 2, party.lobbyId(), "lobby_expired"));
+        fixture.manager.tick();
+        assertEquals(LfgNotificationManager.CardMode.TIMED_OUT, fixture.manager.visibleCards().getFirst().mode());
+    }
+
+    @Test
+    void removedSpectatorPopOutExitsInsteadOfRemainingUnavailableForever() {
+        var fixture = new Fixture();
+        fixture.connect();
+        var open = lobby(91, false, 1);
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, open));
+        fixture.manager.showPersistent(open);
+        fixture.gateway.listener.onFrame(new LfgProtocol.RemoveFrame(1, 2, open.lobbyId(), "host_disband"));
+        fixture.manager.tick();
+        assertEquals(LfgNotificationManager.CardMode.EXITING, fixture.manager.visibleCards().getFirst().mode());
+        fixture.now[0] += LfgNotificationManager.ANIMATION_MILLIS;
+        fixture.manager.tick();
+        assertTrue(fixture.manager.visibleCards().isEmpty());
+    }
+
     private static final class Fixture {
         final long[] now = {0};
         final boolean[] screenOpen = {false};

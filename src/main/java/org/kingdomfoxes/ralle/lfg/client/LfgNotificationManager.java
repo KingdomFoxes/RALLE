@@ -72,6 +72,20 @@ public final class LfgNotificationManager {
             dismissedPersistentCards.remove(change.lobbyId());
         }
         var card = cards.get(change.lobbyId());
+        if (change.current() == null && change.origin() == RaidLfgStore.UpdateOrigin.LIVE
+                && "lobby_expired".equals(change.removalReason())) {
+            dismissedPersistentCards.remove(change.lobbyId());
+            if (card != null) {
+                if (!visible.contains(change.lobbyId())) removeCompletely(change.lobbyId());
+                else feedback(card, CardMode.TIMED_OUT, "Timed out!", clockMillis.getAsLong() + FEEDBACK_MILLIS);
+            }
+            return;
+        }
+        // A removed pop-out is terminal even when the viewer never joined that party.
+        if (card != null && change.current() == null && change.origin() != RaidLfgStore.UpdateOrigin.CLEAR) {
+            if (!visible.contains(change.lobbyId())) removeCompletely(change.lobbyId());
+            else if (card.persistent) beginExit(card);
+        }
         if (card != null) playObservedRosterGrowth(card, change);
         if (viewerDeparted(change)) {
             dismissedPersistentCards.remove(change.lobbyId());
@@ -300,7 +314,7 @@ public final class LfgNotificationManager {
             if (snapshot.phase().terminal()) service.joinController().acknowledge(snapshot.lobbyId());
             return;
         }
-        if (card.mode == CardMode.EXITING || card.mode == CardMode.REMOVED) {
+        if (card.mode == CardMode.EXITING || card.mode == CardMode.REMOVED || card.mode == CardMode.TIMED_OUT) {
             if (snapshot.phase().terminal()) service.joinController().acknowledge(snapshot.lobbyId());
             return;
         }
@@ -328,6 +342,7 @@ public final class LfgNotificationManager {
     }
 
     private void synchronize(Card card, LfgProtocol.Lobby current) {
+        if (card.mode == CardMode.TIMED_OUT) return;
         long now = clockMillis.getAsLong();
         if (current == null) {
             if (card.mode == CardMode.EXITING || card.mode == CardMode.REMOVED) return;
@@ -378,7 +393,7 @@ public final class LfgNotificationManager {
 
         long elapsed = Math.max(0, now - card.lastTickAt);
         card.lastTickAt = now;
-        if (card.persistent && card.mode != CardMode.EXITING) return;
+        if (card.persistent && card.mode != CardMode.EXITING && card.mode != CardMode.TIMED_OUT) return;
         if (card.mode == CardMode.READY) {
             card.remainingPassiveMillis -= elapsed;
             if (card.remainingPassiveMillis <= 0) beginExit(card);
@@ -549,11 +564,12 @@ public final class LfgNotificationManager {
         FILLED_RACE,
         FAILURE,
         UNAVAILABLE,
+        TIMED_OUT,
         EXITING,
         REMOVED;
 
         boolean timedFeedback() {
-            return this == FILLED_SUCCESS || this == FILLED_RACE || this == FAILURE || this == UNAVAILABLE;
+            return this == FILLED_SUCCESS || this == FILLED_RACE || this == FAILURE || this == UNAVAILABLE || this == TIMED_OUT;
         }
     }
 

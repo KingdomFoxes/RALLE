@@ -670,7 +670,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         }
         var member = lobby.members().get(slot);
         var head = new PlayerFaceComponent(member.minecraftUuid().toString(), member.ign(), 16,
-                GuildTerritoryColors.parse(member.guild().color()));
+                GuildTerritoryColors.forGuild(member.guild().tag(), member.guild().color()));
         head.tooltip(RalleTheme.ui(Component.literal("[" + member.guild().tag() + "]"))).margins(Insets.right(4));
         row.child(head);
         var label = Component.empty();

@@ -13,6 +13,23 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class LfgNotificationOverlayTest {
     @Test
+    void timeoutTimerRemainsThirtyMinutesDuringFeedbackAndExit() {
+        var created = Instant.parse("2026-09-05T10:00:00Z");
+        var lobby = new LfgProtocol.Lobby(UUID.randomUUID(), LfgProtocol.RaidType.TNA,
+                LfgProtocol.Region.EU, null, LfgProtocol.Visibility.PUBLIC, LfgProtocol.LobbyStatus.OPEN,
+                false, UUID.randomUUID(), UUID.randomUUID(), created, created, 1, 4, List.of(), null);
+        for (var mode : List.of(org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager.CardMode.TIMED_OUT,
+                org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager.CardMode.EXITING)) {
+            var card = new org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager.CardSnapshot(
+                    lobby, org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager.DiscoveryKind.MANUAL,
+                    mode, org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager.CardMode.TIMED_OUT,
+                    "Timed out!", 0, 0, 1, true);
+            assertEquals("30:00", LfgElapsedTimerComponent.display(created,
+                    LfgNotificationOverlay.timerNow(card, created.plusSeconds(2000))).text());
+        }
+    }
+
+    @Test
     void closeControlOccupiesTheTopRightTwentyPixelSquare() {
         var card = new Rectangle(30, 40, 190, 100);
         var close = LfgNotificationOverlay.closeBounds(card);

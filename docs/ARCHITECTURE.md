@@ -411,10 +411,29 @@ nonfunctional shortcut.
 
 The host's expanded browser cards and persistent party-status card derive a live lobby-age timer
 locally from the synchronized lobby creation instant. Collapsed browser cards omit the timer. The
-timer is never shown on another player's lobby and adds no stored timer state or protocol field.
+timer is normally omitted on another player's lobby and adds no stored timer state.
 
 The only persisted LFG values are local opt-in, notification, sound, keybind,
 HUD-placement settings, and the single last-raid ID used by Automatic Raid Requeue. Whether a card
 is currently popped out remains
 session-only. Credentials, snapshots, pending actions, backend overrides, and
 connection state are memory-only.
+
+
+`lobby.remove` accepts an optional string `reason` (at most 64 characters). A live
+`lobby_expired` removal for unfilled initial recruitment shows
+`Timed out!` in a non-actionable slate-blue button for two seconds, then uses the existing
+500 ms exit animation. During feedback and exit, the card displays a frozen `30:00` timer,
+including on spectator pop-outs. The client never infers expiry from its clock, a disconnect,
+or a snapshot omission. Legacy removals still work without the reason; removed persistent
+spectator cards also exit. Unknown reasons use the ordinary removal behavior.
+
+The client opts into removal reasons with `X-Ralle-Removal-Reasons: 1` on each WebSocket
+handshake. Fox sends the reason only to opted-in connections, preserving older strict clients.
+The server closes initial recruitment at 30 minutes from creation unless the party has
+ever reached four members; recent activity does not extend this deadline. Previously
+filled parties remain exempt even after reopening.
+
+Roster head borders in both the browser and HUD resolve known territory colors through
+`GuildTerritoryColors`, matching Fox's bundled territory table (Fox `#FF8200`, Novu
+`#CE4F4F`). Unknown prefixes retain the backend color; malformed fallbacks use muted gray.

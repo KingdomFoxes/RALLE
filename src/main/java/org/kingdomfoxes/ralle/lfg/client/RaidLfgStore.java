@@ -69,11 +69,18 @@ public final class RaidLfgStore {
     }
 
     public synchronized boolean remove(long globalRevision, UUID lobbyId, UpdateOrigin origin) {
+        return remove(globalRevision, lobbyId, origin, null);
+    }
+
+    public synchronized boolean remove(long globalRevision, UUID lobbyId, UpdateOrigin origin, String reason) {
         if (globalRevision <= state.revision()) return false;
         var updated = new LinkedHashMap<>(state.lobbies());
         var previous = updated.remove(lobbyId);
         state = new State(globalRevision, state.viewer(), refreshedCapabilities(updated), updated);
-        if (previous != null) emitChange(previous, null, origin);
+        if (previous != null) {
+            var change = new LobbyChange(previous, null, origin, reason);
+            for (var sink : changeSinks) sink.changed(change);
+        }
         notifyListeners();
         return true;
     }
@@ -144,7 +151,10 @@ public final class RaidLfgStore {
     }
 
     public record LobbyChange(LfgProtocol.Lobby previous, LfgProtocol.Lobby current,
-                              UpdateOrigin origin) {
+                              UpdateOrigin origin, String removalReason) {
+        public LobbyChange(LfgProtocol.Lobby previous, LfgProtocol.Lobby current, UpdateOrigin origin) {
+            this(previous, current, origin, null);
+        }
         public LobbyChange {
             origin = Objects.requireNonNull(origin, "origin");
             if (previous == null && current == null) {

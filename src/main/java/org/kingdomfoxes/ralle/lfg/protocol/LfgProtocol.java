@@ -91,7 +91,11 @@ public final class LfgProtocol {
 
     public record SnapshotFrame(Snapshot snapshot) implements LiveFrame {}
     public record UpsertFrame(int protocolVersion, long revision, Lobby lobby) implements LiveFrame {}
-    public record RemoveFrame(int protocolVersion, long revision, UUID lobbyId) implements LiveFrame {}
+    public record RemoveFrame(int protocolVersion, long revision, UUID lobbyId, String reason) implements LiveFrame {
+        public RemoveFrame(int protocolVersion, long revision, UUID lobbyId) {
+            this(protocolVersion, revision, lobbyId, null);
+        }
+    }
     public record PartyPingFrame(int protocolVersion, UUID eventId, UUID lobbyId,
                                  UUID hostMinecraftUuid, String hostIgn,
                                  Instant occurredAt) implements LiveFrame {}

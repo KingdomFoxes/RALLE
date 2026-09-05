@@ -73,8 +73,9 @@ public final class StrictLfgJson {
                         lobby(child(object, "lobby"), "lobby.upsert.lobby"));
             }
             case "lobby.remove" -> {
-                fields(object, "lobby.remove", Set.of("type", "protocol_version", "revision", "lobby_id"), Set.of());
-                yield new RemoveFrame(integer(object, "protocol_version"), number(object, "revision"), uuid(object, "lobby_id"));
+                fields(object, "lobby.remove", Set.of("type", "protocol_version", "revision", "lobby_id"), Set.of("reason"));
+                yield new RemoveFrame(integer(object, "protocol_version"), number(object, "revision"), uuid(object, "lobby_id"),
+                        object.has("reason") ? removalReason(object) : null);
             }
             case "party.ping" -> {
                 fields(object, "party.ping", Set.of("type", "protocol_version", "event_id", "lobby_id",
@@ -313,6 +314,12 @@ public final class StrictLfgJson {
     private static String nullableString(JsonObject object, String name) {
         var element = required(object, name);
         return element.isJsonNull() ? null : string(object, name);
+    }
+
+    private static String removalReason(JsonObject object) {
+        var value = string(object, "reason");
+        if (value.length() > 64) throw malformed("reason is too long");
+        return value;
     }
 
     private static boolean bool(JsonObject object, String name) {

@@ -5,6 +5,17 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class StrictLfgJsonTest {
+    @Test
+    void removalAcceptsOnlyBoundedStringReasonAndKeepsLegacyFramesCompatible() {
+        var base = "{\"type\":\"lobby.remove\",\"protocol_version\":1,\"revision\":4,\"lobby_id\":\"00000000-0000-0000-0000-000000000010\"";
+        assertNull(((LfgProtocol.RemoveFrame) StrictLfgJson.decodeLiveFrame(base + "}")).reason());
+        assertEquals("lobby_expired", ((LfgProtocol.RemoveFrame) StrictLfgJson.decodeLiveFrame(
+                base + ",\"reason\":\"lobby_expired\"}")).reason());
+        assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeLiveFrame(base + ",\"reason\":5}"));
+        assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeLiveFrame(
+                base + ",\"reason\":\"" + "x".repeat(65) + "\"}"));
+    }
+
     private static final String LOBBY = """
             {
               "lobby_id":"00000000-0000-0000-0000-000000000010",

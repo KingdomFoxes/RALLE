@@ -596,7 +596,7 @@ public final class RaidLfgService {
             store.upsert(upsert.revision(), upsert.lobby(), RaidLfgStore.UpdateOrigin.LIVE);
         } else if (frame instanceof LfgProtocol.RemoveFrame remove) {
             requireProtocol(remove.protocolVersion());
-            store.remove(remove.revision(), remove.lobbyId(), RaidLfgStore.UpdateOrigin.LIVE);
+            store.remove(remove.revision(), remove.lobbyId(), RaidLfgStore.UpdateOrigin.LIVE, remove.reason());
         } else if (frame instanceof LfgProtocol.PartyPingFrame ping) {
             requireProtocol(ping.protocolVersion());
             focusLobbyId = ping.lobbyId();
