@@ -42,12 +42,6 @@ class RaidStartMessageTest {
     }
 
     @Test
-    void identityMatchingUsesCompleteMinecraftNameTokens() {
-        assertTrue(AutoRaidRequeueController.containsName("\uE000 maxkarson", "maxkarson"));
-        assertTrue(!AutoRaidRequeueController.containsName("maxkarson2", "maxkarson"));
-    }
-
-    @Test
     void partyQueueCoordinatesResolveToTheReportedContainerSlot() {
         assertEquals(49, AutoRaidRequeueController.inventorySlot(6, 5));
     }

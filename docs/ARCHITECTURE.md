@@ -264,8 +264,9 @@ controller only while the authoritative host lobby is full.
 
 Automatic Raid Requeue is the tenth mapping and defaults to Unbound. It is independent of the Fox
 LFG service toggle, but is inert unless explicitly bound and connected to Wynncraft. While bound,
-`AutoRaidRequeueController` listens for the exact fixed Wynncraft Ready Up prompt, verifies its
-speaker against the local profile, tab/display aliases, or local UUID hover metadata, and stores
+`AutoRaidRequeueController` listens to non-overlay server game messages for the fixed Wynncraft Ready Up prompt from any
+queue initiator, including the local player. Signed player chat is excluded. Announcement and Ready Up
+lines may arrive together or within 40 client ticks; newer announcements replace pending ones. It stores
 only the recognized fixed raid ID in `config/ralle-auto-requeue.properties`. Activation sends one
 `/pf` command and follows a bounded three-menu state machine: scan the main raid area through the
 first player-head listing, use the sixth-row fifth-slot Party Queue fallback when needed, select the stored raid,

@@ -34,7 +34,7 @@ pairs Vanilla-font recognition glyphs with the selected interface font,
 including a remaining-time message when Ping is on cooldown, while rapid
 Lock/Unlock toggles are coalesced for one second before any backend mutation.
 Automatic Raid Requeue is a separate, unbound-by-default Wynncraft shortcut. While bound, it
-remembers the fixed raid name from the local player's most recent clickable Ready Up chat prompt
+remembers the fixed raid name from the most recent server Ready Up chat prompt, whoever initiated the queue
 in `config/ralle-auto-requeue.properties`. Pressing it runs one bounded, headless `/pf` flow,
 selects that raid from the main Party Finder page or its Party Queue fallback, and clicks Ready Up
 while ordinary movement remains available. It does not loop or keep a menu visible.

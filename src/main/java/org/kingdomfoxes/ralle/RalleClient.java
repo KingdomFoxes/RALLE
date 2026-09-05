@@ -178,11 +178,10 @@ public final class RalleClient implements ClientModInitializer {
             hostPartyInvites.tick();
             lfgNotificationOverlay.tick();
         });
+        // Queue initiators may be any player; only observe server game messages, not signed player chat.
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
             if (!overlay) autoRaidRequeue.observeChat(message);
         });
-        ClientReceiveMessageEvents.CHAT.register((message, signedMessage, sender, params, receptionTimestamp) ->
-                autoRaidRequeue.observeChat(message));
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
                 literal("ralle").then(literal("settings").executes(command -> {

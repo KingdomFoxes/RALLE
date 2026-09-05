@@ -5,8 +5,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.MenuAccess;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.item.ItemStack;
@@ -16,10 +14,7 @@ import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionBarState;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionGlyph;
 
-import java.util.LinkedHashSet;
 import java.util.Locale;
-import java.util.Set;
-import java.util.regex.Pattern;
 
 /** Bounded, headless Wynncraft Party Finder navigation for the last locally observed raid. */
 public final class AutoRaidRequeueController {
@@ -32,7 +27,6 @@ public final class AutoRaidRequeueController {
     private static final int PARTY_QUEUE_SLOT = inventorySlot(6, 5);
     private static final int READY_START_SLOT = 33;
     private static final int READY_END_SLOT = 35;
-    private static final int READY_PROMPT_PAIR_TICKS = 40;
 
     private final Minecraft minecraft;
     private final KeybindSetting binding;
@@ -44,8 +38,7 @@ public final class AutoRaidRequeueController {
     private AbstractContainerMenu menu;
     private int deadlineTick;
     private int settledTick;
-    private WynnRaid pendingPromptRaid;
-    private int pendingPromptUntilTick;
+    private final RaidReadyTracker readyTracker = new RaidReadyTracker();
 
     public AutoRaidRequeueController(Minecraft minecraft, KeybindSetting binding,
                                      AutoRaidRequeueStore store, LfgActionBarState actionBar) {
@@ -60,20 +53,7 @@ public final class AutoRaidRequeueController {
             clearPendingPrompt();
             return;
         }
-        String text = message.getString();
-        var announcement = RaidStartMessage.parseAnnouncement(text)
-                .filter(prompt -> identifiesLocalPlayer(message, prompt.speaker()));
-        if (announcement.isPresent()) {
-            pendingPromptRaid = announcement.orElseThrow().raid();
-            pendingPromptUntilTick = tickNow() + READY_PROMPT_PAIR_TICKS;
-            if (RaidStartMessage.isReadyPrompt(text)) rememberPendingPrompt();
-            return;
-        }
-        if (RaidStartMessage.isReadyPrompt(text)
-                && pendingPromptRaid != null
-                && tickNow() <= pendingPromptUntilTick) {
-            rememberPendingPrompt();
-        }
+        readyTracker.observe(message.getString(), tickNow()).ifPresent(store::remember);
     }
 
     public void start() {
@@ -213,14 +193,8 @@ public final class AutoRaidRequeueController {
         settledTick = 0;
     }
 
-    private void rememberPendingPrompt() {
-        store.remember(pendingPromptRaid);
-        clearPendingPrompt();
-    }
-
     private void clearPendingPrompt() {
-        pendingPromptRaid = null;
-        pendingPromptUntilTick = 0;
+        readyTracker.clear();
     }
 
     private boolean listening() {
@@ -237,41 +211,6 @@ public final class AutoRaidRequeueController {
                 && RaidLfgService.isWynncraft(server.ip.strip().toLowerCase(Locale.ROOT).split(":", 2)[0])
                 && minecraft.level != null
                 && minecraft.player != null;
-    }
-
-    private boolean identifiesLocalPlayer(Component message, String speaker) {
-        String actualIgn = minecraft.getUser().getName();
-        if (containsName(speaker, actualIgn)) return true;
-
-        Set<String> aliases = new LinkedHashSet<>();
-        aliases.add(minecraft.player.getName().getString());
-        aliases.add(minecraft.player.getDisplayName().getString());
-        var connection = minecraft.getConnection();
-        if (connection != null) {
-            var info = connection.getPlayerInfo(minecraft.getUser().getProfileId());
-            if (info != null) {
-                aliases.add(info.getProfile().name());
-                if (info.getTabListDisplayName() != null) aliases.add(info.getTabListDisplayName().getString());
-            }
-        }
-        if (aliases.stream().anyMatch(alias -> containsName(speaker, alias))) return true;
-
-        for (var part : message.toFlatList()) {
-            var click = part.getStyle().getClickEvent();
-            if (click instanceof ClickEvent.RunCommand command && containsName(command.command(), actualIgn)) return true;
-            if (click instanceof ClickEvent.SuggestCommand command && containsName(command.command(), actualIgn)) return true;
-            var hover = part.getStyle().getHoverEvent();
-            if (hover instanceof HoverEvent.ShowEntity entity
-                    && entity.entity().uuid.equals(minecraft.getUser().getProfileId())) return true;
-            if (hover instanceof HoverEvent.ShowText text && containsName(text.value().getString(), actualIgn)) return true;
-        }
-        return false;
-    }
-
-    static boolean containsName(String decorated, String name) {
-        if (decorated == null || name == null || name.isBlank()) return false;
-        String pattern = "(?<![a-z0-9_])" + Pattern.quote(name.toLowerCase(Locale.ROOT)) + "(?![a-z0-9_])";
-        return Pattern.compile(pattern).matcher(decorated.toLowerCase(Locale.ROOT)).find();
     }
 
     static int containerSlots(AbstractContainerMenu menu) {

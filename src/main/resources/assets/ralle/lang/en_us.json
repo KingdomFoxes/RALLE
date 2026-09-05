@@ -123,7 +123,7 @@
   "ralle.settings.option.raid-lfg-kick-keybind": "Kick Modifier Keybind",
   "ralle.settings.option.raid-lfg-kick-keybind.description": "Hold this key and release top-row 2–4 to kick that synchronized roster slot in order of who joined.",
   "ralle.settings.option.automatic-raid-requeue-keybind": "Automatic Raid Requeue Keybind",
-  "ralle.settings.option.automatic-raid-requeue-keybind.description": "Reopens Party Finder, selects the raid most recently detected from your own Ready Up prompt, and readies without showing the menus. Unbound by default and active only on Wynncraft.",
+  "ralle.settings.option.automatic-raid-requeue-keybind.description": "Reopens Party Finder, selects the raid most recently detected from the latest Ready Up prompt, whoever queued, and readies without showing the menus. Unbound by default and active only on Wynncraft.",
   "ralle.settings.option.interface-font": "Interface Font",
   "ralle.settings.option.interface-font.description": "Chooses Vanilla or Karla for RALLE interface body text and controls. Fox screen headers always use Karla.",
 
