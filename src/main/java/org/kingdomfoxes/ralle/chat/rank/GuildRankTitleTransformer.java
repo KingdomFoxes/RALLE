@@ -8,13 +8,13 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.contents.PlainTextContents;
 import net.minecraft.resources.Identifier;
+import org.kingdomfoxes.ralle.chat.identity.GuildSpeakerIdentity;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 /** Rewrites only Wynncraft's rank-pill glyph passes for an identified guild-chat speaker. */
 final class GuildRankTitleTransformer {
@@ -37,10 +37,6 @@ final class GuildRankTitleTransformer {
     );
     private static final FontDescription WYNN_PILL_FONT = new FontDescription.Resource(
             Identifier.fromNamespaceAndPath("minecraft", "banner/pill")
-    );
-    private static final int MAX_HOVER_COMPONENTS = 256;
-    private static final Pattern NICKNAME_HOVER = Pattern.compile(
-            "^(.{1,64})['’]s real name is ([A-Za-z0-9_]{1,16})$"
     );
     private static final Map<String, GuildRankGlyphs> WYNN_RANK_GLYPHS = Map.of(
             "OWNER", encode("OWNER"),
@@ -119,9 +115,10 @@ final class GuildRankTitleTransformer {
         if (useInternalRanks) {
             internalTitle = snapshot.titleFor(match.speaker().displayName());
             if (internalTitle.isEmpty()) {
-                String realName = hoveredRealName(message, match.speaker().displayName(),
-                        new int[]{MAX_HOVER_COMPONENTS});
-                if (realName != null) internalTitle = snapshot.titleFor(realName);
+                int speakerEnd = match.speaker().messageStart() - 1;
+                int speakerStart = speakerEnd - match.speaker().displayName().length();
+                internalTitle = GuildSpeakerIdentity.resolve(
+                        message, match.speaker().displayName(), speakerStart, speakerEnd).flatMap(snapshot::titleFor);
             }
         }
 
@@ -242,19 +239,6 @@ final class GuildRankTitleTransformer {
         String displayName = text.substring(nameStart, colon);
         return displayName.isBlank() || displayName.indexOf('\n') >= 0
                 ? null : new Speaker(displayName, colon + 1);
-    }
-
-    private static String hoveredRealName(Component component, String displayName, int[] remaining) {
-        if (remaining[0]-- <= 0) return null;
-        if (component.getStyle().getHoverEvent() instanceof HoverEvent.ShowText showText) {
-            var match = NICKNAME_HOVER.matcher(showText.value().getString());
-            if (match.matches() && match.group(1).equals(displayName)) return match.group(2);
-        }
-        for (var sibling : component.getSiblings()) {
-            String realName = hoveredRealName(sibling, displayName, remaining);
-            if (realName != null) return realName;
-        }
-        return null;
     }
 
     private static String indicatorBefore(String text, int backgroundStart) {

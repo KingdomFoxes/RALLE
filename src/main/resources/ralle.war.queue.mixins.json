@@ -1,0 +1,13 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "org.kingdomfoxes.ralle.war.queue.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "plugin": "org.kingdomfoxes.ralle.war.queue.mixin.QueueAttributionMixinPlugin",
+  "client": [
+    "TerritoryAttackTimerOverlayMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

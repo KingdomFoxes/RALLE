@@ -72,13 +72,27 @@ Estimate** option. With exactly Wynntils 4.2.7 installed, holding either Ctrl ke
 over a guild-map territory shows its shortest link distance from the player's HQ
 through any guild's territories and, except at HQ, the provisional
 `60 + 60 × connections` queue estimate prefixed with a clock glyph. Distance
-color interpolates from green at HQ to red at the furthest reachable territory.
+color interpolates from green at HQ through yellow to red according to the guild's
+territory count. Red starts at `round(1.25 × sqrt(territories owned))` connections
+(at least one), yellow at 60% of that threshold, and greater distances stay red.
 Owned destinations are hypothetical. Active attack timers suppress both added
 labels. Labels stay at native size at all zoom levels, even when they overlap
 or extend beyond territory bounds. Missing or conflicting route data remains
 unknown. RALLE reuses Wynntils' existing models and does
 not add polling or backend traffic. The historical duration formula remains a
 release blocker until it is checked against current in-game attack previews.
+
+War → Attack Timers contains the separate disabled-by-default **Show Who
+Queued** option for exactly Wynntils 4.2.7. It prefixes each row in Wynntils'
+existing Guild Attack Timer with the first observed defense-announcement sender:
+the local IGN is blue, other IGNs are gray, and missed or unresolved senders show
+as gray `Unknown`. Enable Wynntils' Guild Attack Timer overlay to see the rows;
+senders must also have defense announcements enabled for their names to be
+observable. RALLE does not change either Wynntils setting. Attribution is kept
+only in memory for the current uninterrupted Wynncraft world, guild, account,
+and character session. Messages received before the option was enabled cannot be
+reconstructed, and a manually typed guild message identical to the automatic
+announcement cannot be distinguished from it.
 
 The first connection after a new installation posts one local RALLE onboarding
 message with clickable settings, LFG, and HUD commands. Its numeric sent marker
@@ -93,6 +107,12 @@ Development runs additionally expose `/ralle testmsg`, which posts two local
 Strategist guild-chat samples for comparing the combined pill with and without
 a space between its stars and title. The command is not registered in release
 builds.
+Development runs with supported Wynntils also expose `/ralle testqueuetimers`.
+With **Show Who Queued** enabled on Wynncraft, it toggles three countdown rows in
+Wynntils' real Guild Attack Timer overlay: local, remote, and `Unknown`. The rows
+exist only in the overlay render input, expire naturally after about three
+minutes, and never queue a war, send chat or commands, or mutate Wynntils' timer
+and defense models. The command is not registered in release builds.
 
 ```text
 ./gradlew build

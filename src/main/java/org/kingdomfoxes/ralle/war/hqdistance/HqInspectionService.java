@@ -28,9 +28,11 @@ public final class HqInspectionService {
             cachedSnapshot = snapshot;
             cache.clear();
             var projectedRoutes = routes.routes(snapshot);
-            int furthest = projectedRoutes.values().stream()
-                    .mapToInt(TerritoryRouteCalculator.Route::connectionCount).max().orElse(0);
-            projectedRoutes.forEach((name, route) -> cache.put(name, format(route, furthest)));
+            int ownedTerritories = (int) snapshot.territories().values().stream()
+                    .filter(territory -> territory.reliable() && snapshot.guildName().equals(territory.owner()))
+                    .count();
+            int redThreshold = redThreshold(ownedTerritories);
+            projectedRoutes.forEach((name, route) -> cache.put(name, format(route, redThreshold)));
         }
         return cache.getOrDefault(territoryName, format(TerritoryRouteCalculator.Route.unknown(), 0));
     }
@@ -44,13 +46,13 @@ public final class HqInspectionService {
         cache.clear();
     }
 
-    private HqInspection format(TerritoryRouteCalculator.Route route, int furthest) {
+    private HqInspection format(TerritoryRouteCalculator.Route route, int redThreshold) {
         return switch (route.status()) {
-            case HEADQUARTERS -> new HqInspection("0", "", OptionalInt.of(0), distanceColor(0, furthest));
+            case HEADQUARTERS -> new HqInspection("0", "", OptionalInt.of(0), distanceColor(0, redThreshold));
             case CONNECTED -> new HqInspection(
                     Integer.toString(route.connectionCount()),
                     formatDuration(durations.estimateSeconds(route.connectionCount())),
-                    OptionalInt.of(route.connectionCount()), distanceColor(route.connectionCount(), furthest));
+                    OptionalInt.of(route.connectionCount()), distanceColor(route.connectionCount(), redThreshold));
             case UNKNOWN -> new HqInspection("Unknown", "", OptionalInt.empty());
         };
     }
@@ -59,11 +61,16 @@ public final class HqInspectionService {
         return "\uD83D\uDD52 " + seconds / 60 + ":" + String.format(java.util.Locale.ROOT, "%02d", seconds % 60);
     }
 
-    /** Linear RGB interpolation from HQ green to the furthest reachable territory's red. */
-    static int distanceColor(int distance, int furthest) {
-        float fraction = furthest <= 0 ? 0 : Math.clamp((float) distance / furthest, 0, 1);
-        int red = Math.round(85 + 170 * fraction);
-        int green = Math.round(255 - 170 * fraction);
+    /** Guild-size heuristic; includes disconnected holdings, but never foreign or uncertain ownership. */
+    static int redThreshold(int ownedTerritories) {
+        return Math.max(1, (int) Math.round(1.25 * Math.sqrt(Math.max(0, ownedTerritories))));
+    }
+
+    /** Green at HQ, yellow at 60% of the threshold, red at and beyond the threshold. */
+    static int distanceColor(int distance, int redThreshold) {
+        double fraction = Math.clamp((double) distance / Math.max(1, redThreshold), 0, 1);
+        int red = (int) Math.round(85 + 170 * Math.min(1, fraction / 0.6));
+        int green = (int) Math.round(255 - 170 * Math.max(0, (fraction - 0.6) / 0.4));
         return 0xFF000055 | red << 16 | green << 8;
     }
 }

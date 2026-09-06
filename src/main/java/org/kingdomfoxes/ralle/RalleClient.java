@@ -8,6 +8,7 @@ import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import org.kingdomfoxes.ralle.api.feature.FeatureRegistry;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
@@ -57,6 +58,7 @@ import org.kingdomfoxes.ralle.war.consumables.ConsumableHighlightService;
 import org.kingdomfoxes.ralle.war.consumables.ConsumableHighlightStore;
 import org.kingdomfoxes.ralle.war.hqdistance.HqDistanceOverlay;
 import org.kingdomfoxes.ralle.war.hqdistance.WynntilsCompatibility;
+import org.kingdomfoxes.ralle.war.queue.QueueAttributionService;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
@@ -87,6 +89,12 @@ public final class RalleClient implements ClientModInitializer {
                             == WynntilsCompatibility.Status.MISSING
                             ? "ralle.settings.hq-distance.missing-wynntils"
                             : "ralle.settings.hq-distance.unsupported-wynntils"));
+            settings.markUnavailable(
+                    RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID,
+                    net.minecraft.network.chat.Component.translatable(wynntilsCompatibility
+                            == WynntilsCompatibility.Status.MISSING
+                            ? "ralle.settings.queue-attribution.missing-wynntils"
+                            : "ralle.settings.queue-attribution.unsupported-wynntils"));
         }
         placements.register(new HudPlacementRegistry.ElementDefinition(
                 ChatLayoutService.CHAT_ELEMENT_ID,
@@ -105,6 +113,9 @@ public final class RalleClient implements ClientModInitializer {
         RalleTypography.bind(settings);
         HqDistanceOverlay.configure(
                 settings.setting(RalleSettings.HQ_DISTANCE_ENABLED_ID, BooleanSetting.class),
+                wynntilsCompatibility.supported());
+        QueueAttributionService.configure(
+                settings.setting(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID, BooleanSetting.class),
                 wynntilsCompatibility.supported());
 
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), placements);
@@ -197,6 +208,7 @@ public final class RalleClient implements ClientModInitializer {
             raidLfg.connectionChanged();
             guildRanks.connectionChanged();
             HqDistanceOverlay.clear();
+            QueueAttributionService.disconnect();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             chatLayout.tick();
@@ -208,6 +220,7 @@ public final class RalleClient implements ClientModInitializer {
             autoRaidRequeue.tick();
             hostPartyInvites.tick();
             lfgNotificationOverlay.tick();
+            QueueAttributionService.tick(client);
         });
         // Queue initiators may be any player; only observe server game messages, not signed player chat.
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
@@ -239,6 +252,16 @@ public final class RalleClient implements ClientModInitializer {
                     client.schedule(() -> context().guildRanks().testMessages().forEach(message ->
                             client.gui.getChat().addMessage(message, null, null)));
                     return 1;
+                }));
+                ralleCommand.then(literal("testqueuetimers").executes(command -> {
+                    var client = Minecraft.getInstance();
+                    var state = QueueAttributionService.toggleDevelopmentPreview();
+                    client.schedule(() -> RalleChatMessages.post(client, Component.literal(switch (state) {
+                        case ENABLED -> "Showing three fake Guild Attack Timer rows. Run /ralle testqueuetimers again to hide them.";
+                        case DISABLED -> "Fake Guild Attack Timer rows hidden.";
+                        case UNAVAILABLE -> "Enable Show Who Queued and connect to Wynncraft with supported Wynntils 4.2.7 first.";
+                    })));
+                    return state == QueueAttributionService.DevelopmentPreviewState.UNAVAILABLE ? 0 : 1;
                 }));
             }
             dispatcher.register(ralleCommand);

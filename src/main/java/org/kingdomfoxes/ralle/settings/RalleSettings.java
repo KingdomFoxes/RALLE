@@ -20,6 +20,7 @@ public final class RalleSettings {
     public static final String CONSUMABLE_HIGHLIGHT_RULES_ID = "consumable-highlight-rules";
     public static final String CONSUMABLE_HIGHLIGHT_PROVIDER_ID = "consumable-highlight-editor";
     public static final String HQ_DISTANCE_ENABLED_ID = "hq-distance-enabled";
+    public static final String WAR_QUEUE_ATTRIBUTION_ENABLED_ID = "queue-attribution-enabled";
 
     private RalleSettings() {}
 
@@ -111,6 +112,7 @@ public final class RalleSettings {
                 Component.translatable("ralle.settings.category.war.description"),
                 List.of(),
                 List.of(
+                        subcategory("attack-timers", toggle(WAR_QUEUE_ATTRIBUTION_ENABLED_ID)),
                         subcategory("territory-map", toggle(HQ_DISTANCE_ENABLED_ID)),
                         subcategory("consumables",
                                 toggle(CONSUMABLE_HIGHLIGHTS_ENABLED_ID),

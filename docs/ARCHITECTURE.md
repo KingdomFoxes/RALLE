@@ -66,6 +66,10 @@ platform ports. It must not depend on a concrete settings screen.
   territory snapshots, a pure bidirectional graph projection, provisional queue
   estimation, cached inspection state, and collision-aware rendering. It consumes
   only data Wynntils already maintains and performs no polling or backend calls.
+- `war.queue`: bounded, memory-only sender attribution projected from verified
+  guild-chat envelopes onto Wynntils' existing Guild Attack Timer render tasks.
+  Pure identity, parsing, tracking, and formatting code is separated from the
+  optional exact-version event/model adapter and HUD-scoped mixin.
 - `platform`: Fabric/Minecraft adapters such as commands, keybinds, connection
   lifecycle, local persistence, and future clickable chat notifications.
 
@@ -167,13 +171,72 @@ snapshot changes, covering guild identity, HQ, ownership, and connections, and
 is explicitly cleared on disconnect. Non-HQ connected destinations currently
 use the historical provisional estimate `60 + 60 × connections` seconds and
 render it as `🕒 m:ss`. All distances are calculated in one BFS per changed
-snapshot. The connection number uses linear RGB interpolation from `#55FF55`
-at HQ to `#FF5555` at the furthest reachable territory in that snapshot; zoom and
-the hovered destination do not affect the color range. Unknown labels and
+snapshot. The connection number uses piecewise linear RGB interpolation from
+`#55FF55` at HQ through `#FFFF55` at 60% of the red threshold to `#FF5555`
+at and beyond that threshold. The threshold is `max(1, round(1.25 × sqrt(N)))`,
+where N counts reliable territories owned by the player's guild, including
+disconnected holdings. Foreign and uncertain ownership do not contribute.
+For 27, 60, 100, and 180 holdings, red starts at 6, 10, 13, and 17 connections.
+Ownership changes recalculate colors without changing the distance or duration
+formula; zoom and the furthest territory on the world map do not affect the scale. Unknown labels and
 durations remain white. This formula excludes border penalties, taxes, routing
 detours, and attack-eligibility cooldowns. Release remains blocked until the
 formula is compared with current in-game attack previews and its fixtures are
 updated if necessary.
+
+## War queue attribution
+
+`war.queue-attribution-enabled` defaults to false and persists in
+`config/ralle.properties`. It is visible but unavailable unless Wynntils is
+exactly 4.2.7 for Minecraft 1.21.11, using the same compile-only artifact and
+compatibility detector as HQ Distance. Enabling it never changes Wynntils'
+configuration: the player must separately enable Wynntils' Guild Attack Timer
+overlay, and a sender must supply the guild defense announcement for attribution
+to be observable.
+
+While enabled in an active Wynncraft world, a lazily registered Wynntils Match
+listener validates the complete current guild indicator, rank pill, speaker, and
+body envelope before accepting `{territory} defense is {level}`. All six pinned
+defense values are accepted, and the territory must equal a canonical Wynntils
+territory name after only narrow whitespace normalization. Character nicknames
+resolve through hover metadata applying to the speaker span; direct names must be
+valid Minecraft IGNs. The observer never cancels or edits chat and performs no
+commands, polling, HTTP requests, or backend work.
+
+Announcements may wait up to ten seconds for the matching timer model entry.
+First observed sender wins for one continuously active territory countdown;
+duplicates are idempotent and conflicts do not overwrite it. Attribution follows
+timer-record replacement and end-time drift, but is dropped on observed absence,
+expiry, a verified capture message, setting disable, disconnect, world/server or
+character-selection transition, or account/guild/character identity change.
+Pending and active metadata are each capped at 512 territories. No component,
+chat history, or completed attribution is persisted. A cancellation and requeue
+that occurs entirely between observations with an indistinguishable timer cannot
+be proven to be a new generation.
+
+An optional version-gated mixin decorates only the row task returned by
+`TerritoryAttackTimerOverlay#lambda$render$0` and its separate editor preview.
+It prepends the local IGN in Minecraft blue or another resolved IGN in gray,
+then a gray ` → `, and otherwise uses localized gray `Unknown`. The original
+styled timer component and `TextRenderSetting` are retained, so Wynntils continues
+to own defense colors, current-territory emphasis, sorting, font, shadow,
+alignment, wrapping, dimensions, and position. Missing, unsupported, disabled,
+or failed integration states leave the original task untouched; adapter failures
+clear state, unregister the listener, and disable only this feature for the
+remainder of that connection session.
+
+An automatic Wynntils defense announcement and an identical manually typed guild
+message have the same observable client representation and cannot be
+distinguished. Missing announcements, sender-side announcement disablement, and
+messages sent before the listener joined are therefore shown as `Unknown` rather
+than inferred.
+
+Development builds expose `/ralle testqueuetimers` only while the feature is
+enabled in an active supported Wynncraft session. It toggles three synthetic
+local, remote, and unknown countdown rows by augmenting only the list value used
+inside the overlay render call. The sentinel timers are replaced with styled
+sample tasks before drawing, expire after roughly three minutes, and never enter
+Wynntils' timer or defense models or cause a server command or message.
 
 ## Local settings
 
