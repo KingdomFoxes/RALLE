@@ -55,6 +55,8 @@ import org.kingdomfoxes.ralle.requeue.AutoRaidRequeueController;
 import org.kingdomfoxes.ralle.requeue.AutoRaidRequeueStore;
 import org.kingdomfoxes.ralle.war.consumables.ConsumableHighlightService;
 import org.kingdomfoxes.ralle.war.consumables.ConsumableHighlightStore;
+import org.kingdomfoxes.ralle.war.hqdistance.HqDistanceOverlay;
+import org.kingdomfoxes.ralle.war.hqdistance.WynntilsCompatibility;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
@@ -77,6 +79,15 @@ public final class RalleClient implements ClientModInitializer {
                 configDirectory.resolve("ralle-onboarding.properties"), existingInstall);
 
         RalleSettings.register(settings);
+        var wynntilsCompatibility = WynntilsCompatibility.detect();
+        if (!wynntilsCompatibility.supported()) {
+            settings.markUnavailable(
+                    RalleSettings.HQ_DISTANCE_ENABLED_ID,
+                    net.minecraft.network.chat.Component.translatable(wynntilsCompatibility
+                            == WynntilsCompatibility.Status.MISSING
+                            ? "ralle.settings.hq-distance.missing-wynntils"
+                            : "ralle.settings.hq-distance.unsupported-wynntils"));
+        }
         placements.register(new HudPlacementRegistry.ElementDefinition(
                 ChatLayoutService.CHAT_ELEMENT_ID,
                 ChatLayoutService.MINIMUM_WIDTH,
@@ -92,6 +103,9 @@ public final class RalleClient implements ClientModInitializer {
         settings.seal();
         placements.seal();
         RalleTypography.bind(settings);
+        HqDistanceOverlay.configure(
+                settings.setting(RalleSettings.HQ_DISTANCE_ENABLED_ID, BooleanSetting.class),
+                wynntilsCompatibility.supported());
 
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), placements);
         var navigation = new SettingsNavigationState(configDirectory.resolve("ralle-settings-ui.properties"), settings);
@@ -182,6 +196,7 @@ public final class RalleClient implements ClientModInitializer {
             chatTypeTabs.resetSession();
             raidLfg.connectionChanged();
             guildRanks.connectionChanged();
+            HqDistanceOverlay.clear();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             chatLayout.tick();

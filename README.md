@@ -67,6 +67,18 @@ be imported, exported, edited, emptied, or reset independently of the master
 toggle. Its editor is shown only while the master toggle is enabled.
 The complete editor also appears in matching settings-search results and follows
 the same searchable-container contract as future full-width settings panels.
+War → Territory Map also contains the disabled-by-default **HQ Distance and Queue
+Estimate** option. With exactly Wynntils 4.2.7 installed, holding either Ctrl key
+over a guild-map territory shows its shortest link distance from the player's HQ
+through any guild's territories and, except at HQ, the provisional
+`60 + 60 × connections` queue estimate prefixed with a clock glyph. Distance
+color interpolates from green at HQ to red at the furthest reachable territory.
+Owned destinations are hypothetical. Active attack timers suppress both added
+labels. Labels stay at native size at all zoom levels, even when they overlap
+or extend beyond territory bounds. Missing or conflicting route data remains
+unknown. RALLE reuses Wynntils' existing models and does
+not add polling or backend traffic. The historical duration formula remains a
+release blocker until it is checked against current in-game attack previews.
 
 The first connection after a new installation posts one local RALLE onboarding
 message with clickable settings, LFG, and HUD commands. Its numeric sent marker

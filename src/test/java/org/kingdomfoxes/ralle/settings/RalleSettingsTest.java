@@ -214,11 +214,14 @@ class RalleSettingsTest {
         assertEquals(KeybindSetting.UNBOUND,
                 registry.setting("automatic-raid-requeue-keybind", KeybindSetting.class).value());
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("automatic-raid-requeue-keybind"));
-        assertEquals(List.of("consumables"),
+        assertEquals(List.of("territory-map", "consumables"),
                 categories.get(3).subcategories().stream().map(value -> value.id()).toList());
+        assertEquals(List.of(RalleSettings.HQ_DISTANCE_ENABLED_ID),
+                categories.get(3).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
+        assertFalse(registry.setting(RalleSettings.HQ_DISTANCE_ENABLED_ID, BooleanSetting.class).value());
         assertEquals(List.of(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID,
                         RalleSettings.CONSUMABLE_HIGHLIGHT_RULES_ID),
-                categories.get(3).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
+                categories.get(3).subcategories().get(1).entries().stream().map(value -> value.id()).toList());
         assertFalse(registry.setting(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID, BooleanSetting.class).value());
         assertEquals(List.of(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID),
                 registry.dependencies(RalleSettings.CONSUMABLE_HIGHLIGHT_RULES_ID));
@@ -236,6 +239,19 @@ class RalleSettingsTest {
 
         assertTrue(Files.readString(path).contains("war.consumable-highlights-enabled=true"));
         assertTrue(registry.available(RalleSettings.CONSUMABLE_HIGHLIGHT_RULES_ID));
+    }
+
+    @Test
+    void hqDistanceToggleDefaultsOffAndPersistsUnderWar() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+
+        var setting = registry.setting(RalleSettings.HQ_DISTANCE_ENABLED_ID, BooleanSetting.class);
+        assertFalse(setting.value());
+        setting.set(true);
+        assertTrue(Files.readString(path).contains("war.hq-distance-enabled=true"));
     }
 
     @Test

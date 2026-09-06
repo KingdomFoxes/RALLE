@@ -17,7 +17,8 @@
   "mixins": [
     "ralle.mixins.json",
     "ralle.lfg.mixins.json",
-    "ralle.consumables.mixins.json"
+    "ralle.consumables.mixins.json",
+    "ralle.wynntils.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.19.3",
@@ -27,6 +28,6 @@
     "owo": ">=0.13.0"
   },
   "suggests": {
-    "wynntils": "*"
+    "wynntils": "=4.2.7"
   }
 }

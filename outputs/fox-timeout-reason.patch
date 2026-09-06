@@ -1,0 +1,572 @@
+diff --git a/.env.example b/.env.example
+index 3af1345..88116e8 100644
+--- a/.env.example
++++ b/.env.example
+@@ -67,7 +67,7 @@ RALLE_LFG_ENABLED=0
+ RALLE_LFG_PROTOCOL_VERSION=1
+ RALLE_SESSION_TTL_SECONDS=900
+ RALLE_CHALLENGE_TTL_SECONDS=60
+-# Lobbies do not expire from inactivity. This interval only prunes delivery/retry records.
++# This interval checks the fixed 30-minute initial-fill deadline and prunes delivery/retry records.
+ RALLE_EXPIRY_CHECK_SECONDS=60
+ # Guild identity is read live from Wynncraft; every guild may use Raid LFG.
+ # Every Fox-side LFG is delivered here; allied copies use active /lfgshare pairs.
+diff --git a/STRUCTURE.md b/STRUCTURE.md
+index 8ac942d..2435360 100644
+--- a/STRUCTURE.md
++++ b/STRUCTURE.md
+@@ -101,8 +101,9 @@ from the gateway message cache by the send's nonce, with no HTTP. Recovery
+ does not survive a restart, which empties that cache: the embed is kept free
+ of backend identifiers, so a post carries no durable handle to search for, and
+ Discord returns a nonce only over the gateway, never from REST history.
+-Discord's own nonce deduplication on send is the guard there. Lobbies never expire from inactivity;
+-explicit closures commit through the remove-outbox path.
++Discord's own nonce deduplication on send is the guard there. Initial recruitment expires after 30 minutes unless the party has reached 4/4.
++Previously filled parties never expire from inactivity. Timeout and explicit closures
++commit through the remove-outbox path.
+ Guild identity is resolved live from Wynncraft rather than from any tracked
+ registry — every Wynncraft guild may use Raid LFG, and only guildless players
+ are refused.
+diff --git a/protocol/ralle/v1/README.md b/protocol/ralle/v1/README.md
+index 00efad1..53e1586 100644
+--- a/protocol/ralle/v1/README.md
++++ b/protocol/ralle/v1/README.md
+@@ -16,3 +16,12 @@ the protocol version intentionally when the v1 contract genuinely changes.
+ 
+ Internal outbox and diagnostic payloads are deliberately excluded. In
+ particular, their `cause` field is not part of protocol-v1 WebSocket frames.
++
++
++Timeout removals support an opt-in additive extension: clients request
++`X-Ralle-Removal-Reasons: 1` on the WebSocket handshake. Only these connections
++receive `reason: "lobby_expired"` when initial recruitment expires. `reason` is
++an optional string of at most 64 characters. Older clients and ordinary removals
++retain the exact legacy v1 frame shape. The capability changes presentation only,
++never visibility, authentication, or authority. Updated RALLE cards freeze at
++30:00, show blue Timed out! feedback for two seconds, then slide out.
+diff --git a/src/features/raids.py b/src/features/raids.py
+index ec47a55..5daaa6a 100644
+--- a/src/features/raids.py
++++ b/src/features/raids.py
+@@ -895,16 +895,9 @@ def _cached_message_by_nonce(client: discord.Client, channel_id: int,
+     return None
+ 
+ 
+-def _timed_out_unjoined(payload: dict, lobby: dict) -> bool:
+-    """True when this removal is the service expiring an idle lobby (see the
+-    repository's expire_stale_lobbies) that never got a second member — the
+-    host was the only one in it. Any other removal (disband, force-close, the
+-    host's RALLE presence dropping) is a real close, and every lobby that
+-    someone actually joined closes as one too."""
+-    if payload.get("reason") != "lobby_expired":
+-        return False
+-    return len([m for m in lobby.get("members") or []
+-                if m.get("role") != "HOST"]) == 0
++def _timed_out_unfilled(payload: dict, lobby: dict) -> bool:
++    """Only the authoritative initial-recruitment deadline reports a timeout."""
++    return payload.get("reason") == "lobby_expired"
+ 
+ 
+ async def _close_delivery(client: discord.Client, delivery: dict, lobby: dict,
+@@ -1127,8 +1120,8 @@ async def process_outbox_event(client: discord.Client, event: dict, *,
+         item.setdefault("destination_key", destination_key)
+         deliveries[destination_key] = item
+     if event["event_type"] == "lobby.remove":
+-        timed_out = _timed_out_unjoined(payload, lobby)
+-        reason = ("Nobody joined before this party timed out." if timed_out
++        timed_out = _timed_out_unfilled(payload, lobby)
++        reason = ("This party did not fill within 30 minutes." if timed_out
+                   else "This lobby has closed.")
+         for delivery in deliveries.values():
+             await _close_delivery(client, delivery, lobby, revision, reason,
+diff --git a/tests/test_raid_lfg_share.py b/tests/test_raid_lfg_share.py
+index 79601be..5222e0e 100644
+--- a/tests/test_raid_lfg_share.py
++++ b/tests/test_raid_lfg_share.py
+@@ -594,13 +594,13 @@ class DiscordDeliveryTests(unittest.IsolatedAsyncioTestCase):
+         self.assertIn("**Status:** \u231b Timed out", embed.description)
+         self.assertTrue(embed.title.startswith("\u231b "))
+         self.assertEqual(embed.footer.text,
+-                         "Nobody joined before this party timed out.")
++                         "This party did not fill within 30 minutes.")
+ 
+-    async def test_expiry_after_someone_joined_still_reads_as_closed(self):
++    async def test_expiry_after_someone_joined_reads_as_timed_out(self):
+         joined = {**LOBBY, "members": [LOBBY["members"][0], member(2)]}
+         embed = await self._remove_and_read_status(joined, "lobby_expired")
+-        self.assertIn("**Status:** \u274c Closed", embed.description)
+-        self.assertEqual(embed.footer.text, "This lobby has closed.")
++        self.assertIn("**Status:** \u231b Timed out", embed.description)
++        self.assertEqual(embed.footer.text, "This party did not fill within 30 minutes.")
+ 
+     async def test_disband_of_an_empty_lobby_is_not_a_timeout(self):
+         """Only the service's own expiry sets reason=lobby_expired; a host who
+diff --git a/web/README.md b/web/README.md
+index 2b30d0c..a3aafaf 100644
+--- a/web/README.md
++++ b/web/README.md
+@@ -532,8 +532,19 @@ than by the interaction callback. Disabled or missing bot configuration uses a
+ controlled bounded pause, and legacy database cleanup runs only after a successful
+ enabled initial reconciliation. Historical Discord posts are never fetched or
+ edited during that cleanup. Other delivery failures use bounded exponential backoff
+-and cannot roll back lobby state. Lobbies never expire from inactivity. The old `RALLE_LOBBY_TTL_SECONDS`
+-variable is ignored. Explicit closures still use the synchronized remove path. API process startup preserves active lobby state.
++and cannot roll back lobby state. Initial recruitment has a fixed 30-minute deadline
++from creation: parties that have never reached 4/4 close at the next cleanup tick,
++regardless of joins, pings, edits, or manual locks. Late joins/manual adds are rejected
++transactionally even before that tick. Once a party has filled, it never expires from
++inactivity, including after it reopens below capacity. The old `RALLE_LOBBY_TTL_SECONDS`
++variable remains ignored. A SQLite `recruitment_completed` flag records first fill
++through normal or manual joins and survives restarts without keeping completed history.
++Pre-upgrade listings are exempt because their prior fill history cannot be reconstructed
++reliably. New listings always start with the flag unset. Timeout deletion and Discord
++outbox removal commit together; the service broadcasts the same `lobby_expired` reason
++to mod clients that opt in with `X-Ralle-Removal-Reasons: 1`. Legacy clients retain the
++original remove frame. Discord labels all unfilled timeout rosters Timed out.
++No Wynncraft party command is generated by timeout cleanup. API startup preserves active state.
+ 
+ Discord commands are `/raid_lfg raid [note]`, `/setup_raid`,
+ `/pingroleselect`, and staff-only `/lfg_force_close lobby_id`. Region is never
+@@ -572,7 +583,7 @@ Foreign keys cascade member/block cleanup. Create, join, leave, revision bump,
+ idempotency record, and outbox insert commit in the same `BEGIN IMMEDIATE`
+ transaction, preventing concurrent same-raid creates or concurrent final-slot
+ joins from both succeeding. Active lobbies survive API process restarts and
+-have no activity TTL; restarting the API does not enqueue
++have no general inactivity TTL; initial recruitment still has its 30-minute deadline. Restarting the API does not enqueue
+ Discord removals. The cleanup loop prunes delivered outbox rows and spent
+ idempotency records after a day — startup used to be the only thing that
+ emptied the idempotency table, and it no longer clears anything. The bot's `db.init()` drops the old
+diff --git a/web/backend/.env.example b/web/backend/.env.example
+index 58b8a2d..cafdac2 100644
+--- a/web/backend/.env.example
++++ b/web/backend/.env.example
+@@ -82,7 +82,7 @@ RALLE_BOT_SERVICE_TOKEN=
+ RALLE_LFG_PROTOCOL_VERSION=1
+ RALLE_SESSION_TTL_SECONDS=900
+ RALLE_CHALLENGE_TTL_SECONDS=60
+-# Lobbies never expire from inactivity; interval below prunes delivery/retry records.
++# This interval checks the fixed 30-minute initial-fill deadline and prunes delivery/retry records.
+ RALLE_EXPIRY_CHECK_SECONDS=60
+ # Guild identity is read live from Wynncraft; every guild may use Raid LFG. Fox's
+ # pool channel is bot-owned; allied destinations use active /lfgshare pairs.
+diff --git a/web/backend/app/lfg/live.py b/web/backend/app/lfg/live.py
+index af67d6f..788735c 100644
+--- a/web/backend/app/lfg/live.py
++++ b/web/backend/app/lfg/live.py
+@@ -20,6 +20,7 @@ class LiveConnection:
+     queue: asyncio.Queue = field(default_factory=asyncio.Queue)
+     visible_lobby_ids: set[str] = field(default_factory=set)
+     last_revision: int = 0
++    removal_reasons: bool = False
+ 
+ 
+ class LiveHub:
+@@ -51,7 +52,8 @@ class LiveHub:
+                     lobby_id=lobby["lobby_id"]))
+ 
+     async def broadcast_remove(self, lobby: dict, revision: int, protocol_version: int,
+-                               can_view: Callable[[dict, dict], bool]) -> None:
++                               can_view: Callable[[dict, dict], bool], *,
++                               reason: str | None = None) -> None:
+         async with self._lock:
+             connections = list(self._connections.values())
+         for connection in connections:
+@@ -60,7 +62,8 @@ class LiveHub:
+                 connection.visible_lobby_ids.discard(lobby["lobby_id"])
+                 connection.queue.put_nowait(live_remove(
+                     protocol_version=protocol_version, revision=revision,
+-                    lobby_id=lobby["lobby_id"]))
++                    lobby_id=lobby["lobby_id"],
++                    reason=reason if connection.removal_reasons else None))
+ 
+     async def send_to_player(self, minecraft_uuid: str, frame: dict) -> None:
+         async with self._lock:
+diff --git a/web/backend/app/lfg/models.py b/web/backend/app/lfg/models.py
+index abbe2c7..b96a7ce 100644
+--- a/web/backend/app/lfg/models.py
++++ b/web/backend/app/lfg/models.py
+@@ -294,6 +294,7 @@ class LiveRemoveFrame(StrictModel):
+     protocol_version: int
+     revision: int
+     lobby_id: UUID
++    reason: str | None = Field(default=None, max_length=64)
+ 
+ 
+ class LiveErrorFrame(StrictModel):
+diff --git a/web/backend/app/lfg/repository.py b/web/backend/app/lfg/repository.py
+index c2e995b..e7756db 100644
+--- a/web/backend/app/lfg/repository.py
++++ b/web/backend/app/lfg/repository.py
+@@ -13,6 +13,7 @@ from ..diagnostics import span
+ from .errors import LFGError
+ 
+ KICK_BLOCK_SECONDS = 120
++RECRUITMENT_TIMEOUT_SECONDS = 30 * 60
+ 
+ 
+ SCHEMA = """
+@@ -36,7 +37,8 @@ CREATE TABLE IF NOT EXISTS ralle_lfg_lobbies (
+     created_at TEXT NOT NULL,
+     last_activity_at TEXT NOT NULL,
+     revision INTEGER NOT NULL CHECK(revision >= 1),
+-    last_ping_at TEXT
++    last_ping_at TEXT,
++    recruitment_completed INTEGER NOT NULL DEFAULT 0 CHECK(recruitment_completed IN (0,1))
+ );
+ -- Creation checks for an existing recruiting lobby inside BEGIN IMMEDIATE.
+ -- Existing parties may reopen alongside another listing of the same raid.
+@@ -263,6 +265,12 @@ class LFGRepository:
+                     con.execute("ALTER TABLE ralle_lfg_lobbies ADD COLUMN last_ping_at TEXT")
+                 if self._has_unconditional_raid_type_unique(con):
+                     self._migrate_raid_type_unique(con)
++                # Existing listings have no reliable retained first-fill history.
++                # Grandfather them; all newly created listings explicitly start at 0.
++                if "recruitment_completed" not in {row[1] for row in con.execute(
++                        "PRAGMA table_info(ralle_lfg_lobbies)")}:
++                    con.execute("ALTER TABLE ralle_lfg_lobbies ADD COLUMN "
++                                "recruitment_completed INTEGER NOT NULL DEFAULT 1")
+                 # Upgrade existing databases without removing any lobby or member.
+                 con.execute("DROP INDEX IF EXISTS ralle_lfg_one_open_per_type")
+                 member_columns = {row[1] for row in con.execute(
+@@ -410,6 +418,14 @@ class LFGRepository:
+             (lobby_id,)).fetchall()]
+         return out
+ 
++    @staticmethod
++    def _require_recruitment_open(lobby: dict) -> None:
++        if (not lobby["recruitment_completed"] and
++                (datetime.now(timezone.utc) - datetime.fromisoformat(lobby["created_at"])).total_seconds()
++                >= RECRUITMENT_TIMEOUT_SECONDS):
++            raise LFGError("LOBBY_NOT_FOUND", "This party has timed out.", status=404,
++                           lobby_id=lobby["lobby_id"])
++
+     @staticmethod
+     def _kick_blocked(con: sqlite3.Connection, lobby_id: str, minecraft_uuid: str,
+                       now: datetime) -> bool:
+@@ -586,8 +602,8 @@ class LFGRepository:
+                 con.execute(
+                     "INSERT INTO ralle_lfg_lobbies "
+                     "(lobby_id,raid_type,region,note,visibility,status,locked,"
+-                    "host_minecraft_uuid,host_guild_uuid,created_at,last_activity_at,revision) "
+-                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
++                    "host_minecraft_uuid,host_guild_uuid,created_at,last_activity_at,revision,recruitment_completed) "
++                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,0)",
+                     (lobby_id, raid_type, region, note, "PUBLIC", "OPEN", 0,
+                      player["minecraft_uuid"], player["guild"]["uuid"], created, created, 1))
+                 con.execute(
+@@ -633,6 +649,7 @@ class LFGRepository:
+                 lobby = self._lobby(con, lobby_id)
+                 if not lobby:
+                     raise LFGError("LOBBY_NOT_FOUND", "Lobby not found.", status=404)
++                self._require_recruitment_open(lobby)
+                 is_member = any(m["minecraft_uuid"] == player["minecraft_uuid"]
+                                 for m in lobby["members"])
+                 if is_member:
+@@ -673,6 +690,9 @@ class LFGRepository:
+                     raise
+                 count = con.execute(
+                     "SELECT count(*) FROM ralle_lfg_members WHERE lobby_id=?", (lobby_id,)).fetchone()[0]
++                if count == 4:
++                    con.execute("UPDATE ralle_lfg_lobbies SET recruitment_completed=1 WHERE lobby_id=?",
++                                (lobby_id,))
+                 # Filling locks recruitment; losing a member reopens it.
+                 con.execute(
+                     "UPDATE ralle_lfg_lobbies SET status=?,locked=locked OR ?,"
+@@ -910,6 +930,7 @@ class LFGRepository:
+                 lobby = self._lobby(con, lobby_id)
+                 if not lobby:
+                     raise LFGError("LOBBY_NOT_FOUND", "Lobby not found.", status=404)
++                self._require_recruitment_open(lobby)
+                 self._require_host(lobby, actor_uuid)
+                 if lobby["locked"]:
+                     raise LFGError("LOBBY_LOCKED", "This lobby is locked.", status=409,
+@@ -943,6 +964,9 @@ class LFGRepository:
+                     raise
+                 count = con.execute(
+                     "SELECT count(*) FROM ralle_lfg_members WHERE lobby_id=?", (lobby_id,)).fetchone()[0]
++                if count == 4:
++                    con.execute("UPDATE ralle_lfg_lobbies SET recruitment_completed=1 WHERE lobby_id=?",
++                                (lobby_id,))
+                 # As with normal joins, filling the fourth slot locks recruitment.
+                 con.execute("UPDATE ralle_lfg_lobbies SET status=?,locked=locked OR ?,"
+                             "last_activity_at=?,revision=revision+1 WHERE lobby_id=?",
+@@ -1056,6 +1080,37 @@ class LFGRepository:
+                  int(delivery.get("closed", False)), now_iso()))
+         await self._run(work)
+ 
++    async def expire_unfilled_lobbies(self, now: datetime) -> list[tuple[dict, int]]:
++        """Atomically expire initial recruitment; activity never extends its deadline."""
++        cutoff = (now.astimezone(timezone.utc) - timedelta(
++            seconds=RECRUITMENT_TIMEOUT_SECONDS)).isoformat()
++
++        def work(con):
++            self._begin(con)
++            try:
++                ids = [row[0] for row in con.execute(
++                    "SELECT lobby_id FROM ralle_lfg_lobbies WHERE recruitment_completed=0 "
++                    "AND created_at<=? AND status='OPEN' AND "
++                    "(SELECT count(*) FROM ralle_lfg_members m "
++                    "WHERE m.lobby_id=ralle_lfg_lobbies.lobby_id)<4 "
++                    "ORDER BY created_at,lobby_id", (cutoff,))]
++                expired = []
++                for lobby_id in ids:
++                    lobby = self._lobby(con, lobby_id)
++                    changed = now_iso()
++                    revision = self._revision(con)
++                    payload = self._event_payload(
++                        con, lobby, cause="lobby.expire", reason="lobby_expired")
++                    con.execute("DELETE FROM ralle_lfg_lobbies WHERE lobby_id=?", (lobby_id,))
++                    self._outbox(con, lobby_id, "lobby.remove", revision, payload, changed)
++                    expired.append((lobby, revision))
++                con.commit()
++                return expired
++            except Exception:
++                con.rollback()
++                raise
++        return await self._run(work)
++
+     async def claim_outbox(self, limit: int = 50, lease_seconds: int = 60) -> list[dict]:
+         def work(con):
+             self._begin(con)
+diff --git a/web/backend/app/lfg/routes.py b/web/backend/app/lfg/routes.py
+index 573e3e4..02863e2 100644
+--- a/web/backend/app/lfg/routes.py
++++ b/web/backend/app/lfg/routes.py
+@@ -539,7 +539,8 @@ async def live(websocket: WebSocket):
+         return
+ 
+     await websocket.accept()
+-    connection = LiveConnection(websocket, player, credential.expires_at)
++    connection = LiveConnection(websocket, player, credential.expires_at,
++                                removal_reasons=websocket.headers.get("x-ralle-removal-reasons") == "1")
+     # Register before snapshotting so a mutation cannot fall into a gap. Any
+     # queued event is still sent only after the complete snapshot.
+     await runtime.live.register(connection)
+diff --git a/web/backend/app/lfg/service.py b/web/backend/app/lfg/service.py
+index 4f0037d..dd94a21 100644
+--- a/web/backend/app/lfg/service.py
++++ b/web/backend/app/lfg/service.py
+@@ -483,6 +483,16 @@ class LFGService:
+         return mutation(protocol_version=self.protocol_version,
+                         revision=revision, lobby=wire)
+ 
++    async def expire_unfilled(self) -> int:
++        """End parties that have not first filled within thirty minutes of creation."""
++        async with self._mutation_lock:
++            expired = await self.repository.expire_unfilled_lobbies(datetime.now(timezone.utc))
++            for lobby, revision in expired:
++                await self.live.broadcast_remove(
++                    lobby, revision, self.protocol_version, self.can_view,
++                    reason="lobby_expired")
++        return len(expired)
++
+     def render_upsert(self, player: dict, lobby: dict, revision: int,
+                       all_lobbies: list[dict] | None = None) -> dict | None:
+         if not self.can_view(player, lobby):
+diff --git a/web/backend/app/lfg/wire.py b/web/backend/app/lfg/wire.py
+index ce3fdc3..4e7a578 100644
+--- a/web/backend/app/lfg/wire.py
++++ b/web/backend/app/lfg/wire.py
+@@ -59,13 +59,17 @@ def live_upsert(*, protocol_version: int, revision: int, lobby: dict) -> dict:
+     }
+ 
+ 
+-def live_remove(*, protocol_version: int, revision: int, lobby_id: str) -> dict:
+-    return {
++def live_remove(*, protocol_version: int, revision: int, lobby_id: str,
++                reason: str | None = None) -> dict:
++    frame = {
+         "type": "lobby.remove",
+         "protocol_version": protocol_version,
+         "revision": revision,
+         "lobby_id": lobby_id,
+     }
++    if reason is not None:
++        frame["reason"] = reason
++    return frame
+ 
+ 
+ def live_error(error_envelope: dict) -> dict:
+diff --git a/web/backend/app/main.py b/web/backend/app/main.py
+index e1539ef..d96c73b 100644
+--- a/web/backend/app/main.py
++++ b/web/backend/app/main.py
+@@ -29,10 +29,11 @@ _RETENTION_SECONDS = 86400
+ 
+ 
+ async def _prune_lfg_records(runtime) -> None:
+-    """Prune delivery/retry records only; inactivity never closes a lobby."""
++    """Enforce initial recruitment deadlines and prune delivery/retry records."""
+     while True:
+         await asyncio.sleep(runtime.settings.expiry_check_seconds)
+         try:
++            await runtime.service.expire_unfilled()
+             await runtime.outbox.prune(_RETENTION_SECONDS)
+             await runtime.outbox.prune_idempotency(_RETENTION_SECONDS)
+         except Exception:
+diff --git a/web/backend/tests/test_lfg.py b/web/backend/tests/test_lfg.py
+index 731195d..373624a 100644
+--- a/web/backend/tests/test_lfg.py
++++ b/web/backend/tests/test_lfg.py
+@@ -1388,6 +1388,90 @@ class RepositoryConcurrencyTests(unittest.TestCase):
+                 "SELECT count(*) FROM ralle_lfg_idempotency").fetchone()[0]))
+         self.assertEqual(remaining, 0)
+ 
++    def test_recruitment_deadline_expires_one_two_and_three_members_with_live_and_outbox_reason(self):
++        async def exercise():
++            for count in (1, 2, 3):
++                lobby, _, _ = await self.runtime.repository.create_lobby(player(1), "TNA", "EU", None, f"create-{count}")
++                lid = lobby["lobby_id"]
++                for number in range(2, count + 1):
++                    await self.runtime.repository.join_lobby(player(number), lid, f"join-{count}-{number}")
++                now = datetime.now(timezone.utc)
++                before = (now - timedelta(seconds=1799)).isoformat()
++                await self.runtime.repository._run(lambda con: con.execute(
++                    "UPDATE ralle_lfg_lobbies SET created_at=? WHERE lobby_id=?", (before, lid)))
++                self.assertEqual(await self.runtime.repository.expire_unfilled_lobbies(now), [])
++                # Recent pings/edits/joins cannot extend the creation deadline.
++                deadline = (now - timedelta(seconds=1800)).isoformat()
++                await self.runtime.repository._run(lambda con: con.execute(
++                    "UPDATE ralle_lfg_lobbies SET created_at=?,last_activity_at=? WHERE lobby_id=?",
++                    (deadline, now.isoformat(), lid)))
++                connection = LiveConnection(None, player(1), 0, removal_reasons=True)
++                legacy = LiveConnection(None, player(1), 0)
++                await self.runtime.live.register(connection)
++                await self.runtime.live.register(legacy)
++                self.assertEqual(await self.runtime.service.expire_unfilled(), 1)
++                self.assertEqual(connection.queue.get_nowait()["reason"], "lobby_expired")
++                self.assertNotIn("reason", legacy.queue.get_nowait())
++                self.assertIsNone(await self.runtime.repository.get_lobby(lid))
++                self.assertEqual(await self.runtime.service.expire_unfilled(), 0)
++                payload = await self.runtime.repository._run(lambda con: con.execute(
++                    "SELECT payload_json FROM ralle_lfg_outbox WHERE lobby_id=? AND event_type='lobby.remove'", (lid,)).fetchone()[0])
++                self.assertEqual(json.loads(payload)["reason"], "lobby_expired")
++                await self.runtime.live.unregister(connection)
++                await self.runtime.live.unregister(legacy)
++        asyncio.run(exercise())
++
++    def test_first_fill_permanently_exempts_party_even_after_reopening_and_restart(self):
++        async def exercise():
++            for manual in (False, True):
++                lobby, _, _ = await self.runtime.repository.create_lobby(player(1), "TNA", "EU", None, f"create-{manual}")
++                lid = lobby["lobby_id"]
++                for number in (2, 3, 4):
++                    if manual:
++                        await self.runtime.repository.manual_add(player(1)["minecraft_uuid"], lid, player(number), f"add-{manual}-{number}")
++                    else:
++                        await self.runtime.repository.join_lobby(player(number), lid, f"join-{manual}-{number}")
++                old = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
++                await self.runtime.repository._run(lambda con: con.execute(
++                    "UPDATE ralle_lfg_lobbies SET created_at=?,last_activity_at=? WHERE lobby_id=?", (old, old, lid)))
++                self.assertEqual(await self.runtime.service.expire_unfilled(), 0)
++                await self.runtime.repository.leave_lobby(player(4)["minecraft_uuid"], lid, f"leave-{manual}")
++                await self.runtime.repository.initialize()
++                self.assertEqual(await self.runtime.service.expire_unfilled(), 0)
++                self.assertEqual(len((await self.runtime.repository.get_lobby(lid))["members"]), 3)
++                await self.runtime.repository.close_lobby(player(1)["minecraft_uuid"], lid, f"close-{manual}")
++        asyncio.run(exercise())
++
++    def test_upgrade_preserves_existing_parties_without_first_fill_history(self):
++        async def exercise():
++            lobby, _, _ = await self.runtime.repository.create_lobby(player(1), "TNA", "EU", None, "legacy")
++            old = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
++            await self.runtime.repository._run(lambda con: con.execute(
++                "UPDATE ralle_lfg_lobbies SET created_at=?", (old,)))
++            await self.runtime.repository._run(lambda con: con.execute(
++                "ALTER TABLE ralle_lfg_lobbies DROP COLUMN recruitment_completed"))
++            await self.runtime.repository.initialize()
++            self.assertEqual(await self.runtime.service.expire_unfilled(), 0)
++            self.assertIsNotNone(await self.runtime.repository.get_lobby(lobby["lobby_id"]))
++        asyncio.run(exercise())
++
++    def test_late_join_cannot_rescue_expired_recruitment_before_cleanup(self):
++        async def exercise():
++            lobby, _, _ = await self.runtime.repository.create_lobby(player(1), "TNA", "EU", None, "host")
++            lid = lobby["lobby_id"]
++            old = (datetime.now(timezone.utc) - timedelta(minutes=31)).isoformat()
++            await self.runtime.repository._run(lambda con: con.execute(
++                "UPDATE ralle_lfg_lobbies SET created_at=? WHERE lobby_id=?", (old, lid)))
++            for manual in (False, True):
++                with self.assertRaises(LFGError) as raised:
++                    if manual:
++                        await self.runtime.repository.manual_add(player(1)["minecraft_uuid"], lid, player(2), "late-add")
++                    else:
++                        await self.runtime.repository.join_lobby(player(2), lid, "late-join")
++                self.assertEqual(raised.exception.code, "LOBBY_NOT_FOUND")
++            self.assertEqual(await self.runtime.service.expire_unfilled(), 1)
++        asyncio.run(exercise())
++
+     def test_cleanup_preserves_old_lobbies_and_emits_no_removal(self):
+         async def exercise():
+             for count, raid in ((1, "NOTG"), (3, "NOL"), (4, "TNA")):
+diff --git a/web/backend/tests/test_protocol_v1_contract.py b/web/backend/tests/test_protocol_v1_contract.py
+index 7f522fc..5d84fa4 100644
+--- a/web/backend/tests/test_protocol_v1_contract.py
++++ b/web/backend/tests/test_protocol_v1_contract.py
+@@ -4,6 +4,7 @@ from __future__ import annotations
+ import json
+ import sys
+ import unittest
++from uuid import uuid4
+ from pathlib import Path
+ 
+ from pydantic import ValidationError
+@@ -11,6 +12,7 @@ from pydantic import ValidationError
+ sys.path.insert(0, str(Path(__file__).parent.parent))
+ 
+ from app.lfg import wire
++from app.lfg.live import LiveConnection, LiveHub
+ from app.lfg.models import (LiveErrorFrame, LivePartyKickCommandFrame,
+                             LivePartyPingFrame, LiveRemoveFrame,
+                             LiveSessionExpiringFrame, LiveSnapshotFrame,
+@@ -76,6 +78,11 @@ class ProtocolV1ContractTests(unittest.TestCase):
+             lobby_id=remove["lobby_id"]), remove)
+         self.assertEqual(set(remove), {"type", "protocol_version", "revision", "lobby_id"})
+         LiveRemoveFrame.model_validate(remove)
++        expired = wire.live_remove(
++            protocol_version=remove["protocol_version"], revision=remove["revision"],
++            lobby_id=remove["lobby_id"], reason="lobby_expired")
++        self.assertEqual(expired, {**remove, "reason": "lobby_expired"})
++        LiveRemoveFrame.model_validate(expired)
+ 
+         error = fixture("live", "error")
+         self.assertEqual(wire.live_error({"error": error["error"]}), error)
+@@ -113,5 +120,38 @@ class ProtocolV1ContractTests(unittest.TestCase):
+                 model.model_validate({**value, "cause": "internal.only"})
+ 
+ 
++class RemovalReasonDeliveryTests(unittest.IsolatedAsyncioTestCase):
++    async def test_explicit_reason_reaches_visible_clients_without_leaking_to_others(self):
++        hub = LiveHub()
++        lobby = {"lobby_id": str(uuid4())}
++        visible = LiveConnection(None, {}, 0, removal_reasons=True)
++        visible.visible_lobby_ids.add(lobby["lobby_id"])
++        hidden = LiveConnection(None, {}, 0)
++        await hub.register(visible)
++        await hub.register(hidden)
++        await hub.broadcast_remove(lobby, 4, 1, lambda player, party: False,
++                                   reason="lobby_expired")
++        frame = visible.queue.get_nowait()
++        self.assertEqual(frame["reason"], "lobby_expired")
++        LiveRemoveFrame.model_validate(frame)
++        self.assertFalse(visible.visible_lobby_ids)
++        self.assertTrue(hidden.queue.empty())
++
++    async def test_ordinary_removal_retains_legacy_shape(self):
++        hub = LiveHub()
++        connection = LiveConnection(None, {}, 0)
++        await hub.register(connection)
++        lobby = {"lobby_id": str(uuid4())}
++        await hub.broadcast_remove(lobby, 4, 1, lambda player, party: True)
++        self.assertEqual(connection.queue.get_nowait(), wire.live_remove(
++            protocol_version=1, revision=4, lobby_id=lobby["lobby_id"]))
++
++    def test_invalid_reason_type_and_length_are_rejected(self):
++        frame = fixture("live", "lobby_remove")
++        for reason in (42, "x" * 65):
++            with self.subTest(reason=reason), self.assertRaises(ValidationError):
++                LiveRemoveFrame.model_validate({**frame, "reason": reason})
++
++
+ if __name__ == "__main__":
+     unittest.main()

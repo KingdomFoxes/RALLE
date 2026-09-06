@@ -19,6 +19,7 @@ public final class RalleSettings {
     public static final String CONSUMABLE_HIGHLIGHTS_ENABLED_ID = "consumable-highlights-enabled";
     public static final String CONSUMABLE_HIGHLIGHT_RULES_ID = "consumable-highlight-rules";
     public static final String CONSUMABLE_HIGHLIGHT_PROVIDER_ID = "consumable-highlight-editor";
+    public static final String HQ_DISTANCE_ENABLED_ID = "hq-distance-enabled";
 
     private RalleSettings() {}
 
@@ -109,10 +110,13 @@ public final class RalleSettings {
                 Component.translatable("ralle.settings.category.war"),
                 Component.translatable("ralle.settings.category.war.description"),
                 List.of(),
-                List.of(subcategory("consumables",
-                        toggle(CONSUMABLE_HIGHLIGHTS_ENABLED_ID),
-                        customPanel(CONSUMABLE_HIGHLIGHT_RULES_ID, CONSUMABLE_HIGHLIGHT_PROVIDER_ID)
-                ))
+                List.of(
+                        subcategory("territory-map", toggle(HQ_DISTANCE_ENABLED_ID)),
+                        subcategory("consumables",
+                                toggle(CONSUMABLE_HIGHLIGHTS_ENABLED_ID),
+                                customPanel(CONSUMABLE_HIGHLIGHT_RULES_ID, CONSUMABLE_HIGHLIGHT_PROVIDER_ID)
+                        )
+                )
         ));
 
         registry.requireEnabled("message-direction", "message-direction-enabled");

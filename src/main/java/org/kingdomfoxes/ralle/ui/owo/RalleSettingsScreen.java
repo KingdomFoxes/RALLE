@@ -361,9 +361,12 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                 .color(available ? RalleTheme.MUTED : RalleTheme.DISABLED)
                 .maxWidth(SettingsScreenLayout.descriptionWidth(geometry.documentWidth(), stacked)));
         if (!available) {
-            var unmet = settings.unmetDependencies(entry.id()).stream()
-                    .map(setting -> setting.title().getString()).toList();
-            copy.child(UIComponents.label(RalleTheme.ui(Component.translatable("ralle.settings.requires", String.join(", ", unmet))))
+            var reason = settings.unavailableReason(entry.id()).orElseGet(() -> {
+                var unmet = settings.unmetDependencies(entry.id()).stream()
+                        .map(setting -> setting.title().getString()).toList();
+                return Component.translatable("ralle.settings.requires", String.join(", ", unmet));
+            });
+            copy.child(UIComponents.label(RalleTheme.ui(reason))
                     .lineHeight(RalleTheme.BODY_LINE_HEIGHT)
                     .color(RalleTheme.ACCENT)
                     .maxWidth(SettingsScreenLayout.dependencyDescriptionWidth(geometry.documentWidth())));
@@ -447,7 +450,8 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         button.id("setting-control-" + entry.id());
         button.sizing(Sizing.fixed(126), Sizing.fixed(20));
         button.active = available;
-        if (!available) button.tooltip(RalleTheme.ui(Component.translatable("ralle.settings.unavailable")));
+        if (!available) button.tooltip(RalleTheme.ui(settings.unavailableReason(entry.id())
+                .orElseGet(() -> Component.translatable("ralle.settings.unavailable"))));
     }
 
     private void toggleBoolean(BooleanSetting setting, ButtonComponent trigger) {

@@ -10,7 +10,7 @@ final class SettingsPageContent {
     private SettingsPageContent() {}
 
     static List<SettingsEntry> visibleEntries(SettingsRegistry registry, List<SettingsEntry> entries) {
-        return entries.stream().filter(entry -> registry.available(entry.id())).toList();
+        return entries.stream().filter(entry -> registry.visible(entry.id())).toList();
     }
 
     static List<String> unmetParentTitles(SettingsRegistry registry, List<SettingsEntry> entries) {

@@ -1,5 +1,6 @@
 package org.kingdomfoxes.ralle.api.settings;
 
+import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,6 +24,7 @@ public final class SettingsRegistry {
     private static final Logger LOGGER = LoggerFactory.getLogger(SettingsRegistry.class);
     private final Map<String, SettingsCategory> categories = new LinkedHashMap<>();
     private final Map<String, List<String>> dependencies = new LinkedHashMap<>();
+    private final Map<String, Component> unavailableReasons = new LinkedHashMap<>();
     private final Path storagePath;
     private boolean sealed;
 
@@ -68,6 +70,13 @@ public final class SettingsRegistry {
         dependencies.computeIfAbsent(entryId, ignored -> new ArrayList<>()).add(requiredBooleanSettingId);
     }
 
+    /** Makes an entry visible but non-interactive when an optional runtime integration is unavailable. */
+    public void markUnavailable(String entryId, Component reason) {
+        requireOpen();
+        Objects.requireNonNull(entryId, "entryId");
+        unavailableReasons.put(entryId, Objects.requireNonNull(reason, "reason"));
+    }
+
     public Collection<SettingsCategory> categories() {
         return List.copyOf(categories.values());
     }
@@ -97,7 +106,17 @@ public final class SettingsRegistry {
     }
 
     public boolean available(String entryId) {
+        return unmetDependencies(entryId).isEmpty() && !unavailableReasons.containsKey(entryId);
+    }
+
+    /** Dependency-hidden children are omitted; capability-unavailable entries remain visible with an explanation. */
+    public boolean visible(String entryId) {
         return unmetDependencies(entryId).isEmpty();
+    }
+
+    public Optional<Component> unavailableReason(String entryId) {
+        Objects.requireNonNull(entryId, "entryId");
+        return Optional.ofNullable(unavailableReasons.get(entryId));
     }
 
     private void collectUnmetDependencies(String entryId, Map<String, BooleanSetting> unmet) {
@@ -186,6 +205,11 @@ public final class SettingsRegistry {
 
     private void validateDependencies() {
         var entryIds = entries().stream().map(SettingsEntry::id).collect(java.util.stream.Collectors.toSet());
+        for (var entryId : unavailableReasons.keySet()) {
+            if (!entryIds.contains(entryId)) {
+                throw new IllegalArgumentException("Unknown unavailable settings entry: " + entryId);
+            }
+        }
         for (var dependency : dependencies.entrySet()) {
             if (!entryIds.contains(dependency.getKey())) {
                 throw new IllegalArgumentException("Unknown dependent settings entry: " + dependency.getKey());

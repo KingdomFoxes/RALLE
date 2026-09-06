@@ -40,6 +40,8 @@
   "ralle.settings.subcategory.controls.description": "Configurable shortcuts for opening and operating Raid LFG.",
   "ralle.settings.subcategory.consumables": "Consumables",
   "ralle.settings.subcategory.consumables.description": "Displayed-name rules for Wynncraft container slot highlights.",
+  "ralle.settings.subcategory.territory-map": "Territory Map",
+  "ralle.settings.subcategory.territory-map.description": "Optional information added to Wynntils' guild map.",
 
   "ralle.settings.category.chat": "Chat",
   "ralle.settings.category.chat.description": "Local chat layout and rendering options for any world or server.",
@@ -131,6 +133,10 @@
   "ralle.settings.option.consumable-highlights-enabled.description": "Highlights matching displayed item names in container slots while connected to Wynncraft. Item lore is never inspected.",
   "ralle.settings.option.consumable-highlight-rules": "Highlight Rules",
   "ralle.settings.option.consumable-highlight-rules.description": "Ordered local rules; the first matching primary word or alias supplies the slot border.",
+  "ralle.settings.option.hq-distance-enabled": "HQ Distance and Queue Estimate",
+  "ralle.settings.option.hq-distance-enabled.description": "Hold either Ctrl key over a territory in the supported Wynntils guild map to see its shortest link distance from your HQ across any guild's territories and a hypothetical queue estimate. Distance fades from green near HQ to red at the furthest territory. Labels remain visible when zoomed out; a live attack timer takes precedence.",
+  "ralle.settings.hq-distance.missing-wynntils": "Unavailable: Wynntils is not installed. Install Wynntils 4.2.7 for Minecraft 1.21.11.",
+  "ralle.settings.hq-distance.unsupported-wynntils": "Unavailable: Wynntils is installed, but this first version supports exactly Wynntils 4.2.7 for Minecraft 1.21.11.",
 
   "ralle.consumables.action.add": "Add",
   "ralle.consumables.action.apply": "Apply",

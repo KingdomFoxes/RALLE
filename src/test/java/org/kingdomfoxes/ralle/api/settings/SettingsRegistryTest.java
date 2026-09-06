@@ -106,6 +106,18 @@ class SettingsRegistryTest {
     }
 
     @Test
+    void capabilityUnavailableEntriesStayVisibleButCannotBeUsed() {
+        var registry = registry();
+        registry.registerCategory(category("war", subcategory("map", toggle("distance"))));
+        registry.markUnavailable("distance", text("Install the supported integration"));
+        registry.seal();
+
+        assertTrue(registry.visible("distance"));
+        assertFalse(registry.available("distance"));
+        assertEquals("Install the supported integration", registry.unavailableReason("distance").orElseThrow().getString());
+    }
+
+    @Test
     void loadsAndSavesCategorySettingKeysAcrossSubcategories() throws Exception {
         var path = directory.resolve("ralle.properties");
         Files.writeString(path, "chat.chat-timestamps=true\n");

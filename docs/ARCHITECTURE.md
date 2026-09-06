@@ -62,6 +62,10 @@ platform ports. It must not depend on a concrete settings screen.
 - `war.consumables`: local, immutable ordered displayed-name rules and the
   container-slot highlight service. The service is inert unless its setting is
   enabled, a play connection exists, and the host is a real Wynncraft domain.
+- `war.hqdistance`: an optional exact-version Wynntils adapter around immutable
+  territory snapshots, a pure bidirectional graph projection, provisional queue
+  estimation, cached inspection state, and collision-aware rendering. It consumes
+  only data Wynntils already maintains and performs no polling or backend calls.
 - `platform`: Fabric/Minecraft adapters such as commands, keybinds, connection
   lifecycle, local persistence, and future clickable chat notifications.
 
@@ -121,6 +125,55 @@ The color dialog's scroll, potion, and food slot preview resolves custom-model-d
 selectors and models from the active Wynncraft resource pack. RALLE does not ship
 copies of those textures; missing or incompatible pack entries fall back to
 recognizable vanilla items without affecting highlight configuration.
+
+## HQ distance and queue estimate
+
+`war.hq-distance-enabled` defaults to false and persists in
+`config/ralle.properties`. It is visible but unavailable unless the installed
+Wynntils version is exactly 4.2.7 for Minecraft 1.21.11. The compile-only
+development dependency is pinned to Modrinth project `dU5Gb9Ab`, Fabric version
+artifact `jeBTZ3Zn`; Wynntils is never bundled.
+
+The optional `TerritoryPoi#renderAt` tail hook is restricted at runtime to
+`GuildMapScreen`. It draws only for the hovered territory while either physical
+Ctrl key is down, using Wynntils' transformed center, zoom scale, and active map
+scissor. It does not intercept input. A known active attack timer suppresses both
+RALLE labels so Wynntils' real timer remains authoritative. Labels remain anchored
+above and below the centered guild tag or HQ crown without collision or territory
+fit checks, including when zoomed out. Overlap with names and neighboring
+territories is intentional; the map viewport scissor still applies. Labels
+use Wynntils' own font renderer and four-direction outline at native size with
+pixel-aligned origins; they never shrink to fractional scales to fit a territory.
+Unexpected adapter or linkage failures are logged once and disable only this
+overlay for the remainder of the client session.
+
+`WynntilsTerritorySnapshotSource` projects the current guild identity and
+advancement-backed territory information without retaining mutable Wynntils
+objects. Links are normalized as bidirectional and references to missing nodes
+are ignored. `TerritoryRouteCalculator` performs breadth-first search from the
+single owned HQ through territories regardless of their owner. Owned destinations use the same distance result,
+representing the documented hypothetical ownership change. Missing identity,
+missing or multiple owned HQs, or globally unavailable input yields `Unknown`.
+Missing information or disagreement between advancement and profile ownership
+marks only the affected territory as unreliable. Unrelated stale territories do
+not invalidate a verified route. Unreliable destinations and HQs yield `Unknown`;
+routes never traverse unreliable nodes, and an unsuccessful search that reaches
+one yields `Unknown` instead of claiming disconnection. A genuinely
+disconnected destination also yields `Unknown`; HQ yields `0` without a
+duration.
+
+`HqInspectionService` invalidates its route cache whenever the complete immutable
+snapshot changes, covering guild identity, HQ, ownership, and connections, and
+is explicitly cleared on disconnect. Non-HQ connected destinations currently
+use the historical provisional estimate `60 + 60 × connections` seconds and
+render it as `🕒 m:ss`. All distances are calculated in one BFS per changed
+snapshot. The connection number uses linear RGB interpolation from `#55FF55`
+at HQ to `#FF5555` at the furthest reachable territory in that snapshot; zoom and
+the hovered destination do not affect the color range. Unknown labels and
+durations remain white. This formula excludes border penalties, taxes, routing
+detours, and attack-eligibility cooldowns. Release remains blocked until the
+formula is compared with current in-game attack previews and its fixtures are
+updated if necessary.
 
 ## Local settings
 
