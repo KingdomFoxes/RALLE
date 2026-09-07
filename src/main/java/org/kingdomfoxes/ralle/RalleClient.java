@@ -8,7 +8,6 @@ import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
 import org.kingdomfoxes.ralle.api.feature.FeatureRegistry;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
@@ -249,24 +248,6 @@ public final class RalleClient implements ClientModInitializer {
                             context().lfgSounds(), lfgNotifications, lockDebouncer)));
                     return 1;
                 }));
-            if (FabricLoader.getInstance().isDevelopmentEnvironment()) {
-                ralleCommand.then(literal("testmsg").executes(command -> {
-                    var client = Minecraft.getInstance();
-                    client.schedule(() -> context().guildRanks().testMessages().forEach(message ->
-                            client.gui.getChat().addMessage(message, null, null)));
-                    return 1;
-                }));
-                ralleCommand.then(literal("testqueuetimers").executes(command -> {
-                    var client = Minecraft.getInstance();
-                    var state = QueueAttributionService.toggleDevelopmentPreview();
-                    client.schedule(() -> RalleChatMessages.post(client, Component.literal(switch (state) {
-                        case ENABLED -> "Showing three fake Guild Attack Timer rows. Run /ralle testqueuetimers again to hide them.";
-                        case DISABLED -> "Fake Guild Attack Timer rows hidden.";
-                        case UNAVAILABLE -> "Enable Show Who Queued and connect to Wynncraft with supported Wynntils 4.2.7 first.";
-                    })));
-                    return state == QueueAttributionService.DevelopmentPreviewState.UNAVAILABLE ? 0 : 1;
-                }));
-            }
             dispatcher.register(ralleCommand);
         });
     }

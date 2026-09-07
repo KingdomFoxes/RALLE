@@ -6,7 +6,6 @@ import com.wynntils.core.text.StyledText;
 import com.wynntils.handlers.chat.event.ChatMessageEvent;
 import com.wynntils.handlers.chat.type.RecipientType;
 import com.wynntils.models.territories.TerritoryAttackTimer;
-import com.wynntils.models.territories.type.GuildResourceValues;
 import com.wynntils.models.worlds.event.WorldStateEvent;
 import com.wynntils.models.worlds.type.WorldState;
 import com.wynntils.utils.render.TextRenderTask;
@@ -119,37 +118,12 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
 
     @Override public void decorateTimer(Object timerObject, Object taskObject) {
         if (!(timerObject instanceof TerritoryAttackTimer timer) || !(taskObject instanceof TextRenderTask task)) return;
-        var demoRow = QueueAttributionService.developmentRow(timer.territoryName());
-        if (demoRow.isPresent()) {
-            decorateDemoTimer(timer, task, demoRow.orElseThrow());
-            return;
-        }
         Component decorated = QueueAttributionFormatter.format(
                 task.getText().getComponent(),
                 tracker.attributionFor(timer.territoryName()),
                 Minecraft.getInstance().getUser().getName(),
                 Component.translatable("ralle.war.queue.unknown"), QueueAttributionService.selfColor());
         task.setText(StyledText.fromComponent(decorated));
-    }
-
-    private static void decorateDemoTimer(
-            TerritoryAttackTimer timer,
-            TextRenderTask task,
-            QueueAttributionDemo.Row row
-    ) {
-        var defense = GuildResourceValues.fromString(row.defense());
-        Component original = Component.empty()
-                .append(Component.literal(row.territory()).withStyle(net.minecraft.ChatFormatting.GRAY))
-                .append(Component.literal(" (" + row.defense() + ")").withStyle(defense.getDefenceColor()))
-                .append(Component.literal(" " + timer.timerString()).withStyle(net.minecraft.ChatFormatting.AQUA));
-        String self = Minecraft.getInstance().getUser().getName();
-        java.util.Optional<String> sender = switch (row.sender()) {
-            case SELF -> java.util.Optional.of(self);
-            case REMOTE -> java.util.Optional.of(QueueAttributionDemo.REMOTE_IGN);
-            case UNKNOWN -> java.util.Optional.empty();
-        };
-        task.setText(StyledText.fromComponent(QueueAttributionFormatter.format(
-                original, sender, self, Component.translatable("ralle.war.queue.unknown"), QueueAttributionService.selfColor())));
     }
 
     @Override public void decoratePreview(Object taskObject) {

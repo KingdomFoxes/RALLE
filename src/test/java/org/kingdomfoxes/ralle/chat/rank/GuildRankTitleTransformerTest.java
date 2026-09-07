@@ -355,18 +355,6 @@ class GuildRankTitleTransformerTest {
     }
 
     @Test
-    void developmentSamplesAlwaysUsePublicStrategistAndShowBothGapVariants() {
-        var messages = GuildRankTitleTransformer.testMessages();
-        var withoutGap = GuildRankTitleTransformer.encodeStarsAndTitle(3, "STRATEGIST", false);
-        var withGap = GuildRankTitleTransformer.encodeStarsAndTitle(3, "STRATEGIST", true);
-
-        assertEquals(2, messages.size());
-        assertTrue(messages.get(0).getString().contains(withoutGap.background() + withoutGap.foreground()));
-        assertTrue(messages.get(1).getString().contains(withGap.background() + withGap.foreground()));
-        assertTrue(messages.stream().allMatch(message -> message.getString().contains(" maxkarson:")));
-    }
-
-    @Test
     void doesNotUseAnOrdinaryMentionAsTheSpeakersFoxRank() {
         var guildMessage = Component.literal(
                 GuildRankTitleTransformer.background("CAPTAIN")

@@ -10,7 +10,6 @@ import net.minecraft.network.chat.contents.PlainTextContents;
 import net.minecraft.resources.Identifier;
 import org.kingdomfoxes.ralle.chat.identity.GuildSpeakerIdentity;
 
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -74,14 +73,6 @@ final class GuildRankTitleTransformer {
             Map.entry("MARCHIONESS", "Marquis/Marchioness/Marqix"),
             Map.entry("MARQIX", "Marquis/Marchioness/Marqix")
     );
-    private static final String TEST_GUILD_INDICATOR = new StringBuilder()
-            .appendCodePoint(0xCFFFC)
-            .appendCodePoint(0xE006)
-            .appendCodePoint(0xCFFFF)
-            .appendCodePoint(0xE002)
-            .appendCodePoint(0xCFFFE)
-            .toString();
-
     private GuildRankTitleTransformer() {}
 
     static Component apply(Component message, GuildRankSnapshot snapshot) {
@@ -93,16 +84,6 @@ final class GuildRankTitleTransformer {
             GuildRankSnapshot snapshot,
             GuildRankStyle rankStyle,
             boolean useInternalRanks
-    ) {
-        return apply(message, snapshot, rankStyle, useInternalRanks, true);
-    }
-
-    private static Component apply(
-            Component message,
-            GuildRankSnapshot snapshot,
-            GuildRankStyle rankStyle,
-            boolean useInternalRanks,
-            boolean spaceBetweenStarsAndTitle
     ) {
         Objects.requireNonNull(message, "message");
         Objects.requireNonNull(snapshot, "snapshot");
@@ -136,7 +117,7 @@ final class GuildRankTitleTransformer {
             }
             replacement = rankStyle == GuildRankStyle.STARS
                     ? encodeStars(stars)
-                    : encodeStarsAndTitle(stars, displayedTitle, spaceBetweenStarsAndTitle);
+                    : encodeStarsAndTitle(stars, displayedTitle, true);
         }
 
         return transform(message, match.oldGlyphs(), replacement, rankHover, match.indicator(),
@@ -209,26 +190,6 @@ final class GuildRankTitleTransformer {
             terminatorIndex = text.indexOf(FOREGROUND_TERMINATOR, foregroundEnd);
         }
         return null;
-    }
-
-    static List<Component> testMessages() {
-        return List.of(
-                testMessage(false, "no space"),
-                testMessage(true, "with space")
-        );
-    }
-
-    private static Component testMessage(boolean gap, String label) {
-        var original = Component.empty()
-                .append(Component.literal(TEST_GUILD_INDICATOR).withStyle(ChatFormatting.WHITE))
-                .append(" ")
-                .append(Component.literal(background("STRATEGIST"))
-                        .withStyle(style -> style.withFont(WYNN_PILL_FONT)))
-                .append(Component.literal(foreground("STRATEGIST")).withStyle(style -> style
-                        .withColor(ChatFormatting.BLACK)
-                        .withFont(WYNN_PILL_FONT)))
-                .append(Component.literal(" maxkarson: " + label).withStyle(ChatFormatting.AQUA));
-        return apply(original, GuildRankSnapshot.EMPTY, GuildRankStyle.STARS_AND_TITLES, false, gap);
     }
 
     private static Speaker speakerAfter(String text, int foregroundEnd) {

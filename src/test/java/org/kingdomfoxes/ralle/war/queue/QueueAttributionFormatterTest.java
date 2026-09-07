@@ -19,7 +19,7 @@ class QueueAttributionFormatterTest {
         assertEquals(0x123456, self.get(0).style().getColor().getValue());
         assertEquals(ChatFormatting.GRAY.getColor(), self.get(1).style().getColor().getValue());
         assertEquals(ChatFormatting.GOLD.getColor(), self.get(2).style().getColor().getValue());
-        var row = QueueAttributionDemo.preview("Player",
+        var row = QueueAttributionPreview.preview("Player",
                 new org.kingdomfoxes.ralle.war.consumables.HighlightStyle(0x123456, false), 0L);
         assertEquals("Player → Detlas (High) 2:32", row.getString());
         assertEquals(0x123456, segments(row).get(0).style().getColor().getValue());
@@ -30,7 +30,7 @@ class QueueAttributionFormatterTest {
         var style = new org.kingdomfoxes.ralle.war.consumables.HighlightStyle(0x123456, false);
         for (String account : new String[]{"DifferentPlayer", "WWWWWWWWWWWWWWWW"}) {
             assertEquals(account + " → Detlas (High) 2:32",
-                    QueueAttributionDemo.preview(account, style, 0L).getString());
+                    QueueAttributionPreview.preview(account, style, 0L).getString());
         }
     }
 
@@ -52,7 +52,7 @@ class QueueAttributionFormatterTest {
         var unknown = segments(QueueAttributionFormatter.format(original, Optional.empty(), "player",
                 Component.literal("Unknown"), style, 0L));
         assertEquals(ChatFormatting.GRAY.getColor(), unknown.get(0).style().getColor().getValue());
-        var preview = segments(QueueAttributionDemo.preview("Player", style, 250L));
+        var preview = segments(QueueAttributionPreview.preview("Player", style, 250L));
         for (int i = 0; i < 6; i++) assertEquals(later.get(i), preview.get(i));
     }
 

@@ -238,13 +238,6 @@ distinguished. Missing announcements, sender-side announcement disablement, and
 messages sent before the listener joined are therefore shown as `Unknown` rather
 than inferred.
 
-Development builds expose `/ralle testqueuetimers` only while the feature is
-enabled in an active supported Wynncraft session. It toggles three synthetic
-local, remote, and unknown countdown rows by augmenting only the list value used
-inside the overlay render call. The sentinel timers are replaced with styled
-sample tasks before drawing, expire after roughly three minutes, and never enter
-Wynntils' timer or defense models or cause a server command or message.
-
 ## Local settings
 
 `/ralle settings` opens the owo-lib adapter over RALLE-owned category and setting
@@ -275,11 +268,6 @@ use the complete canonical group label, such as `Lord/Lady/Liege`, instead of
 only the member's selected form. The member's selected Fox title stays white;
 alternative titles and slash separators are gray. The default titles style with Internal Guild
 Ranks disabled remains inert.
-
-Development environments alone register `/ralle testmsg`. It posts fixed local
-Strategist samples for `maxkarson` with and without the star/title gap and does
-not consult the internal-rank cache. Release builds continue to expose only the
-three public `/ralle` subcommands.
 
 The one-time installation message uses the shared local RALLE chat presentation
 and stores `message-sent=0/1` in `config/ralle-onboarding.properties`. A missing

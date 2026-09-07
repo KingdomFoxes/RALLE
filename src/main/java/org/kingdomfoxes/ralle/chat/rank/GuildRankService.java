@@ -91,11 +91,6 @@ public final class GuildRankService {
         return GuildRankTitleTransformer.apply(message, snapshot, style, useInternalRanks);
     }
 
-    /** Development-only local samples for comparing the combined-pill title gap. */
-    public java.util.List<Component> testMessages() {
-        return GuildRankTitleTransformer.testMessages();
-    }
-
     public synchronized boolean refreshing() {
         return refreshFuture != null && !refreshFuture.isDone();
     }

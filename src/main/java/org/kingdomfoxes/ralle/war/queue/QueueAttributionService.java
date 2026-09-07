@@ -6,12 +6,10 @@ import org.kingdomfoxes.ralle.client.WynncraftHost;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
 
 /** Runtime-safe facade used by Fabric lifecycle hooks and the optional Wynntils mixin. */
 public final class QueueAttributionService {
     private static final Logger LOGGER = LoggerFactory.getLogger(QueueAttributionService.class);
-    private static final QueueAttributionDemo DEVELOPMENT_DEMO = new QueueAttributionDemo(System::currentTimeMillis);
     private static BooleanSetting enabled;
     private static org.kingdomfoxes.ralle.api.settings.ColorSetting selfColor;
     public static void configureColor(org.kingdomfoxes.ralle.api.settings.ColorSetting setting) { selfColor = setting; }
@@ -28,12 +26,10 @@ public final class QueueAttributionService {
         enabled = setting;
         supported = compatible;
         failed = false;
-        DEVELOPMENT_DEMO.clear();
     }
 
     public static void tick(Minecraft minecraft) {
         if (!requested() || !connectedToWynncraft(minecraft)) {
-            DEVELOPMENT_DEMO.clear();
             stop(false);
             return;
         }
@@ -70,7 +66,6 @@ public final class QueueAttributionService {
     }
 
     public static void disconnect() {
-        DEVELOPMENT_DEMO.clear();
         stop(true);
         failed = false;
     }
@@ -81,29 +76,6 @@ public final class QueueAttributionService {
         stop(false);
         LOGGER.error("Disabling war queue attribution for this session after a Wynntils integration failure", exception);
     }
-
-    public static DevelopmentPreviewState toggleDevelopmentPreview() {
-        boolean available = active() && connectedToWynncraft(Minecraft.getInstance());
-        return switch (DEVELOPMENT_DEMO.toggle(available)) {
-            case ENABLED -> DevelopmentPreviewState.ENABLED;
-            case DISABLED -> DevelopmentPreviewState.DISABLED;
-            case UNAVAILABLE -> DevelopmentPreviewState.UNAVAILABLE;
-        };
-    }
-
-    public static List<DevelopmentTimer> developmentTimers() {
-        if (!active()) return List.of();
-        return DEVELOPMENT_DEMO.timers().stream()
-                .map(timer -> new DevelopmentTimer(timer.key(), timer.timerEndMillis()))
-                .toList();
-    }
-
-    static java.util.Optional<QueueAttributionDemo.Row> developmentRow(String key) {
-        return DEVELOPMENT_DEMO.row(key);
-    }
-
-    public enum DevelopmentPreviewState { ENABLED, DISABLED, UNAVAILABLE }
-    public record DevelopmentTimer(String key, long timerEndMillis) {}
 
     private static boolean active() {
         return requested() && integration != null && integration.registered();

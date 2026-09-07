@@ -105,17 +105,6 @@ saved vanilla RALLE keybinds are migrated as already seen.
 
 Requirements: Java 21.
 
-Development runs additionally expose `/ralle testmsg`, which posts two local
-Strategist guild-chat samples for comparing the combined pill with and without
-a space between its stars and title. The command is not registered in release
-builds.
-Development runs with supported Wynntils also expose `/ralle testqueuetimers`.
-With **Show Who Queued** enabled on Wynncraft, it toggles three countdown rows in
-Wynntils' real Guild Attack Timer overlay: local, remote, and `Unknown`. The rows
-exist only in the overlay render input, expire naturally after about three
-minutes, and never queue a war, send chat or commands, or mutate Wynntils' timer
-and defense models. The command is not registered in release builds.
-
 ```text
 ./gradlew build
 ./gradlew runClient
