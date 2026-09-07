@@ -6,13 +6,36 @@ import java.util.Optional;
 import java.util.function.LongSupplier;
 
 /** Development-only, render-scoped sample rows. No Wynntils model or server state is mutated. */
-final class QueueAttributionDemo {
+public final class QueueAttributionDemo {
     static final String REMOTE_IGN = "_Leoh_";
     private static final List<Template> TEMPLATES = List.of(
             new Template("ralle$queue_demo$remote", Sender.REMOTE, "Nemract", "Very High", 70_000L),
             new Template("ralle$queue_demo$self", Sender.SELF, "Detlas", "High", 152_000L),
             new Template("ralle$queue_demo$unknown", Sender.UNKNOWN, "Ragni", "Low", 193_000L)
     );
+
+    public static net.minecraft.network.chat.Component preview(String self,
+            org.kingdomfoxes.ralle.war.consumables.HighlightStyle style, long timeMillis) {
+        return TEMPLATES.stream().filter(template -> template.sender() == Sender.SELF).map(template -> {
+            var sender = switch (template.sender()) {
+                case SELF -> Optional.of(self);
+                case REMOTE -> Optional.of(REMOTE_IGN);
+                case UNKNOWN -> Optional.<String>empty();
+            };
+            long seconds = template.durationMillis() / 1000;
+            int defenseColor = switch (template.defense()) {
+                case "Very High" -> 0xAA0000;
+                case "High" -> 0xFF5555;
+                default -> 0x55FF55;
+            };
+            var original = net.minecraft.network.chat.Component.empty()
+                    .append(net.minecraft.network.chat.Component.literal(template.territory()).withStyle(net.minecraft.ChatFormatting.GRAY))
+                    .append(net.minecraft.network.chat.Component.literal(" (" + template.defense() + ")").withStyle(s -> s.withColor(defenseColor)))
+                    .append(net.minecraft.network.chat.Component.literal(" %d:%02d".formatted(seconds / 60, seconds % 60)).withStyle(net.minecraft.ChatFormatting.AQUA));
+            return QueueAttributionFormatter.format(original, sender, self,
+                    net.minecraft.network.chat.Component.translatable("ralle.war.queue.unknown"), style, timeMillis);
+        }).findFirst().orElseThrow();
+    }
 
     private final LongSupplier clock;
     private boolean active;

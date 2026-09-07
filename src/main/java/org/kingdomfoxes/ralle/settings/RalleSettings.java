@@ -22,6 +22,8 @@ public final class RalleSettings {
     public static final String HQ_DISTANCE_ENABLED_ID = "hq-distance-enabled";
     public static final String WAR_QUEUE_ATTRIBUTION_ENABLED_ID = "queue-attribution-enabled";
 
+    public static final String HQ_DISTANCE_KEYBIND_ID = "hq-distance-keybind";
+    public static final String QUEUE_SELF_COLOR_ID = "queue-self-color";
     private RalleSettings() {}
 
     public static void register(SettingsRegistry registry) {
@@ -112,8 +114,12 @@ public final class RalleSettings {
                 Component.translatable("ralle.settings.category.war.description"),
                 List.of(),
                 List.of(
-                        subcategory("attack-timers", toggle(WAR_QUEUE_ATTRIBUTION_ENABLED_ID)),
-                        subcategory("territory-map", toggle(HQ_DISTANCE_ENABLED_ID)),
+                        subcategory("attack-timers", toggle(WAR_QUEUE_ATTRIBUTION_ENABLED_ID),
+                                new org.kingdomfoxes.ralle.api.settings.ColorSetting(QUEUE_SELF_COLOR_ID,
+                                        title(QUEUE_SELF_COLOR_ID), description(QUEUE_SELF_COLOR_ID), 0x5555FF)),
+                        subcategory("territory-map", toggle(HQ_DISTANCE_ENABLED_ID),
+                                new KeybindSetting(HQ_DISTANCE_KEYBIND_ID, title(HQ_DISTANCE_KEYBIND_ID),
+                                        description(HQ_DISTANCE_KEYBIND_ID), "key.keyboard.left.control")),
                         subcategory("consumables",
                                 toggle(CONSUMABLE_HIGHLIGHTS_ENABLED_ID),
                                 customPanel(CONSUMABLE_HIGHLIGHT_RULES_ID, CONSUMABLE_HIGHLIGHT_PROVIDER_ID)
@@ -128,6 +134,8 @@ public final class RalleSettings {
         registry.requireEnabled("chat-screenshot-snap-to-text", "chat-screenshot-enabled");
         registry.requireEnabled("chat-screenshot-smooth-expansion", "chat-screenshot-enabled");
         registry.requireEnabled("chat-selection-sounds", "chat-screenshot-enabled");
+        registry.requireEnabled(QUEUE_SELF_COLOR_ID, WAR_QUEUE_ATTRIBUTION_ENABLED_ID);
+        registry.requireEnabled(HQ_DISTANCE_KEYBIND_ID, HQ_DISTANCE_ENABLED_ID);
         registry.requireEnabled(CONSUMABLE_HIGHLIGHT_RULES_ID, CONSUMABLE_HIGHLIGHTS_ENABLED_ID);
         registry.requireEnabled("new-party-notifications", "raid-lfg-enabled");
         registry.requireEnabled("reopened-party-notifications", "raid-lfg-enabled");

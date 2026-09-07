@@ -12,6 +12,51 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class QueueAttributionFormatterTest {
     @Test
+    void customColorAffectsOnlySelfAndPreviewUsesDemoQueues() {
+        var original = Component.literal("Detlas").withStyle(ChatFormatting.GOLD);
+        var self = segments(QueueAttributionFormatter.format(original, Optional.of("Player"), "player",
+                Component.literal("Unknown"), 0x123456));
+        assertEquals(0x123456, self.get(0).style().getColor().getValue());
+        assertEquals(ChatFormatting.GRAY.getColor(), self.get(1).style().getColor().getValue());
+        assertEquals(ChatFormatting.GOLD.getColor(), self.get(2).style().getColor().getValue());
+        var row = QueueAttributionDemo.preview("Player",
+                new org.kingdomfoxes.ralle.war.consumables.HighlightStyle(0x123456, false), 0L);
+        assertEquals("Player → Detlas (High) 2:32", row.getString());
+        assertEquals(0x123456, segments(row).get(0).style().getColor().getValue());
+    }
+
+    @Test
+    void previewUsesTheSuppliedAccountIncludingMaximumLengthNames() {
+        var style = new org.kingdomfoxes.ralle.war.consumables.HighlightStyle(0x123456, false);
+        for (String account : new String[]{"DifferentPlayer", "WWWWWWWWWWWWWWWW"}) {
+            assertEquals(account + " → Detlas (High) 2:32",
+                    QueueAttributionDemo.preview(account, style, 0L).getString());
+        }
+    }
+
+    @Test
+    void rainbowAnimatesOnlyTheLocalNameAndMatchesPreview() {
+        var style = new org.kingdomfoxes.ralle.war.consumables.HighlightStyle(0x123456, true);
+        var original = Component.literal("Detlas").withStyle(ChatFormatting.GOLD);
+        var first = segments(QueueAttributionFormatter.format(original, Optional.of("Player"), "player",
+                Component.literal("Unknown"), style, 0L));
+        var later = segments(QueueAttributionFormatter.format(original, Optional.of("Player"), "player",
+                Component.literal("Unknown"), style, 250L));
+        org.junit.jupiter.api.Assertions.assertNotEquals(first.get(0).style().getColor(), first.get(1).style().getColor());
+        org.junit.jupiter.api.Assertions.assertNotEquals(first.get(0).style().getColor(), later.get(0).style().getColor());
+        assertEquals(ChatFormatting.GRAY.getColor(), first.get(6).style().getColor().getValue());
+        assertEquals(ChatFormatting.GOLD.getColor(), first.get(7).style().getColor().getValue());
+        var remote = segments(QueueAttributionFormatter.format(original, Optional.of("Remote"), "player",
+                Component.literal("Unknown"), style, 0L));
+        assertEquals(ChatFormatting.GRAY.getColor(), remote.get(0).style().getColor().getValue());
+        var unknown = segments(QueueAttributionFormatter.format(original, Optional.empty(), "player",
+                Component.literal("Unknown"), style, 0L));
+        assertEquals(ChatFormatting.GRAY.getColor(), unknown.get(0).style().getColor().getValue());
+        var preview = segments(QueueAttributionDemo.preview("Player", style, 250L));
+        for (int i = 0; i < 6; i++) assertEquals(later.get(i), preview.get(i));
+    }
+
+    @Test
     void usesBlueForSelfGrayForOthersAndPreservesOriginalStyles() {
         var original = Component.empty()
                 .append(Component.literal("Detlas").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD))

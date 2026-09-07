@@ -30,6 +30,13 @@ final class StrictGuildRankJson {
             var member = memberElement.getAsJsonObject();
             String player = string(member, "name");
             if (GuildRankSnapshot.normalizePlayer(player) == null) continue;
+            // PM is a separate role; the API retains the member's base Fox rank (for example Lord).
+            var primeMinister = member.get("prime_minister");
+            if (primeMinister != null && primeMinister.isJsonPrimitive()
+                    && primeMinister.getAsJsonPrimitive().isBoolean() && primeMinister.getAsBoolean()) {
+                titles.put(player, "PRIME MINISTER");
+                continue;
+            }
             var ranksElement = member.get("ranks");
             if (ranksElement == null || !ranksElement.isJsonArray()) continue;
             for (var rankElement : ranksElement.getAsJsonArray()) {

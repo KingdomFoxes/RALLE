@@ -1092,7 +1092,14 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     @Override
+    public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+        if (event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE && RalleModalDialogs.dismissTop(root)) return true;
+        return super.keyPressed(event);
+    }
+
+    @Override
     public void onClose() {
+        if (RalleModalDialogs.dismissTop(root)) return;
         kickTargeting.reset();
         minecraft.setScreen(parent);
     }

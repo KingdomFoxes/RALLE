@@ -407,7 +407,15 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         }
 
         ButtonComponent button;
-        if (entry instanceof ChoiceSetting setting) {
+        if (entry instanceof org.kingdomfoxes.ralle.api.settings.ColorSetting setting) {
+            button = RalleIconButtons.palette(setting.title(), ignored -> ConsumableColorDialogScreen.openQueueColor(this, setting));
+            configureControlButton(entry, available, button);
+            button.horizontalSizing(Sizing.fixed(20));
+            var lane = UIContainers.horizontalFlow(Sizing.fixed(126), Sizing.fixed(20));
+            lane.horizontalAlignment(HorizontalAlignment.CENTER);
+            lane.child(button);
+            return lane;
+        } else if (entry instanceof ChoiceSetting setting) {
             button = UIComponents.button(choiceLabel(setting), ignored -> openChoice(setting, buttonFor(entry.id())));
             button.renderer(RalleButtonRenderers.neutral());
         } else if (entry instanceof ActionEntry action) {
@@ -544,6 +552,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             updateKeybind(captured, key == InputConstants.UNKNOWN ? KeybindSetting.UNBOUND : key.getName(), trigger);
             return true;
         }
+        if (event.key() == GLFW.GLFW_KEY_ESCAPE && RalleModalDialogs.dismissTop(root)) return true;
         return super.keyPressed(event);
     }
 
@@ -715,6 +724,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     public void onClose() {
+        if (RalleModalDialogs.dismissTop(root)) return;
         persistNavigation();
         minecraft.setScreen(parent);
     }

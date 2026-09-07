@@ -41,19 +41,33 @@ final class ConsumableColorDialogScreen {
             Integer editingIndex,
             HighlightStyle initial
     ) {
+        open(screen, store, editingIndex, initial, null);
+    }
+
+    static void openQueueColor(RalleSettingsScreen screen, org.kingdomfoxes.ralle.api.settings.ColorSetting setting) {
+        open(screen, null, 0, setting.value(), setting);
+    }
+
+    private static void open(RalleSettingsScreen screen, ConsumableHighlightStore store, Integer editingIndex,
+                             HighlightStyle initial, org.kingdomfoxes.ralle.api.settings.ColorSetting queueColor) {
         var draft = new ColorStyleDraft(initial);
         boolean editing = editingIndex != null;
-        int dialogWidth = editing ? EDIT_DIALOG_WIDTH : ADD_DIALOG_WIDTH;
+        int dialogWidth = queueColor != null ? 290 : editing ? EDIT_DIALOG_WIDTH : ADD_DIALOG_WIDTH;
         int innerWidth = dialogWidth - DIALOG_PADDING * 2;
         var content = UIContainers.verticalFlow(Sizing.fixed(dialogWidth), Sizing.content());
         content.gap(6).padding(Insets.of(DIALOG_PADDING)).surface(RalleSurfaces.FRAMED_NAVY);
 
         var body = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content()).gap(8);
         var fields = UIContainers.verticalFlow(
-                editing ? Sizing.fixed(EDIT_FIELDS_WIDTH) : Sizing.expand(100), Sizing.content()).gap(5);
-        fields.child(UIComponents.label(RalleTheme.ui(Component.translatable(editingIndex == null
+                editing ? Sizing.fixed(queueColor != null ? 134 : EDIT_FIELDS_WIDTH) : Sizing.expand(100), Sizing.content()).gap(5);
+        var title = UIComponents.label(RalleTheme.ui(Component.translatable(queueColor != null ? "ralle.war.queue.color.title" : editingIndex == null
                         ? "ralle.consumables.dialog.add.title" : "ralle.consumables.dialog.color.title")))
-                .color(RalleTheme.ACCENT));
+                .color(RalleTheme.ACCENT);
+        if (queueColor != null) {
+            content.child(title);
+            content.child(new QueueColorPreviewComponent(draft::style));
+        }
+        else fields.child(title);
         TextBoxComponent name = editingIndex == null ? UIComponents.textBox(Sizing.fill(100)) : null;
         TextBoxComponent aliases = editingIndex == null ? UIComponents.textBox(Sizing.fill(100)) : null;
         if (name != null) {
@@ -71,14 +85,14 @@ final class ConsumableColorDialogScreen {
         var hexRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(20)).gap(6);
         hexRow.verticalAlignment(VerticalAlignment.CENTER);
         hexRow.child(hex);
-        hexRow.child(new HighlightedSlotPreviewComponent(new WynncraftScrollPreviewItemProvider(), draft::style));
+        if (queueColor == null) hexRow.child(new HighlightedSlotPreviewComponent(new WynncraftScrollPreviewItemProvider(), draft::style));
         fields.child(hexRow);
         var rainbow = UIComponents.checkbox(RalleTheme.ui(Component.translatable("ralle.consumables.field.rainbow")));
         rainbow.checked(draft.rainbow());
         rainbow.onChanged(draft::rainbow);
         fields.child(rainbow);
 
-        var picker = new HsvWheelTrianglePicker(PICKER_SIZE, draft.rgb());
+        var picker = new HsvWheelTrianglePicker(queueColor != null ? 128 : PICKER_SIZE, draft.rgb());
         var syncingHex = new boolean[1];
         picker.onChanged(rgb -> {
             draft.rgb(rgb);
@@ -102,7 +116,9 @@ final class ConsumableColorDialogScreen {
                     throw new IllegalArgumentException("Color must use #RRGGBB");
                 }
                 draft.hex(hex.getValue());
-                if (editingIndex == null) {
+                if (queueColor != null) {
+                    queueColor.set(draft.style());
+                } else if (editingIndex == null) {
                     store.add(new ConsumableHighlightRule(
                             name.getValue(),
                             ConsumableHighlightValidation.parseAliasBatch(aliases.getValue()),
@@ -119,7 +135,8 @@ final class ConsumableColorDialogScreen {
         submit.sizing(Sizing.fill(100), Sizing.fixed(20));
         submit.renderer(RalleButtonRenderers.primary());
         body.child(fields).child(picker);
-        content.child(body).child(error).child(submit);
+        content.child(body).child(error);
+        content.child(submit);
         overlayHolder[0] = screen.showModal(content);
     }
 

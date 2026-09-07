@@ -136,11 +136,11 @@
   "ralle.settings.option.consumable-highlight-rules": "Highlight Rules",
   "ralle.settings.option.consumable-highlight-rules.description": "Ordered local rules; the first matching primary word or alias supplies the slot border.",
   "ralle.settings.option.hq-distance-enabled": "HQ Distance and Queue Estimate",
-  "ralle.settings.option.hq-distance-enabled.description": "Hold either Ctrl key over a territory in the supported Wynntils guild map to see its shortest link distance from your HQ across any guild's territories and a hypothetical queue estimate. Distance fades from green through yellow to red based on how many territories your guild owns; larger guilds reach red at longer distances. Labels remain visible when zoomed out; a live attack timer takes precedence.",
+  "ralle.settings.option.hq-distance-enabled.description": "Hold the configured inspection key (Ctrl by default) over a territory in the supported Wynntils guild map to see its shortest link distance from your HQ across any guild's territories and a hypothetical queue estimate. Distance fades from green through yellow to red based on how many territories your guild owns; larger guilds reach red at longer distances. Labels remain visible when zoomed out; a live attack timer takes precedence.",
   "ralle.settings.hq-distance.missing-wynntils": "Unavailable: Wynntils is not installed. Install Wynntils 4.2.7 for Minecraft 1.21.11.",
   "ralle.settings.hq-distance.unsupported-wynntils": "Unavailable: Wynntils is installed, but this first version supports exactly Wynntils 4.2.7 for Minecraft 1.21.11.",
   "ralle.settings.option.queue-attribution-enabled": "Show Who Queued",
-  "ralle.settings.option.queue-attribution-enabled.description": "Shows who announced each queued territory in Wynntils' Guild Attack Timer. Your name is blue; other names are gray. Missing names appear as Unknown. Only announcements received while enabled can be identified.",
+  "ralle.settings.option.queue-attribution-enabled.description": "Shows who announced each queued territory in Wynntils' Guild Attack Timer. Your name uses your chosen color (blue by default); other names are gray. Missing names appear as Unknown. Only announcements received while enabled can be identified.",
   "ralle.settings.queue-attribution.missing-wynntils": "Unavailable: Wynntils is not installed. Install Wynntils 4.2.7 for Minecraft 1.21.11 and enable its Guild Attack Timer overlay.",
   "ralle.settings.queue-attribution.unsupported-wynntils": "Unavailable: This feature supports exactly Wynntils 4.2.7 for Minecraft 1.21.11. Enable Wynntils' Guild Attack Timer overlay and defense announcements.",
   "ralle.war.queue.unknown": "Unknown",
@@ -221,5 +221,12 @@
   "ralle.chat-layout.position-info.description": "Shows compact coordinates and dimensions inside the selected element.",
   "ralle.chat-layout.reset": "Reset Changes",
   "ralle.chat-screenshot.copied": "Copied screenshot",
-  "ralle.chat-screenshot.copy-failed": "RALLE could not copy the chat image: %s. The selection was kept; check clipboard access and try again."
+  "ralle.chat-screenshot.copy-failed": "RALLE could not copy the chat image: %s. The selection was kept; check clipboard access and try again.",
+  "ralle.settings.option.hq-distance-keybind": "HQ Distance and Queue Estimate Keybind",
+  "ralle.settings.option.hq-distance-keybind.description": "Hold this key while hovering a territory in the supported Wynntils guild map. Defaults to Ctrl; either Ctrl key works with the default binding.",
+  "key.ralle.hq-distance": "Hold HQ distance and queue estimate",
+  "key.categories.ralle.war": "RALLE War",
+  "ralle.settings.option.queue-self-color": "Your Queue Color",
+  "ralle.settings.option.queue-self-color.description": "Choose a solid color or animated rainbow for your name in Show Who Queued. Defaults to the original blue.",
+  "ralle.war.queue.color.title": "EDIT YOUR QUEUE COLOR"
 }

@@ -125,7 +125,7 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
                 task.getText().getComponent(),
                 tracker.attributionFor(timer.territoryName()),
                 Minecraft.getInstance().getUser().getName(),
-                Component.translatable("ralle.war.queue.unknown"));
+                Component.translatable("ralle.war.queue.unknown"), QueueAttributionService.selfColor());
         task.setText(StyledText.fromComponent(decorated));
     }
 
@@ -146,7 +146,7 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
             case UNKNOWN -> java.util.Optional.empty();
         };
         task.setText(StyledText.fromComponent(QueueAttributionFormatter.format(
-                original, sender, self, Component.translatable("ralle.war.queue.unknown"))));
+                original, sender, self, Component.translatable("ralle.war.queue.unknown"), QueueAttributionService.selfColor())));
     }
 
     @Override public void decoratePreview(Object taskObject) {
@@ -154,7 +154,7 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
         String self = Minecraft.getInstance().getUser().getName();
         Component decorated = QueueAttributionFormatter.format(
                 task.getText().getComponent(), java.util.Optional.of(self), self,
-                Component.translatable("ralle.war.queue.unknown"));
+                Component.translatable("ralle.war.queue.unknown"), QueueAttributionService.selfColor());
         task.setText(StyledText.fromComponent(decorated));
     }
 

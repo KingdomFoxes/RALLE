@@ -13,6 +13,11 @@ public final class QueueAttributionService {
     private static final Logger LOGGER = LoggerFactory.getLogger(QueueAttributionService.class);
     private static final QueueAttributionDemo DEVELOPMENT_DEMO = new QueueAttributionDemo(System::currentTimeMillis);
     private static BooleanSetting enabled;
+    private static org.kingdomfoxes.ralle.api.settings.ColorSetting selfColor;
+    public static void configureColor(org.kingdomfoxes.ralle.api.settings.ColorSetting setting) { selfColor = setting; }
+    static org.kingdomfoxes.ralle.war.consumables.HighlightStyle selfColor() {
+        return selfColor == null ? new org.kingdomfoxes.ralle.war.consumables.HighlightStyle(0x5555FF, false) : selfColor.value();
+    }
     private static boolean supported;
     private static boolean failed;
     private static QueueAttributionAdapter integration;

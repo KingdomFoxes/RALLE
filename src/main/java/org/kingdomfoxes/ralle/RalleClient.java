@@ -111,6 +111,9 @@ public final class RalleClient implements ClientModInitializer {
         settings.seal();
         placements.seal();
         RalleTypography.bind(settings);
+        HqDistanceOverlay.configureKeybind(settings.setting(RalleSettings.HQ_DISTANCE_KEYBIND_ID, KeybindSetting.class));
+        QueueAttributionService.configureColor(settings.setting(RalleSettings.QUEUE_SELF_COLOR_ID,
+                org.kingdomfoxes.ralle.api.settings.ColorSetting.class));
         HqDistanceOverlay.configure(
                 settings.setting(RalleSettings.HQ_DISTANCE_ENABLED_ID, BooleanSetting.class),
                 wynntilsCompatibility.supported());

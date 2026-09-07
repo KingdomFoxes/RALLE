@@ -39,6 +39,32 @@ class StrictGuildRankJsonTest {
     }
 
     @Test
+    void primeMinisterRoleOverridesBaseFoxRankAndCachesThePmPill() {
+        var titles = StrictGuildRankJson.decodeApi("""
+                {"members":[{"name":"ToolyTom","ingame_rank":"chief",
+                  "fox_rank":"Lord","fox_section":"Prime Minister","prime_minister":true,
+                  "ranks":[{"kind":"ingame","name":"chief"},
+                           {"kind":"fox","name":"Lord","section":"Prime Minister"}]}]}
+                """);
+        assertEquals(Map.of("ToolyTom", "PRIME MINISTER"), titles);
+        var snapshot = new GuildRankSnapshot(1234L, titles);
+        var restored = StrictGuildRankJson.decodeCache(StrictGuildRankJson.encodeCache(snapshot));
+        assertEquals("PRIME MINISTER", restored.titleFor("ToolyTom").orElseThrow());
+        assertEquals(GuildRankTitleTransformer.encode("PM"), restored.glyphsFor("PRIME MINISTER"));
+    }
+
+    @Test
+    void onlyAnExplicitBooleanTrueOverridesTheBaseRank() {
+        for (String value : new String[]{"false", "null", "1", "\"true\"", "{}", "[]"}) {
+            var titles = StrictGuildRankJson.decodeApi("""
+                    {"members":[{"name":"ToolyTom","prime_minister":%s,
+                     "ranks":[{"kind":"fox","name":"Lord"}]}]}
+                    """.formatted(value));
+            assertEquals(Map.of("ToolyTom", "LORD"), titles);
+        }
+    }
+
+    @Test
     void cacheRoundTripPreservesTimestampAndNormalizedMappings() {
         var original = new GuildRankSnapshot(1234L, Map.of("MaxKarson", "Sir"));
 

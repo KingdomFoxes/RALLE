@@ -474,8 +474,13 @@ final class GuildRankTitleTransformer {
         return result.appendCodePoint(POSITIVE_TWO).toString();
     }
 
+    private static String pillTitle(String title) {
+        return "PRIME MINISTER".equals(title) ? "PM" : title;
+    }
+
     static GuildRankGlyphs encode(String title) {
-        return new GuildRankGlyphs(background(title), foreground(title));
+        String pillTitle = pillTitle(title);
+        return new GuildRankGlyphs(background(pillTitle), foreground(pillTitle));
     }
 
     static GuildRankGlyphs encodeStars(int stars) {
@@ -488,7 +493,7 @@ final class GuildRankTitleTransformer {
         String normalizedTitle = GuildRankSnapshot.normalizeTitle(title);
         if (normalizedTitle == null) throw new IllegalArgumentException("Invalid guild rank title");
         if (stars == 0) return encode(normalizedTitle);
-        return encodeComposite(stars, normalizedTitle, gap);
+        return encodeComposite(stars, pillTitle(normalizedTitle), gap);
     }
 
     private static GuildRankGlyphs encodeComposite(int stars, String title, boolean gap) {

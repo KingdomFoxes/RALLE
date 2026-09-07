@@ -139,8 +139,8 @@ development dependency is pinned to Modrinth project `dU5Gb9Ab`, Fabric version
 artifact `jeBTZ3Zn`; Wynntils is never bundled.
 
 The optional `TerritoryPoi#renderAt` tail hook is restricted at runtime to
-`GuildMapScreen`. It draws only for the hovered territory while either physical
-Ctrl key is down, using Wynntils' transformed center, zoom scale, and active map
+`GuildMapScreen`. It draws only for the hovered territory while the
+configured inspection key is down (either Ctrl by default), using Wynntils' transformed center, zoom scale, and active map
 scissor. It does not intercept input. A known active attack timer suppresses both
 RALLE labels so Wynntils' real timer remains authoritative. Labels remain anchored
 above and below the centered guild tag or HQ crown without collision or territory
@@ -216,7 +216,7 @@ be proven to be a new generation.
 
 An optional version-gated mixin decorates only the row task returned by
 `TerritoryAttackTimerOverlay#lambda$render$0` and its separate editor preview.
-It prepends the local IGN in Minecraft blue or another resolved IGN in gray,
+It prepends the local IGN in the configured color (Minecraft blue by default) or another resolved IGN in gray,
 then a gray ` → `, and otherwise uses localized gray `Unknown`. The original
 styled timer component and `TextRenderSetting` are retained, so Wynntils continues
 to own defense colors, current-territory emphasis, sorting, font, shadow,
@@ -553,3 +553,24 @@ filled parties remain exempt even after reopening.
 Roster head borders in both the browser and HUD resolve known territory colors through
 `GuildTerritoryColors`, matching Fox's bundled territory table (Fox `#FF8200`, Novu
 `#CE4F4F`). Unknown prefixes retain the backend color; malformed fallbacks use muted gray.
+
+
+### War controls and popup navigation
+The local setting `war.hq-distance-keybind` defaults to `key.keyboard.left.control`;
+either Ctrl works with this default. It synchronizes bidirectionally with Minecraft
+Controls and polls held input while the supported guild map is open. Unbound
+suppresses inspection; the feature toggle remains disabled by default.
+`war.queue-self-color` persists a `#RRGGBB` value with an optional `;rainbow` suffix, default `#5555FF`. Existing solid colors load unchanged.
+The settings palette uses the shared consumable color dialog shell with HSV and
+hex/rainbow controls and only the signed-in account's frozen sample queue above the hex controls. The preview occupies the full inner dialog width and draws one native-font line, keeping the timer beside the territory even for a 16-character IGN. Hex input and Rainbow sit beneath it beside the compact color wheel. Apply spans the full inner dialog width below the picker body.
+Apply saves the color; Escape discards the draft. Production and editor attribution
+use the selected solid color or animated per-character rainbow only for the local IGN. Rainbow uses the consumable highlight hue cycle and retains the stored solid RGB when switched off. Other row formatting stays owned by Wynntils.
+Settings and LFG screens consume Escape before owo can dismiss a popup and
+propagate the same event to the parent. Closing a popup retains the parent screen.
+Prime Minister snapshot glyphs are pre-encoded as PM, including stars-and-title
+presentation; identity and rank hover retain the full title.
+
+The public rank decoder gives an explicit boolean `prime_minister: true` precedence
+over the base Fox rank in `ranks` (for example Lord). It stores `PRIME MINISTER` in
+the local snapshot/cache so the existing renderer emits PM in title-bearing pills.
+Absent, false, or malformed PM flags retain normal Fox-rank decoding.

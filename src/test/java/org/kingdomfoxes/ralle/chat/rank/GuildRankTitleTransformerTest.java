@@ -20,6 +20,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GuildRankTitleTransformerTest {
     @Test
+    void primeMinisterUsesCompactPillButRetainsFullHoverTitle() {
+        var snapshot = new GuildRankSnapshot(1, Map.of("maxkarson", "Prime Minister"));
+        assertEquals("PRIME MINISTER", snapshot.titleFor("maxkarson").orElseThrow());
+        assertEquals(GuildRankTitleTransformer.encode("PM"), snapshot.glyphsFor("PRIME MINISTER"));
+        for (int stars = 0; stars <= 5; stars++) {
+            assertEquals(GuildRankTitleTransformer.encodeStarsAndTitle(stars, "PM", true),
+                    GuildRankTitleTransformer.encodeStarsAndTitle(stars, "PRIME MINISTER", true));
+        }
+        assertEquals("CHIEF - Prime Minister",
+                GuildRankTitleTransformer.rankHoverText("CHIEF", Optional.of("PRIME MINISTER")).getString());
+    }
+
+    @Test
     void replacesTheTitleAndRestoresAquaToThePillAndGuildIndicator() {
         var indicator = Component.literal(strategistIndicator()).withStyle(ChatFormatting.WHITE);
         var background = Component.literal(GuildRankTitleTransformer.background("STRATEGIST"));

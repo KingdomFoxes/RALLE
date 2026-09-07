@@ -31,9 +31,42 @@ class RalleSettingsTest {
                     if (entry instanceof BooleanSetting setting) {
                         assertFalse(setting.value(), setting.id() + " must default off");
                     } else if (entry instanceof KeybindSetting setting) {
-                        assertEquals(KeybindSetting.UNBOUND, setting.value(), setting.id() + " must default Unbound");
+                        assertEquals(RalleSettings.HQ_DISTANCE_KEYBIND_ID.equals(setting.id())
+                                ? "key.keyboard.left.control" : KeybindSetting.UNBOUND, setting.value());
                     }
                 });
+    }
+
+    @Test
+    void warColorAndInspectionBindingPersistLocally() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+        var color = registry.setting(RalleSettings.QUEUE_SELF_COLOR_ID, org.kingdomfoxes.ralle.api.settings.ColorSetting.class);
+        assertEquals(new org.kingdomfoxes.ralle.war.consumables.HighlightStyle(0x5555FF, false), color.value());
+        color.set(new org.kingdomfoxes.ralle.war.consumables.HighlightStyle(0xABCDEF, true));
+        registry.setting(RalleSettings.HQ_DISTANCE_KEYBIND_ID, KeybindSetting.class).set("key.keyboard.g");
+        var restored = new SettingsRegistry(path);
+        RalleSettings.register(restored);
+        restored.seal();
+        assertEquals(new org.kingdomfoxes.ralle.war.consumables.HighlightStyle(0xABCDEF, true), restored.setting(RalleSettings.QUEUE_SELF_COLOR_ID,
+                org.kingdomfoxes.ralle.api.settings.ColorSetting.class).value());
+        assertEquals("key.keyboard.g", restored.setting(RalleSettings.HQ_DISTANCE_KEYBIND_ID, KeybindSetting.class).value());
+        assertFalse(restored.setting(RalleSettings.HQ_DISTANCE_ENABLED_ID, BooleanSetting.class).value());
+        assertFalse(restored.setting(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID, BooleanSetting.class).value());
+    }
+
+    @Test
+    void existingSolidQueueColorsRemainSolid() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        Files.writeString(path, "war.queue-self-color=#ABCDEF\n");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+        var color = registry.setting(RalleSettings.QUEUE_SELF_COLOR_ID, org.kingdomfoxes.ralle.api.settings.ColorSetting.class);
+        assertEquals(new org.kingdomfoxes.ralle.war.consumables.HighlightStyle(0xABCDEF, false), color.value());
+        assertEquals("#ABCDEF", color.serialize());
     }
 
     @Test
@@ -216,10 +249,10 @@ class RalleSettingsTest {
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("automatic-raid-requeue-keybind"));
         assertEquals(List.of("attack-timers", "territory-map", "consumables"),
                 categories.get(3).subcategories().stream().map(value -> value.id()).toList());
-        assertEquals(List.of(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID),
+        assertEquals(List.of(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID, RalleSettings.QUEUE_SELF_COLOR_ID),
                 categories.get(3).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
         assertFalse(registry.setting(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID, BooleanSetting.class).value());
-        assertEquals(List.of(RalleSettings.HQ_DISTANCE_ENABLED_ID),
+        assertEquals(List.of(RalleSettings.HQ_DISTANCE_ENABLED_ID, RalleSettings.HQ_DISTANCE_KEYBIND_ID),
                 categories.get(3).subcategories().get(1).entries().stream().map(value -> value.id()).toList());
         assertFalse(registry.setting(RalleSettings.HQ_DISTANCE_ENABLED_ID, BooleanSetting.class).value());
         assertEquals(List.of(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID,

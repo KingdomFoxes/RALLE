@@ -11,6 +11,18 @@ import net.minecraft.network.chat.Component;
 /** Shared compact confirmation overlay matching the Raid LFG modal language. */
 final class RalleModalDialogs {
     private RalleModalDialogs() {}
+    static boolean dismissTop(io.wispforest.owo.ui.container.FlowLayout root) {
+        if (root == null) return false;
+        var children = root.children();
+        for (int i = children.size() - 1; i >= 0; i--) {
+            var child = children.get(i);
+            if (child instanceof OverlayContainer<?> || child instanceof io.wispforest.owo.ui.component.DropdownComponent) {
+                root.removeChild(child);
+                return true;
+            }
+        }
+        return false;
+    }
 
     static void confirm(
             RalleSettingsScreen screen,
