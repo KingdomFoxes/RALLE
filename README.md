@@ -13,10 +13,12 @@ per-line text-snapped overlay and text-width image crop, plus processed-xylophon
 count and successful-copy feedback. Screenshotting and its sounds are disabled
 by default on new installs.
 OW-like Chat Tabbing is another disabled-by-default local input option. In an empty
-chat, unmodified Tab prepares Guild, Party, the latest complete outgoing `/msg`
-recipient when known, and prefix-free All Chat in sequence; editing the prepared
-prefix restores vanilla autocomplete, and RALLE never sends the prepared command
-automatically. New empty chat screens restore the last selected type. That type
+chat, unmodified Tab cycles `[Guild]`, `[Party]`, the latest complete outgoing `/msg`
+recipient as `[username]` when known, and `[All]`. These labels sit outside the
+editable message: Backspace, Delete, selection, and cut cannot remove them.
+Sending restores the corresponding command prefix without transmitting the label.
+Typing a slash command retains command handling; message drafts retain vanilla
+Tab completion. New empty chat screens restore the last selected type. That type
 and the latest valid recipient reset when disconnecting and are never saved to disk.
 Persistent Chat is another disabled-by-default option. When enabled, it keeps
 up to the selected 300, 500, 1000, or 1500 displayed messages and wrapped lines

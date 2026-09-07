@@ -21,9 +21,43 @@ public final class ChatTypeTabService {
     );
     private static final Pattern GUILD_MESSAGE = Pattern.compile("^/?g[\\t ]+(.+)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PARTY_MESSAGE = Pattern.compile("^/?p[\\t ]+(.+)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern EXPLICIT_PREFIX = Pattern.compile(
+            "^/(?:g |p |msg [A-Za-z0-9_]{3,16} )", Pattern.CASE_INSENSITIVE);
 
     private String lastDirectMessageRecipient;
     private ChatType lastChatType;
+
+    /** Native chat colors: guild aqua, party yellow, direct messages pink, all white. */
+    public static int channelColor(String prefix) {
+        if (GUILD_PREFIX.equals(prefix)) return 0xFF55FFFF;
+        if (PARTY_PREFIX.equals(prefix)) return 0xFFFFFF55;
+        if (prefix != null && prefix.matches("/msg [A-Za-z0-9_]{3,16} ")) return 0xFFFF55FF;
+        return 0xFFFFFFFF;
+    }
+
+    /** Presentation is separate from the editable body and never goes on the wire. */
+    public static String channelLabel(String prefix) {
+        if (GUILD_PREFIX.equals(prefix)) return "[Guild]";
+        if (PARTY_PREFIX.equals(prefix)) return "[Party]";
+        if (prefix != null && prefix.matches("/msg [A-Za-z0-9_]{3,16} ")) {
+            return "[" + prefix.substring(5).strip() + "]";
+        }
+        return "[All]";
+    }
+
+    /** Recognizes explicit prefixes from typing, paste, history, or saved drafts. */
+    public static Optional<String> explicitPrefix(String input) {
+        var matcher = EXPLICIT_PREFIX.matcher(input);
+        if (!matcher.find()) return Optional.empty();
+        String prefix = matcher.group();
+        return Optional.of(prefix.regionMatches(true, 0, "/msg ", 0, 5)
+                ? "/msg " + prefix.substring(5) : prefix.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    public static String outgoingMessage(String body, String prefix) {
+        if (body.isBlank() || body.stripLeading().startsWith("/") || prefix == null) return body;
+        return prefix + body;
+    }
 
     public void observeSentCommand(String command) {
         Objects.requireNonNull(command, "command");

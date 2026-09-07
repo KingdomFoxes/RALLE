@@ -19,13 +19,17 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
+import net.minecraft.client.gui.GuiGraphics;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(ChatScreen.class)
 abstract class ChatScreenMixin extends Screen {
     @Shadow protected EditBox input;
+    @Shadow private int historyPos;
     @Unique private String ralle$lastInsertedChatTypePrefix;
+    @Unique private String ralle$historyDraftPrefix;
 
     protected ChatScreenMixin(Component title) {
         super(title);
@@ -33,13 +37,42 @@ abstract class ChatScreenMixin extends Screen {
 
     @Inject(method = "init", at = @At("TAIL"), require = 0)
     private void ralle$restoreChatType(CallbackInfo callback) {
-        if (!this.input.getValue().isEmpty()
-                || !RalleClient.context().settings()
-                        .setting(ChatTypeTabService.SETTING_ID, BooleanSetting.class)
-                        .value()) {
-            return;
+        if (!ralle$channelEnabled()) return;
+        if (this.ralle$lastInsertedChatTypePrefix == null) {
+            this.ralle$lastInsertedChatTypePrefix = RalleClient.context().chatTypeTabs().prefixForNewChat().orElse("");
         }
-        RalleClient.context().chatTypeTabs().prefixForNewChat().ifPresent(this::ralle$setChatTypePrefix);
+        ralle$adoptExplicitPrefix();
+        ralle$layoutChannel();
+    }
+
+    @Inject(method = "onEdited", at = @At("TAIL"), require = 0)
+    private void ralle$editChannel(String value, CallbackInfo callback) {
+        if (!ralle$channelEnabled()) return;
+        ralle$adoptExplicitPrefix();
+        ralle$layoutChannel();
+    }
+
+    @Inject(method = "moveInHistory", at = @At("HEAD"), require = 0)
+    private void ralle$historyChannel(int direction, CallbackInfo callback) {
+        if (!ralle$channelEnabled()) return;
+        int size = this.minecraft.gui.getChat().getRecentChat().size();
+        int next = Math.clamp(this.historyPos + direction, 0, size);
+        if (next == this.historyPos) return;
+        if (this.historyPos == size) this.ralle$historyDraftPrefix = this.ralle$lastInsertedChatTypePrefix;
+        this.ralle$lastInsertedChatTypePrefix = next == size ? this.ralle$historyDraftPrefix : "";
+    }
+
+    @ModifyVariable(method = "handleChatInput", at = @At("HEAD"), argsOnly = true, ordinal = 0)
+    private String ralle$routeChannel(String body) {
+        return ralle$channelEnabled()
+                ? ChatTypeTabService.outgoingMessage(body, this.ralle$lastInsertedChatTypePrefix) : body;
+    }
+
+    @Inject(method = "render", at = @At("TAIL"), require = 0)
+    private void ralle$renderChannel(GuiGraphics graphics, int mouseX, int mouseY, float delta, CallbackInfo callback) {
+        if (!ralle$channelEnabled() || this.input.getValue().startsWith("/")) return;
+        graphics.drawString(this.font, ChatTypeTabService.channelLabel(this.ralle$lastInsertedChatTypePrefix),
+                4, this.input.getY(), ChatTypeTabService.channelColor(this.ralle$lastInsertedChatTypePrefix));
     }
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true, require = 0)
@@ -104,7 +137,8 @@ abstract class ChatScreenMixin extends Screen {
                         .setting(ChatTypeTabService.SETTING_ID, BooleanSetting.class)
                         .value()) {
             RalleClient.context().chatTypeTabs()
-                    .nextPrefix(this.input.getValue(), this.ralle$lastInsertedChatTypePrefix)
+                    .nextPrefix(this.input.getValue().isEmpty() ? this.ralle$lastInsertedChatTypePrefix : this.input.getValue(),
+                            this.input.getValue().isEmpty() ? this.ralle$lastInsertedChatTypePrefix : null)
                     .ifPresent(prefix -> {
                         this.ralle$setChatTypePrefix(prefix);
                         RalleClient.context().chatTypeTabs().rememberPrefix(prefix);
@@ -143,6 +177,11 @@ abstract class ChatScreenMixin extends Screen {
     @Inject(method = "removed", at = @At("HEAD"), require = 0)
     private void ralle$cancelScreenshotOnClose(CallbackInfo callback) {
         RalleClient.context().chatScreenshots().cancel();
+        if (ralle$channelEnabled()) {
+            // Vanilla owns draft persistence; retain its destination with the body.
+            this.input.setResponder(value -> {});
+            this.input.setValue(ChatTypeTabService.outgoingMessage(this.input.getValue(), this.ralle$lastInsertedChatTypePrefix));
+        }
     }
 
     private static boolean ralle$controlDown() {
@@ -153,9 +192,32 @@ abstract class ChatScreenMixin extends Screen {
 
     @Unique
     private void ralle$setChatTypePrefix(String prefix) {
-        this.input.setValue(prefix);
-        this.input.setCursorPosition(prefix.length());
-        this.input.setHighlightPos(prefix.length());
         this.ralle$lastInsertedChatTypePrefix = prefix;
+        ralle$layoutChannel();
+    }
+
+    @Unique
+    private boolean ralle$channelEnabled() {
+        return RalleClient.context().settings().setting(ChatTypeTabService.SETTING_ID, BooleanSetting.class).value();
+    }
+
+    @Unique
+    private void ralle$adoptExplicitPrefix() {
+        String value = this.input.getValue();
+        ChatTypeTabService.explicitPrefix(value).ifPresent(prefix -> {
+            this.ralle$lastInsertedChatTypePrefix = prefix;
+            this.input.setValue(value.substring(prefix.length()));
+        });
+    }
+
+    @Unique
+    private void ralle$layoutChannel() {
+        boolean command = this.input.getValue().startsWith("/");
+        String label = ChatTypeTabService.channelLabel(this.ralle$lastInsertedChatTypePrefix);
+        int left = command ? 4 : 4 + this.font.width(label) + 5;
+        this.input.setX(left);
+        this.input.setWidth(Math.max(1, this.width - left));
+        this.input.setMessage(command ? Component.translatable("chat.editBox")
+                : Component.literal(label + " ").append(Component.translatable("chat.editBox")));
     }
 }

@@ -297,10 +297,18 @@ Its latest valid outgoing `/msg` recipient and last selected stable chat type ar
 connection-local memory only. A new empty ChatScreen restores that type without
 overriding command-key input or drafts, while disconnecting clears both values.
 The Fabric outgoing-command observer does not mutate or resend commands. The
-ChatScreen integration cycles Guild, Party, the latest DM when known, and
-prefix-free All Chat, consuming only an unmodified Tab on an empty input or an
-exact RALLE-inserted prefix and leaving edited drafts and normal command
-completion to Minecraft.
+ChatScreen integration cycles `[Guild]`, `[Party]`, `[latest outgoing DM username]`,
+and `[All]`, consuming only an unmodified Tab on an empty message body.
+The channel label is rendered beside the EditBox, outside its editable contents,
+and included in its narration label. Deletion, selection, copy, and cut operate
+only on the body. Sending prepends `/g `, `/p `, or `/msg username ` to the body
+before vanilla normalization, history, and dispatch; empty bodies send nothing,
+and explicit slash commands bypass the selected channel. Typed/pasted supported
+prefixes, command history, and vanilla saved drafts recover their channel.
+History navigation restores the draft's channel when returning to the current
+input. Resizing preserves the channel. Drafts and normal commands retain
+Minecraft's Tab completion. The Show Who Queued color action uses the shared
+palette icon followed by `Click to edit color` in the existing control lane.
 
 Custom HUD placements are stored separately in
 `config/ralle-hud-layout.properties`. Resizable elements such as the v1 chat

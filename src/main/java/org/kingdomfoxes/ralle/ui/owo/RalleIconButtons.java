@@ -14,6 +14,14 @@ public final class RalleIconButtons {
     private RalleIconButtons() {}
 
     public static RalleIconButton palette(Component accessibleLabel, Consumer<ButtonComponent> pressed) {
+        return palette(accessibleLabel, null, pressed);
+    }
+
+    public static RalleIconButton labeledPalette(Component label, Consumer<ButtonComponent> pressed) {
+        return palette(label, RalleTheme.ui(label), pressed);
+    }
+
+    private static RalleIconButton palette(Component accessibleLabel, Component visibleLabel, Consumer<ButtonComponent> pressed) {
         var button = base(accessibleLabel, pressed);
         button.renderer((graphics, control, delta) -> {
             RalleButtonRenderers.neutral().draw(graphics, control, delta);
@@ -21,6 +29,11 @@ public final class RalleIconButtons {
             for (int i = 0; i < colors.length; i++) {
                 graphics.fill(control.getX() + 5 + i % 3 * 3, control.getY() + 6 + i / 3 * 3,
                         control.getX() + 8 + i % 3 * 3, control.getY() + 9 + i / 3 * 3, colors[i]);
+            }
+            if (visibleLabel != null) {
+                graphics.drawString(Minecraft.getInstance().font, visibleLabel,
+                        control.getX() + 20, control.getY() + 6,
+                        control.active ? 0xFFFFFFFF : 0xFF8993A8);
             }
         });
         return button;

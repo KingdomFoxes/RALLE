@@ -8,6 +8,37 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ChatTypeTabServiceTest {
     @Test
+    void labelsNeverBecomePartOfTheOutgoingMessage() {
+        assertEquals("[Guild]", ChatTypeTabService.channelLabel("/g "));
+        assertEquals("[Party]", ChatTypeTabService.channelLabel("/p "));
+        assertEquals("[FoxFriend]", ChatTypeTabService.channelLabel("/msg FoxFriend "));
+        assertEquals("[All]", ChatTypeTabService.channelLabel(""));
+        assertEquals("/g hello", ChatTypeTabService.outgoingMessage("hello", "/g "));
+        assertEquals("/p hello", ChatTypeTabService.outgoingMessage("hello", "/p "));
+        assertEquals("/msg FoxFriend hello", ChatTypeTabService.outgoingMessage("hello", "/msg FoxFriend "));
+        assertEquals("hello", ChatTypeTabService.outgoingMessage("hello", ""));
+    }
+
+    @Test
+    void emptyBodyDoesNotSendACommandAndExplicitCommandsBypassTheChannel() {
+        assertEquals("", ChatTypeTabService.outgoingMessage("", "/g "));
+        assertEquals("  ", ChatTypeTabService.outgoingMessage("  ", "/p "));
+        assertEquals("/ralle settings", ChatTypeTabService.outgoingMessage("/ralle settings", "/g "));
+        assertEquals("  /help", ChatTypeTabService.outgoingMessage("  /help", "/g "));
+        assertEquals("[Guild] hello", ChatTypeTabService.outgoingMessage("[Guild] hello", ""));
+    }
+
+    @Test
+    void explicitCommandsFromTypingPasteHistoryAndDraftsRecoverTheirChannel() {
+        assertEquals(Optional.of("/g "), ChatTypeTabService.explicitPrefix("/G hello"));
+        assertEquals(Optional.of("/p "), ChatTypeTabService.explicitPrefix("/p "));
+        assertEquals(Optional.of("/msg FoxFriend "), ChatTypeTabService.explicitPrefix("/MSG FoxFriend hello"));
+        assertEquals(Optional.empty(), ChatTypeTabService.explicitPrefix("/msg incomplete"));
+        assertEquals(Optional.empty(), ChatTypeTabService.explicitPrefix("/guild other command"));
+        assertEquals(Optional.empty(), ChatTypeTabService.explicitPrefix("/msg invalid-name hello"));
+    }
+
+    @Test
     void cyclesGuildPartyAndAllChatWithoutADirectMessageRecipient() {
         var service = new ChatTypeTabService();
 

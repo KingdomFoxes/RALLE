@@ -408,9 +408,10 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
         ButtonComponent button;
         if (entry instanceof org.kingdomfoxes.ralle.api.settings.ColorSetting setting) {
-            button = RalleIconButtons.palette(setting.title(), ignored -> ConsumableColorDialogScreen.openQueueColor(this, setting));
+            button = RalleIconButtons.labeledPalette(Component.translatable("ralle.settings.color.edit"),
+                    ignored -> ConsumableColorDialogScreen.openQueueColor(this, setting));
             configureControlButton(entry, available, button);
-            button.horizontalSizing(Sizing.fixed(20));
+            button.horizontalSizing(Sizing.fixed(126));
             var lane = UIContainers.horizontalFlow(Sizing.fixed(126), Sizing.fixed(20));
             lane.horizontalAlignment(HorizontalAlignment.CENTER);
             lane.child(button);
