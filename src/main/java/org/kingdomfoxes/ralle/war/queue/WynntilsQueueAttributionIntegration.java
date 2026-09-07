@@ -31,7 +31,6 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
     private final QueueAttributionTracker tracker;
     private boolean registered;
     private SessionIdentity sessionIdentity;
-    private Set<String> territoryNames = Set.of();
 
     WynntilsQueueAttributionIntegration(QueueAnnouncementParser parser, QueueAttributionTracker tracker) {
         this.parser = Objects.requireNonNull(parser, "parser");
@@ -66,13 +65,17 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
         }
         if (!current.usable()) {
             tracker.clear();
-            territoryNames = Set.of();
             return;
         }
 
         List<AttackTimerSnapshot> timers = Models.GuildAttackTimer.getAttackTimers().stream()
                 .map(timer -> new AttackTimerSnapshot(timer.territoryName(), timer.timerEnd()))
                 .toList();
+        tracker.reconcile(timers);
+    }
+
+    /** Territory names are needed only when resolving an incoming announcement, never every tick. */
+    private static Set<String> territoryNames() {
         var canonicalNames = new LinkedHashSet<String>();
         Models.Territory.getTerritoryNames()
                 .map(Models.Territory::getTerritoryProfile)
@@ -81,9 +84,9 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
                 .filter(Objects::nonNull)
                 .filter(name -> !name.isBlank())
                 .forEach(canonicalNames::add);
-        timers.stream().map(AttackTimerSnapshot::territoryName).forEach(canonicalNames::add);
-        territoryNames = Set.copyOf(canonicalNames);
-        tracker.reconcile(timers);
+        Models.GuildAttackTimer.getAttackTimers().stream()
+                .map(TerritoryAttackTimer::territoryName).forEach(canonicalNames::add);
+        return canonicalNames;
     }
 
     @SubscribeEvent(receiveCanceled = true)
@@ -92,7 +95,7 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
             if (!registered || sessionIdentity == null || !sessionIdentity.usable()) return;
             if (event.getRecipientType() == RecipientType.GUILD || event.getRecipientType() == RecipientType.INFO) {
                 GuildChatIdentityResolver.resolve(event.getMessage().getComponent())
-                        .flatMap(message -> parser.parse(message, territoryNames))
+                        .flatMap(message -> parser.parse(message, territoryNames()))
                         .ifPresent(tracker::observe);
             }
             if (event.getRecipientType() == RecipientType.INFO) observeCapture(event.getMessage().getComponent());
@@ -161,7 +164,6 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
     @Override public void clear() {
         tracker.clear();
         sessionIdentity = null;
-        territoryNames = Set.of();
     }
 
     private void observeCapture(Component component) {
@@ -169,7 +171,7 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
         if (text.length() > 512 || text.indexOf('\n') >= 0 || text.indexOf('\r') >= 0) return;
         var match = CAPTURE_MESSAGE.matcher(text);
         if (!match.matches()) return;
-        String canonical = QueueAnnouncementParser.canonicalTerritory(match.group(1), territoryNames);
+        String canonical = QueueAnnouncementParser.canonicalTerritory(match.group(1), territoryNames());
         if (canonical != null) tracker.captured(canonical);
     }
 

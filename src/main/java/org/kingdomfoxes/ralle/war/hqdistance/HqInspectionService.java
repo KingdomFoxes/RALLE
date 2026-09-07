@@ -6,6 +6,7 @@ import java.util.OptionalInt;
 
 /** Caches the pure route projection until identity, HQ, ownership, or connections change. */
 public final class HqInspectionService {
+    private static final HqInspection UNKNOWN = new HqInspection("Unknown", "", OptionalInt.empty());
     private final TerritorySnapshotSource source;
     private final TerritoryRouteCalculator routes;
     private final QueueDurationEstimator durations;
@@ -34,7 +35,7 @@ public final class HqInspectionService {
             int redThreshold = redThreshold(ownedTerritories);
             projectedRoutes.forEach((name, route) -> cache.put(name, format(route, redThreshold)));
         }
-        return cache.getOrDefault(territoryName, format(TerritoryRouteCalculator.Route.unknown(), 0));
+        return cache.getOrDefault(territoryName, UNKNOWN);
     }
 
     public boolean hasActiveAttackTimer(String territoryName) {
@@ -53,7 +54,7 @@ public final class HqInspectionService {
                     Integer.toString(route.connectionCount()),
                     formatDuration(durations.estimateSeconds(route.connectionCount())),
                     OptionalInt.of(route.connectionCount()), distanceColor(route.connectionCount(), redThreshold));
-            case UNKNOWN -> new HqInspection("Unknown", "", OptionalInt.empty());
+            case UNKNOWN -> UNKNOWN;
         };
     }
 

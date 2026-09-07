@@ -15,6 +15,7 @@ public final class ChatTypeTabService {
     private static final String GUILD_PREFIX = "/g ";
     private static final String PARTY_PREFIX = "/p ";
     private static final String ALL_CHAT_PREFIX = "";
+    private static final Pattern DIRECT_MESSAGE_PREFIX = Pattern.compile("/msg [A-Za-z0-9_]{3,16} ");
     private static final Pattern DIRECT_MESSAGE = Pattern.compile(
             "^/?msg[\\t ]+([A-Za-z0-9_]{3,16})[\\t ]+(.+)$",
             Pattern.CASE_INSENSITIVE
@@ -31,7 +32,7 @@ public final class ChatTypeTabService {
     public static int channelColor(String prefix) {
         if (GUILD_PREFIX.equals(prefix)) return 0xFF55FFFF;
         if (PARTY_PREFIX.equals(prefix)) return 0xFFFFFF55;
-        if (prefix != null && prefix.matches("/msg [A-Za-z0-9_]{3,16} ")) return 0xFFFF55FF;
+        if (prefix != null && DIRECT_MESSAGE_PREFIX.matcher(prefix).matches()) return 0xFFFF55FF;
         return 0xFFFFFFFF;
     }
 
@@ -39,7 +40,7 @@ public final class ChatTypeTabService {
     public static String channelLabel(String prefix) {
         if (GUILD_PREFIX.equals(prefix)) return "[Guild]";
         if (PARTY_PREFIX.equals(prefix)) return "[Party]";
-        if (prefix != null && prefix.matches("/msg [A-Za-z0-9_]{3,16} ")) {
+        if (prefix != null && DIRECT_MESSAGE_PREFIX.matcher(prefix).matches()) {
             return "[" + prefix.substring(5).strip() + "]";
         }
         return "[All]";

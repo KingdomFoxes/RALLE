@@ -14,6 +14,7 @@ public final class QueueAnnouncementParser {
             "^(.{1,128}) defense is (None|Very Low|Low|Medium|High|Very High)$"
     );
     private static final Pattern IGN = Pattern.compile("[A-Za-z0-9_]{1,16}");
+    private static final Pattern WHITESPACE = Pattern.compile("[ \\t]+");
 
     public Optional<QueueAnnouncement> parse(
             GuildChatMessage message,
@@ -54,7 +55,7 @@ public final class QueueAnnouncementParser {
     }
 
     private static String normalizeWhitespace(String value) {
-        return value.strip().replaceAll("[ \\t]+", " ");
+        return WHITESPACE.matcher(value.strip()).replaceAll(" ");
     }
 
     private static boolean containsLineBreak(String value) {

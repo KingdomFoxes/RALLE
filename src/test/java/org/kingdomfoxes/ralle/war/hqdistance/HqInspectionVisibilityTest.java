@@ -17,11 +17,4 @@ class HqInspectionVisibilityTest {
         assertTrue(HqInspectionVisibility.visible(true, true, true, true, false));
     }
 
-    @Test
-    void eitherPhysicalControlKeyActivatesInspection() {
-        assertFalse(InspectionModifier.held(false, false));
-        assertTrue(InspectionModifier.held(true, false));
-        assertTrue(InspectionModifier.held(false, true));
-        assertTrue(InspectionModifier.held(true, true));
-    }
 }

@@ -103,7 +103,10 @@ uses the vanilla backing item as proof of type. Matching then uses only
 turns punctuation and formatting separators into spaces, collapses whitespace,
 and compares complete words or phrases. It does not infer singular/plural
 variants. The first rule in stored order wins, and a bounded displayed-name
-cache is cleared whenever a new snapshot is published.
+cache is cleared whenever a new snapshot is published. Cache keys retain the raw
+displayed name so repeat slot renders skip normalization as well as rule matching.
+Matching and snapshot updates share one lock to prevent stale cache entries after
+an edit; empty rule lists bypass matching entirely.
 
 An optional tail injection into `AbstractContainerScreen#renderSlot` draws a
 single full-opacity, one-pixel border outside the 18-by-18 slot after its item
@@ -202,6 +205,10 @@ territory name after only narrow whitespace normalization. Character nicknames
 resolve through hover metadata applying to the speaker span; direct names must be
 valid Minecraft IGNs. The observer never cancels or edits chat and performs no
 commands, polling, HTTP requests, or backend work.
+
+Canonical territory names are read from the current Wynntils models only while
+resolving incoming guild announcements or capture messages. Client ticks reconcile
+active timers and session identity without rebuilding the full territory-name set.
 
 Announcements may wait up to ten seconds for the matching timer model entry.
 First observed sender wins for one continuously active territory countdown;

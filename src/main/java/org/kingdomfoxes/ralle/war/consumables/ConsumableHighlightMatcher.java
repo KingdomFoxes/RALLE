@@ -11,7 +11,7 @@ public final class ConsumableHighlightMatcher {
     public static final int DEFAULT_CACHE_SIZE = 512;
     private final int cacheSize;
     private final Map<String, Optional<HighlightStyle>> cache;
-    private volatile List<CompiledRule> compiled = List.of();
+    private List<CompiledRule> compiled = List.of();
 
     public ConsumableHighlightMatcher(List<ConsumableHighlightRule> rules) {
         this(rules, DEFAULT_CACHE_SIZE);
@@ -40,17 +40,14 @@ public final class ConsumableHighlightMatcher {
         cache.clear();
     }
 
-    public Optional<HighlightStyle> match(String displayedName) {
+    public synchronized Optional<HighlightStyle> match(String displayedName) {
+        if (displayedName == null || compiled.isEmpty()) return Optional.empty();
+        // Key by the unmodified name so repeated slot renders skip Unicode normalization too.
+        var cached = cache.get(displayedName);
+        if (cached != null) return cached;
         var normalized = ConsumableNameNormalizer.normalize(displayedName);
-        if (normalized.isEmpty()) return Optional.empty();
-        synchronized (this) {
-            var cached = cache.get(normalized);
-            if (cached != null) return cached;
-        }
-        var result = find(normalized);
-        synchronized (this) {
-            cache.put(normalized, result);
-        }
+        var result = normalized.isEmpty() ? Optional.<HighlightStyle>empty() : find(normalized);
+        cache.put(displayedName, result);
         return result;
     }
 
