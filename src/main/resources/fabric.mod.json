@@ -29,6 +29,6 @@
     "owo": ">=0.13.0"
   },
   "suggests": {
-    "wynntils": "=4.2.7"
+    "wynntils": ">=4.2.7"
   }
 }

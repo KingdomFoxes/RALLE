@@ -62,14 +62,14 @@ platform ports. It must not depend on a concrete settings screen.
 - `war.consumables`: local, immutable ordered displayed-name rules and the
   container-slot highlight service. The service is inert unless its setting is
   enabled, a play connection exists, and the host is a real Wynncraft domain.
-- `war.hqdistance`: an optional exact-version Wynntils adapter around immutable
+- `war.hqdistance`: an optional version-gated Wynntils adapter around immutable
   territory snapshots, a pure bidirectional graph projection, provisional queue
   estimation, cached inspection state, and collision-aware rendering. It consumes
   only data Wynntils already maintains and performs no polling or backend calls.
 - `war.queue`: bounded, memory-only sender attribution projected from verified
   guild-chat envelopes onto Wynntils' existing Guild Attack Timer render tasks.
   Pure identity, parsing, tracking, and formatting code is separated from the
-  optional exact-version event/model adapter and HUD-scoped mixin.
+  optional version-gated event/model adapter and HUD-scoped mixin.
 - `platform`: Fabric/Minecraft adapters such as commands, keybinds, connection
   lifecycle, local persistence, and future clickable chat notifications.
 
@@ -137,7 +137,7 @@ recognizable vanilla items without affecting highlight configuration.
 
 `war.hq-distance-enabled` defaults to false and persists in
 `config/ralle.properties`. It is visible but unavailable unless the installed
-Wynntils version is exactly 4.2.7 for Minecraft 1.21.11. The compile-only
+Wynntils version is 4.2.7 or newer for Minecraft 1.21.11. The compile-only
 development dependency is pinned to Modrinth project `dU5Gb9Ab`, Fabric version
 artifact `jeBTZ3Zn`; Wynntils is never bundled.
 
@@ -191,7 +191,7 @@ updated if necessary.
 
 `war.queue-attribution-enabled` defaults to false and persists in
 `config/ralle.properties`. It is visible but unavailable unless Wynntils is
-exactly 4.2.7 for Minecraft 1.21.11, using the same compile-only artifact and
+4.2.7 or newer for Minecraft 1.21.11, using the same compile-only artifact and
 compatibility detector as HQ Distance. Enabling it never changes Wynntils'
 configuration: the player must separately enable Wynntils' Guild Attack Timer
 overlay, and a sender must supply the guild defense announcement for attribution

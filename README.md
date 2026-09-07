@@ -70,7 +70,7 @@ toggle. Its editor is shown only while the master toggle is enabled.
 The complete editor also appears in matching settings-search results and follows
 the same searchable-container contract as future full-width settings panels.
 War → Territory Map also contains the disabled-by-default **HQ Distance and Queue
-Estimate** option. With exactly Wynntils 4.2.7 installed, holding either Ctrl key
+Estimate** option. With Wynntils 4.2.7 or newer installed, holding either Ctrl key
 over a guild-map territory shows its shortest link distance from the player's HQ
 through any guild's territories and, except at HQ, the provisional
 `60 + 60 × connections` queue estimate prefixed with a clock glyph. Distance
@@ -85,7 +85,7 @@ not add polling or backend traffic. The historical duration formula remains a
 release blocker until it is checked against current in-game attack previews.
 
 War → Attack Timers contains the separate disabled-by-default **Show Who
-Queued** option for exactly Wynntils 4.2.7. It prefixes each row in Wynntils'
+Queued** option for Wynntils 4.2.7 or newer. It prefixes each row in Wynntils'
 existing Guild Attack Timer with the first observed defense-announcement sender:
 the local IGN is blue, other IGNs are gray, and missed or unresolved senders show
 as gray `Unknown`. Enable Wynntils' Guild Attack Timer overlay to see the rows;

@@ -20,7 +20,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/** All direct Wynntils 4.2.7 event, model, and render-task references are isolated here. */
+/** All direct Wynntils event, model, and render-task references are isolated here. */
 final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapter {
     private static final Pattern CAPTURE_MESSAGE = Pattern.compile(
             "^\\s*[^\\[]*\\[[^\\]\\r\\n]{1,64}] (?:has )?captured the territory (.{1,128})\\.$"

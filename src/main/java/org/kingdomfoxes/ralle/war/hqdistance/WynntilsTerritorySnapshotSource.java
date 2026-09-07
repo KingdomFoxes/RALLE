@@ -5,7 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 
-/** Read-only adapter over Wynntils 4.2.7's already-maintained guild and territory models. */
+/** Read-only adapter over Wynntils' already-maintained guild and territory models. */
 final class WynntilsTerritorySnapshotSource implements TerritorySnapshotSource {
     @Override
     public TerritorySnapshot snapshot() {
