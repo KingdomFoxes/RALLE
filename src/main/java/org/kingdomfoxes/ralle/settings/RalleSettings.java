@@ -83,15 +83,14 @@ public final class RalleSettings {
                 "raid-lfg",
                 Component.translatable("ralle.settings.category.raid-lfg"),
                 Component.translatable("ralle.settings.category.raid-lfg.description"),
-                List.of(toggle("raid-lfg-enabled")),
+                List.of(toggle("raid-lfg-enabled"), action("edit-notification-position")),
                 List.of(
                         subcategory("notifications",
                                 toggle("new-party-notifications"),
                                 toggle("reopened-party-notifications"),
                                 toggle("party-status-notifications"),
                                 toggle("auto-pop-out-main-ui"),
-                                toggle("notification-sounds"),
-                                action("edit-notification-position")
+                                toggle("notification-sounds")
                         ),
                         subcategory("controls",
                                 keybind("raid-lfg-keybind"),
@@ -189,6 +188,12 @@ public final class RalleSettings {
     }
 
     private static Component description(String id) {
+        if ("text-shadow".equals(id)) {
+            return Component.translatable(
+                    "ralle.settings.option.text-shadow.description",
+                    Component.translatable("ralle.settings.option.text-shadow.description.note")
+            );
+        }
         return Component.translatable("ralle.settings.option." + id + ".description");
     }
 }

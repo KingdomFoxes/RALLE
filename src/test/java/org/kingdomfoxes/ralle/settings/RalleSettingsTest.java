@@ -229,7 +229,11 @@ class RalleSettingsTest {
         assertEquals(List.of(), registry.dependencies(RalleSettings.GUILD_RANK_STYLE_ID));
         assertEquals(List.of("notifications", "controls"),
                 categories.get(2).subcategories().stream().map(value -> value.id()).toList());
-        assertEquals(List.of("raid-lfg-enabled"), categories.get(2).entries().stream().map(value -> value.id()).toList());
+        assertEquals(List.of("raid-lfg-enabled", "edit-notification-position"),
+                categories.get(2).entries().stream().map(value -> value.id()).toList());
+        assertEquals(List.of("new-party-notifications", "reopened-party-notifications",
+                        "party-status-notifications", "auto-pop-out-main-ui", "notification-sounds"),
+                categories.get(2).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
         var keybinds = List.of(
                 "raid-lfg-keybind",
                 "raid-lfg-join-keybind",

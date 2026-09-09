@@ -432,7 +432,9 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
             lines.add(new ChatScreenshotSnapshot.FrozenLine(
                     line.content(),
                     messageIndex,
-                    minecraft.font.width(line.content())
+                    minecraft.font.width(line.content()),
+                    org.kingdomfoxes.ralle.chat.screenshot.ChatLineVisibility.hasVisibleContent(
+                            minecraft.font, line.content())
             ));
         }
 

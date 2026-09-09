@@ -333,7 +333,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     OverlayContainer<UIComponent> showModal(UIComponent content) {
-        var overlay = UIContainers.overlay(content).closeOnClick(false);
+        var overlay = new RalleModalOverlay<>(content);
         root.child(overlay);
         return overlay;
     }
@@ -357,7 +357,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         copy.gap(2);
         copy.child(UIComponents.label(RalleTheme.ui(entry.title())).lineHeight(RalleTheme.BODY_LINE_HEIGHT)
                 .color(available ? RalleTheme.TEXT : RalleTheme.DISABLED));
-        copy.child(UIComponents.label(RalleTheme.ui(entry.description())).lineHeight(RalleTheme.BODY_LINE_HEIGHT)
+        copy.child(UIComponents.label(descriptionForDisplay(entry, available)).lineHeight(RalleTheme.BODY_LINE_HEIGHT)
                 .color(available ? RalleTheme.MUTED : RalleTheme.DISABLED)
                 .maxWidth(SettingsScreenLayout.descriptionWidth(geometry.documentWidth(), stacked)));
         if (!available) {
@@ -374,6 +374,17 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         row.child(copy);
         row.child(control(entry, available));
         return row;
+    }
+
+    private Component descriptionForDisplay(SettingsEntry entry, boolean available) {
+        if (available && "text-shadow".equals(entry.id())) {
+            return RalleTheme.ui(Component.translatable(
+                    "ralle.settings.option.text-shadow.description",
+                    Component.translatable("ralle.settings.option.text-shadow.description.note")
+                            .withColor(RalleTheme.ACCENT_RGB)
+            ));
+        }
+        return RalleTheme.ui(entry.description());
     }
 
     private UIComponent control(SettingsEntry entry, boolean available) {
@@ -536,6 +547,11 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     public boolean keyPressed(KeyEvent event) {
+        if (event.key() == GLFW.GLFW_KEY_ESCAPE && RalleModalDialogs.dismissTop(root)) {
+            capturingKeybind = null;
+            capturingButton = null;
+            return true;
+        }
         if (capturingKeybind != null) {
             if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
                 var cancelled = capturingKeybind;
@@ -553,7 +569,6 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             updateKeybind(captured, key == InputConstants.UNKNOWN ? KeybindSetting.UNBOUND : key.getName(), trigger);
             return true;
         }
-        if (event.key() == GLFW.GLFW_KEY_ESCAPE && RalleModalDialogs.dismissTop(root)) return true;
         return super.keyPressed(event);
     }
 

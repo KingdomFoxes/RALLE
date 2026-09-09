@@ -696,6 +696,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void tickKickTargeting() {
+        if (RalleModalDialogs.hasPopup(root)) return;
         var targetId = kickTargeting.completedTarget();
         if (targetId == null || kickLobbyId == null) return;
         var lobby = lobby(kickLobbyId);
@@ -745,7 +746,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void updateKickHover(int mouseX, int mouseY) {
-        if (!kickTargeting.active() || kickTargeting.submitted()) return;
+        if (RalleModalDialogs.hasPopup(root) || !kickTargeting.active() || kickTargeting.submitted()) return;
         UUID next = null;
         for (var entry : kickRows.entrySet()) {
             if (entry.getValue().isInBoundingBox(mouseX, mouseY)) {
@@ -768,7 +769,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void renderKickTargeting(GuiGraphics graphics) {
-        if (!kickTargeting.active() || kickButton == null) return;
+        if (RalleModalDialogs.hasPopup(root) || !kickTargeting.active() || kickButton == null) return;
         var target = kickRows.get(kickTargeting.visualTarget());
         if (target == null) return;
 
@@ -854,6 +855,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     private void openDisbandConfirmation(LfgProtocol.Lobby lobby) {
         if (root == null || service.lifecycle() != RaidLfgService.LifecycleState.ONLINE) return;
+        kickTargeting.reset();
         var content = UIContainers.verticalFlow(Sizing.fixed(300), Sizing.content());
         content.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
         content.child(UIComponents.label(RalleTheme.ui(Component.literal("DISBAND PARTY")))
@@ -875,7 +877,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         controls.child(confirm).child(cancel);
         content.child(controls);
 
-        var overlay = UIContainers.overlay(content).closeOnClick(false);
+        var overlay = new RalleModalOverlay<>(content);
         overlayHolder[0] = overlay;
         root.child(overlay);
     }
@@ -911,6 +913,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     private void openCreateModal() {
         if (root == null || service.lifecycle() != RaidLfgService.LifecycleState.ONLINE) return;
+        kickTargeting.reset();
         var content = UIContainers.verticalFlow(Sizing.fixed(320), Sizing.content());
         content.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
         content.child(UIComponents.label(RalleTheme.ui(Component.literal("CREATE RAID LOBBY BRATAN"))).color(RalleTheme.ACCENT));
@@ -985,7 +988,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         cancel.renderer(RalleButtonRenderers.neutral());
         controls.child(submit).child(cancel);
         content.child(controls);
-        var overlay = UIContainers.overlay(content).closeOnClick(false);
+        var overlay = new RalleModalOverlay<>(content);
         overlayHolder[0] = overlay;
         root.child(overlay);
     }
