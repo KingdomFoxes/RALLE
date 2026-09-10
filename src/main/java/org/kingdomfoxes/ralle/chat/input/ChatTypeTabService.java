@@ -27,6 +27,18 @@ public final class ChatTypeTabService {
 
     private String lastDirectMessageRecipient;
     private ChatType lastChatType;
+    private long inputRequestRevision;
+    private boolean inputSelectedAll;
+
+    /** One visible switch, not a lock: subsequent explicit channel selections are respected. */
+    public void selectAllForInput() {
+        lastChatType = ChatType.ALL;
+        inputSelectedAll = true;
+        inputRequestRevision++;
+    }
+
+    public long inputRequestRevision() { return inputRequestRevision; }
+    public boolean inputSelectedAll() { return inputSelectedAll; }
 
     /** Native chat colors: guild aqua, party yellow, direct messages pink, all white. */
     public static int channelColor(String prefix) {
@@ -62,6 +74,7 @@ public final class ChatTypeTabService {
 
     public void observeSentCommand(String command) {
         Objects.requireNonNull(command, "command");
+        inputSelectedAll = false;
         var matcher = DIRECT_MESSAGE.matcher(command);
         if (matcher.matches() && !matcher.group(2).isBlank()) {
             var recipient = matcher.group(1);
@@ -77,6 +90,18 @@ public final class ChatTypeTabService {
     public void observeSentChat(String message) {
         Objects.requireNonNull(message, "message");
         if (!message.isBlank()) rememberPrefix(ALL_CHAT_PREFIX);
+    }
+
+    /** Incoming DMs update the cycle, without selecting a different chat type. */
+    public void observeIncomingSender(String sender) {
+        if (sender != null && sender.matches("[A-Za-z0-9_]{3,16}")) {
+            lastDirectMessageRecipient = sender;
+        }
+    }
+
+    public String refreshEmptyChannel(String prefix, String body) {
+        return body.isEmpty() && prefix != null && DIRECT_MESSAGE_PREFIX.matcher(prefix).matches()
+                && lastDirectMessageRecipient != null ? "/msg " + lastDirectMessageRecipient + " " : prefix;
     }
 
     /** Returns the last selected chat type for a newly opened empty chat. */
@@ -110,12 +135,15 @@ public final class ChatTypeTabService {
         }
 
         lastChatType = chatType;
+        inputSelectedAll = false;
     }
 
     /** Clears connection-local tab state after leaving a world or server. */
     public void resetSession() {
         lastDirectMessageRecipient = null;
         lastChatType = null;
+        inputSelectedAll = false;
+        inputRequestRevision++;
     }
 
     /**
@@ -129,6 +157,10 @@ public final class ChatTypeTabService {
 
         var prefixes = cyclePrefixes();
         int currentIndex = prefixes.indexOf(lastInsertedPrefix);
+        // An open screen may still hold the previous DM target (especially a draft).
+        if (currentIndex < 0 && DIRECT_MESSAGE_PREFIX.matcher(lastInsertedPrefix).matches()) {
+            return Optional.of(ALL_CHAT_PREFIX);
+        }
         if (currentIndex < 0) return Optional.of(GUILD_PREFIX);
         return Optional.of(prefixes.get((currentIndex + 1) % prefixes.size()));
     }

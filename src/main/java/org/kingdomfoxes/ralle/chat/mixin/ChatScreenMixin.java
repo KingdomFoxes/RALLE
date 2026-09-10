@@ -28,8 +28,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 abstract class ChatScreenMixin extends Screen {
     @Shadow protected EditBox input;
     @Shadow private int historyPos;
+    @Shadow protected boolean isDraft;
     @Unique private String ralle$lastInsertedChatTypePrefix;
     @Unique private String ralle$historyDraftPrefix;
+    @Unique private long ralle$observedInputRevision;
 
     protected ChatScreenMixin(Component title) {
         super(title);
@@ -38,10 +40,13 @@ abstract class ChatScreenMixin extends Screen {
     @Inject(method = "init", at = @At("TAIL"), require = 0)
     private void ralle$restoreChatType(CallbackInfo callback) {
         if (!ralle$channelEnabled()) return;
+        boolean restoreInputDraft = this.isDraft && RalleClient.context().chatTypeTabs().inputSelectedAll();
         if (this.ralle$lastInsertedChatTypePrefix == null) {
             this.ralle$lastInsertedChatTypePrefix = RalleClient.context().chatTypeTabs().prefixForNewChat().orElse("");
         }
         ralle$adoptExplicitPrefix();
+        if (restoreInputDraft) this.ralle$lastInsertedChatTypePrefix = "";
+        this.ralle$observedInputRevision = RalleClient.context().chatTypeTabs().inputRequestRevision();
         ralle$layoutChannel();
     }
 
@@ -64,8 +69,20 @@ abstract class ChatScreenMixin extends Screen {
 
     @ModifyVariable(method = "handleChatInput", at = @At("HEAD"), argsOnly = true, ordinal = 0)
     private String ralle$routeChannel(String body) {
+        ralle$syncInputRequest();
         return ralle$channelEnabled()
                 ? ChatTypeTabService.outgoingMessage(body, this.ralle$lastInsertedChatTypePrefix) : body;
+    }
+
+    @Inject(method = "render", at = @At("HEAD"), require = 0)
+    private void ralle$refreshInputChannel(GuiGraphics graphics, int mouseX, int mouseY, float delta, CallbackInfo callback) {
+        ralle$syncInputRequest();
+        if (!ralle$channelEnabled() || this.input.getValue().startsWith("/")) return;
+        String refreshed = RalleClient.context().chatTypeTabs().refreshEmptyChannel(
+                this.ralle$lastInsertedChatTypePrefix, this.input.getValue());
+        if (!java.util.Objects.equals(refreshed, this.ralle$lastInsertedChatTypePrefix)) {
+            ralle$setChatTypePrefix(refreshed);
+        }
     }
 
     @Inject(method = "render", at = @At("TAIL"), require = 0)
@@ -131,6 +148,7 @@ abstract class ChatScreenMixin extends Screen {
 
     @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true, require = 0)
     private void ralle$handleChatKeys(KeyEvent event, CallbackInfoReturnable<Boolean> callback) {
+        ralle$syncInputRequest();
         if (event.key() == GLFW.GLFW_KEY_TAB
                 && event.modifiers() == 0
                 && RalleClient.context().settings()
@@ -176,6 +194,7 @@ abstract class ChatScreenMixin extends Screen {
 
     @Inject(method = "removed", at = @At("HEAD"), require = 0)
     private void ralle$cancelScreenshotOnClose(CallbackInfo callback) {
+        ralle$syncInputRequest();
         RalleClient.context().chatScreenshots().cancel();
         if (ralle$channelEnabled()) {
             // Vanilla owns draft persistence; retain its destination with the body.
@@ -188,6 +207,18 @@ abstract class ChatScreenMixin extends Screen {
         var window = net.minecraft.client.Minecraft.getInstance().getWindow();
         return InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_CONTROL)
                 || InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_CONTROL);
+    }
+
+    @Unique
+    private void ralle$syncInputRequest() {
+        if (!ralle$channelEnabled() || this.input == null) return;
+        var tabs = RalleClient.context().chatTypeTabs();
+        if (this.ralle$observedInputRevision == tabs.inputRequestRevision()) return;
+        this.ralle$observedInputRevision = tabs.inputRequestRevision();
+        if (tabs.inputSelectedAll()) {
+            this.ralle$historyDraftPrefix = "";
+            ralle$setChatTypePrefix("");
+        }
     }
 
     @Unique

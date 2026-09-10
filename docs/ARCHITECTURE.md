@@ -288,11 +288,18 @@ deletion-marker replacement, then clears or prunes with the corresponding
 in-memory chat history.
 
 OW-like Chat Tabbing is gated only by the opt-in `chat.chat-type-tabbing` setting.
-Its latest valid outgoing `/msg` recipient and last selected stable chat type are
-connection-local memory only. A new empty ChatScreen restores that type without
+Incoming DM observation uses Fabric `ALLOW_GAME`, ignores action-bar messages,
+and requires Wynncraft plus the enabled setting. It verifies the private-message
+indicator/color and the local recipient, resolving nickname hover metadata on
+the name spans. It does not select DM when another channel is selected. An empty
+open DM channel refreshes to the latest contact; a non-empty draft keeps its
+destination. Unrecognized envelopes are ignored; no chat is cancelled or resent.
+Its latest valid outgoing `/msg` recipient or incoming Wynncraft DM sender and
+last selected stable chat type are connection-local memory only.
+A new empty ChatScreen restores that type without
 overriding command-key input or drafts, while disconnecting clears both values.
 The Fabric outgoing-command observer does not mutate or resend commands. The
-ChatScreen integration cycles `[Guild]`, `[Party]`, `[latest outgoing DM username]`,
+ChatScreen integration cycles `[Guild]`, `[Party]`, `[latest DM username]`,
 and `[All]`, consuming only an unmodified Tab on an empty message body.
 The channel label is rendered beside the EditBox, outside its editable contents,
 and included in its narration label. Deletion, selection, copy, and cut operate
@@ -304,6 +311,31 @@ History navigation restores the draft's channel when returning to the current
 input. Resizing preserves the channel. Drafts and normal commands retain
 Minecraft's Tab completion. The Show Who Queued color action uses the shared
 palette icon followed by `Click to edit color` in the existing control lane.
+
+`WynncraftChatInputController` gates passive text-entry detection on Wynncraft,
+a local player, and OW-like Chat Tabbing. `WynncraftInputPrompts` normalizes bounded
+server text, including wrapped lines and supplementary spacing glyphs. It accepts
+market search/quantity/price prompts and anchored instructions to enter names,
+amounts, prices, or searches in chat. Player-message prefixes and slash-command
+instructions do not match. `ChatInputRequestTracker` correlates input-menu clicks
+with a matching server close within five seconds. Add Ally in a Diplomacy menu
+and Recruit a Friend use screenshot-confirmed labels; pet rename/name controls
+and explicit chat-input tooltip instructions provide additional detection.
+Player-inventory slots, non-pickup clicks, navigation, mismatched/expired closes,
+manual closes, menu replacement, and disabled/off-server behavior do not switch.
+
+Narrow Minecraft mixins observe the menu click before mutation, system chat before
+`ChatListener.handleSystemMessage`, and server versus local menu closes separately.
+Fabric chat callbacks alone miss prompts hidden by Wynntils' enclosing listener
+wrapper. No Wynntils classes are required and no packet, message, or click is
+cancelled or generated. A monotonically changing local revision updates an open
+ChatScreen's label, layout, and narration before input/rendering. Saved channel
+drafts retain their body while selecting All. Slash commands remain commands.
+All is a one-time selection, not a forced input mode: normal Tab cycling remains
+available, and All stays selected after submission/cancellation to keep retries
+safe. No automatic restoration guesses server completion. Pending menu evidence
+clears on new actions, sent chat, timeout, menu replacement, manual close,
+feature disable, and disconnect. No new setting, keybind, or saved data is added.
 
 Custom HUD placements are stored separately in
 `config/ralle-hud-layout.properties`. Resizable elements such as the v1 chat

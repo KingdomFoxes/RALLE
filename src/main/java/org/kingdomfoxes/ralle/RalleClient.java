@@ -4,6 +4,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
+import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
@@ -18,6 +19,9 @@ import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.kingdomfoxes.ralle.chat.RalleChatMessages;
 import org.kingdomfoxes.ralle.chat.RalleOnboardingNotice;
 import org.kingdomfoxes.ralle.chat.input.ChatTypeTabService;
+import org.kingdomfoxes.ralle.chat.input.WynncraftChatInputController;
+import org.kingdomfoxes.ralle.chat.identity.DirectMessageIdentityResolver;
+import org.kingdomfoxes.ralle.client.WynncraftHost;
 import org.kingdomfoxes.ralle.chat.rank.GuildRankService;
 import org.kingdomfoxes.ralle.chat.rank.HttpGuildRankGateway;
 import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
@@ -177,6 +181,8 @@ public final class RalleClient implements ClientModInitializer {
                 actionBarState, disbandConfirmation, lockDebouncer, autoRaidRequeue);
         var chatBehavior = new ChatBehaviorService(Minecraft.getInstance(), settings);
         var chatTypeTabs = new ChatTypeTabService();
+        var chatInput = new WynncraftChatInputController(Minecraft.getInstance(),
+                () -> settings.setting(ChatTypeTabService.SETTING_ID, BooleanSetting.class).value(), chatTypeTabs);
         var chatScreenshots = new ChatScreenshotService(
                 Minecraft.getInstance(),
                 settings,
@@ -190,6 +196,7 @@ public final class RalleClient implements ClientModInitializer {
                 chatLayout,
                 chatBehavior,
                 chatTypeTabs,
+                chatInput,
                 guildRanks,
                 chatScreenshots,
                 raidLfg,
@@ -207,6 +214,7 @@ public final class RalleClient implements ClientModInitializer {
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             autoRaidRequeue.cancel();
             chatTypeTabs.resetSession();
+            chatInput.reset();
             raidLfg.connectionChanged();
             guildRanks.connectionChanged();
             HqDistanceOverlay.clear();
@@ -215,6 +223,7 @@ public final class RalleClient implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             chatLayout.tick();
             chatBehavior.tick();
+            chatInput.tick();
             guildRanks.tick();
             chatScreenshots.tick();
             raidLfg.tick();
@@ -227,6 +236,18 @@ public final class RalleClient implements ClientModInitializer {
         RaidRequeueMessages.register(autoRaidRequeue::observeChat);
         ClientSendMessageEvents.COMMAND.register(chatTypeTabs::observeSentCommand);
         ClientSendMessageEvents.CHAT.register(chatTypeTabs::observeSentChat);
+        ClientSendMessageEvents.CHAT.register(message -> chatInput.reset());
+        ClientReceiveMessageEvents.ALLOW_GAME.register((message, overlay) -> {
+            var client = Minecraft.getInstance();
+            var server = client.getCurrentServer();
+            if (!overlay && server != null
+                    && WynncraftHost.matches(server.ip)
+                    && settings.setting(ChatTypeTabService.SETTING_ID, BooleanSetting.class).value()) {
+                DirectMessageIdentityResolver.incomingSender(message, client.getUser().getName())
+                        .ifPresent(chatTypeTabs::observeIncomingSender);
+            }
+            return true;
+        });
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             var ralleCommand = literal("ralle").then(literal("settings").executes(command -> {

@@ -6,6 +6,9 @@
   "client": [
     "ChatComponentMixin",
     "ChatScreenMixin",
+    "ChatInputMenuClickMixin",
+    "ChatInputServerMenuMixin",
+    "ChatInputLocalCloseMixin",
     "GameRendererAccessor",
     "GuiRendererMixin",
     "GuiTextRenderStateMixin",
