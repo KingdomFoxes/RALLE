@@ -3,7 +3,6 @@ package org.kingdomfoxes.ralle;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
@@ -53,6 +52,7 @@ import org.kingdomfoxes.ralle.lfg.client.LfgRosterSoundController;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.requeue.AutoRaidRequeueController;
 import org.kingdomfoxes.ralle.requeue.AutoRaidRequeueStore;
+import org.kingdomfoxes.ralle.requeue.RaidRequeueMessages;
 import org.kingdomfoxes.ralle.war.consumables.ConsumableHighlightService;
 import org.kingdomfoxes.ralle.war.consumables.ConsumableHighlightStore;
 import org.kingdomfoxes.ralle.war.hqdistance.HqDistanceOverlay;
@@ -224,10 +224,7 @@ public final class RalleClient implements ClientModInitializer {
             lfgNotificationOverlay.tick();
             QueueAttributionService.tick(client);
         });
-        // Queue initiators may be any player; only observe server game messages, not signed player chat.
-        ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
-            if (!overlay) autoRaidRequeue.observeChat(message);
-        });
+        RaidRequeueMessages.register(autoRaidRequeue::observeChat);
         ClientSendMessageEvents.COMMAND.register(chatTypeTabs::observeSentCommand);
         ClientSendMessageEvents.CHAT.register(chatTypeTabs::observeSentChat);
 
