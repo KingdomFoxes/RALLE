@@ -37,7 +37,8 @@ public final class TerritoryRouteCalculator {
             for (var neighbor : graph.getOrDefault(current, Set.of())) {
                 if (distances.containsKey(neighbor)) continue;
                 var territory = snapshot.territories().get(neighbor);
-                if (territory == null || !territory.reliable()) continue;
+                // Ownership can lag behind captures; it does not change physical links.
+                if (territory == null) continue;
                 int distance = distances.get(current) + 1;
                 result.put(neighbor, Route.connected(distance));
                 distances.put(neighbor, distance);

@@ -53,14 +53,14 @@ class QueueAttributionTrackerTest {
     }
 
     @Test
-    void absenceExpiryAndCaptureEndTheGeneration() {
+    void expiryAndCaptureEndTheGeneration() {
         tracker.reconcile(List.of(timer("Detlas", 5_000L)));
         tracker.observe(announcement("Detlas", "First"));
         tracker.reconcile(List.of());
         assertTrue(tracker.attributionFor("Detlas").isEmpty());
 
         tracker.reconcile(List.of(timer("Detlas", 5_000L)));
-        tracker.observe(announcement("Detlas", "Second"));
+        assertEquals("First", tracker.attributionFor("Detlas").orElseThrow());
         tracker.captured("Detlas");
         tracker.reconcile(List.of(timer("Detlas", 5_000L)));
         assertTrue(tracker.attributionFor("Detlas").isEmpty());
@@ -84,6 +84,7 @@ class QueueAttributionTrackerTest {
 
         assertEquals(0, tracker.pendingSize());
         assertEquals(0, tracker.activeSize());
+        assertEquals(0, tracker.cachedSize());
         assertTrue(tracker.attributionFor("Ragni").isEmpty());
     }
 
@@ -98,6 +99,42 @@ class QueueAttributionTrackerTest {
 
         tracker.reconcile(timers);
         assertEquals(QueueAttributionTracker.MAX_ACTIVE, tracker.activeSize());
+        assertEquals(QueueAttributionTracker.MAX_ACTIVE, tracker.cachedSize());
+    }
+
+    @Test
+    void timerReloadAfterWorldSwapRetainsNameWithSmallEndTimeDrift() {
+        tracker.reconcile(List.of(timer("Detlas", 30_000L)));
+        tracker.observe(announcement("Detlas", "First"));
+        tracker.reconcile(List.of());
+        clock.advance(12_000L);
+        tracker.reconcile(List.of());
+        tracker.reconcile(List.of(timer("Detlas", 32_000L)));
+        assertEquals("First", tracker.attributionFor("Detlas").orElseThrow());
+    }
+
+    @Test
+    void clearlyDifferentOrExpiredTimerCannotReuseCachedSender() {
+        tracker.observe(announcement("Detlas", "First"));
+        tracker.reconcile(List.of(timer("Detlas", 30_000L)));
+        tracker.reconcile(List.of());
+        tracker.reconcile(List.of(timer("Detlas", 60_000L)));
+        assertTrue(tracker.attributionFor("Detlas").isEmpty());
+        tracker.observe(announcement("Detlas", "Second"));
+        tracker.reconcile(List.of());
+        clock.advance(60_000L);
+        tracker.reconcile(List.of(timer("Detlas", 65_000L)));
+        assertTrue(tracker.attributionFor("Detlas").isEmpty());
+    }
+
+    @Test
+    void captureWhileTimerListIsEmptyInvalidatesCachedAttribution() {
+        tracker.observe(announcement("Detlas", "First"));
+        tracker.reconcile(List.of(timer("Detlas", 30_000L)));
+        tracker.reconcile(List.of());
+        tracker.captured("Detlas");
+        tracker.reconcile(List.of(timer("Detlas", 30_000L)));
+        assertTrue(tracker.attributionFor("Detlas").isEmpty());
     }
 
     private static QueueAnnouncement announcement(String territory, String player) {

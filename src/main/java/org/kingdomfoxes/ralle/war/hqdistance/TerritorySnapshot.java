@@ -25,7 +25,7 @@ public record TerritorySnapshot(
             this(name, owner, headquarters, connections, true);
         }
 
-        /** A stale API owner invalidates this node, not unrelated routes elsewhere on the map. */
+        /** Reliability applies to ownership/HQ identification, never to physical link traversal. */
         public static Territory observed(
                 String name, String owner, String profileOwner, boolean headquarters, Set<String> connections) {
             boolean reliable = owner != null && !owner.isBlank() && owner.equals(profileOwner)

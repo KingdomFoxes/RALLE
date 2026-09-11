@@ -154,20 +154,20 @@ pixel-aligned origins; they never shrink to fractional scales to fit a territory
 Unexpected adapter or linkage failures are logged once and disable only this
 overlay for the remainder of the client session.
 
-`WynntilsTerritorySnapshotSource` projects the current guild identity and
-advancement-backed territory information without retaining mutable Wynntils
-objects. Links are normalized as bidirectional and references to missing nodes
-are ignored. `TerritoryRouteCalculator` performs breadth-first search from the
-single owned HQ through territories regardless of their owner. Owned destinations use the same distance result,
-representing the documented hypothetical ownership change. Missing identity,
-missing or multiple owned HQs, or globally unavailable input yields `Unknown`.
-Missing information or disagreement between advancement and profile ownership
-marks only the affected territory as unreliable. Unrelated stale territories do
-not invalidate a verified route. Unreliable destinations and HQs yield `Unknown`;
-routes never traverse unreliable nodes, and an unsuccessful search that reaches
-one yields `Unknown` instead of claiming disconnection. A genuinely
-disconnected destination also yields `Unknown`; HQ yields `0` without a
-duration.
+`WynntilsTerritorySnapshotSource` projects the current guild identity, all known
+territory-profile endpoints, and advancement-backed links without retaining
+mutable Wynntils objects. Links are normalized as bidirectional; a territory
+without advancement details can still use reciprocal links reported by neighbors.
+`TerritoryRouteCalculator` performs breadth-first search from the single owned HQ
+through territories regardless of owner or disagreement between ownership sources.
+Ownership reliability determines HQ identification and the guild-holding color
+scale, not physical connectivity. This prevents newly captured foreign territories
+from blocking shortcuts and inflating both distance and provisional duration.
+Owned destinations use the same hypothetical distance result. Missing identity,
+missing or multiple owned HQs, unreliable HQ ownership, or globally unavailable
+input yields `Unknown`. A destination unreachable through known links also yields
+`Unknown`; HQ yields `0` without a duration. Links absent from all available
+advancement data cannot be inferred from geographic adjacency.
 
 `HqInspectionService` invalidates its route cache whenever the complete immutable
 snapshot changes, covering guild identity, HQ, ownership, and connections, and
@@ -211,15 +211,20 @@ resolving incoming guild announcements or capture messages. Client ticks reconci
 active timers and session identity without rebuilding the full territory-name set.
 
 Announcements may wait up to ten seconds for the matching timer model entry.
-First observed sender wins for one continuously active territory countdown;
-duplicates are idempotent and conflicts do not overwrite it. Attribution follows
-timer-record replacement and end-time drift, but is dropped on observed absence,
-expiry, a verified capture message, setting disable, disconnect, world/server or
-character-selection transition, or account/guild/character identity change.
-Pending and active metadata are each capped at 512 territories. No component,
-chat history, or completed attribution is persisted. A cancellation and requeue
-that occurs entirely between observations with an indistinguishable timer cannot
-be proven to be a new generation.
+First observed sender wins for one territory countdown; duplicates are idempotent
+and conflicts do not overwrite it. A bounded memory cache preserves attribution
+through world/server switches, character selection, reconnects, and temporary empty
+timer lists. Returning timers must match the territory and cached end time within
+ten seconds; clearly different countdowns cannot inherit the old sender. Cached
+entries expire at their timer end and are removed on verified capture, setting
+disable, integration failure, or an observed account/guild change. Missing guild
+data during loading pauses attribution rather than clearing the known scope.
+Pending, active, and cached metadata are each capped at 512 territories. No
+component, chat history, or completed attribution is persisted to disk. A
+cancellation and requeue with an indistinguishable end time cannot be proven to be
+a new generation. Manual verification should cover switching worlds with multiple
+named timers, returning after expiry, captures during timer reload, and changing
+accounts or guilds.
 
 An optional version-gated mixin decorates only the row task returned by
 `TerritoryAttackTimerOverlay#lambda$render$0` and its separate editor preview.

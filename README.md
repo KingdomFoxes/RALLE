@@ -86,8 +86,8 @@ territory count. Red starts at `round(1.25 × sqrt(territories owned))` connecti
 (at least one), yellow at 60% of that threshold, and greater distances stay red.
 Owned destinations are hypothetical. Active attack timers suppress both added
 labels. Labels stay at native size at all zoom levels, even when they overlap
-or extend beyond territory bounds. Missing or conflicting route data remains
-unknown. RALLE reuses Wynntils' existing models and does
+or extend beyond territory bounds. Missing routes or an uncertain HQ remain unknown; stale ownership
+does not block known links through other guilds. RALLE reuses Wynntils' existing models and does
 not add polling or backend traffic. The historical duration formula remains a
 release blocker until it is checked against current in-game attack previews.
 
@@ -98,9 +98,11 @@ the local IGN is blue, other IGNs are gray, and missed or unresolved senders sho
 as gray `Unknown`. Enable Wynntils' Guild Attack Timer overlay to see the rows;
 senders must also have defense announcements enabled for their names to be
 observable. RALLE does not change either Wynntils setting. Attribution is kept
-only in memory for the current uninterrupted Wynncraft world, guild, account,
-and character session. Messages received before the option was enabled cannot be
-reconstructed, and a manually typed guild message identical to the automatic
+only in memory and survives world/server switches, character selection, and
+reconnects for the same account and guild while the matching countdown remains
+unexpired. Captures, clearly different countdowns, account/guild changes, and
+disabling the option discard old names. Messages received before the option was
+enabled cannot be reconstructed, and a manually typed guild message identical to the automatic
 announcement cannot be distinguished from it.
 
 The first connection after a new installation posts one local RALLE onboarding
