@@ -55,7 +55,7 @@ public final class WynncraftPartyQueuePrompt extends BaseOwoScreen<FlowLayout> {
         var cancel = UIComponents.button(RalleTheme.ui(Component.translatable("gui.cancel")),
                 ignored -> choose.accept(Choice.CANCEL));
         cancel.horizontalSizing(Sizing.fill(100));
-        cancel.renderer(RalleButtonRenderers.neutral());
+        cancel.renderer(RalleButtonRenderers.destructive());
         return content.child(party).child(solo).child(cancel);
     }
 
