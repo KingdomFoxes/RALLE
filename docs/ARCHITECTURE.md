@@ -388,10 +388,12 @@ backend starts its 120-second presence grace only after the player's final authe
 lost; reconnecting cancels that grace, while expiry closes only the synchronized LFG lobby.
 
 The packaged protocol-v1 base URL is fixed to
-`https://kingdomfoxes.com/api/ralle/v1`. There is no runtime setting, JVM property, or automatic
-fallback. Explicitly constructed development and test gateways may use insecure HTTP and WebSocket
-transports only for loopback hosts. The JDK gateway is pinned to HTTP/1.1 so local requests do not
-attempt an `h2c` upgrade that a local HTTP server may not support.
+`https://kingdomfoxes.com/api/ralle/v1`. There is no player-facing setting or automatic fallback.
+The Gradle development command `./gradlew runClient -PlocalBackend` supplies the fixed, process-only
+development override `http://127.0.0.1:8001/api/ralle/v1`; ordinary runs and packaged builds remain
+on production. Explicitly constructed development and test gateways may use insecure HTTP and
+WebSocket transports only for loopback hosts. The JDK gateway is pinned to HTTP/1.1 so local
+requests do not attempt an `h2c` upgrade that a local HTTP server may not support.
 
 Authentication uses `POST /auth/challenge`, Minecraft's session `joinServer` proof, then
 `POST /auth/complete`. The issued bearer credential is never persisted. `GET /lobbies` provides a
@@ -563,7 +565,12 @@ snapshots and future non-screen local actions still qualify for the external
 party-status option. This covers Discord and future keybind creation without
 assigning authority to client-reported member source labels. Abandoned
 registrations expire after one minute. Persistent party-status cards track
-roster and lobby changes and do not passively expire, but an authoritative
+roster and lobby changes and do not passively expire while below capacity. Full
+cards retain their controls for ten seconds, then use the standard 500 ms slide-out.
+Repeated full updates do not extend this deadline; reopening before exit cancels
+it, and refilling starts a fresh ten seconds. This also applies to manual spectator
+pop-outs and cards first shown already full. Automatic full dismissal suppresses
+snapshot-driven redisplay until departure or an explicit new pop-out. An authoritative
 departure, kick, or disband closes the viewer's card. Every expanded browser
 card also has an explicit full-width neutral `Pop out` control which creates the
 same persistent HUD presentation and closes the browser.
@@ -634,3 +641,37 @@ The public rank decoder gives an explicit boolean `prime_minister: true` precede
 over the base Fox rank in `ranks` (for example Lord). It stores `PRIME MINISTER` in
 the local snapshot/cache so the existing renderer emits PM in title-bearing pills.
 Absent, false, or malformed PM flags retain normal Fox-rank decoding.
+
+### Creating LFG with an existing Wynncraft party
+
+`WynncraftPartyCreation` is the shared pre-create path for the browser, create
+chord, and selector wheel. On supported optional Wynntils installations it reads
+`Models.Party` without requesting data or issuing commands. Wynntils' party
+model extracts canonical names from nickname hover metadata in party events.
+Only a known local party leader with other members gets the confirmation. The
+browser mounts the compact confirmation over its existing create form; keybind
+creation mounts the same framed content over gameplay. Escape cancels creation.
+Party, solo, and cancel choices are explicit and never persisted. Oversized
+parties cannot be imported; no subset is silently selected. After confirmation,
+the connection, viewer, party leader, and complete roster are rechecked.
+
+The optional `party_members` create-request array contains at most three
+distinct canonical Minecraft usernames, excluding the host. Empty imports omit
+the field, preserving ordinary protocol-v1 requests. A backend without the new
+field rejects the request; the client never silently retries it as solo creation.
+Party import therefore requires deploying the matching Fox backend change.
+
+Fox resolves every imported identity through Wynncraft, accepts guests from any
+guild or no guild, and reserves host plus guests atomically under the existing
+capacity/uniqueness rules. Guests use the existing `MANUAL` member source; no
+session, eligibility, or player authorization is conferred by being imported.
+The party roster is a host-declared reservation, not server-verified proof of
+Wynncraft party membership. Guildless guests have protocol-v1 presentation
+metadata UUID `00000000-0000-0000-0000-000000000000`, name `No guild`, tag `-`,
+and neutral color `#697487`; that marker is never accepted for authentication.
+Ambiguous or unresolved names fail rather than being guessed as another account.
+Guest identity failures, duplicate identities, host duplication, existing LFG
+occupancy, and oversized parties leave no partial lobby. Accepted replays return
+the original transaction. No data is saved or transmitted before an explicit
+create action. Without a supported party-data provider, ordinary creation remains
+available and no existing-party prompt is inferred.

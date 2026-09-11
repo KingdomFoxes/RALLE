@@ -287,7 +287,7 @@ public final class RaidLfgKeybinds {
             feedback.accept(false, net.minecraft.network.chat.Component.translatable("ralle.lfg.wheel.region-unavailable"));
             return;
         }
-        service.create(raid, region.get(), null).whenComplete((ignored, failure) -> minecraft.execute(() -> {
+        WynncraftPartyCreation.create(service, raid, region.get(), null).whenComplete((ignored, failure) -> minecraft.execute(() -> {
             if (failure == null) sounds.playPartyCreated();
             finishWheelMutation(feedback, failure, "ralle.lfg.wheel.created", "ralle.lfg.wheel.create-failed",
                     LfgActionGlyph.CREATE);
@@ -505,7 +505,7 @@ public final class RaidLfgKeybinds {
                 actionBar.show("region not detectd idk why REPORT TS", LfgActionBarState.Tone.DANGER);
                 return;
             }
-            service.create(selected.raid(), region.get(), null)
+            WynncraftPartyCreation.create(service, selected.raid(), region.get(), null)
                     .whenComplete((ignored, failure) -> minecraft.execute(() -> {
                         if (failure == null) sounds.playPartyCreated();
                         else showMutationFailure(failure, "Create failed", LfgActionGlyph.CREATE);

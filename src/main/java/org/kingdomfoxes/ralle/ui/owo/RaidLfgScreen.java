@@ -157,6 +157,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     protected void build(FlowLayout root) {
+        cancelPartyQueuePrompt();
         this.root = root;
         root.surface(Surface.VANILLA_TRANSLUCENT)
                 .horizontalAlignment(HorizontalAlignment.CENTER)
@@ -947,10 +948,12 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var submit = UIComponents.button(RalleTheme.ui(Component.literal("Create")), ignored -> {
             ignored.active = false;
             error.text(RalleTheme.ui(Component.literal("Creating..."))).color(RalleTheme.MUTED);
-            var statusSuppression = notifications == null
-                    ? null : notifications.suppressNextMainUiPartyStatus();
-            service.create(selectedRaid[0], selectedRegion[0], noteValue[0]).whenComplete((mutation, failure) -> {
-                if (statusSuppression != null) statusSuppression.close();
+            var statusSuppression = new LfgNotificationManager.PartyStatusSuppression[1];
+            org.kingdomfoxes.ralle.lfg.client.WynncraftPartyCreation.create(
+                    service, selectedRaid[0], selectedRegion[0], noteValue[0], () -> {
+                        if (notifications != null) statusSuppression[0] = notifications.suppressNextMainUiPartyStatus();
+                    }).whenComplete((mutation, failure) -> {
+                if (statusSuppression[0] != null) statusSuppression[0].close();
                 minecraft.execute(() -> {
                     if (failure == null) {
                         soundTracker.actionCompleted("create", null, sounds);
@@ -1096,15 +1099,48 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+        if (event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE && cancelPartyQueuePrompt()) return true;
         if (event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE && RalleModalDialogs.dismissTop(root)) return true;
         return super.keyPressed(event);
     }
 
     @Override
     public void onClose() {
+        if (cancelPartyQueuePrompt()) return;
         if (RalleModalDialogs.dismissTop(root)) return;
         kickTargeting.reset();
         minecraft.setScreen(parent);
+    }
+
+    private java.util.concurrent.CompletableFuture<WynncraftPartyQueuePrompt.Choice> partyQueueResult;
+    private OverlayContainer<?> partyQueueOverlay;
+
+    void showPartyQueuePrompt(java.util.List<String> members,
+            java.util.concurrent.CompletableFuture<WynncraftPartyQueuePrompt.Choice> result) {
+        cancelPartyQueuePrompt();
+        partyQueueResult = result;
+        partyQueueOverlay = new RalleModalOverlay<>(WynncraftPartyQueuePrompt.content(members, choice -> {
+            partyQueueOverlay.remove();
+            partyQueueOverlay = null;
+            partyQueueResult = null;
+            result.complete(choice);
+        }));
+        root.child(partyQueueOverlay);
+    }
+
+    private boolean cancelPartyQueuePrompt() {
+        if (partyQueueResult == null) return false;
+        var result = partyQueueResult;
+        partyQueueResult = null;
+        if (partyQueueOverlay != null) partyQueueOverlay.remove();
+        partyQueueOverlay = null;
+        result.complete(WynncraftPartyQueuePrompt.Choice.CANCEL);
+        return true;
+    }
+
+    @Override public void removed() {
+        cancelPartyQueuePrompt();
+        super.removed();
     }
 
     record CardAction(CardActionKind kind, String label, boolean destructive, boolean requiresConfirmation) {}

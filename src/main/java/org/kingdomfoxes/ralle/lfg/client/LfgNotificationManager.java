@@ -21,7 +21,7 @@ public final class LfgNotificationManager {
     public static final int MAX_VISIBLE = 3;
     public static final long PASSIVE_MILLIS = 20_000;
     public static final long FEEDBACK_MILLIS = 2_000;
-    public static final long FILLED_SUCCESS_MILLIS = 5_000;
+    public static final long FILLED_SUCCESS_MILLIS = 10_000;
     public static final long ANIMATION_MILLIS = 500;
     static final long MAIN_UI_SUPPRESSION_MILLIS = 60_000;
 
@@ -248,6 +248,8 @@ public final class LfgNotificationManager {
     /** Explicitly keeps a live lobby card on the HUD until the player closes it. */
     public synchronized void showPersistent(LfgProtocol.Lobby lobby) {
         dismissedPersistentCards.remove(lobby.lobbyId());
+        var existing = cards.get(lobby.lobbyId());
+        if (existing != null) existing.fullUntil = null;
         showPersistent(lobby, DiscoveryKind.MANUAL);
     }
 
@@ -263,6 +265,7 @@ public final class LfgNotificationManager {
         card.lobby = lobby;
         card.kind = kind;
         card.persistent = true;
+        updateFullDeadline(card, lobby, now);
 
         // Promoting an existing discovery card changes its lifetime, not its presentation identity.
         // Keep its current entrance progress and queue position so joining through the card cannot
@@ -345,6 +348,7 @@ public final class LfgNotificationManager {
         if (card.mode == CardMode.TIMED_OUT) return;
         long now = clockMillis.getAsLong();
         if (current == null) {
+            card.fullUntil = null;
             if (card.mode == CardMode.EXITING || card.mode == CardMode.REMOVED) return;
             if (card.persistent) {
                 card.mode = CardMode.UNAVAILABLE;
@@ -361,6 +365,7 @@ public final class LfgNotificationManager {
 
         card.lobby = current;
         if (card.persistent) {
+            updateFullDeadline(card, current, now);
             if (card.mode != CardMode.COUNTDOWN && card.mode != CardMode.SUBMITTING
                     && card.mode != CardMode.EXITING && card.mode != CardMode.REMOVED) {
                 card.mode = CardMode.READY;
@@ -393,7 +398,14 @@ public final class LfgNotificationManager {
 
         long elapsed = Math.max(0, now - card.lastTickAt);
         card.lastTickAt = now;
-        if (card.persistent && card.mode != CardMode.EXITING && card.mode != CardMode.TIMED_OUT) return;
+        if (card.persistent && card.mode != CardMode.EXITING && card.mode != CardMode.TIMED_OUT) {
+            if (card.fullUntil != null && now >= card.fullUntil
+                    && card.mode != CardMode.COUNTDOWN && card.mode != CardMode.SUBMITTING) {
+                dismissedPersistentCards.add(card.lobby.lobbyId());
+                beginExit(card);
+            }
+            return;
+        }
         if (card.mode == CardMode.READY) {
             card.remainingPassiveMillis -= elapsed;
             if (card.remainingPassiveMillis <= 0) beginExit(card);
@@ -410,6 +422,12 @@ public final class LfgNotificationManager {
         } else if (card.mode == CardMode.EXITING && now - card.animationStartedAt >= ANIMATION_MILLIS) {
             card.mode = CardMode.REMOVED;
         }
+    }
+
+    /** Keep host/member actions usable while full; ordinary roster updates never restart the wait. */
+    private void updateFullDeadline(Card card, LfgProtocol.Lobby lobby, long now) {
+        if (lobby.members().size() < lobby.capacity()) card.fullUntil = null;
+        else if (card.fullUntil == null) card.fullUntil = now + FILLED_SUCCESS_MILLIS;
     }
 
     private void feedback(Card card, CardMode mode, String text, long until) {
@@ -526,6 +544,10 @@ public final class LfgNotificationManager {
             if (current != null) card.lobby = current;
             long now = clockMillis.getAsLong();
             visible.addLast(id);
+            if (card.persistent) {
+                card.fullUntil = null;
+                updateFullDeadline(card, card.lobby, now);
+            }
             card.remainingPassiveMillis = PASSIVE_MILLIS;
             card.animationStartedAt = now;
             card.lastTickAt = now;
@@ -604,6 +626,7 @@ public final class LfgNotificationManager {
         private long animationStartedAt;
         private long lastTickAt;
         private long feedbackUntil;
+        private Long fullUntil;
         private boolean entranceCompleted;
         private boolean persistent;
         private CardMode exitMode = CardMode.READY;

@@ -119,7 +119,12 @@ Requirements: Java 21.
 ```text
 ./gradlew build
 ./gradlew runClient
+./gradlew runClient -PlocalBackend
 ```
+
+The `localBackend` Gradle property runs the development client against the
+internal Fox backend at `http://127.0.0.1:8001` instead of production. It does
+not change packaged builds.
 
 Import the repository root as a Gradle project in IntelliJ IDEA and select a
 Java 21 Gradle JVM.

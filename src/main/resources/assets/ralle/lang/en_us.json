@@ -249,5 +249,10 @@
   "ralle.settings.option.queue-self-color": "Your Queue Color",
   "ralle.settings.color.edit": "Click to edit color",
   "ralle.settings.option.queue-self-color.description": "Choose a solid color or animated rainbow for your name in Show Who Queued. Defaults to the original blue.",
-  "ralle.war.queue.color.title": "EDIT YOUR QUEUE COLOR"
+  "ralle.war.queue.color.title": "EDIT YOUR QUEUE COLOR",
+  "ralle.lfg.party-queue.title": "QUEUE YOUR WYNNCRAFT PARTY?",
+  "ralle.lfg.party-queue.body": "Include your current party in this Raid LFG lobby? These players will occupy slots: %s",
+  "ralle.lfg.party-queue.too-large": "Raid LFG has four slots including you. Your whole party cannot fit.",
+  "ralle.lfg.party-queue.yes": "Queue with my party",
+  "ralle.lfg.party-queue.solo": "Create with just me"
 }
