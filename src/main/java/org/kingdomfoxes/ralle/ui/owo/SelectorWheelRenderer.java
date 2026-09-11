@@ -39,7 +39,7 @@ final class SelectorWheelRenderer {
 
     static int color(SelectorWheelModel.Sector sector, double x, double y, boolean selected) {
         if (!sector.contains(x, y, 0)) return 0;
-        if (!sector.contains(x, y, 1)) return selected ? 0xFF000000 | RalleTheme.ACCENT_RGB : 0xFF586985;
+        if (!sector.contains(x, y, 1)) return selected ? 0xFF000000 | RalleTheme.ACCENT_RGB : 0xFFFFFFFF;
         if (!sector.contains(x + 1, y + 2, 0)) return 0xFF030A18;
         if (!sector.contains(x - 1, y - 1, 0)) return 0xFF71819B;
         return selected ? 0xF0223552 : 0xEE0A1830;
