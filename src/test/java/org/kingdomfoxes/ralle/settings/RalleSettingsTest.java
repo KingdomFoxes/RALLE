@@ -248,6 +248,10 @@ class RalleSettingsTest {
             assertEquals(KeybindSetting.UNBOUND, registry.setting(id, KeybindSetting.class).value());
             assertEquals(List.of("raid-lfg-enabled"), registry.dependencies(id));
         }
+        for (var id : List.of("raid-lfg-create-selector-wheel", "raid-lfg-kick-selector-wheel")) {
+            assertFalse(registry.setting(id, BooleanSetting.class).value());
+            assertEquals(List.of("raid-lfg-enabled"), registry.dependencies(id));
+        }
         assertEquals(KeybindSetting.UNBOUND,
                 registry.setting("automatic-raid-requeue-keybind", KeybindSetting.class).value());
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("automatic-raid-requeue-keybind"));

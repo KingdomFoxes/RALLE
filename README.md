@@ -48,8 +48,10 @@ element available; the About page exposes the same action as `Edit HUDs`.
 feature is enabled on Wynncraft. Hosts can disband, kick with a
 hold-to-confirm roster interaction, lock or reopen joining, and ping current
 party members. Eight additional action shortcuts cover Join, Close,
-Leave/Disband, Party Filled, Ping, Lock/Unlock, Create, and Kick; Create and Kick use
-top-row-number chords and report their keybind-only feedback through a fixed
+Leave/Disband, Party Filled, Ping, Lock/Unlock, Create, and Kick. Create and Kick use
+top-row-number chords by default; their independent, disabled-by-default selector-wheel
+settings replace those chords with hold, hover, and left-click selection. Chords report
+their keybind-only feedback through a fixed
 Action Bar above the crosshair. Notification cards use a red top-right X for
 presentation-only dismissal, including during a Join countdown, and show usable
 bound keys beside their Join, Leave/Disband, and Party Filled actions. Action Bar feedback
@@ -61,7 +63,7 @@ remembers the fixed raid name from the most recent server Ready Up chat prompt, 
 in `config/ralle-auto-requeue.properties`. Pressing it runs one bounded, headless `/pf` flow,
 selects that raid from the main Party Finder page or its Party Queue fallback, and clicks Ready Up
 while ordinary movement remains available. It does not loop or keep a menu visible.
-On new installs, Raid LFG, its notifications, its sounds, and all ten LFG and
+On new installs, Raid LFG, both selector wheels, its notifications, its sounds, and all ten LFG and
 Automatic Raid Requeue controls default to disabled or Unbound.
 Saved settings remain authoritative for existing users.
 

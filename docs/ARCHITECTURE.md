@@ -482,6 +482,24 @@ held. Create maps 1–6 to Dailies, NOTG, NOL, TCC, TNA, and TWP and derives
 EU/NA/AS from locally synchronized Wynncraft server labels. Kick maps 2–4 to a
 captured member UUID and revalidates that member before mutation.
 
+Two independent local booleans can replace the Create and Kick chords with a transparent,
+non-pausing selector wheel. A wheel opens only from synchronized normal gameplay, owns input
+for that modifier hold, selects only by direct control hover, and submits at most one existing
+Create or Kick operation on a fresh left click. Its session captures raid or lobby/member UUID
+identities and revalidates current capabilities, region, lobby identity, host authority, target
+membership, and pending mutations immediately before submission. Releasing the modifier,
+Escape, focus loss, invalid synchronized state, or replacement by another screen cancels it.
+Notification-card hit regions and the keybind Action Bar are inactive while the wheel owns input.
+Both selectors render curved annular segments around an empty center. Create places each
+native raid item above its short label; Kick embeds player heads in a smaller ring. Hit testing
+uses the annular segments and their fixed outward envelopes, not rectangular content bounds.
+Each segment independently eases outward five logical pixels over 120 ms and returns smoothly
+on deselection. Geometry and content share the same viewport scale. Cached pixel scanlines
+keep curved rendering crisp without recalculating the raster every frame.
+Raw presses and physical-key tick recovery both choose the enabled wheel instead of entering
+the legacy chord. Closing on release cannot re-arm the release guard; closing while held waits
+until both physical modifiers are released. Screen replacement also clears the active owner.
+
 Keybind-only feedback is held in `LfgActionBarState` and rendered by the fixed
 HUD overlay above the crosshair. Raid titles use the same centralized
 raid-name/item mapping as the browser and notification cards. Join remains

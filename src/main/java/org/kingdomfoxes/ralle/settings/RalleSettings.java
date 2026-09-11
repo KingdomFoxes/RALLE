@@ -101,7 +101,9 @@ public final class RalleSettings {
                                 keybind("raid-lfg-ping-keybind"),
                                 keybind("raid-lfg-lock-keybind"),
                                 keybind("raid-lfg-create-keybind"),
+                                toggle("raid-lfg-create-selector-wheel"),
                                 keybind("raid-lfg-kick-keybind"),
+                                toggle("raid-lfg-kick-selector-wheel"),
                                 keybind("automatic-raid-requeue-keybind")
                         )
                 )
@@ -150,7 +152,9 @@ public final class RalleSettings {
         registry.requireEnabled("raid-lfg-ping-keybind", "raid-lfg-enabled");
         registry.requireEnabled("raid-lfg-lock-keybind", "raid-lfg-enabled");
         registry.requireEnabled("raid-lfg-create-keybind", "raid-lfg-enabled");
+        registry.requireEnabled("raid-lfg-create-selector-wheel", "raid-lfg-enabled");
         registry.requireEnabled("raid-lfg-kick-keybind", "raid-lfg-enabled");
+        registry.requireEnabled("raid-lfg-kick-selector-wheel", "raid-lfg-enabled");
         registry.requireEnabled("automatic-raid-requeue-keybind", "raid-lfg-enabled");
     }
 
