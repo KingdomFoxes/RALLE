@@ -151,8 +151,10 @@ scissor. It does not intercept input. A known active attack timer suppresses bot
 RALLE labels so Wynntils' real timer remains authoritative. Labels remain anchored
 above and below the centered guild tag or HQ crown without collision or territory
 fit checks, including when zoomed out. Overlap with names and neighboring
-territories is intentional; the map viewport scissor still applies. Labels
-use Wynntils' own font renderer and four-direction outline at native size with
+territories is intentional; the map viewport scissor still applies. On another
+guild's HQ, the queue estimate sits below its crown, just as ordinary territories
+place it below their guild tag. Labels use Wynntils' own font renderer and
+four-direction outline at native size with
 pixel-aligned origins; they never shrink to fractional scales to fit a territory.
 Unexpected adapter or linkage failures are logged once and disable only this
 overlay for the remainder of the client session.

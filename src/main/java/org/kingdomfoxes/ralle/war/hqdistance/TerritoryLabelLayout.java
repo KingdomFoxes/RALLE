@@ -28,6 +28,7 @@ public final class TerritoryLabelLayout {
         if (headquarters) {
             int crownTop = top + (height - HQ_CROWN_HEIGHT) / 2;
             upperY = crownTop - lineHeight - GAP;
+            if (lowerLabel) lowerY = crownTop + HQ_CROWN_HEIGHT + GAP;
         } else {
             int tagTop = top + (height - lineHeight) / 2;
             upperY = tagTop - lineHeight - GAP;
