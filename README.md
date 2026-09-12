@@ -3,8 +3,12 @@
 Raid Alliance Logistics Liaison Equipment is a client-side Fabric mod for
 Minecraft 1.21.11. The current foundation includes lifecycle composition, a
 RALLE-owned feature and settings registry, local settings persistence, and a
-searchable owo-lib settings screen opened with `/ralle settings`. Its chat
-section includes a dedicated editor for moving, resizing, and restoring the
+searchable owo-lib settings screen opened with `/ralle settings`.
+The distributable RALLE jar bundles its compatible owo-lib version, so users do
+not need to install owo-lib separately. Fabric API remains a required separate
+mod.
+
+Its chat section includes a dedicated editor for moving, resizing, and restoring the
 single chat box; placements are normalized across resolution and GUI-scale
 changes and apply in singleplayer or on any server. Message direction,
 horizontal text alignment, and text-shadow modes are implemented as
