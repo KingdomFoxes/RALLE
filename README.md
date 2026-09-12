@@ -50,7 +50,15 @@ hold-to-confirm roster interaction, lock or reopen joining, and ping current
 party members. Eight additional action shortcuts cover Join, Close,
 Leave/Disband, Party Filled, Ping, Lock/Unlock, Create, and Kick. Create and Kick use
 top-row-number chords by default; their independent, disabled-by-default selector-wheel
-settings replace those chords with hold, hover, and left-click selection. Chords report
+settings replace those chords with hold, hover, and left-click selection. Create-wheel
+hover plays vanilla Vault step. After the existing-party prompt and successful server
+acceptance, the same wheel remains visible: the selected segment extends another five
+pixels and dissolves into clusters of one to five dust pixels, including its item and label,
+over 80% of the selected vanilla Conduit attack sample's duration. It then holds for another
+100 ms before closing.
+Releasing the modifier after clicking does not interrupt this flow; Escape still dismisses
+it, and cancellation or failure never plays the success animation. The Kick wheel retains
+its existing behavior. Chords report
 their keybind-only feedback through a fixed
 Action Bar above the crosshair. Notification cards use a red top-right X for
 presentation-only dismissal, including during a Join countdown, and show usable

@@ -10,6 +10,7 @@ import net.minecraft.world.item.ItemStack;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgKeybinds;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
+import org.kingdomfoxes.ralle.sound.CreateWheelSounds;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -42,6 +43,8 @@ public final class LfgSelectorWheelScreen extends Screen {
     private double outerRadius;
     private Component status;
     private boolean statusFailure;
+    private boolean partyPromptOpen;
+    private CreateWheelAnimation creationAnimation;
 
     public LfgSelectorWheelScreen(Minecraft minecraft, RaidLfgKeybinds controller,
                                   RaidLfgService service, Mode mode, int initiatingKey) {
@@ -81,17 +84,22 @@ public final class LfgSelectorWheelScreen extends Screen {
         double labelWidth = entries.stream().mapToInt(entry -> font.width(RalleTypography.body(entry.label())))
                 .max().orElse(0);
         outerRadius = mode == Mode.CREATE ? Math.max(76, labelWidth + 32) : 40;
-        wheelScale = Math.max(.01, Math.min(1, Math.min((width / 2d - 8) / (outerRadius + 7),
-                (height / 2d - 24) / (outerRadius + 7))));
+        int envelope = mode == Mode.CREATE ? 18 : 7;
+        wheelScale = Math.max(.01, Math.min(1, Math.min((width / 2d - 8) / (outerRadius + envelope),
+                (height / 2d - 24) / (outerRadius + envelope))));
         boolean top = mode == Mode.CREATE || entries.size() != 2;
         geometry = SelectorWheelModel.ring(entries.size(), mode == Mode.CREATE ? 24 : 14, outerRadius, top);
     }
 
     @Override public void tick() {
         if (minecraft.screen != this) return;
+        if (creationAnimation != null && creationAnimation.finished(System.currentTimeMillis())) {
+            cancelAndClose();
+            return;
+        }
         long window = minecraft.getWindow().handle();
         if (GLFW.glfwGetWindowAttrib(window, GLFW.GLFW_FOCUSED) == GLFW.GLFW_FALSE
-                || !physicalKeyDown(window, initiatingKey)
+                || !retainsCreatePresentation() && !physicalKeyDown(window, initiatingKey)
                 || !controller.wheelStillValid(this, mode, lobbyId, hostedAtOpen)) {
             cancelAndClose();
         }
@@ -106,6 +114,7 @@ public final class LfgSelectorWheelScreen extends Screen {
         int hovered = model.state() == SelectorWheelModel.State.SELECTING
                 ? hit(mouseX, mouseY) : -1;
         if (hovered >= 0 && !enabled(entries.get(hovered))) hovered = -1;
+        if (mode == Mode.CREATE && hovered >= 0 && hovered != model.hovered()) CreateWheelSounds.hover(minecraft);
         model.hover(hovered, now);
         graphics.pose().pushMatrix();
         graphics.pose().translate(width / 2f, height / 2f);
@@ -114,12 +123,21 @@ public final class LfgSelectorWheelScreen extends Screen {
             var entry = entries.get(index);
             var bounds = geometry.get(index);
             double offset = model.offset(index, now);
+            boolean dissolving = creationAnimation != null && index == model.hovered();
+            if (dissolving) offset += creationAnimation.extension(now);
             int dx = (int) Math.round(Math.cos(bounds.angle()) * offset);
             int dy = (int) Math.round(Math.sin(bounds.angle()) * offset);
-            SelectorWheelRenderer.draw(graphics, bounds, dx, dy, index == model.hovered());
+            double progress = dissolving ? creationAnimation.progress(now) : 0;
+            if (dissolving) SelectorWheelRenderer.drawDissolving(graphics, bounds, dx, dy, progress);
+            else if (mode == Mode.CREATE) {
+                SelectorWheelRenderer.drawCreate(graphics, bounds, dx, dy, index == model.hovered());
+            } else {
+                SelectorWheelRenderer.draw(graphics, bounds, dx, dy, index == model.hovered());
+            }
             int x = (int) Math.round(bounds.centerX()) + dx;
             int y = (int) Math.round(bounds.centerY()) + dy;
-            if (mode == Mode.CREATE) drawRaid(graphics, entry, x, y, index == model.hovered());
+            if (dissolving) drawDissolvingRaid(graphics, entry, x, y, dx, dy, progress);
+            else if (mode == Mode.CREATE) drawRaid(graphics, entry, x, y, index == model.hovered());
             else drawPlayer(graphics, entry, x, y, index == model.hovered());
         }
         graphics.pose().popMatrix();
@@ -135,7 +153,31 @@ public final class LfgSelectorWheelScreen extends Screen {
         graphics.renderItem(new ItemStack(RaidPresentation.item(entry.raid())), x - 8, y - 14);
         var label = RalleTypography.body(entry.label());
         graphics.drawString(font, label, x - font.width(label) / 2, y + 5,
-                enabled(entry) ? hovered ? ACCENT : TEXT : DISABLED, false);
+                enabled(entry) || retainsCreatePresentation() ? hovered ? ACCENT : TEXT : DISABLED, false);
+    }
+
+    private void drawDissolvingRaid(GuiGraphics graphics, Entry entry, int x, int y,
+                                   int dx, int dy, double progress) {
+        var item = new ItemStack(RaidPresentation.item(entry.raid()));
+        SelectorWheelRenderer.clipDissolving(graphics, x - 8, y - 14, x + 8, y + 2, dx, dy, progress,
+                () -> graphics.renderItem(item, x - 8, y - 14));
+        var label = RalleTypography.body(entry.label());
+        int left = x - font.width(label) / 2;
+        SelectorWheelRenderer.clipDissolving(graphics, left, y + 5, left + font.width(label),
+                y + 5 + font.lineHeight, dx, dy, progress,
+                () -> graphics.drawString(font, label, left, y + 5, ACCENT, false));
+    }
+
+    private boolean retainsCreatePresentation() {
+        return mode == Mode.CREATE && model.state() == SelectorWheelModel.State.SUBMITTED && !statusFailure;
+    }
+
+    public void suspendForPartyPrompt() { partyPromptOpen = true; }
+    public void resumeFromPartyPrompt() { partyPromptOpen = false; }
+    public void abandonPartyPrompt() {
+        partyPromptOpen = false;
+        model.cancel();
+        controller.wheelClosed(this);
     }
 
     private void drawPlayer(GuiGraphics graphics, Entry entry, int x, int y, boolean hovered) {
@@ -170,7 +212,7 @@ public final class LfgSelectorWheelScreen extends Screen {
     }
 
     @Override public boolean keyReleased(KeyEvent event) {
-        if (event.key() == initiatingKey) cancelAndClose();
+        if (event.key() == initiatingKey && !retainsCreatePresentation()) cancelAndClose();
         return true;
     }
 
@@ -180,7 +222,7 @@ public final class LfgSelectorWheelScreen extends Screen {
     @Override public void onClose() { cancelAndClose(); }
 
     @Override public void removed() {
-        controller.wheelClosed(this);
+        if (!partyPromptOpen) controller.wheelClosed(this);
         super.removed();
     }
 
@@ -198,6 +240,10 @@ public final class LfgSelectorWheelScreen extends Screen {
     private void feedback(boolean success, Component message) {
         statusFailure = !success;
         status = message;
+        if (success && mode == Mode.CREATE && creationAnimation == null && minecraft.screen == this) {
+            long duration = CreateWheelSounds.created(minecraft);
+            creationAnimation = new CreateWheelAnimation(System.currentTimeMillis(), duration);
+        }
     }
 
     private boolean enabled(Entry entry) {

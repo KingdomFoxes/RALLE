@@ -287,10 +287,16 @@ public final class RaidLfgKeybinds {
             feedback.accept(false, net.minecraft.network.chat.Component.translatable("ralle.lfg.wheel.region-unavailable"));
             return;
         }
+        var requestingWheel = activeWheel;
         WynncraftPartyCreation.create(service, raid, region.get(), null).whenComplete((ignored, failure) -> minecraft.execute(() -> {
-            if (failure == null) sounds.playPartyCreated();
-            finishWheelMutation(feedback, failure, "ralle.lfg.wheel.created", "ralle.lfg.wheel.create-failed",
-                    LfgActionGlyph.CREATE);
+            Throwable cause = failure;
+            while (cause != null && cause.getCause() != null) cause = cause.getCause();
+            if (cause instanceof java.util.concurrent.CancellationException) return;
+            var message = net.minecraft.network.chat.Component.translatable(failure == null
+                    ? "ralle.lfg.wheel.created" : "ralle.lfg.wheel.create-failed");
+            if (requestingWheel != null && activeWheel == requestingWheel) feedback.accept(failure == null, message);
+            else if (failure == null) actionBar.show(message.getString(), LfgActionBarState.Tone.POSITIVE, LfgActionGlyph.CREATE);
+            else showMutationFailure(failure, message.getString(), LfgActionGlyph.CREATE);
         }));
     }
 

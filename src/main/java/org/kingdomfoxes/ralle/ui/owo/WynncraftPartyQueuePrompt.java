@@ -20,17 +20,24 @@ public final class WynncraftPartyQueuePrompt extends BaseOwoScreen<FlowLayout> {
 
     private final List<String> members;
     private final CompletableFuture<Choice> result;
+    private final LfgSelectorWheelScreen wheel;
 
-    private WynncraftPartyQueuePrompt(List<String> members, CompletableFuture<Choice> result) {
+    private WynncraftPartyQueuePrompt(List<String> members, CompletableFuture<Choice> result,
+                                     LfgSelectorWheelScreen wheel) {
         this.members = members;
         this.result = result;
+        this.wheel = wheel;
     }
 
     public static CompletableFuture<Choice> show(List<String> members) {
         var result = new CompletableFuture<Choice>();
         var minecraft = Minecraft.getInstance();
         if (minecraft.screen instanceof RaidLfgScreen browser) browser.showPartyQueuePrompt(members, result);
-        else minecraft.setScreen(new WynncraftPartyQueuePrompt(members, result));
+        else {
+            var wheel = minecraft.screen instanceof LfgSelectorWheelScreen selector ? selector : null;
+            if (wheel != null) wheel.suspendForPartyPrompt();
+            minecraft.setScreen(new WynncraftPartyQueuePrompt(members, result, wheel));
+        }
         return result;
     }
 
@@ -71,14 +78,23 @@ public final class WynncraftPartyQueuePrompt extends BaseOwoScreen<FlowLayout> {
         // Complete before removed() can interpret changing the screen as cancellation.
         var completion = result;
         chosen = true;
-        Minecraft.getInstance().setScreen(null);
+        if (wheel != null && choice != Choice.CANCEL) {
+            wheel.resumeFromPartyPrompt();
+            Minecraft.getInstance().setScreen(wheel);
+        } else {
+            if (wheel != null) wheel.abandonPartyPrompt();
+            Minecraft.getInstance().setScreen(null);
+        }
         completion.complete(choice);
     }
 
     private boolean chosen;
     @Override public void onClose() { choose(Choice.CANCEL); }
     @Override public void removed() {
-        if (!chosen) result.complete(Choice.CANCEL);
+        if (!chosen) {
+            if (wheel != null) wheel.abandonPartyPrompt();
+            result.complete(Choice.CANCEL);
+        }
         super.removed();
     }
     @Override public boolean isPauseScreen() { return false; }
