@@ -1,4 +1,7 @@
 {
+  "ui.kick_explosion": {
+    "sounds": [{ "name": "ralle:ui/kick_explosion" }]
+  },
   "ui.xylophone.d5": {
     "sounds": [{ "name": "ralle:ui/xylophone/d5" }]
   },

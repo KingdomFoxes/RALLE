@@ -8,6 +8,39 @@ import javax.imageio.ImageIO;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SelectorWheelRendererTest {
+    @Test void compactKickLayoutPreviewAtTwoScales() throws Exception {
+        var preview = new BufferedImage(660, 400, BufferedImage.TYPE_INT_ARGB);
+        var canvas = preview.createGraphics();
+        canvas.setColor(new java.awt.Color(0x101824));
+        canvas.fillRect(0, 0, 660, 400);
+        for (int row = 0; row < 2; row++) for (int count = 1; count <= 3; count++) {
+            double scale = row == 0 ? 1 : 1.5;
+            int cx = (count - 1) * 220 + 110;
+            int cy = row * 200 + 100;
+            for (var sector : SelectorWheelModel.kickGeometry(count)) {
+                for (int y = -40; y < 40; y++) for (int x = -40; x < 40; x++) {
+                    int color = SelectorWheelRenderer.color(sector, x + .5, y + .5, false);
+                    if (color == 0) continue;
+                    canvas.setColor(new java.awt.Color(color, true));
+                    int left = cx + (int) Math.floor(x * scale);
+                    int top = cy + (int) Math.floor(y * scale);
+                    canvas.fillRect(left, top, (int) Math.ceil(scale), (int) Math.ceil(scale));
+                }
+                canvas.setColor(new java.awt.Color(0xBC915F));
+                canvas.fillRect(cx + (int) Math.round((sector.centerX() - 8) * scale),
+                        cy + (int) Math.round((sector.centerY() - 8) * scale),
+                        (int) (16 * scale), (int) (16 * scale));
+            }
+            canvas.setColor(java.awt.Color.WHITE);
+            canvas.drawLine(cx - 3, cy, cx + 3, cy);
+            canvas.drawLine(cx, cy - 3, cx, cy + 3);
+            canvas.drawString(count + " member / scale " + scale, cx - 65, cy + 88);
+        }
+        canvas.dispose();
+        var output = Path.of("build", "reports", "wheel-kick-layouts.png");
+        Files.createDirectories(output.getParent());
+        ImageIO.write(preview, "png", output.toFile());
+    }
     @Test void everyInteriorPixelUsesOnlySolidNavyAndHasNoGrayOrBlackEdgeArtifacts() {
         var sectors = SelectorWheelModel.ring(6, 24, 76, true);
         for (boolean selected : new boolean[] {false, true}) for (var sector : sectors) {
@@ -22,22 +55,26 @@ class SelectorWheelRendererTest {
         }
     }
 
-    @Test void kickWheelRetainsItsExistingHighlightAndDepthPalette() {
-        var sector = SelectorWheelModel.ring(3, 14, 40, true).getFirst();
-        var colors = new java.util.HashSet<Integer>();
-        for (int y = -40; y < 40; y++) for (int x = -40; x < 40; x++) {
-            colors.add(SelectorWheelRenderer.color(sector, x + .5, y + .5, false));
+    @Test void allKickVariantsUseTheCleanCreatePalette() {
+        for (int count = 1; count <= 3; count++) for (var sector : SelectorWheelModel.kickGeometry(count)) {
+            for (boolean selected : new boolean[] {false, true}) {
+                int fill = selected ? 0xF0223552 : 0xEE0A1830;
+                int outline = selected ? 0xFF000000 | RalleTheme.ACCENT_RGB : 0xFFFFFFFF;
+                for (int y = -40; y < 40; y++) for (int x = -40; x < 40; x++) {
+                    int color = SelectorWheelRenderer.color(sector, x + .5, y + .5, selected);
+                    assertTrue(color == 0 || color == fill || color == outline);
+                }
+            }
         }
-        assertTrue(colors.contains(0xFF71819B));
-        assertTrue(colors.contains(0xFF030A18));
     }
 
-    @Test void creationDustPreviewKeepsOtherSectorsAndEndsWithAnEmptySelectedSector() throws Exception {
+    @Test void premadeFadePreviewKeepsOtherSectorsAndEndsWithAnEmptySelectedSector() throws Exception {
         var preview = new BufferedImage(880, 460, BufferedImage.TYPE_INT_ARGB);
         var canvas = preview.createGraphics();
         canvas.setColor(new java.awt.Color(0x101824));
         canvas.fillRect(0, 0, 880, 460);
         var ring = SelectorWheelModel.ring(6, 24, 76, true);
+        var mask = ImageIO.read(Path.of("src/main/resources/assets/ralle/textures/gui/wheel/create_dissolve.png").toFile());
         double[] stages = {0, .35, .7, 1};
         for (int row = 0; row < 2; row++) for (int frame = 0; frame < stages.length; frame++) {
             double scale = row == 0 ? 1 : .75;
@@ -52,12 +89,18 @@ class SelectorWheelRendererTest {
                 }
             }
             int[] count = {0};
-            SelectorWheelRenderer.dissolvingPixels(ring.getFirst(), 0, stages[frame] == 0 ? -5 : -10,
-                    stages[frame], (x, y, color) -> {
-                        count[0]++;
-                        canvas.setColor(new java.awt.Color(color, true));
-                        canvas.fillRect(cx + (int) Math.floor(x * scale), cy + (int) Math.floor(y * scale), 1, 1);
-                    });
+            int maskFrame = CreateWheelAnimation.frame(stages[frame]);
+            for (int y = -76; y < 76; y++) for (int x = -76; x < 76; x++) {
+                int color = SelectorWheelRenderer.createColor(ring.getFirst(), x + .5, y + .5, true);
+                int alpha = mask.getRGB(maskFrame % 8 * 128 + Math.floorMod(x + 80, 128),
+                        maskFrame / 8 * 128 + Math.floorMod(y + 80, 128)) >>> 24;
+                alpha = (color >>> 24) * alpha / 255;
+                if (alpha == 0) continue;
+                count[0]++;
+                canvas.setColor(new java.awt.Color(alpha << 24 | color & 0xFFFFFF, true));
+                canvas.fillRect(cx + (int) Math.floor(x * scale),
+                        cy + (int) Math.floor((y - (stages[frame] == 0 ? 5 : 10)) * scale), 1, 1);
+            }
             if (stages[frame] == 1) assertEquals(0, count[0]);
             else assertTrue(count[0] > 0);
             canvas.setColor(java.awt.Color.WHITE);

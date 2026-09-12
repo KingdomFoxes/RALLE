@@ -18,5 +18,6 @@ public enum RalleSoundCue {
     LFG_RESONATE_2,
     LFG_RESONATE_3,
     LFG_RESONATE_4,
-    LFG_FUNGUS_BREAK_4
+    LFG_FUNGUS_BREAK_4,
+    KICK_EXPLOSION
 }

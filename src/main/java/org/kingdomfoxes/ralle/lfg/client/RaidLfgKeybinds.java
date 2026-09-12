@@ -11,6 +11,9 @@ import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
+import org.kingdomfoxes.ralle.sound.RalleSoundCue;
+import org.kingdomfoxes.ralle.sound.RalleSoundEvents;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionGlyph;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionBarState;
 import org.kingdomfoxes.ralle.ui.owo.RaidPresentation;
@@ -315,17 +318,20 @@ public final class RaidLfgKeybinds {
                     target == null ? "ralle.lfg.wheel.player-left" : "ralle.lfg.wheel.pending"));
             return;
         }
+        var requestingWheel = activeWheel;
         service.kick(lobbyId, target.minecraftUuid(), target.ign()).whenComplete((ignored, failure) -> minecraft.execute(() -> {
-            if (failure == null) sounds.playKickSucceeded();
-            finishWheelMutation(feedback, failure, "ralle.lfg.wheel.kicked", "ralle.lfg.wheel.kick-failed",
+            if (failure == null) minecraft.getSoundManager().play(SimpleSoundInstance.forUI(
+                    RalleSoundEvents.event(RalleSoundCue.KICK_EXPLOSION), 1f, .65f));
+            finishWheelMutation(requestingWheel, feedback, failure, "ralle.lfg.wheel.kicked", "ralle.lfg.wheel.kick-failed",
                     LfgActionGlyph.KICK);
         }));
     }
 
-    private void finishWheelMutation(BiConsumer<Boolean, net.minecraft.network.chat.Component> feedback,
+    private void finishWheelMutation(LfgSelectorWheelScreen requestingWheel,
+                                     BiConsumer<Boolean, net.minecraft.network.chat.Component> feedback,
                                      Throwable failure, String successKey, String failureKey, LfgActionGlyph glyph) {
         var message = net.minecraft.network.chat.Component.translatable(failure == null ? successKey : failureKey);
-        if (activeWheel != null) feedback.accept(failure == null, message);
+        if (requestingWheel != null && activeWheel == requestingWheel) feedback.accept(failure == null, message);
         else if (failure == null) actionBar.show(message.getString(), LfgActionBarState.Tone.POSITIVE, glyph);
         else showMutationFailure(failure, message.getString(), glyph);
     }

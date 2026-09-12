@@ -1,13 +1,13 @@
-package org.kingdomfoxes.ralle.chat.screenshot;
+package org.kingdomfoxes.ralle.ui.render;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import org.jspecify.annotations.Nullable;
 
-/** Render-thread-only target override used for the isolated chat render pass. */
-public final class ChatCaptureTargetOverride {
+/** Render-thread-only target override for isolated GUI captures, with no feature state. */
+public final class GuiCaptureTargetOverride {
     private static final ThreadLocal<RenderTarget> TARGET = new ThreadLocal<>();
 
-    private ChatCaptureTargetOverride() {}
+    private GuiCaptureTargetOverride() {}
 
     public static void runWith(RenderTarget target, Runnable action) {
         if (TARGET.get() != null) throw new IllegalStateException("Nested RALLE capture render");

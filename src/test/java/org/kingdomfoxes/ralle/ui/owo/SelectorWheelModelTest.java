@@ -4,6 +4,40 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SelectorWheelModelTest {
+    @Test void compactKickVariantsKeepTheThreeMemberSegmentSizeAndEmptyCenter() {
+        var original = SelectorWheelModel.ring(3, 14, 40, true);
+        assertEquals(original, SelectorWheelModel.kickGeometry(3));
+        for (int count = 1; count <= 2; count++) {
+            var sectors = SelectorWheelModel.kickGeometry(count);
+            assertEquals(original.getFirst(), sectors.getFirst());
+            assertEquals(0, SelectorWheelModel.hit(sectors, 0, -27));
+            assertEquals(count == 2 ? 1 : -1, SelectorWheelModel.hit(sectors, 0, 27));
+            assertEquals(-1, SelectorWheelModel.hit(sectors, 27, 0));
+            assertEquals(-1, SelectorWheelModel.hit(sectors, 0, 0));
+            for (var sector : sectors) assertEquals(Math.PI / 3, sector.halfAngle());
+        }
+        assertTrue(SelectorWheelModel.kickGeometry(0).isEmpty());
+    }
+
+    @Test void rosterChangesWhileKickPendingNeverTransferTheOldTargetOrAllowAnotherSubmission() {
+        var model = new SelectorWheelModel();
+        model.open(0);
+        for (int count = 3; count > 0; count--) {
+            model.hover(count - 1, 0);
+            assertTrue(model.submit());
+            model.rosterChanged();
+            assertEquals(-1, model.hovered());
+            assertEquals(SelectorWheelModel.State.SUBMITTED, model.state());
+            model.hover(0, 0);
+            assertFalse(model.submit());
+            model.resumeSelection();
+            assertFalse(model.submit()); // A fresh target/click is required after the effect.
+            assertEquals(SelectorWheelModel.State.SELECTING, model.state());
+        }
+        model.cancel();
+        model.resumeSelection();
+        assertEquals(SelectorWheelModel.State.AWAITING_RELEASE, model.state());
+    }
     @Test void oneHoldSubmitsAtMostOnceAndRequiresRelease() {
         var model = new SelectorWheelModel();
         model.open(0); model.hover(0, 0);

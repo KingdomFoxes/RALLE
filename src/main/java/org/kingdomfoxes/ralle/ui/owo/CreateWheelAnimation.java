@@ -1,6 +1,6 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
-/** Deterministic individual-pixel erosion followed by a brief empty-sector hold. */
+/** Premade individual-pixel erosion followed by a brief empty-sector hold. */
 final class CreateWheelAnimation {
     static final long HOLD_MILLIS = 100;
     static final double SOUND_DURATION_FRACTION = .8;
@@ -19,23 +19,7 @@ final class CreateWheelAnimation {
         return 5 * (1 - Math.pow(1 - t, 3));
     }
 
-    private static int hash(int x, int y) {
-        int hash = x * 0x1f123bb5 ^ y * 0x5f356495;
-        hash ^= hash >>> 16;
-        hash *= 0x45d9f3b;
-        hash ^= hash >>> 16;
-        return hash;
-    }
-
-    static double threshold(int x, int y) {
-        return .12 + .52 * ((hash(x, y) & 0xffff) / 65535d);
-    }
-
-    static double opacity(int x, int y, double progress) {
-        return 1 - Math.clamp((progress - threshold(x, y)) / .36, 0, 1);
-    }
-
-    static boolean visible(int x, int y, double progress) {
-        return progress < threshold(x, y) + .18;
+    static int frame(double progress) {
+        return (int) Math.floor(Math.clamp(progress, 0, 1) * 63);
     }
 }

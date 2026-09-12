@@ -41,7 +41,10 @@ platform ports. It must not depend on a concrete settings screen.
   and composes the styled prefix onto every rendered line,
   so transformations and transparent chat screenshots include timestamps without
   changing source messages, signatures, tags, logging, or interaction metadata.
-- `sound`: client-only registered UI sound events and playback adapters. Chat
+- `sound`: client-only registered UI sound events and playback adapters. LFG
+  playback and its notification-setting check run on the Minecraft client executor:
+  REST/live-event store observers may run on worker threads and must never mutate
+  SoundEngine's active-sound maps directly. Chat
   selection injects this narrow port, while its Minecraft implementation owns
   parent-setting gates, count-to-cue mapping, rate limiting, and coalescing.
   Raid LFG discovery cards own their lifecycle cues. The shared join-result
@@ -495,8 +498,9 @@ captured member UUID and revalidates that member before mutation.
 
 Two independent local booleans can replace the Create and Kick chords with a transparent,
 non-pausing selector wheel. A wheel opens only from synchronized normal gameplay, owns input
-for that modifier hold, selects only by direct control hover, and submits at most one existing
-Create or Kick operation on a fresh left click. Its session captures raid or lobby/member UUID
+for that modifier hold and selects only by direct control hover. Create submits at most once
+per hold. Kick accepts another fresh left click after the previous accepted kick animation
+finishes (or a failed request returns), with at most one kick request pending. Its session captures raid or lobby/member UUID
 identities and revalidates current capabilities, region, lobby identity, host authority, target
 membership, and pending mutations immediately before submission. Releasing the modifier,
 Escape, focus loss, invalid synchronized state, or replacement by another screen cancels it.
@@ -507,6 +511,32 @@ uses the annular segments and their fixed outward envelopes, not rectangular con
 Each segment independently eases outward five logical pixels over 120 ms and returns smoothly
 on deselection. Geometry and content share the same viewport scale. Cached pixel scanlines
 keep curved rendering crisp without recalculating the raster every frame.
+Both wheels use a clean navy interior with white/gold outlines, omitting gray highlights and
+black edge-depth pixels. Kick keeps three-member geometry unchanged; one member uses just
+the top 120-degree segment, and two use equally sized top/bottom segments. Its roster tracks
+the synchronized lobby while open, resets stale index-based hover/motion on changes, and
+revalidates each UUID before submission. Accepted kicks play the bundled Realistic Explosion
+sprite (17 frames, 80 ms/frame) at the submitted target's saved position and the user-selected
+explosion sound once; failed requests never animate. Roster updates may arrive before the
+mutation response without moving or discarding that saved effect position. A delayed response
+cannot animate or change a newer wheel. Release/Escape still closes immediately.
+
+Create captures the selected clean segment, current resource-pack raid item, and selected-font
+label once into a screen-owned GPU texture, warmed on hover. During success, one composite
+quad samples that texture and the bundled 64-frame erosion-mask atlas; there are no runtime
+random/hash calculations, pixel-by-pixel fill calls, repeated scissor/item/text draws, or GPU
+readbacks. The outward movement, 80%-of-sound dissolve duration, 100 ms empty hold, and exit
+creation cue remain. Snapshots are disposed on resize, prompt suspension and screen removal;
+failed capture uses bounded ordinary rendering and removes the segment halfway through the
+same presentation interval. Raid ItemStacks are reused for the screen's lifetime.
+`GuiCaptureTargetOverride` provides the existing isolated GUI target routing for both screenshot
+capture and wheel capture, without sharing their GUI render states or feature enablement.
+Asset preparation is offline in `tools/prepare_wheel_assets.py`; provenance is packaged under
+`licenses/ralle-wheel-assets/README.txt`. To run the optional native shader smoke test, set
+`RALLE_GPU_TEST=1` and run `test --tests '*CreateWheelGpuTest'`. It uses an invisible OpenGL
+window to check the shipped shader and premade mask alpha; actual Minecraft frame-time and
+Wynntils compatibility checks still require an in-game run.
+
 Raw presses and physical-key tick recovery both choose the enabled wheel instead of entering
 the legacy chord. Closing on release cannot re-arm the release guard; closing while held waits
 until both physical modifiers are released. Screen replacement also clears the active owner.

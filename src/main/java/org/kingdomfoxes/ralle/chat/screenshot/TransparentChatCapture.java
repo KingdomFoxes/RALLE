@@ -15,6 +15,7 @@ import org.kingdomfoxes.ralle.chat.ChatRenderLayout;
 import org.kingdomfoxes.ralle.chat.ChatTextShadowStyles;
 import org.kingdomfoxes.ralle.chat.mixin.GameRendererAccessor;
 import org.kingdomfoxes.ralle.chat.render.FullShadowFrameCollector;
+import org.kingdomfoxes.ralle.ui.render.GuiCaptureTargetOverride;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -66,7 +67,7 @@ public final class TransparentChatCapture implements ChatScreenshotCapture {
                 renderLines(graphics, request);
 
                 TextureTarget finalTarget = target;
-                ChatCaptureTargetOverride.runWith(target, () -> renderer.ralle$getGuiRenderer().render(
+                GuiCaptureTargetOverride.runWith(target, () -> renderer.ralle$getGuiRenderer().render(
                         renderer.ralle$getFogRenderer().getBuffer(FogRenderer.FogMode.NONE)
                 ));
                 download(finalTarget, completion);

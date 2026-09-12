@@ -38,6 +38,30 @@ public final class SelectorWheelModel {
     public void cancel() { if (ownsInput()) state = State.AWAITING_RELEASE; }
     public void released() { state = State.CLOSED; }
 
+    /** Kick may accept a fresh click after feedback, without requiring a new modifier hold. */
+    public void resumeSelection() {
+        if (state != State.SUBMITTED) return;
+        state = State.SELECTING;
+        hovered = -1;
+        motions.clear();
+    }
+
+    /** Roster indices are presentation positions, never persistent member identities. */
+    public void rosterChanged() {
+        hovered = -1;
+        motions.clear();
+    }
+
+    public static List<Sector> kickGeometry(int count) {
+        if (count < 0 || count > 3) throw new IllegalArgumentException("Invalid kick roster");
+        if (count == 3) return ring(3, 14, 40, true);
+        var sectors = new ArrayList<Sector>();
+        for (int i = 0; i < count; i++) {
+            sectors.add(new Sector(14, 40, -Math.PI / 2 + i * Math.PI, Math.PI / 3));
+        }
+        return List.copyOf(sectors);
+    }
+
     public static List<Sector> ring(int count, double inner, double outer, boolean firstAtTop) {
         if (count < 0 || inner < 0 || outer <= inner) throw new IllegalArgumentException("Invalid ring");
         var sectors = new ArrayList<Sector>();

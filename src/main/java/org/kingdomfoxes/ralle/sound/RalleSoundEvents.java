@@ -45,6 +45,7 @@ public final class RalleSoundEvents {
         events.put(RalleSoundCue.LFG_RESONATE_3, event("lfg.resonate_3"));
         events.put(RalleSoundCue.LFG_RESONATE_4, event("lfg.resonate_4"));
         events.put(RalleSoundCue.LFG_FUNGUS_BREAK_4, event("lfg.fungus_break_4"));
+        events.put(RalleSoundCue.KICK_EXPLOSION, event("ui.kick_explosion"));
         return Map.copyOf(events);
     }
 
