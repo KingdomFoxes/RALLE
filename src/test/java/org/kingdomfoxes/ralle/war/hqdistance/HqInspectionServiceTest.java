@@ -122,6 +122,28 @@ class HqInspectionServiceTest {
         assertFalse(service.inspect("hq").hasLowerLabel());
     }
 
+    @Test
+    void wipedGuildShowsRedNoHeadquartersInsteadOfUnknown() {
+        var source = new MutableSource(new TerritorySnapshot("Fox", Map.of(
+                "target", node("target", "Other", false)), true, false));
+        var service = new HqInspectionService(source, new TerritoryRouteCalculator(), new ProvisionalQueueDurationEstimator());
+
+        var inspection = service.inspect("target");
+        assertEquals("No Hq!", inspection.upperLabel());
+        assertEquals(0xFFFF5555, inspection.upperColor());
+        assertFalse(inspection.hasLowerLabel());
+        assertFalse(inspection.connectionCount().isPresent());
+    }
+
+    @Test
+    void incompleteOwnershipDoesNotClaimTheGuildWasWiped() {
+        var source = new MutableSource(new TerritorySnapshot("Fox", Map.of(
+                "target", TerritorySnapshot.Territory.observed("target", null, "Other", false, null)), true, false));
+        var service = new HqInspectionService(source, new TerritoryRouteCalculator(), new ProvisionalQueueDurationEstimator());
+
+        assertEquals("Unknown", service.inspect("target").upperLabel());
+    }
+
     private static TerritorySnapshot snapshot(String target, String owner) {
         return new TerritorySnapshot("Fox", Map.of(
                 "hq", node("hq", "Fox", true, target),

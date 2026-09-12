@@ -102,7 +102,8 @@ territory count. Red starts at `round(1.25 × sqrt(territories owned))` connecti
 (at least one), yellow at 60% of that threshold, and greater distances stay red.
 Owned destinations are hypothetical. Active attack timers suppress both added
 labels. Labels stay at native size at all zoom levels, even when they overlap
-or extend beyond territory bounds. Missing routes or an uncertain HQ remain unknown; stale ownership
+or extend beyond territory bounds. A complete zero-claim snapshot shows red
+`No Hq!`; missing routes, incomplete ownership, or an uncertain HQ remain unknown. Stale ownership
 does not block known links through other guilds. RALLE reuses Wynntils' existing models and does
 not add polling or backend traffic. The historical duration formula remains a
 release blocker until it is checked against current in-game attack previews.

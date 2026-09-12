@@ -163,9 +163,11 @@ through territories regardless of owner or disagreement between ownership source
 Ownership reliability determines HQ identification and the guild-holding color
 scale, not physical connectivity. This prevents newly captured foreign territories
 from blocking shortcuts and inflating both distance and provisional duration.
-Owned destinations use the same hypothetical distance result. Missing identity,
-missing or multiple owned HQs, unreliable HQ ownership, or globally unavailable
-input yields `Unknown`. A destination unreachable through known links also yields
+Owned destinations use the same hypothetical distance result. A complete ownership
+projection showing that the player's guild owns no territories renders red
+`No Hq!` without a duration. Missing identity, an incomplete ownership projection,
+missing or multiple owned HQs while holdings remain, unreliable HQ ownership, or
+globally unavailable input yields `Unknown`. A destination unreachable through known links also yields
 `Unknown`; HQ yields `0` without a duration. Links absent from all available
 advancement data cannot be inferred from geographic adjacency.
 
@@ -185,7 +187,10 @@ formula; zoom and the furthest territory on the world map do not affect the scal
 durations remain white. This formula excludes border penalties, taxes, routing
 detours, and attack-eligibility cooldowns. Release remains blocked until the
 formula is compared with current in-game attack previews and its fixtures are
-updated if necessary.
+updated if necessary. Wynncraft's 1.20.4 Hotfix #3 documented a temporary,
+gradually increasing timer for repeated free wars, but neither its increment nor
+decay window is public and Wynntils' territory snapshot exposes no authoritative
+penalty state. RALLE therefore does not fabricate that server-side value.
 
 ## War queue attribution
 
@@ -201,7 +206,11 @@ While enabled in an active Wynncraft world, a lazily registered Wynntils Match
 listener validates the complete current guild indicator, rank pill, speaker, and
 body envelope before accepting `{territory} defense is {level}`. All six pinned
 defense values are accepted, and the territory must equal a canonical Wynntils
-territory name after only narrow whitespace normalization. Character nicknames
+territory name after narrow whitespace normalization. Before matching the body,
+the parser replaces Wynncraft's exact newline-plus-continuation-glyph prefix
+(`U+CFFFC U+E001 U+D0006` followed by a space) with a space. This accepts
+server-wrapped territory names and defense levels while rejecting other line
+breaks and appended text. Character nicknames
 resolve through hover metadata applying to the speaker span; direct names must be
 valid Minecraft IGNs. The observer never cancels or edits chat and performs no
 commands, polling, HTTP requests, or backend work.
