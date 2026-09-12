@@ -41,17 +41,15 @@ final class SelectorWheelRenderer {
                                  double progress, Pixel pixel) {
         if (progress >= 1) return;
         for (var run : FACES.computeIfAbsent(new Face(sector, true, true), SelectorWheelRenderer::rasterize)) {
-            for (int x = run.left(); x < run.right();) {
-                int clusterSize = Math.min(CreateWheelAnimation.clusterSize(x, run.y()), run.right() - x);
+            for (int x = run.left(); x < run.right(); x++) {
                 double opacity = CreateWheelAnimation.opacity(x, run.y(), progress);
-                if (opacity <= 0) { x += clusterSize; continue; }
+                if (opacity <= 0) continue;
                 double dust = 1 - opacity;
                 int px = x + dx + (int) Math.round(dust * (3 + 4 * CreateWheelAnimation.threshold(x, run.y())));
                 int py = run.y() + dy - (int) Math.round(dust * 6);
                 int alpha = (int) Math.round((run.color() >>> 24) * opacity);
                 int color = alpha << 24 | run.color() & 0xFFFFFF;
-                for (int within = 0; within < clusterSize; within++) pixel.draw(px + within, py, color);
-                x += clusterSize;
+                pixel.draw(px, py, color);
             }
         }
     }
@@ -64,20 +62,13 @@ final class SelectorWheelRenderer {
         for (int y = top; y < bottom; y++) {
             int start = left;
             boolean inRun = false;
-            for (int x = left; x < right;) {
-                int anchorX = x - dx;
-                int clusterSize = Math.min(CreateWheelAnimation.clusterSize(anchorX, y - dy), right - x);
-                boolean visible = CreateWheelAnimation.visible(anchorX, y - dy, progress);
+            for (int x = left; x <= right; x++) {
+                boolean visible = x < right && CreateWheelAnimation.visible(x - dx, y - dy, progress);
                 if (visible && !inRun) { start = x; inRun = true; }
                 if (!visible && inRun) {
                     graphics.enableScissor(start, y, x, y + 1);
                     try { draw.run(); } finally { graphics.disableScissor(); }
                     inRun = false;
-                }
-                x += clusterSize;
-                if (x == right && inRun) {
-                    graphics.enableScissor(start, y, right, y + 1);
-                    try { draw.run(); } finally { graphics.disableScissor(); }
                 }
             }
         }

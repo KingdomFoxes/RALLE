@@ -1,6 +1,6 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
-/** Deterministic clustered erosion followed by a brief empty-sector hold. */
+/** Deterministic individual-pixel erosion followed by a brief empty-sector hold. */
 final class CreateWheelAnimation {
     static final long HOLD_MILLIS = 100;
     static final double SOUND_DURATION_FRACTION = .8;
@@ -27,19 +27,15 @@ final class CreateWheelAnimation {
         return hash;
     }
 
-    static int clusterSize(int anchorX, int y) {
-        return 1 + Math.floorMod(hash(anchorX, y), 5);
+    static double threshold(int x, int y) {
+        return .12 + .52 * ((hash(x, y) & 0xffff) / 65535d);
     }
 
-    static double threshold(int anchorX, int y) {
-        return .04 + .72 * ((hash(anchorX, y) & 0xffff) / 65535d);
+    static double opacity(int x, int y, double progress) {
+        return 1 - Math.clamp((progress - threshold(x, y)) / .36, 0, 1);
     }
 
-    static double opacity(int anchorX, int y, double progress) {
-        return 1 - Math.clamp((progress - threshold(anchorX, y)) / .18, 0, 1);
-    }
-
-    static boolean visible(int anchorX, int y, double progress) {
-        return progress < threshold(anchorX, y) + .09;
+    static boolean visible(int x, int y, double progress) {
+        return progress < threshold(x, y) + .18;
     }
 }

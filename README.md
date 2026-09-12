@@ -53,9 +53,9 @@ top-row-number chords by default; their independent, disabled-by-default selecto
 settings replace those chords with hold, hover, and left-click selection. Create-wheel
 hover plays vanilla Vault step. After the existing-party prompt and successful server
 acceptance, the same wheel remains visible: the selected segment extends another five
-pixels and dissolves into clusters of one to five dust pixels, including its item and label,
-over 80% of the selected vanilla Conduit attack sample's duration. It then holds for another
-100 ms before closing.
+pixels and dissolves into individual dust pixels, including its item and label. A broad fade
+window keeps many pixels dissolving concurrently over 80% of the selected vanilla Conduit
+attack sample's duration. It then holds for another 100 ms before closing.
 Releasing the modifier after clicking does not interrupt this flow; Escape still dismisses
 it, and cancellation or failure never plays the success animation. The Kick wheel retains
 its existing behavior. Chords report

@@ -17,7 +17,7 @@ class CreateWheelAnimationTest {
         }
     }
 
-    @Test void pixelsErodeIndependentlyWithoutReappearingAndAllDisappearByEnd() {
+    @Test void manyIndividualPixelsFadeConcurrentlyWithoutReappearing() {
         int partiallyFaded = 0;
         int untouched = 0;
         for (int y = -76; y < 76; y++) for (int x = -76; x < 76; x++) {
@@ -30,17 +30,7 @@ class CreateWheelAnimationTest {
             if (middle > 0 && middle < 1) partiallyFaded++;
             if (middle == 1) untouched++;
         }
-        assertTrue(partiallyFaded > 100);
+        assertTrue(partiallyFaded > 10_000);
         assertTrue(untouched > 100);
-    }
-
-    @Test void deterministicClusterSizesAlwaysStayBetweenOneAndFivePixels() {
-        boolean[] found = new boolean[6];
-        for (int y = -76; y < 76; y++) for (int x = -76; x < 76; x++) {
-            int size = CreateWheelAnimation.clusterSize(x, y);
-            assertTrue(size >= 1 && size <= 5);
-            found[size] = true;
-        }
-        for (int size = 1; size <= 5; size++) assertTrue(found[size]);
     }
 }
