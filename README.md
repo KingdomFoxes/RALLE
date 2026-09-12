@@ -56,6 +56,8 @@ acceptance, the same wheel remains visible: the selected segment extends another
 pixels and dissolves into individual dust pixels, including its item and label. A broad fade
 window keeps many pixels dissolving concurrently over 80% of the selected vanilla Conduit
 attack sample's duration. It then holds for another 100 ms before closing.
+When creation succeeds while the wheel is still present, its normal amethyst-resonance
+creation cue plays exactly once as the wheel closes.
 Releasing the modifier after clicking does not interrupt this flow; Escape still dismisses
 it, and cancellation or failure never plays the success animation. The Kick wheel retains
 its existing behavior. Chords report

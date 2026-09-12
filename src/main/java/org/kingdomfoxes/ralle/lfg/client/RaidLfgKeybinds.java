@@ -275,6 +275,10 @@ public final class RaidLfgKeybinds {
     public LfgProtocol.Lobby currentLobbyForWheel() { return currentLobby(); }
     public LfgProtocol.Lobby currentHostLobbyForWheel() { return currentHostLobby(); }
 
+    public void playSuccessfulWheelCreateExit() {
+        sounds.playPartyCreated();
+    }
+
     public void submitWheelCreate(LfgProtocol.RaidType raid, BiConsumer<Boolean, net.minecraft.network.chat.Component> feedback) {
         var state = service.store().state();
         if (service.lifecycle() != RaidLfgService.LifecycleState.ONLINE || state.capabilities() == null

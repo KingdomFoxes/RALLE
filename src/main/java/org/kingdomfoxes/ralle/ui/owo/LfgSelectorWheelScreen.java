@@ -45,6 +45,7 @@ public final class LfgSelectorWheelScreen extends Screen {
     private boolean statusFailure;
     private boolean partyPromptOpen;
     private CreateWheelAnimation creationAnimation;
+    private final CreateWheelExitCue exitCue = new CreateWheelExitCue();
 
     public LfgSelectorWheelScreen(Minecraft minecraft, RaidLfgKeybinds controller,
                                   RaidLfgService service, Mode mode, int initiatingKey) {
@@ -222,7 +223,10 @@ public final class LfgSelectorWheelScreen extends Screen {
     @Override public void onClose() { cancelAndClose(); }
 
     @Override public void removed() {
-        if (!partyPromptOpen) controller.wheelClosed(this);
+        if (exitCue.wheelRemoved(partyPromptOpen)) controller.playSuccessfulWheelCreateExit();
+        if (!partyPromptOpen) {
+            controller.wheelClosed(this);
+        }
         super.removed();
     }
 
@@ -243,6 +247,7 @@ public final class LfgSelectorWheelScreen extends Screen {
         if (success && mode == Mode.CREATE && creationAnimation == null && minecraft.screen == this) {
             long duration = CreateWheelSounds.created(minecraft);
             creationAnimation = new CreateWheelAnimation(System.currentTimeMillis(), duration);
+            exitCue.creationAccepted();
         }
     }
 
