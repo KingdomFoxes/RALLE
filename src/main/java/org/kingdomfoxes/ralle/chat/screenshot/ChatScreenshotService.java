@@ -126,6 +126,7 @@ public final class ChatScreenshotService {
             targetBounds = calculateBounds();
             animationFrom = targetBounds;
             animationRange = selectedRange();
+            animationStarted = now();
         }
     }
 
@@ -269,14 +270,11 @@ public final class ChatScreenshotService {
         if (opacity <= 0.0F) return;
         int outlineColor = ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.SELECTION_GOLD, opacity);
         graphics.enableScissor(snapshot.viewportLeft(), snapshot.viewportTop(), snapshot.viewportRight(), snapshot.viewportBottom());
-        if (visualBounds.size() == 1) {
-            if (state() == State.DRAGGING) drawSolid(graphics, visualBounds.getFirst(), outlineColor);
-            else drawDashed(graphics, visualBounds.getFirst(),
-                    (int) ((now / 60L) % (ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP)),
-                    outlineColor);
+        if (state() == State.DRAGGING) {
+            if (visualBounds.size() == 1) drawSolid(graphics, visualBounds.getFirst(), outlineColor);
+            else drawContour(graphics, visualBounds, outlineColor);
         } else {
-            int phase = (int) ((now / 60L) % (ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP));
-            drawContour(graphics, visualBounds, state() == State.DRAGGING, phase, outlineColor);
+            drawDashedContour(graphics, visualBounds, dashedPhase(now), outlineColor);
         }
         if (state() == State.COPIED_FADING) drawCopiedConfirmation(graphics, bounds, opacity);
         graphics.disableScissor();
@@ -354,54 +352,82 @@ public final class ChatScreenshotService {
         graphics.fill(bounds.right() - 1, bounds.top(), bounds.right(), bounds.bottom(), color);
     }
 
-    private static void drawDashed(GuiGraphics graphics, Rectangle bounds, int phase, int color) {
-        int width = bounds.width();
-        int height = bounds.height();
-        for (int x = -phase; x < width; x += ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP) {
-            int start = Math.max(0, x);
-            int end = Math.min(width, x + ChatScreenshotTokens.DASH_LENGTH);
-            if (end > start) {
-                graphics.fill(bounds.left() + start, bounds.top(), bounds.left() + end, bounds.top() + 1, color);
-                graphics.fill(bounds.left() + start, bounds.bottom() - 1, bounds.left() + end, bounds.bottom(), color);
-            }
-        }
-        for (int y = -phase; y < height; y += ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP) {
-            int start = Math.max(0, y);
-            int end = Math.min(height, y + ChatScreenshotTokens.DASH_LENGTH);
-            if (end > start) {
-                graphics.fill(bounds.left(), bounds.top() + start, bounds.left() + 1, bounds.top() + end, color);
-                graphics.fill(bounds.right() - 1, bounds.top() + start, bounds.right(), bounds.top() + end, color);
-            }
-        }
-    }
-
     private static void drawContour(
             GuiGraphics graphics,
             List<Rectangle> bounds,
-            boolean solid,
-            int phase,
             int color
     ) {
         Rectangle first = bounds.getFirst();
-        drawHorizontalSegment(graphics, first.left(), first.right(), first.top(), solid, phase, color);
+        drawHorizontalSegment(graphics, first.left(), first.right(), first.top(), color);
         for (int index = 0; index < bounds.size(); index++) {
             Rectangle current = bounds.get(index);
-            drawVerticalSegment(graphics, current.left(), current.top(), current.bottom(), solid, phase, color);
-            drawVerticalSegment(graphics, current.right() - 1, current.top(), current.bottom(), solid, phase, color);
+            drawVerticalSegment(graphics, current.left(), current.top(), current.bottom(), color);
+            drawVerticalSegment(graphics, current.right() - 1, current.top(), current.bottom(), color);
             if (index == 0) continue;
             Rectangle previous = bounds.get(index - 1);
             int boundary = current.top();
             if (current.left() != previous.left()) {
                 drawHorizontalSegment(graphics, Math.min(current.left(), previous.left()),
-                        Math.max(current.left(), previous.left()) + 1, boundary, solid, phase, color);
+                        Math.max(current.left(), previous.left()) + 1, boundary, color);
             }
             if (current.right() != previous.right()) {
                 drawHorizontalSegment(graphics, Math.min(current.right(), previous.right()) - 1,
-                        Math.max(current.right(), previous.right()), boundary, solid, phase, color);
+                        Math.max(current.right(), previous.right()), boundary, color);
             }
         }
         Rectangle last = bounds.getLast();
-        drawHorizontalSegment(graphics, last.left(), last.right(), last.bottom() - 1, solid, phase, color);
+        drawHorizontalSegment(graphics, last.left(), last.right(), last.bottom() - 1, color);
+    }
+
+    private static void drawDashedContour(
+            GuiGraphics graphics,
+            List<Rectangle> bounds,
+            int phase,
+            int color
+    ) {
+        int cycle = ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP;
+        int pathOffset = 0;
+        for (ChatScreenshotOutline.Segment segment : ChatScreenshotOutline.perimeter(bounds)) {
+            int offset = 0;
+            while (offset < segment.length()) {
+                int patternOffset = Math.floorMod(pathOffset + offset - phase, cycle);
+                int remaining = patternOffset < ChatScreenshotTokens.DASH_LENGTH
+                        ? ChatScreenshotTokens.DASH_LENGTH - patternOffset
+                        : cycle - patternOffset;
+                int run = Math.min(remaining, segment.length() - offset);
+                if (patternOffset < ChatScreenshotTokens.DASH_LENGTH) {
+                    drawDashedRun(graphics, segment, offset, run, color);
+                }
+                offset += run;
+            }
+            pathOffset += segment.length();
+        }
+    }
+
+    private int dashedPhase(long now) {
+        long elapsed = Math.max(0L, now - animationStarted);
+        int cycle = ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP;
+        return (int) ((elapsed / ChatScreenshotTokens.DASH_MILLIS) % cycle);
+    }
+
+    private static void drawDashedRun(
+            GuiGraphics graphics,
+            ChatScreenshotOutline.Segment segment,
+            int offset,
+            int length,
+            int color
+    ) {
+        int firstX = segment.xAt(offset);
+        int lastX = segment.xAt(offset + length - 1);
+        int firstY = segment.yAt(offset);
+        int lastY = segment.yAt(offset + length - 1);
+        graphics.fill(
+                Math.min(firstX, lastX),
+                Math.min(firstY, lastY),
+                Math.max(firstX, lastX) + 1,
+                Math.max(firstY, lastY) + 1,
+                color
+        );
     }
 
     private static void drawHorizontalSegment(
@@ -409,20 +435,10 @@ public final class ChatScreenshotService {
             int left,
             int right,
             int y,
-            boolean solid,
-            int phase,
             int color
     ) {
         if (right <= left) return;
-        if (solid) {
-            graphics.fill(left, y, right, y + 1, color);
-            return;
-        }
-        for (int x = left - phase; x < right; x += ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP) {
-            int start = Math.max(left, x);
-            int end = Math.min(right, x + ChatScreenshotTokens.DASH_LENGTH);
-            if (end > start) graphics.fill(start, y, end, y + 1, color);
-        }
+        graphics.fill(left, y, right, y + 1, color);
     }
 
     private static void drawVerticalSegment(
@@ -430,20 +446,10 @@ public final class ChatScreenshotService {
             int x,
             int top,
             int bottom,
-            boolean solid,
-            int phase,
             int color
     ) {
         if (bottom <= top) return;
-        if (solid) {
-            graphics.fill(x, top, x + 1, bottom, color);
-            return;
-        }
-        for (int y = top - phase; y < bottom; y += ChatScreenshotTokens.DASH_LENGTH + ChatScreenshotTokens.DASH_GAP) {
-            int start = Math.max(top, y);
-            int end = Math.min(bottom, y + ChatScreenshotTokens.DASH_LENGTH);
-            if (end > start) graphics.fill(x, start, x + 1, end, color);
-        }
+        graphics.fill(x, top, x + 1, bottom, color);
     }
 
     private void drawCopiedConfirmation(GuiGraphics graphics, Rectangle selection, float opacity) {
