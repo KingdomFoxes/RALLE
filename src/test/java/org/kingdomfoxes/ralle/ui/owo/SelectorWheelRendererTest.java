@@ -89,17 +89,22 @@ class SelectorWheelRendererTest {
                 }
             }
             int[] count = {0};
-            int maskFrame = CreateWheelAnimation.frame(stages[frame]);
+            var source = new BufferedImage(168, 168, BufferedImage.TYPE_INT_ARGB);
             for (int y = -76; y < 76; y++) for (int x = -76; x < 76; x++) {
                 int color = SelectorWheelRenderer.createColor(ring.getFirst(), x + .5, y + .5, true);
-                int alpha = mask.getRGB(maskFrame % 8 * 128 + Math.floorMod(x + 80, 128),
-                        maskFrame / 8 * 128 + Math.floorMod(y + 80, 128)) >>> 24;
-                alpha = (color >>> 24) * alpha / 255;
-                if (alpha == 0) continue;
+                int alpha = color >>> 24;
+                int premultiplied = alpha << 24;
+                for (int shift : new int[] {16, 8, 0}) premultiplied |= ((color >> shift & 255) * alpha / 255) << shift;
+                source.setRGB(x + 84, y + 84, premultiplied);
+            }
+            var dust = CreateDustReference.render(source, CreateWheelAnimation.frame(stages[frame]), mask);
+            for (int y = 0; y < 168; y++) for (int x = 0; x < 168; x++) {
+                int color = dust.getRGB(x, y);
+                if (color >>> 24 == 0) continue;
                 count[0]++;
-                canvas.setColor(new java.awt.Color(alpha << 24 | color & 0xFFFFFF, true));
-                canvas.fillRect(cx + (int) Math.floor(x * scale),
-                        cy + (int) Math.floor((y - (stages[frame] == 0 ? 5 : 10)) * scale), 1, 1);
+                canvas.setColor(new java.awt.Color(color, true));
+                canvas.fillRect(cx + (int) Math.floor((x - 84) * scale),
+                        cy + (int) Math.floor((y - 84 - (stages[frame] == 0 ? 5 : 10)) * scale), 1, 1);
             }
             if (stages[frame] == 1) assertEquals(0, count[0]);
             else assertTrue(count[0] > 0);

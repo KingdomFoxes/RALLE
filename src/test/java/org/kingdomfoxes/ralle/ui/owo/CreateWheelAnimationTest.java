@@ -17,27 +17,20 @@ class CreateWheelAnimationTest {
         }
     }
 
-    @Test void premadeFramesFadeManyPixelsConcurrentlyWithoutReappearing() throws Exception {
-        var atlas = javax.imageio.ImageIO.read(java.nio.file.Path.of(
-                "src/main/resources/assets/ralle/textures/gui/wheel/create_dissolve.png").toFile());
-        assertEquals(1024, atlas.getWidth());
-        assertEquals(1024, atlas.getHeight());
-        int partiallyFaded = 0;
-        int untouched = 0;
-        for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++) {
-            int previous = 255;
-            for (int frame = 0; frame < 64; frame++) {
-                int alpha = atlas.getRGB(frame % 8 * 128 + x, frame / 8 * 128 + y) >>> 24;
-                assertTrue(alpha <= previous);
-                previous = alpha;
-                if (frame == 0) assertEquals(255, alpha);
-                if (frame == 63) assertEquals(0, alpha);
-                if (frame == 31 && alpha > 0 && alpha < 255) partiallyFaded++;
-                if (frame == 31 && alpha == 255) untouched++;
-            }
+    @Test void bakedDustMatchesOriginalTrajectoriesAndOverlapOrderForEveryFrame() throws Exception {
+        var atlas = CreateDustReference.atlas();
+        assertEquals(4096, atlas.getWidth());
+        assertEquals(4096, atlas.getHeight());
+        var source = new java.awt.image.BufferedImage(180, 180, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        for (int y = 8; y < 172; y++) for (int x = 8; x < 172; x++) {
+            if ((x + y) % 7 != 0) source.setRGB(x, y, 0xC0000000 | (x % 192) << 16 | (y % 192) << 8 | 80);
         }
-        assertTrue(partiallyFaded > 10_000);
-        assertTrue(untouched > 100);
+        for (int frame = 0; frame < 64; frame++) {
+            var expected = CreateDustReference.render(source, frame, null);
+            var actual = CreateDustReference.render(source, frame, atlas);
+            assertArrayEquals(expected.getRGB(0, 0, 180, 180, null, 0, 180),
+                    actual.getRGB(0, 0, 180, 180, null, 0, 180), "Frame " + frame);
+        }
     }
 
     @Test void frameSelectionIsBoundedAndRetainsFinalEmptyFrame() {

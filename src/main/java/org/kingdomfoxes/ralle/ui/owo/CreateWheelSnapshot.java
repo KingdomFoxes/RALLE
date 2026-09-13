@@ -40,6 +40,8 @@ final class CreateWheelSnapshot implements AutoCloseable {
     }
 
     static CreateWheelSnapshot capture(Minecraft minecraft, int extent, Consumer<GuiGraphics> draw) {
+        // Warm the shared baked atlas on hover, before accepted creation starts playback.
+        minecraft.getTextureManager().getTexture(MASK);
         int density = Math.max(1, minecraft.getWindow().getGuiScale());
         int size = extent * 2;
         var target = new TextureTarget("RALLE Create segment", size * density, size * density, true);

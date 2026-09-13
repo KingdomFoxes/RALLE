@@ -525,15 +525,22 @@ cannot animate or change a newer wheel. Release/Escape still closes immediately.
 
 Create captures the selected clean segment, current resource-pack raid item, and selected-font
 label once into a screen-owned GPU texture, warmed on hover. During success, one composite
-quad samples that texture and the bundled 64-frame erosion-mask atlas; there are no runtime
+quad samples that texture and the bundled 64-frame dust-motion atlas; there are no runtime
 random/hash calculations, pixel-by-pixel fill calls, repeated scissor/item/text draws, or GPU
-readbacks. The outward movement, 80%-of-sound dissolve duration, 100 ms empty hold, and exit
+readbacks. The original pixel drift (up to six logical pixels upward/rightward), opacity, and
+overlap paint order are baked offline from the original animation formula. Each atlas texel
+encodes two source contributors; four pages retain up to eight overlapping pixels. The 4096px
+RGBA atlas occupies a fixed 64 MiB on the GPU and is warmed with the hover snapshot before
+playback. Its 256px pattern exactly covers wheel coordinates -128 through 127 and repeats for
+larger custom-font geometry. Eight pixels of capture padding retain outward-flying dust.
+The outward movement, 80%-of-sound dissolve duration, 100 ms empty hold, and exit
 creation cue remain. Snapshots are disposed on resize, prompt suspension and screen removal;
 failed capture uses bounded ordinary rendering and removes the segment halfway through the
 same presentation interval. Raid ItemStacks are reused for the screen's lifetime.
 `GuiCaptureTargetOverride` provides the existing isolated GUI target routing for both screenshot
 capture and wheel capture, without sharing their GUI render states or feature enablement.
-Asset preparation is offline in `tools/prepare_wheel_assets.py`; provenance is packaged under
+Dust-only preparation is offline in `tools/bake_create_dust.py` (NumPy/Pillow); the complete
+asset preparation entry point remains `tools/prepare_wheel_assets.py`. Provenance is packaged under
 `licenses/ralle-wheel-assets/README.txt`. To run the optional native shader smoke test, set
 `RALLE_GPU_TEST=1` and run `test --tests '*CreateWheelGpuTest'`. It uses an invisible OpenGL
 window to check the shipped shader and premade mask alpha; actual Minecraft frame-time and

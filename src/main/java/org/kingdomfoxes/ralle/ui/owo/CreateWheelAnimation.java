@@ -1,6 +1,6 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
-/** Premade individual-pixel erosion followed by a brief empty-sector hold. */
+/** Premade individual-pixel dust motion followed by a brief empty-sector hold. */
 final class CreateWheelAnimation {
     static final long HOLD_MILLIS = 100;
     static final double SOUND_DURATION_FRACTION = .8;

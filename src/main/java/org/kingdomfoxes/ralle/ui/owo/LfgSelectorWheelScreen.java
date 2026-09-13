@@ -214,7 +214,7 @@ public final class LfgSelectorWheelScreen extends Screen {
         var bounds = geometry.get(index);
         var entry = entries.get(index);
         try {
-            snapshots[index] = CreateWheelSnapshot.capture(minecraft, (int) Math.ceil(outerRadius) + 4, graphics -> {
+            snapshots[index] = CreateWheelSnapshot.capture(minecraft, (int) Math.ceil(outerRadius) + 8, graphics -> {
                 SelectorWheelRenderer.drawCreate(graphics, bounds, 0, 0, true);
                 int x = (int) Math.round(bounds.centerX());
                 int y = (int) Math.round(bounds.centerY());
