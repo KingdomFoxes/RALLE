@@ -42,6 +42,34 @@ class RalleSoundAssetsTest {
     }
 
     @Test
+    void newInstrumentBanksHaveManifestEntriesAndPackagedVorbis() throws IOException {
+        com.google.gson.JsonObject manifest;
+        try (var input = resource("assets/ralle/sounds.json")) {
+            manifest = com.google.gson.JsonParser.parseString(new String(input.readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject();
+        }
+        for (var bank : List.of(ChatSelectionInstrument.ACOUSTIC_GUITAR, ChatSelectionInstrument.BASS_GUITAR,
+                ChatSelectionInstrument.PIANO, ChatSelectionInstrument.DRUMS)) {
+            var cues = new java.util.HashSet<RalleSoundCue>();
+            for (int count = 1; count <= 10; count++) cues.add(bank.cueForCount(count));
+            cues.add(bank.copySuccess());
+            for (var cue : cues) {
+                String bankName = bank.name().toLowerCase(java.util.Locale.ROOT);
+                String suffix = cue.name().substring(bank.name().length() + 1).toLowerCase(java.util.Locale.ROOT);
+                String key = "ui." + bankName + "." + suffix;
+                assertTrue(manifest.has(key), key);
+                String asset = manifest.getAsJsonObject(key).getAsJsonArray("sounds").get(0)
+                        .getAsJsonObject().get("name").getAsString();
+                String path = "assets/ralle/sounds/" + asset.substring("ralle:".length()) + ".ogg";
+                try (var input = resource(path)) {
+                    var bytes = input.readAllBytes();
+                    assertArrayEquals("OggS".getBytes(StandardCharsets.US_ASCII), java.util.Arrays.copyOf(bytes, 4), path);
+                    assertTrue(new String(bytes, StandardCharsets.ISO_8859_1).contains("vorbis"), path);
+                }
+            }
+        }
+    }
+
+    @Test
     void lfgNotificationCuesReferenceExactMinecraftAssets() throws IOException {
         String manifest;
         try (var input = resource("assets/ralle/sounds.json")) {

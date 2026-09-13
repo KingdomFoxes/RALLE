@@ -7,6 +7,8 @@ import java.util.OptionalInt;
 /** Caches the pure route projection until identity, HQ, ownership, or connections change. */
 public final class HqInspectionService {
     private static final HqInspection UNKNOWN = new HqInspection("Unknown", "", OptionalInt.empty());
+    private static final HqInspection NO_HEADQUARTERS =
+            new HqInspection("No Hq!", "", OptionalInt.empty(), 0xFFFF5555);
     private final TerritorySnapshotSource source;
     private final TerritoryRouteCalculator routes;
     private final QueueDurationEstimator durations;
@@ -33,7 +35,11 @@ public final class HqInspectionService {
                     .filter(territory -> territory.reliable() && snapshot.guildName().equals(territory.owner()))
                     .count();
             int redThreshold = redThreshold(ownedTerritories);
-            projectedRoutes.forEach((name, route) -> cache.put(name, format(route, redThreshold)));
+            if (hasDefinitivelyNoHeadquarters(snapshot)) {
+                projectedRoutes.keySet().forEach(name -> cache.put(name, NO_HEADQUARTERS));
+            } else {
+                projectedRoutes.forEach((name, route) -> cache.put(name, format(route, redThreshold)));
+            }
         }
         return cache.getOrDefault(territoryName, UNKNOWN);
     }
@@ -56,6 +62,17 @@ public final class HqInspectionService {
                     OptionalInt.of(route.connectionCount()), distanceColor(route.connectionCount(), redThreshold));
             case UNKNOWN -> UNKNOWN;
         };
+    }
+
+    /** A complete ownership projection with no holdings is a wipe, not an unknown route. */
+    private static boolean hasDefinitivelyNoHeadquarters(TerritorySnapshot snapshot) {
+        return snapshot.complete()
+                && !snapshot.ownershipConflict()
+                && !snapshot.guildName().isBlank()
+                && !snapshot.territories().isEmpty()
+                && snapshot.territories().values().stream().allMatch(territory -> !territory.owner().isBlank())
+                && snapshot.territories().values().stream()
+                        .noneMatch(territory -> snapshot.guildName().equals(territory.owner()));
     }
 
     static String formatDuration(int seconds) {

@@ -12,6 +12,7 @@ public final class ChatScreenshotTokens {
     public static final int OUTLINE_WIDTH = 1;
     public static final int DASH_LENGTH = 4;
     public static final int DASH_GAP = 3;
+    public static final long DASH_MILLIS = 60L;
     public static final int CONFIRMATION_HORIZONTAL_PADDING = 2;
     public static final int CONFIRMATION_VERTICAL_PADDING = 1;
     public static final int CONFIRMATION_DEPTH = 2;

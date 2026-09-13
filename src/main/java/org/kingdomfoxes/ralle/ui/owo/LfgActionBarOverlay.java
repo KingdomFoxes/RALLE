@@ -41,8 +41,18 @@ public final class LfgActionBarOverlay {
 
         if (snapshot.raid() == null) {
             var text = actionText(snapshot.glyph(), snapshot.text());
-            int width = Math.round(minecraft.font.width(text) * TEXT_SCALE);
-            drawScaledText(graphics, text, (graphics.guiWidth() - width) / 2, y, color);
+            var lines = minecraft.font.split(text, Math.max(1, (int) ((graphics.guiWidth() - 24) / TEXT_SCALE)));
+            int lineHeight = Math.round((minecraft.font.lineHeight + 2) * TEXT_SCALE);
+            int lineY = y - (lines.size() - 1) * lineHeight;
+            for (var line : lines) {
+                int width = Math.round(minecraft.font.width(line) * TEXT_SCALE);
+                graphics.pose().pushMatrix();
+                graphics.pose().translate((graphics.guiWidth() - width) / 2, lineY);
+                graphics.pose().scale(TEXT_SCALE, TEXT_SCALE);
+                graphics.drawString(minecraft.font, line, 0, 0, color, true);
+                graphics.pose().popMatrix();
+                lineY += lineHeight;
+            }
             return;
         }
 

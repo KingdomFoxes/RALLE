@@ -13,6 +13,11 @@ public interface LfgGateway {
     CompletableFuture<LfgProtocol.Snapshot> snapshot(String bearerToken);
     CompletableFuture<LfgProtocol.Mutation> create(String bearerToken, LfgProtocol.RaidType raid,
                                                    LfgProtocol.Region region, String note, UUID idempotencyKey);
+    default CompletableFuture<LfgProtocol.Mutation> createWithParty(String bearerToken, LfgProtocol.RaidType raid,
+            LfgProtocol.Region region, String note, java.util.List<String> partyMembers, UUID idempotencyKey) {
+        if (partyMembers.isEmpty()) return create(bearerToken, raid, region, note, idempotencyKey);
+        return CompletableFuture.failedFuture(new IllegalStateException("Party import is unavailable."));
+    }
     CompletableFuture<LfgProtocol.Mutation> join(String bearerToken, UUID lobbyId, UUID idempotencyKey);
     CompletableFuture<LfgProtocol.Mutation> leave(String bearerToken, UUID lobbyId, UUID idempotencyKey);
     CompletableFuture<LfgProtocol.Mutation> disband(String bearerToken, UUID lobbyId, UUID idempotencyKey);

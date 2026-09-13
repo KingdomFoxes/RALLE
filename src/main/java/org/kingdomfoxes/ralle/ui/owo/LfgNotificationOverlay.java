@@ -1,19 +1,15 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
-import com.mojang.authlib.GameProfile;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.PlayerFaceRenderer;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.client.gui.screens.inventory.tooltip.DefaultTooltipPositioner;
-import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
-import net.minecraft.world.entity.player.PlayerSkin;
 import net.minecraft.world.item.ItemStack;
 import org.kingdomfoxes.ralle.RalleClient;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
@@ -33,9 +29,6 @@ import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 /** Draws and hit-tests fixed Raid LFG notification cards in HUD and screen layers. */
 public final class LfgNotificationOverlay {
@@ -53,8 +46,6 @@ public final class LfgNotificationOverlay {
     private static final int REGION_GOOD = 0xFF00FF55;
     private static final int REGION_MODERATE = 0xFFFFFF00;
     private static final int REGION_POOR = 0xFFFF3333;
-    private static final ConcurrentMap<UUID, CompletableFuture<PlayerSkin>> SKINS = new ConcurrentHashMap<>();
-    private static final ConcurrentMap<UUID, PlayerSkin> RESOLVED_SKINS = new ConcurrentHashMap<>();
 
     private final Minecraft minecraft;
     private final RaidLfgService service;
@@ -103,6 +94,7 @@ public final class LfgNotificationOverlay {
     private boolean shouldRenderOverScreen(net.minecraft.client.gui.screens.Screen screen) {
         return minecraft.level != null
                 && !(screen instanceof RaidLfgScreen)
+                && !(screen instanceof LfgSelectorWheelScreen)
                 && !(screen instanceof ChatLayoutEditorScreen);
     }
 
@@ -228,9 +220,8 @@ public final class LfgNotificationOverlay {
             return;
         }
         var member = lobby.members().get(slot);
-        graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), rosterBorderColor(member));
-        var skin = resolvedSkin(member.minecraftUuid(), member.ign());
-        PlayerFaceRenderer.draw(graphics, skin, bounds.x() + 1, bounds.y() + 1, 18);
+        PlayerHeadPresentation.draw(graphics, minecraft, member,
+                bounds.x(), bounds.y(), 18, rosterBorderColor(member));
     }
 
     private void renderControls(GuiGraphics graphics, LfgNotificationManager.CardSnapshot card,
@@ -500,22 +491,6 @@ public final class LfgNotificationOverlay {
             return true;
         }
         return false;
-    }
-
-    private PlayerSkin resolvedSkin(UUID id, String name) {
-        var existing = RESOLVED_SKINS.get(id);
-        if (existing != null) return existing;
-        var fallback = DefaultPlayerSkin.get(id);
-        SKINS.computeIfAbsent(id, ignored -> {
-            var partial = new GameProfile(id, name);
-            return CompletableFuture.supplyAsync(() -> minecraft.services().profileResolver()
-                            .fetchById(id).orElse(partial))
-                    .thenCompose(minecraft.getSkinManager()::get)
-                    .thenApply(skin -> skin.orElse(fallback))
-                    .exceptionally(error -> fallback)
-                    .whenComplete((skin, error) -> RESOLVED_SKINS.put(id, skin));
-        });
-        return fallback;
     }
 
     private String ellipsize(String text, int maximumWidth) {

@@ -13,6 +13,13 @@ final class WynntilsTerritorySnapshotSource implements TerritorySnapshotSource {
         var territories = new LinkedHashMap<String, TerritorySnapshot.Territory>();
         boolean complete = guildName != null && !guildName.isBlank();
 
+        // Include all known endpoints, even when advancement details have not arrived.
+        // Neighboring advancement entries can still provide their reciprocal links.
+        Models.Territory.getTerritoryNames().forEach(name -> {
+            var profile = Models.Territory.getTerritoryProfile(name);
+            if (profile != null) territories.put(name, TerritorySnapshot.Territory.observed(
+                    name, null, profile.getGuild(), false, null));
+        });
         for (var poi : Models.Territory.getTerritoryPoisFromAdvancement()) {
             var info = poi.getTerritoryInfo();
             var profile = poi.getTerritoryProfile();

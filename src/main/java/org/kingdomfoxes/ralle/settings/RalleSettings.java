@@ -13,6 +13,7 @@ import org.kingdomfoxes.ralle.api.settings.CustomPanelEntry;
 import java.util.List;
 
 public final class RalleSettings {
+    public static final String CHAT_SELECTION_INSTRUMENT_ID = "chat-selection-instrument";
     public static final String INTERFACE_FONT_ID = "interface-font";
     public static final String INTERNAL_GUILD_RANKS_ID = "internal-guild-ranks";
     public static final String GUILD_RANK_STYLE_ID = "guild-rank-style";
@@ -74,7 +75,9 @@ public final class RalleSettings {
                                 toggle("chat-screenshot-enabled"),
                                 toggle("chat-screenshot-snap-to-text"),
                                 toggle("chat-screenshot-smooth-expansion"),
-                                toggle("chat-selection-sounds")
+                                toggle("chat-selection-sounds"),
+                                choice(CHAT_SELECTION_INSTRUMENT_ID, "xylophone",
+                                        "xylophone", "acoustic-guitar", "bass-guitar", "piano", "drums")
                         )
                 )
         ));
@@ -83,15 +86,14 @@ public final class RalleSettings {
                 "raid-lfg",
                 Component.translatable("ralle.settings.category.raid-lfg"),
                 Component.translatable("ralle.settings.category.raid-lfg.description"),
-                List.of(toggle("raid-lfg-enabled")),
+                List.of(toggle("raid-lfg-enabled"), action("edit-notification-position")),
                 List.of(
                         subcategory("notifications",
                                 toggle("new-party-notifications"),
                                 toggle("reopened-party-notifications"),
                                 toggle("party-status-notifications"),
                                 toggle("auto-pop-out-main-ui"),
-                                toggle("notification-sounds"),
-                                action("edit-notification-position")
+                                toggle("notification-sounds")
                         ),
                         subcategory("controls",
                                 keybind("raid-lfg-keybind"),
@@ -102,7 +104,9 @@ public final class RalleSettings {
                                 keybind("raid-lfg-ping-keybind"),
                                 keybind("raid-lfg-lock-keybind"),
                                 keybind("raid-lfg-create-keybind"),
+                                toggle("raid-lfg-create-selector-wheel"),
                                 keybind("raid-lfg-kick-keybind"),
+                                toggle("raid-lfg-kick-selector-wheel"),
                                 keybind("automatic-raid-requeue-keybind")
                         )
                 )
@@ -134,6 +138,7 @@ public final class RalleSettings {
         registry.requireEnabled("chat-screenshot-snap-to-text", "chat-screenshot-enabled");
         registry.requireEnabled("chat-screenshot-smooth-expansion", "chat-screenshot-enabled");
         registry.requireEnabled("chat-selection-sounds", "chat-screenshot-enabled");
+        registry.requireEnabled(CHAT_SELECTION_INSTRUMENT_ID, "chat-selection-sounds");
         registry.requireEnabled(QUEUE_SELF_COLOR_ID, WAR_QUEUE_ATTRIBUTION_ENABLED_ID);
         registry.requireEnabled(HQ_DISTANCE_KEYBIND_ID, HQ_DISTANCE_ENABLED_ID);
         registry.requireEnabled(CONSUMABLE_HIGHLIGHT_RULES_ID, CONSUMABLE_HIGHLIGHTS_ENABLED_ID);
@@ -151,7 +156,9 @@ public final class RalleSettings {
         registry.requireEnabled("raid-lfg-ping-keybind", "raid-lfg-enabled");
         registry.requireEnabled("raid-lfg-lock-keybind", "raid-lfg-enabled");
         registry.requireEnabled("raid-lfg-create-keybind", "raid-lfg-enabled");
+        registry.requireEnabled("raid-lfg-create-selector-wheel", "raid-lfg-enabled");
         registry.requireEnabled("raid-lfg-kick-keybind", "raid-lfg-enabled");
+        registry.requireEnabled("raid-lfg-kick-selector-wheel", "raid-lfg-enabled");
         registry.requireEnabled("automatic-raid-requeue-keybind", "raid-lfg-enabled");
     }
 
@@ -189,6 +196,12 @@ public final class RalleSettings {
     }
 
     private static Component description(String id) {
+        if ("text-shadow".equals(id)) {
+            return Component.translatable(
+                    "ralle.settings.option.text-shadow.description",
+                    Component.translatable("ralle.settings.option.text-shadow.description.note")
+            );
+        }
         return Component.translatable("ralle.settings.option." + id + ".description");
     }
 }

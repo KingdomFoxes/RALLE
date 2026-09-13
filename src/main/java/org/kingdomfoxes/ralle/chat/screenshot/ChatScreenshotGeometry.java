@@ -99,6 +99,7 @@ public final class ChatScreenshotGeometry {
             LineRange range
     ) {
         var bounds = new ArrayList<Rectangle>();
+        int[] effectiveWidths = effectiveWidthsInVisualOrder(snapshot, range);
         double scaledLineHeight = snapshot.lineHeight() * snapshot.chatScale();
         for (int index = range.first(); index <= range.last(); index++) {
             int relative = index - scroll;
@@ -109,8 +110,7 @@ public final class ChatScreenshotGeometry {
             int top = snapshot.viewportTop() + (int) Math.floor(topSlot * scaledLineHeight);
             int bottom = snapshot.viewportTop() + (int) Math.ceil((topSlot + 1) * scaledLineHeight);
             var vertical = new Rectangle(snapshot.viewportLeft(), top, snapshot.viewportRight(), bottom);
-            bounds.add(snapToTextBounds(snapshot, vertical,
-                    Math.max(1, snapshot.lines().get(index).textWidth())));
+            bounds.add(snapToTextBounds(snapshot, vertical, effectiveWidths[index - range.first()]));
         }
         bounds.sort(Comparator.comparingInt(Rectangle::top));
         if (bounds.isEmpty()) return List.of();
@@ -140,6 +140,38 @@ public final class ChatScreenshotGeometry {
                 Math.min(snapshot.viewportBottom(), last.bottom() + ChatScreenshotTokens.VERTICAL_PADDING)
         ));
         return List.copyOf(bounds);
+    }
+
+    /** Empty selected rows borrow the next visible row's contour without changing their vertical slot. */
+    private static int[] effectiveWidthsInVisualOrder(ChatScreenshotSnapshot snapshot, LineRange range) {
+        int count = range.count();
+        int[] widths = new int[count];
+        int[] visualIndices = new int[count];
+        for (int visual = 0; visual < count; visual++) {
+            visualIndices[visual] = snapshot.direction() == ChatBehaviorService.MessageDirection.TOP_DOWN
+                    ? range.first() + visual
+                    : range.last() - visual;
+        }
+
+        int following = 0;
+        for (int visual = count - 1; visual >= 0; visual--) {
+            int index = visualIndices[visual];
+            var line = snapshot.lines().get(index);
+            if (line.hasVisibleContent()) following = Math.max(1, line.textWidth());
+            widths[index - range.first()] = following;
+        }
+        int preceding = 0;
+        for (int visual = 0; visual < count; visual++) {
+            int index = visualIndices[visual];
+            var line = snapshot.lines().get(index);
+            if (line.hasVisibleContent()) preceding = Math.max(1, line.textWidth());
+            if (widths[index - range.first()] == 0) widths[index - range.first()] = preceding;
+        }
+        int fallback = maximumTextWidth(snapshot, range);
+        for (int index = 0; index < count; index++) {
+            if (widths[index] == 0) widths[index] = fallback;
+        }
+        return widths;
     }
 
     public static int snappedCaptureVisualWidth(int maximumTextWidth, double chatScale) {

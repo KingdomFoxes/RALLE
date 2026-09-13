@@ -290,6 +290,77 @@ class LfgNotificationManagerTest {
     }
 
     @Test
+    void persistentFullCardsKeepActionsForTenSecondsThenSlideOut() {
+        for (var full : List.of(fullViewerHostedLobby(96),
+                fullJoinedLobby(lobby(97, false, 1)), lobbyWithMemberCount(98, 4, 1))) {
+            var fixture = new Fixture();
+            fixture.connect();
+            fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, full));
+            fixture.manager.showPersistent(full);
+            fixture.now[0] += 9_999;
+            fixture.manager.tick();
+            assertEquals(LfgNotificationManager.CardMode.READY, fixture.manager.visibleCards().getFirst().mode());
+            fixture.now[0]++;
+            fixture.manager.tick();
+            assertEquals(LfgNotificationManager.CardMode.EXITING, fixture.manager.visibleCards().getFirst().mode());
+            assertEquals(LfgNotificationManager.CardMode.READY, fixture.manager.visibleCards().getFirst().presentedMode());
+            fixture.now[0] += LfgNotificationManager.ANIMATION_MILLIS;
+            fixture.manager.tick();
+            assertTrue(fixture.manager.visibleCards().isEmpty());
+        }
+    }
+
+    @Test
+    void explicitPopOutDuringFullExitRestartsTheTenSecondWindow() {
+        var fixture = new Fixture();
+        fixture.connect();
+        var full = fullViewerHostedLobby(95);
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, full));
+        fixture.manager.showPersistent(full);
+        fixture.now[0] += 10_000;
+        fixture.manager.tick();
+        fixture.manager.showPersistent(full);
+        fixture.now[0] += 9_999;
+        fixture.manager.tick();
+        assertEquals(LfgNotificationManager.CardMode.READY, fixture.manager.visibleCards().getFirst().mode());
+        fixture.now[0]++;
+        fixture.manager.tick();
+        assertEquals(LfgNotificationManager.CardMode.EXITING, fixture.manager.visibleCards().getFirst().mode());
+    }
+
+    private static LfgProtocol.Lobby fullViewerHostedLobby(int id) {
+        var hosted = viewerHostedLobby(id, 1);
+        var members = new java.util.ArrayList<>(hosted.members());
+        members.addAll(lobbyWithMemberCount(id, 4, 1).members().subList(1, 4));
+        return new LfgProtocol.Lobby(hosted.lobbyId(), hosted.raidType(), hosted.region(), hosted.note(),
+                hosted.visibility(), hosted.status(), true, VIEWER_ID, GUILD_ID, hosted.createdAt(),
+                hosted.lastActivityAt(), 1, 4, members, hosted.capabilities());
+    }
+
+    @Test
+    void reopeningCancelsFullDeadlineAndRefillingStartsAFreshTenSeconds() {
+        var fixture = new Fixture();
+        fixture.connect();
+        var open = lobbyWithMemberCount(99, 3, 1);
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, open));
+        fixture.manager.showPersistent(open);
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 2, lobbyWithMemberCount(99, 4, 2)));
+        fixture.now[0] += 9_000;
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 3, lobbyWithMemberCount(99, 3, 3)));
+        fixture.now[0] += 20_000;
+        fixture.manager.tick();
+        assertEquals(LfgNotificationManager.CardMode.READY, fixture.manager.visibleCards().getFirst().mode());
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 4, lobbyWithMemberCount(99, 4, 4)));
+        fixture.now[0] += 9_999;
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 5, lobbyWithMemberCount(99, 4, 5)));
+        fixture.manager.tick();
+        assertEquals(LfgNotificationManager.CardMode.READY, fixture.manager.visibleCards().getFirst().mode());
+        fixture.now[0]++;
+        fixture.manager.tick();
+        assertEquals(LfgNotificationManager.CardMode.EXITING, fixture.manager.visibleCards().getFirst().mode());
+    }
+
+    @Test
     void externalPartyMembershipStaysPersistentAcrossOrdinaryUpdatesUntilClosed() {
         var fixture = new Fixture();
         fixture.partyStatusEnabled[0] = true;

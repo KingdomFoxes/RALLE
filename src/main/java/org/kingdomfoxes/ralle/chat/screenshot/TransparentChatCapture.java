@@ -12,15 +12,16 @@ import net.minecraft.util.FormattedCharSequence;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.BatchedFullShadowSequence;
 import org.kingdomfoxes.ralle.chat.ChatRenderLayout;
+import org.kingdomfoxes.ralle.chat.ChatTextShadowStyles;
 import org.kingdomfoxes.ralle.chat.mixin.GameRendererAccessor;
 import org.kingdomfoxes.ralle.chat.render.FullShadowFrameCollector;
+import org.kingdomfoxes.ralle.ui.render.GuiCaptureTargetOverride;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 /** Re-renders frozen chat lines into a transparent GPU target and transfers the result locally. */
 public final class TransparentChatCapture implements ChatScreenshotCapture {
-    private static final int PARTIAL_FULL_SHADOW = 0xFF000000;
     private static final Executor CLIPBOARD_EXECUTOR = Executors.newSingleThreadExecutor(task -> {
         Thread thread = new Thread(task, "RALLE image clipboard");
         thread.setDaemon(true);
@@ -66,7 +67,7 @@ public final class TransparentChatCapture implements ChatScreenshotCapture {
                 renderLines(graphics, request);
 
                 TextureTarget finalTarget = target;
-                ChatCaptureTargetOverride.runWith(target, () -> renderer.ralle$getGuiRenderer().render(
+                GuiCaptureTargetOverride.runWith(target, () -> renderer.ralle$getGuiRenderer().render(
                         renderer.ralle$getFogRenderer().getBuffer(FogRenderer.FogMode.NONE)
                 ));
                 download(finalTarget, completion);
@@ -99,7 +100,7 @@ public final class TransparentChatCapture implements ChatScreenshotCapture {
             switch (request.shadow()) {
                 case NONE -> graphics.drawString(minecraft.font, transform(line, Style::withoutShadow), x, y, textColor, false);
                 case VANILLA -> graphics.drawString(minecraft.font, line, x, y, textColor, true);
-                case PARTIAL_FULL -> graphics.drawString(minecraft.font, transform(line, style -> style.withShadowColor(PARTIAL_FULL_SHADOW)), x, y, textColor, true);
+                case PARTIAL_FULL -> graphics.drawString(minecraft.font, ChatTextShadowStyles.partialFull(line), x, y, textColor, true);
                 case FULL -> renderFullShadow(graphics, fullShadow, line, x, y, textColor, request.textOpacity());
             }
         }

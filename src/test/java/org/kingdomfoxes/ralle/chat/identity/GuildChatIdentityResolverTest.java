@@ -31,6 +31,18 @@ class GuildChatIdentityResolverTest {
     }
 
     @Test
+    void wrappedDefenseAnnouncementKeepsNicknameIdentityThroughQueueParsing() {
+        var component = message("Speeddealer", "Speeddealer's real name is ToolyTom",
+                "Thesead Suburbs defense is Very\n\uDAFF\uDFFC\uE001\uDB00\uDC06 Low");
+        var resolved = GuildChatIdentityResolver.resolve(component).orElseThrow();
+        var announcement = new org.kingdomfoxes.ralle.war.queue.QueueAnnouncementParser()
+                .parse(resolved, java.util.List.of("Thesead Suburbs")).orElseThrow();
+
+        assertEquals("ToolyTom", announcement.senderIgn());
+        assertEquals("Thesead Suburbs", announcement.territoryName());
+    }
+
+    @Test
     void rejectsContradictoryOrMalformedSpeakerHoverWithoutFallingBackToAlias() {
         assertTrue(GuildChatIdentityResolver.resolve(
                 message("LooksLikeIGN", "SomeoneElse's real name is Real_Player", "Ragni defense is Low"))

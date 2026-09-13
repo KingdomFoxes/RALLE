@@ -13,7 +13,6 @@ import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAccess {
-    private static final int PARTIAL_FULL_SHADOW_COLOR = 0xFF000000;
     private static final int WRAPPED_FULL_TEXT_COLOR = 0x000000;
     private static final float WRAPPED_FULL_OPACITY_SCALE = 0.25F;
     private static final float MIN_WRAPPED_FULL_PASS_OPACITY = 3.0F / 255.0F;
@@ -131,7 +130,7 @@ public final class ChatGraphicsTransform implements ChatComponent.ChatGraphicsAc
         return switch (shadow) {
             case NONE -> style.withoutShadow();
             case VANILLA -> style;
-            case PARTIAL_FULL -> style.withShadowColor(PARTIAL_FULL_SHADOW_COLOR);
+            case PARTIAL_FULL -> ChatTextShadowStyles.partialFull(style);
             case FULL -> style.withoutShadow();
         };
     }

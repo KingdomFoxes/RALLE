@@ -11,15 +11,20 @@ import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
+import org.kingdomfoxes.ralle.sound.RalleSoundCue;
+import org.kingdomfoxes.ralle.sound.RalleSoundEvents;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionGlyph;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionBarState;
 import org.kingdomfoxes.ralle.ui.owo.RaidPresentation;
 import org.kingdomfoxes.ralle.ui.owo.RaidLfgScreen;
+import org.kingdomfoxes.ralle.ui.owo.LfgSelectorWheelScreen;
 import org.kingdomfoxes.ralle.requeue.AutoRaidRequeueController;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.EnumMap;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 
 /** Owns the persisted Raid LFG bindings, chord input, targeting, and keybind-only feedback. */
 public final class RaidLfgKeybinds {
@@ -49,6 +54,8 @@ public final class RaidLfgKeybinds {
 
     private final Minecraft minecraft;
     private final BooleanSetting enabled;
+    private final BooleanSetting createWheelEnabled;
+    private final BooleanSetting kickWheelEnabled;
     private final RaidLfgService service;
     private final LfgSoundPlayer sounds;
     private final LfgNotificationManager notifications;
@@ -61,7 +68,11 @@ public final class RaidLfgKeybinds {
     private final EnumMap<Action, Binding> bindings = new EnumMap<>(Action.class);
     private final LfgChordState<Selection> chordState = new LfgChordState<>();
 
+    private boolean createFeedbackPending;
+
     private ChordMode chordMode = ChordMode.NONE;
+    private LfgSelectorWheelScreen activeWheel;
+    private final LfgModifierInput modifierInput = new LfgModifierInput();
 
     public RaidLfgKeybinds(Minecraft minecraft, SettingsRegistry settings, RaidLfgService service,
                            LfgSoundPlayer sounds, LfgNotificationManager notifications,
@@ -81,6 +92,8 @@ public final class RaidLfgKeybinds {
         this.lockDebouncer = lockDebouncer;
         this.autoRaidRequeue = autoRaidRequeue;
         this.enabled = settings.setting("raid-lfg-enabled", BooleanSetting.class);
+        this.createWheelEnabled = settings.setting("raid-lfg-create-selector-wheel", BooleanSetting.class);
+        this.kickWheelEnabled = settings.setting("raid-lfg-kick-selector-wheel", BooleanSetting.class);
 
         register(settings, Action.OPEN, OPEN_ID, "key.ralle.raid-lfg");
         register(settings, Action.JOIN, JOIN_ID, "key.ralle.raid-lfg-join");
@@ -102,20 +115,34 @@ public final class RaidLfgKeybinds {
         validateConfirmation();
         tickLockDebounce();
 
+        modifierInput.observe(physicalDown(Action.CREATE), physicalDown(Action.KICK));
+        if (createFeedbackPending && activeWheel == null) {
+            if (minecraft.screen == null && minecraft.player != null && enabled.value()) {
+                actionBar.hold(net.minecraft.network.chat.Component.translatable(LfgCreationFeedback.progress(service)).getString(),
+                        LfgActionBarState.Tone.MUTED, LfgActionGlyph.CREATE);
+            }
+            return;
+        }
+        if (activeWheel != null || modifierInput.awaitingRelease()) return;
+
         if (!inputAllowed()) {
-            resetChord(true);
+            resetChord(chordMode != ChordMode.NONE);
             return;
         }
 
-        boolean createDown = down(Action.CREATE);
-        boolean kickDown = down(Action.KICK);
-        if (createDown == kickDown) {
+        boolean createDown = createWheelEnabled.value() ? physicalDown(Action.CREATE) : down(Action.CREATE);
+        boolean kickDown = kickWheelEnabled.value() ? physicalDown(Action.KICK) : down(Action.KICK);
+        var route = modifierInput.route(createDown, kickDown, createWheelEnabled.value(), kickWheelEnabled.value());
+        if (route == LfgModifierInput.Route.NONE) {
             if (chordMode != ChordMode.NONE) resetChord(false);
             return;
         }
 
         var nextMode = createDown ? ChordMode.CREATE : ChordMode.KICK;
-        beginChord(nextMode);
+        if (route == LfgModifierInput.Route.CREATE_WHEEL || route == LfgModifierInput.Route.KICK_WHEEL) {
+            var action = createDown ? Action.CREATE : Action.KICK;
+            openWheel(nextMode, KeyBindingHelper.getBoundKeyOf(bindings.get(action).mapping).getValue());
+        } else beginChord(nextMode);
     }
 
     /**
@@ -123,6 +150,8 @@ public final class RaidLfgKeybinds {
      * digits used by an already-active, valid Create/Kick chord.
      */
     public boolean handleKeyboard(KeyEvent event, int glfwAction) {
+        modifierInput.observe(physicalDown(Action.CREATE), physicalDown(Action.KICK));
+        if (activeWheel != null) return false;
         if (glfwAction == GLFW.GLFW_PRESS
                 && minecraft.screen == null
                 && minecraft.level != null
@@ -132,6 +161,10 @@ public final class RaidLfgKeybinds {
             return false;
         }
         if (!inputAllowed()) {
+            if (glfwAction == GLFW.GLFW_PRESS && minecraft.screen == null && minecraft.level != null
+                    && minecraft.player != null && enabled.value() && matches(Action.CREATE, event)) {
+                showCreateMessage(LfgCreationFeedback.unavailable(service), LfgActionBarState.Tone.DANGER);
+            }
             if (glfwAction == GLFW.GLFW_PRESS
                     && minecraft.screen == null
                     && minecraft.level != null
@@ -147,6 +180,10 @@ public final class RaidLfgKeybinds {
         boolean kickModifier = matches(Action.KICK, event);
         if (createModifier != kickModifier) {
             var eventMode = createModifier ? ChordMode.CREATE : ChordMode.KICK;
+            if (glfwAction == GLFW.GLFW_PRESS && wheelEnabled(eventMode)) {
+                if (!modifierInput.awaitingRelease()) openWheel(eventMode, event.key());
+                return true;
+            }
             if (glfwAction == GLFW.GLFW_PRESS) beginChord(eventMode);
             else if (glfwAction == GLFW.GLFW_RELEASE && chordMode == eventMode) resetChord(false);
             return false;
@@ -189,6 +226,8 @@ public final class RaidLfgKeybinds {
     }
 
     private void beginChord(ChordMode nextMode) {
+        // Both raw events and tick recovery must respect the selected input mode.
+        if (wheelEnabled(nextMode)) return;
         if (chordMode == ChordMode.NONE) {
             chordMode = nextMode;
             chordState.begin();
@@ -198,6 +237,121 @@ public final class RaidLfgKeybinds {
         } else if (chordMode != nextMode) {
             resetChord(false);
         }
+    }
+
+    private boolean wheelEnabled(ChordMode mode) {
+        return mode == ChordMode.CREATE ? createWheelEnabled.value() : kickWheelEnabled.value();
+    }
+
+    private void openWheel(ChordMode mode, int key) {
+        if (modifierInput.awaitingRelease() || !inputAllowed()
+                || GLFW.glfwGetWindowAttrib(minecraft.getWindow().handle(), GLFW.GLFW_FOCUSED) == GLFW.GLFW_FALSE
+                || conflicted(mode == ChordMode.CREATE ? Action.CREATE : Action.KICK)) return;
+        if (mode == ChordMode.CREATE && LfgCreationFeedback.unavailable(service) != null) {
+            showCreateMessage(LfgCreationFeedback.unavailable(service), LfgActionBarState.Tone.DANGER);
+            modifierInput.closed(true, false);
+            return;
+        }
+        resetChord(true);
+        actionBar.clear();
+        activeWheel = new LfgSelectorWheelScreen(minecraft, this, service,
+                mode == ChordMode.CREATE ? LfgSelectorWheelScreen.Mode.CREATE : LfgSelectorWheelScreen.Mode.KICK,
+                key);
+        minecraft.setScreen(activeWheel);
+    }
+
+    public void wheelClosed(LfgSelectorWheelScreen wheel) {
+        if (activeWheel != wheel) return;
+        activeWheel = null;
+        // A release event reaches the screen after the raw hook. Do not re-arm a latch
+        // which that same release already cleared, and do not rely on cleared KeyMappings.
+        modifierInput.closed(physicalDown(Action.CREATE), physicalDown(Action.KICK));
+        resetChord(true);
+    }
+
+    public boolean wheelStillValid(LfgSelectorWheelScreen wheel, LfgSelectorWheelScreen.Mode mode,
+                                   UUID lobbyId, boolean hostedAtOpen) {
+        if (wheel != activeWheel || !enabled.value() || minecraft.level == null || minecraft.player == null
+                || mode == LfgSelectorWheelScreen.Mode.KICK && service.lifecycle() != RaidLfgService.LifecycleState.ONLINE
+                || !wheelEnabled(mode == LfgSelectorWheelScreen.Mode.CREATE ? ChordMode.CREATE : ChordMode.KICK)) return false;
+        if (mode == LfgSelectorWheelScreen.Mode.KICK && lobbyId != null) {
+            var lobby = currentLobby();
+            if (lobby == null || !lobby.lobbyId().equals(lobbyId)) return false;
+            var hostLobby = currentHostLobby();
+            return !hostedAtOpen || hostLobby != null && hostLobby.lobbyId().equals(lobbyId);
+        }
+        return true;
+    }
+
+    public boolean isOtherWheelModifier(LfgSelectorWheelScreen.Mode mode, KeyEvent event) {
+        return matches(mode == LfgSelectorWheelScreen.Mode.CREATE ? Action.KICK : Action.CREATE, event);
+    }
+
+    private boolean physicalDown(Action action) {
+        var key = KeyBindingHelper.getBoundKeyOf(bindings.get(action).mapping);
+        return !conflicted(action) && key.getType() == InputConstants.Type.KEYSYM && key.getValue() >= 0
+                && GLFW.glfwGetKey(minecraft.getWindow().handle(), key.getValue()) == GLFW.GLFW_PRESS;
+    }
+
+    public LfgProtocol.Lobby currentLobbyForWheel() { return currentLobby(); }
+    public LfgProtocol.Lobby currentHostLobbyForWheel() { return currentHostLobby(); }
+
+    public void playSuccessfulWheelCreateExit() {
+        sounds.playPartyCreated();
+    }
+
+    public void submitWheelCreate(LfgProtocol.RaidType raid, BiConsumer<Boolean, net.minecraft.network.chat.Component> feedback) {
+        var unavailable = LfgCreationFeedback.unavailable(service);
+        if (unavailable != null) {
+            feedback.accept(false, net.minecraft.network.chat.Component.translatable(unavailable));
+            return;
+        }
+        var region = regionDetector.detect();
+        if (region.isEmpty()) {
+            feedback.accept(false, net.minecraft.network.chat.Component.translatable("ralle.lfg.wheel.region-unavailable"));
+            return;
+        }
+        var requestingWheel = activeWheel;
+        WynncraftPartyCreation.create(service, raid, region.get(), null, () -> createFeedbackPending = true)
+                .whenComplete((ignored, failure) -> minecraft.execute(() -> {
+            createFeedbackPending = false;
+            var key = failure == null ? "ralle.lfg.wheel.created" : LfgCreationFeedback.failure(failure);
+            if (key == null) { actionBar.clear(); return; }
+            var message = net.minecraft.network.chat.Component.translatable(key);
+            if (LfgCreationFeedback.key("already-exists").equals(key)) service.refresh();
+            if (requestingWheel != null && activeWheel == requestingWheel) feedback.accept(failure == null, message);
+            else if (failure == null) actionBar.show(message.getString(), LfgActionBarState.Tone.POSITIVE, LfgActionGlyph.CREATE);
+            else showCreateMessage(key, LfgActionBarState.Tone.DANGER);
+        }));
+    }
+
+    public void submitWheelKick(UUID lobbyId, UUID targetId,
+                                BiConsumer<Boolean, net.minecraft.network.chat.Component> feedback) {
+        var lobby = currentHostLobby();
+        var target = lobby == null || !lobby.lobbyId().equals(lobbyId) ? null : lobby.members().stream()
+                .filter(member -> member.minecraftUuid().equals(targetId))
+                .filter(member -> member.role() != LfgProtocol.MemberRole.HOST).findFirst().orElse(null);
+        if (target == null || service.pending(lobbyId, "kick")) {
+            feedback.accept(false, net.minecraft.network.chat.Component.translatable(
+                    target == null ? "ralle.lfg.wheel.player-left" : "ralle.lfg.wheel.pending"));
+            return;
+        }
+        var requestingWheel = activeWheel;
+        service.kick(lobbyId, target.minecraftUuid(), target.ign()).whenComplete((ignored, failure) -> minecraft.execute(() -> {
+            if (failure == null) minecraft.getSoundManager().play(SimpleSoundInstance.forUI(
+                    RalleSoundEvents.event(RalleSoundCue.KICK_EXPLOSION), 1f, .65f));
+            finishWheelMutation(requestingWheel, feedback, failure, "ralle.lfg.wheel.kicked", "ralle.lfg.wheel.kick-failed",
+                    LfgActionGlyph.KICK);
+        }));
+    }
+
+    private void finishWheelMutation(LfgSelectorWheelScreen requestingWheel,
+                                     BiConsumer<Boolean, net.minecraft.network.chat.Component> feedback,
+                                     Throwable failure, String successKey, String failureKey, LfgActionGlyph glyph) {
+        var message = net.minecraft.network.chat.Component.translatable(failure == null ? successKey : failureKey);
+        if (requestingWheel != null && activeWheel == requestingWheel) feedback.accept(failure == null, message);
+        else if (failure == null) actionBar.show(message.getString(), LfgActionBarState.Tone.POSITIVE, glyph);
+        else showMutationFailure(failure, message.getString(), glyph);
     }
 
     private void drainClicks() {
@@ -378,17 +532,25 @@ public final class RaidLfgKeybinds {
     private void execute(Selection selected) {
         presentSelection(selected, false);
         if (chordMode == ChordMode.CREATE) {
-            var state = service.store().state();
-            if (state.capabilities() == null || !state.capabilities().create() || service.pendingCreate()) return;
-            var region = regionDetector.detect();
-            if (region.isEmpty()) {
-                actionBar.show("region not detectd idk why REPORT TS", LfgActionBarState.Tone.DANGER);
+            var unavailable = LfgCreationFeedback.unavailable(service);
+            if (unavailable != null) {
+                showCreateMessage(unavailable, LfgActionBarState.Tone.DANGER);
                 return;
             }
-            service.create(selected.raid(), region.get(), null)
+            var region = regionDetector.detect();
+            if (region.isEmpty()) {
+                showCreateMessage("ralle.lfg.wheel.region-unavailable", LfgActionBarState.Tone.DANGER);
+                return;
+            }
+            WynncraftPartyCreation.create(service, selected.raid(), region.get(), null,
+                    () -> createFeedbackPending = true)
                     .whenComplete((ignored, failure) -> minecraft.execute(() -> {
+                        createFeedbackPending = false;
+                        var key = failure == null ? "ralle.lfg.wheel.created" : LfgCreationFeedback.failure(failure);
+                        if (key == null) { actionBar.clear(); return; }
                         if (failure == null) sounds.playPartyCreated();
-                        else showMutationFailure(failure, "Create failed", LfgActionGlyph.CREATE);
+                        if (LfgCreationFeedback.key("already-exists").equals(key)) service.refresh();
+                        showCreateMessage(key, failure == null ? LfgActionBarState.Tone.POSITIVE : LfgActionBarState.Tone.DANGER);
                     }));
             return;
         }
@@ -421,6 +583,11 @@ public final class RaidLfgKeybinds {
                                         command.locked() ? LfgActionGlyph.LOCK : LfgActionGlyph.UNLOCK);
                             }
                         })));
+    }
+
+    private void showCreateMessage(String key, LfgActionBarState.Tone tone) {
+        if (key != null) actionBar.show(net.minecraft.network.chat.Component.translatable(key).getString(),
+                tone, 3500L, LfgActionGlyph.CREATE);
     }
 
     private void showMissingHostParty() {

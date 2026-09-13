@@ -17,6 +17,8 @@ public final class QueueAttributionTracker {
     private final LongSupplier clock;
     private final LinkedHashMap<String, Pending> pending = new LinkedHashMap<>();
     private LinkedHashMap<String, Active> active = new LinkedHashMap<>();
+    // Retain only unexpired generations while Wynntils rebuilds its timer list.
+    private final LinkedHashMap<String, Active> cached = new LinkedHashMap<>();
     private final LinkedHashMap<String, Long> captureTombstones = new LinkedHashMap<>();
 
     public QueueAttributionTracker(LongSupplier clock) {
@@ -33,6 +35,7 @@ public final class QueueAttributionTracker {
         if (timer != null && timer.timerEndMillis() > now) {
             if (timer.senderIgn() == null) {
                 active.put(announcement.territoryName(), timer.withSender(announcement.senderIgn()));
+                cached.put(announcement.territoryName(), timer.withSender(announcement.senderIgn()));
             }
             return;
         }
@@ -45,6 +48,7 @@ public final class QueueAttributionTracker {
         Objects.requireNonNull(snapshots, "snapshots");
         long now = clock.getAsLong();
         expirePending(now);
+        cached.entrySet().removeIf(entry -> entry.getValue().timerEndMillis() <= now);
         var next = new LinkedHashMap<String, Active>();
         var observedTerritories = new HashSet<String>();
 
@@ -61,7 +65,9 @@ public final class QueueAttributionTracker {
             if (next.containsKey(territory) || next.size() >= MAX_ACTIVE) continue;
 
             Active previous = active.get(territory);
+            if (previous == null) previous = cached.get(territory);
             Active current = previous != null && previous.timerEndMillis() > now
+                    && Math.abs(previous.timerEndMillis() - snapshot.timerEndMillis()) < CLEARLY_LATER_TIMER_MILLIS
                     ? previous.withEnd(snapshot.timerEndMillis())
                     : new Active(snapshot.timerEndMillis(), null);
             Pending waiting = pending.remove(territory);
@@ -71,6 +77,8 @@ public final class QueueAttributionTracker {
             next.put(territory, current);
         }
         captureTombstones.keySet().removeIf(territory -> !observedTerritories.contains(territory));
+        cached.putAll(next);
+        trimOldest(cached, MAX_ACTIVE);
         active = next;
     }
 
@@ -78,6 +86,8 @@ public final class QueueAttributionTracker {
     public synchronized void captured(String territoryName) {
         Objects.requireNonNull(territoryName, "territoryName");
         Active removed = active.remove(territoryName);
+        Active remembered = cached.remove(territoryName);
+        if (removed == null) removed = remembered;
         pending.remove(territoryName);
         captureTombstones.put(territoryName,
                 removed == null ? Long.MAX_VALUE : removed.timerEndMillis());
@@ -86,17 +96,20 @@ public final class QueueAttributionTracker {
 
     public synchronized Optional<String> attributionFor(String territoryName) {
         Active current = active.get(territoryName);
-        return current == null ? Optional.empty() : Optional.ofNullable(current.senderIgn());
+        return current == null || current.timerEndMillis() <= clock.getAsLong()
+                ? Optional.empty() : Optional.ofNullable(current.senderIgn());
     }
 
     public synchronized void clear() {
         pending.clear();
         active.clear();
+        cached.clear();
         captureTombstones.clear();
     }
 
     int pendingSize() { return pending.size(); }
     int activeSize() { return active.size(); }
+    int cachedSize() { return cached.size(); }
 
     private void expirePending(long now) {
         pending.entrySet().removeIf(entry -> entry.getValue().expiresAtMillis() < now);

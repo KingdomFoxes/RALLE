@@ -36,7 +36,7 @@ public record ChatScreenshotSnapshot(
         return Math.max(1, viewportRight - viewportLeft);
     }
 
-    public record FrozenLine(FormattedCharSequence content, int messageIndex, int textWidth) {
+    public record FrozenLine(FormattedCharSequence content, int messageIndex, int textWidth, boolean hasVisibleContent) {
         public FrozenLine {
             if (textWidth < 0) throw new IllegalArgumentException("textWidth must not be negative");
         }

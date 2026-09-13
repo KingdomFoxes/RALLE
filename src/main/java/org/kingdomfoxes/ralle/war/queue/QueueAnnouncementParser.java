@@ -15,6 +15,9 @@ public final class QueueAnnouncementParser {
     );
     private static final Pattern IGN = Pattern.compile("[A-Za-z0-9_]{1,16}");
     private static final Pattern WHITESPACE = Pattern.compile("[ \\t]+");
+    // Wynncraft wraps the packet body itself, before Minecraft's visual wrapping.
+    // Only unwrap its exact continuation prefix; arbitrary newlines remain invalid.
+    private static final String SERVER_CONTINUATION = "\n\uDAFF\uDFFC\uE001\uDB00\uDC06 ";
 
     public Optional<QueueAnnouncement> parse(
             GuildChatMessage message,
@@ -22,11 +25,12 @@ public final class QueueAnnouncementParser {
     ) {
         Objects.requireNonNull(message, "message");
         Objects.requireNonNull(canonicalTerritoryNames, "canonicalTerritoryNames");
+        String body = message.body().replace(SERVER_CONTINUATION, " ");
         if (message.resolvedIgn().isEmpty()
                 || !IGN.matcher(message.resolvedIgn().orElseThrow()).matches()
-                || containsLineBreak(message.body())) return Optional.empty();
+                || containsLineBreak(body)) return Optional.empty();
 
-        var match = ANNOUNCEMENT.matcher(normalizeWhitespace(message.body()));
+        var match = ANNOUNCEMENT.matcher(normalizeWhitespace(body));
         if (!match.matches()) return Optional.empty();
 
         var names = new LinkedHashMap<String, String>();

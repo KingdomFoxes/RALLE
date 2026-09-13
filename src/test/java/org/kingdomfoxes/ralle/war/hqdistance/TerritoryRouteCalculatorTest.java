@@ -12,7 +12,7 @@ class TerritoryRouteCalculatorTest {
     private final TerritoryRouteCalculator calculator = new TerritoryRouteCalculator();
 
     @Test
-    void findsShortestOwnedPathAcrossCyclesAndNormalizesOneWayLinks() {
+    void findsShortestPathAcrossCyclesAndNormalizesOneWayLinks() {
         var snapshot = snapshot(
                 node("hq", "Fox", true, "a"),
                 node("a", "Fox", false, "b", "c"),
@@ -70,17 +70,17 @@ class TerritoryRouteCalculatorTest {
                 TerritorySnapshot.Territory.observed("incomplete", null, "Other", false, null));
 
         assertEquals(1, calculator.route(snapshot, "target").connectionCount());
-        assertEquals(TerritoryRouteCalculator.Route.Status.UNKNOWN, calculator.route(snapshot, "stale").status());
+        assertEquals(1, calculator.route(snapshot, "stale").connectionCount());
         assertEquals(TerritoryRouteCalculator.Route.Status.UNKNOWN, calculator.route(snapshot, "incomplete").status());
     }
 
     @Test
-    void uncertainIntermediateAndHeadquartersCannotAuthorizeNumericDistances() {
+    void uncertainOwnershipStillAllowsTraversalButCannotIdentifyHeadquarters() {
         var snapshot = snapshot(
                 node("hq", "Fox", true, "middle"),
                 TerritorySnapshot.Territory.observed("middle", "Fox", "Other", false, Set.of("target")),
                 node("target", "Fox", false));
-        assertEquals(TerritoryRouteCalculator.Route.Status.UNKNOWN, calculator.route(snapshot, "target").status());
+        assertEquals(2, calculator.route(snapshot, "target").connectionCount());
 
         var staleHq = snapshot(
                 TerritorySnapshot.Territory.observed("hq", "Fox", "Other", true, Set.of("target")),
@@ -94,6 +94,32 @@ class TerritoryRouteCalculatorTest {
                 node("hq", "Fox", true, "middle"),
                 TerritorySnapshot.Territory.observed("middle", "Fox", "Fox", false, Set.of("target")),
                 node("target", "Fox", false));
+        assertEquals(2, calculator.route(snapshot, "target").connectionCount());
+    }
+
+    @Test
+    void sixLinkShortcutThroughCapturedTerritoriesBeatsTenLinkOwnedDetour() {
+        var nodes = new LinkedHashMap<String, TerritorySnapshot.Territory>();
+        nodes.put("hq", node("hq", "Fox", true, "owned1", "foreign1"));
+        for (int i = 1; i < 10; i++) {
+            nodes.put("owned" + i, node("owned" + i, "Fox", false,
+                    i == 9 ? "target" : "owned" + (i + 1)));
+        }
+        for (int i = 1; i < 6; i++) {
+            nodes.put("foreign" + i, TerritorySnapshot.Territory.observed(
+                    "foreign" + i, "Previous owner", "Other", false,
+                    Set.of(i == 5 ? "target" : "foreign" + (i + 1))));
+        }
+        nodes.put("target", node("target", "Fox", false));
+        assertEquals(6, calculator.route(new TerritorySnapshot("Fox", nodes, true, false),
+                "target").connectionCount());
+    }
+
+    @Test
+    void missingAdvancementDetailsCanUseKnownReciprocalLinks() {
+        var snapshot = snapshot(node("hq", "Fox", true, "middle"),
+                TerritorySnapshot.Territory.observed("middle", null, "Other", false, null),
+                node("target", "Other", false, "middle"));
         assertEquals(2, calculator.route(snapshot, "target").connectionCount());
     }
 

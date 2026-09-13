@@ -6,6 +6,7 @@ import org.kingdomfoxes.ralle.api.settings.SettingsScreenFactory;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.kingdomfoxes.ralle.chat.input.ChatTypeTabService;
+import org.kingdomfoxes.ralle.chat.input.WynncraftChatInputController;
 import org.kingdomfoxes.ralle.chat.rank.GuildRankService;
 import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotService;
 import org.kingdomfoxes.ralle.lfg.client.HostPartyInviteController;
@@ -22,6 +23,7 @@ public record RalleContext(
         ChatLayoutService chatLayout,
         ChatBehaviorService chatBehavior,
         ChatTypeTabService chatTypeTabs,
+        WynncraftChatInputController chatInput,
         GuildRankService guildRanks,
         ChatScreenshotService chatScreenshots,
         RaidLfgService raidLfg,

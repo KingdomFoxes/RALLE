@@ -8,6 +8,45 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ChatTypeTabServiceTest {
     @Test
+    void serverInputSelectionOverridesPriorChannelButAllowsManualChoiceAndCommands() {
+        var service = new ChatTypeTabService();
+        service.observeSentCommand("msg FriendFox hello");
+        long previousRevision = service.inputRequestRevision();
+        service.selectAllForInput();
+        assertEquals(previousRevision + 1, service.inputRequestRevision());
+        assertEquals(Optional.of(""), service.prefixForNewChat());
+        service.observeIncomingSender("OtherFox");
+        assertEquals(Optional.of(""), service.prefixForNewChat());
+        assertEquals("unchanged draft", ChatTypeTabService.outgoingMessage("unchanged draft", ""));
+        assertEquals("/help", ChatTypeTabService.outgoingMessage("/help", ""));
+        service.rememberPrefix("/g ");
+        assertEquals(false, service.inputSelectedAll());
+        assertEquals(Optional.of("/g "), service.prefixForNewChat());
+        service.selectAllForInput();
+        service.resetSession();
+        assertEquals(false, service.inputSelectedAll());
+        assertEquals(Optional.empty(), service.prefixForNewChat());
+    }
+
+    @Test
+    void incomingMessageAddsAndUpdatesTabWithoutChangingSelectedTypeOrDraftDestination() {
+        var service = new ChatTypeTabService();
+        service.rememberPrefix("/p ");
+        service.observeIncomingSender("FirstFox");
+        assertEquals(Optional.of("/msg FirstFox "), service.nextPrefix("/p ", "/p "));
+        assertEquals(Optional.of("/p "), service.prefixForNewChat());
+        service.rememberPrefix("/msg FirstFox ");
+        service.observeIncomingSender("NewFox");
+        assertEquals(Optional.of("/msg NewFox "), service.prefixForNewChat());
+        assertEquals("/msg NewFox ", service.refreshEmptyChannel("/msg FirstFox ", ""));
+        assertEquals("/msg FirstFox ", service.refreshEmptyChannel("/msg FirstFox ", "draft"));
+        assertEquals("/p ", service.refreshEmptyChannel("/p ", ""));
+        assertEquals(Optional.of(""), service.nextPrefix("/msg FirstFox ", "/msg FirstFox "));
+        service.resetSession();
+        assertEquals(Optional.of(""), service.nextPrefix("/p ", "/p "));
+    }
+
+    @Test
     void labelsNeverBecomePartOfTheOutgoingMessage() {
         assertEquals("[Guild]", ChatTypeTabService.channelLabel("/g "));
         assertEquals("[Party]", ChatTypeTabService.channelLabel("/p "));

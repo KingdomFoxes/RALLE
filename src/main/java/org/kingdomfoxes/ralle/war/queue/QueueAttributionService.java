@@ -29,14 +29,19 @@ public final class QueueAttributionService {
     }
 
     public static void tick(Minecraft minecraft) {
-        if (!requested() || !connectedToWynncraft(minecraft)) {
-            stop(false);
+        if (!requested()) {
+            stop();
+            return;
+        }
+        if (!connectedToWynncraft(minecraft)) {
+            pause();
             return;
         }
         try {
             var adapter = integration();
-            if (!adapter.ready()) {
-                stop(false);
+            if (minecraft.level == null || minecraft.player == null || !adapter.ready()) {
+                // Wynncraft world/character loading is a pause, not a new attribution session.
+                adapter.unregister();
                 return;
             }
             adapter.register();
@@ -66,14 +71,15 @@ public final class QueueAttributionService {
     }
 
     public static void disconnect() {
-        stop(true);
+        // Keep bounded, expiring names for reconnects to the same account/guild.
+        pause();
         failed = false;
     }
 
     static void fail(Throwable exception) {
         if (failed) return;
         failed = true;
-        stop(false);
+        stop();
         LOGGER.error("Disabling war queue attribution for this session after a Wynntils integration failure", exception);
     }
 
@@ -86,7 +92,7 @@ public final class QueueAttributionService {
     }
 
     private static boolean connectedToWynncraft(Minecraft minecraft) {
-        if (minecraft == null || minecraft.level == null || minecraft.player == null) return false;
+        if (minecraft == null) return false;
         var server = minecraft.getCurrentServer();
         return server != null && WynncraftHost.matches(server.ip);
     }
@@ -100,14 +106,18 @@ public final class QueueAttributionService {
         return integration;
     }
 
-    private static void stop(boolean discardAdapter) {
+    private static void pause() {
         if (integration == null) return;
         try {
             integration.unregister();
         } catch (RuntimeException | LinkageError exception) {
             if (!failed) LOGGER.warn("Could not unregister the Wynntils queue attribution listener", exception);
         }
+    }
+
+    private static void stop() {
+        pause();
+        if (integration == null) return;
         integration.clear();
-        if (discardAdapter) integration = null;
     }
 }

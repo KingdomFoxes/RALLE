@@ -428,6 +428,7 @@ class RaidLfgServiceTest {
         gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
 
         var result = service.create(LfgProtocol.RaidType.TNA, LfgProtocol.Region.EU, null);
+        assertEquals(LfgCreationFeedback.key("processing"), LfgCreationFeedback.unavailable(service));
         var duplicate = service.create(LfgProtocol.RaidType.TNA, LfgProtocol.Region.EU, null);
         gateway.createFuture.completeExceptionally(new org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException(
                 "Fox Raid LFG could not be reached.", new java.io.IOException("lost response")));
@@ -435,12 +436,15 @@ class RaidLfgServiceTest {
         assertFalse(result.isDone());
         assertThrows(CompletionException.class, duplicate::join);
         assertTrue(service.outcomeUnknown(null, "create"));
+        assertEquals(LfgCreationFeedback.key("checking"), LfgCreationFeedback.unavailable(service));
         assertTrue(service.statusMessage().startsWith("Action submitted"));
         now[0] = 1_000;
         service.tick();
         gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshotWithLobby()));
 
         assertEquals(hostedLobby(true).lobbyId(), result.join().lobby().lobbyId());
+        assertFalse(service.pendingCreate());
+        assertFalse(service.outcomeUnknown(null, "create"));
         assertEquals(1, gateway.createCalls);
         assertEquals(1, gateway.createKeys.stream().distinct().count());
         assertEquals("Live", service.statusMessage());

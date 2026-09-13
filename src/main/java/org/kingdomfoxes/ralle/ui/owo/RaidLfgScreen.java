@@ -4,6 +4,7 @@ import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.DropdownComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
+import org.kingdomfoxes.ralle.lfg.client.LfgCreationFeedback;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.container.GridLayout;
@@ -79,6 +80,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private FlowLayout root;
     private FlowLayout gridHost;
     private LabelComponent footerStatus;
+    private Runnable updateCreateFeedback = () -> {};
     private ButtonComponent createButton;
     private ButtonComponent refreshButton;
     private ButtonComponent statusButton;
@@ -157,6 +159,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     protected void build(FlowLayout root) {
+        cancelPartyQueuePrompt();
         this.root = root;
         root.surface(Surface.VANILLA_TRANSLUCENT)
                 .horizontalAlignment(HorizontalAlignment.CENTER)
@@ -220,6 +223,13 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     public void tick() {
         super.tick();
+        updateCreateFeedback.run();
+        if (createButton != null) {
+            var reason = LfgCreationFeedback.unavailable(service);
+            createButton.active = reason == null;
+            createButton.tooltip(RalleTheme.ui(reason == null ? Component.literal("Create a raid lobby")
+                    : Component.translatable(reason)));
+        }
         var state = service.store().state();
         if (scrollTargetComponent != null) {
             scroll.scrollTo(scrollTargetComponent);
@@ -696,6 +706,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void tickKickTargeting() {
+        if (RalleModalDialogs.hasPopup(root)) return;
         var targetId = kickTargeting.completedTarget();
         if (targetId == null || kickLobbyId == null) return;
         var lobby = lobby(kickLobbyId);
@@ -745,7 +756,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void updateKickHover(int mouseX, int mouseY) {
-        if (!kickTargeting.active() || kickTargeting.submitted()) return;
+        if (RalleModalDialogs.hasPopup(root) || !kickTargeting.active() || kickTargeting.submitted()) return;
         UUID next = null;
         for (var entry : kickRows.entrySet()) {
             if (entry.getValue().isInBoundingBox(mouseX, mouseY)) {
@@ -768,7 +779,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void renderKickTargeting(GuiGraphics graphics) {
-        if (!kickTargeting.active() || kickButton == null) return;
+        if (RalleModalDialogs.hasPopup(root) || !kickTargeting.active() || kickButton == null) return;
         var target = kickRows.get(kickTargeting.visualTarget());
         if (target == null) return;
 
@@ -854,6 +865,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     private void openDisbandConfirmation(LfgProtocol.Lobby lobby) {
         if (root == null || service.lifecycle() != RaidLfgService.LifecycleState.ONLINE) return;
+        kickTargeting.reset();
         var content = UIContainers.verticalFlow(Sizing.fixed(300), Sizing.content());
         content.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
         content.child(UIComponents.label(RalleTheme.ui(Component.literal("DISBAND PARTY")))
@@ -875,7 +887,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         controls.child(confirm).child(cancel);
         content.child(controls);
 
-        var overlay = UIContainers.overlay(content).closeOnClick(false);
+        var overlay = new RalleModalOverlay<>(content);
         overlayHolder[0] = overlay;
         root.child(overlay);
     }
@@ -911,6 +923,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     private void openCreateModal() {
         if (root == null || service.lifecycle() != RaidLfgService.LifecycleState.ONLINE) return;
+        kickTargeting.reset();
         var content = UIContainers.verticalFlow(Sizing.fixed(320), Sizing.content());
         content.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
         content.child(UIComponents.label(RalleTheme.ui(Component.literal("CREATE RAID LOBBY BRATAN"))).color(RalleTheme.ACCENT));
@@ -943,12 +956,25 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var overlayHolder = new OverlayContainer<?>[1];
         var submit = UIComponents.button(RalleTheme.ui(Component.literal("Create")), ignored -> {
             ignored.active = false;
-            error.text(RalleTheme.ui(Component.literal("Creating..."))).color(RalleTheme.MUTED);
-            var statusSuppression = notifications == null
-                    ? null : notifications.suppressNextMainUiPartyStatus();
-            service.create(selectedRaid[0], selectedRegion[0], noteValue[0]).whenComplete((mutation, failure) -> {
-                if (statusSuppression != null) statusSuppression.close();
+            error.text(Component.empty());
+            var submitted = new boolean[1];
+            var finished = new boolean[1];
+            updateCreateFeedback = () -> {
+                if (finished[0] || overlayHolder[0].parent() == null) return;
+                if (submitted[0]) error.text(RalleTheme.ui(Component.translatable(
+                        LfgCreationFeedback.progress(service)))).color(RalleTheme.MUTED);
+            };
+            var statusSuppression = new LfgNotificationManager.PartyStatusSuppression[1];
+            org.kingdomfoxes.ralle.lfg.client.WynncraftPartyCreation.create(
+                    service, selectedRaid[0], selectedRegion[0], noteValue[0], () -> {
+                        submitted[0] = true;
+                        updateCreateFeedback.run();
+                        if (notifications != null) statusSuppression[0] = notifications.suppressNextMainUiPartyStatus();
+                    }).whenComplete((mutation, failure) -> {
+                if (statusSuppression[0] != null) statusSuppression[0].close();
                 minecraft.execute(() -> {
+                    finished[0] = true;
+                    if (minecraft.screen != this || overlayHolder[0].parent() == null) return;
                     if (failure == null) {
                         soundTracker.actionCompleted("create", null, sounds);
                         if (notifications != null && notifications.mainUiAutoPopOutEnabled()) {
@@ -964,16 +990,17 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                         refreshFromService(true);
                         return;
                     }
-                    var cause = unwrap(failure);
-                    if (cause instanceof LfgGatewayException gateway
-                            && "RAID_ALREADY_LISTED".equals(gateway.error().code())) {
-                        overlayHolder[0].remove();
+                    var message = LfgCreationFeedback.failure(failure);
+                    ignored.active = LfgCreationFeedback.unavailable(service) == null;
+                    error.text(RalleTheme.ui(message == null ? Component.empty() : Component.translatable(message)))
+                            .color(Color.ofRgb(0xFF6B6B));
+                    updateCreateFeedback = () -> {
+                        if (overlayHolder[0].parent() != null)
+                            ignored.active = LfgCreationFeedback.unavailable(service) == null;
+                    };
+                    if (LfgCreationFeedback.key("already-exists").equals(message)) {
+                        service.refresh();
                         refreshFromService(true);
-                    } else {
-                        ignored.active = true;
-                        error.text(RalleTheme.ui(Component.literal(cause.getMessage() == null
-                                        ? "Lobby creation failed." : cause.getMessage())))
-                                .color(Color.ofRgb(0xFF6B6B));
                     }
                 });
             });
@@ -985,9 +1012,17 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         cancel.renderer(RalleButtonRenderers.neutral());
         controls.child(submit).child(cancel);
         content.child(controls);
-        var overlay = UIContainers.overlay(content).closeOnClick(false);
+        var overlay = new RalleModalOverlay<>(content);
         overlayHolder[0] = overlay;
         root.child(overlay);
+        updateCreateFeedback = () -> {
+            if (overlay.parent() == null) return;
+            var reason = LfgCreationFeedback.unavailable(service);
+            submit.active = reason == null;
+            error.text(RalleTheme.ui(reason == null ? Component.empty() : Component.translatable(reason)))
+                    .color(RalleTheme.MUTED);
+        };
+        updateCreateFeedback.run();
     }
 
     private void openStatusDropdown(ButtonComponent trigger) {
@@ -1093,15 +1128,48 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+        if (event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE && cancelPartyQueuePrompt()) return true;
         if (event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE && RalleModalDialogs.dismissTop(root)) return true;
         return super.keyPressed(event);
     }
 
     @Override
     public void onClose() {
+        if (cancelPartyQueuePrompt()) return;
         if (RalleModalDialogs.dismissTop(root)) return;
         kickTargeting.reset();
         minecraft.setScreen(parent);
+    }
+
+    private java.util.concurrent.CompletableFuture<WynncraftPartyQueuePrompt.Choice> partyQueueResult;
+    private OverlayContainer<?> partyQueueOverlay;
+
+    void showPartyQueuePrompt(java.util.List<String> members,
+            java.util.concurrent.CompletableFuture<WynncraftPartyQueuePrompt.Choice> result) {
+        cancelPartyQueuePrompt();
+        partyQueueResult = result;
+        partyQueueOverlay = new RalleModalOverlay<>(WynncraftPartyQueuePrompt.content(members, choice -> {
+            partyQueueOverlay.remove();
+            partyQueueOverlay = null;
+            partyQueueResult = null;
+            result.complete(choice);
+        }));
+        root.child(partyQueueOverlay);
+    }
+
+    private boolean cancelPartyQueuePrompt() {
+        if (partyQueueResult == null) return false;
+        var result = partyQueueResult;
+        partyQueueResult = null;
+        if (partyQueueOverlay != null) partyQueueOverlay.remove();
+        partyQueueOverlay = null;
+        result.complete(WynncraftPartyQueuePrompt.Choice.CANCEL);
+        return true;
+    }
+
+    @Override public void removed() {
+        cancelPartyQueuePrompt();
+        super.removed();
     }
 
     record CardAction(CardActionKind kind, String label, boolean destructive, boolean requiresConfirmation) {}

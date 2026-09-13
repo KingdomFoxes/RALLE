@@ -7,6 +7,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TerritoryLabelLayoutTest {
     @Test
+    void placesQueueEstimateBelowHeadquartersCrown() {
+        var layout = TerritoryLabelLayout.calculate(
+                new TerritoryRenderBounds(10, 20, 60, 64), 8, 24, 9, true, true).orElseThrow();
+        assertEquals(40, layout.centerX());
+        assertEquals(33, layout.upperY());
+        assertEquals(61, layout.lowerY());
+    }
+
+    @Test
+    void headquartersQueueEstimateCanOverflowSmallTerritory() {
+        var layout = TerritoryLabelLayout.calculate(
+                new TerritoryRenderBounds(10, 20, 20, 10), 8, 24, 9, true, true).orElseThrow();
+        assertEquals(20, layout.centerX());
+        assertEquals(35, layout.lowerY());
+    }
+
+    @Test
     void placesLabelsAroundTagWhenAllOwnedContentHasRoom() {
         var layout = TerritoryLabelLayout.calculate(
                 new TerritoryRenderBounds(10, 20, 60, 64), 8, 24, 9, false, true).orElseThrow();

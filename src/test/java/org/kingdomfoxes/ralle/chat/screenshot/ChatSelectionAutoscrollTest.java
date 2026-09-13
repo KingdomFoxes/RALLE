@@ -63,6 +63,6 @@ class ChatSelectionAutoscrollTest {
     }
 
     private static ChatScreenshotSnapshot.FrozenLine line(int message) {
-        return new ChatScreenshotSnapshot.FrozenLine(FormattedCharSequence.forward("line", Style.EMPTY), message, 24);
+        return new ChatScreenshotSnapshot.FrozenLine(FormattedCharSequence.forward("line", Style.EMPTY), message, 24, true);
     }
 }

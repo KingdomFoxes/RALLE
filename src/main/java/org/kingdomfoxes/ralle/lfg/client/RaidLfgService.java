@@ -224,14 +224,22 @@ public final class RaidLfgService {
 
     public CompletableFuture<LfgProtocol.Mutation> create(LfgProtocol.RaidType raid,
                                                            LfgProtocol.Region region, String note) {
+        return createWithParty(raid, region, note, List.of());
+    }
+
+    public CompletableFuture<LfgProtocol.Mutation> createWithParty(LfgProtocol.RaidType raid,
+            LfgProtocol.Region region, String note, List<String> partyMembers) {
         final String cleaned;
+        final List<String> members;
         try {
             cleaned = sanitizeNote(note);
+            members = List.copyOf(partyMembers);
+            org.kingdomfoxes.ralle.lfg.protocol.StrictLfgJson.createRequest(raid, region, cleaned, members);
         } catch (IllegalArgumentException exception) {
             return CompletableFuture.failedFuture(exception);
         }
         return mutate(new PendingMutation("create", null, raid, region, cleaned, false, null),
-                (token, key) -> gateway.create(token, raid, region, cleaned, key));
+                (token, key) -> gateway.createWithParty(token, raid, region, cleaned, members, key));
     }
 
     public CompletableFuture<LfgProtocol.Mutation> join(UUID lobbyId) {

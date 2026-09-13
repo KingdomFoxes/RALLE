@@ -118,9 +118,23 @@ public final class StrictLfgJson {
     }
 
     public static String createRequest(RaidType raidType, Region region, String note) {
+        return createRequest(raidType, region, note, List.of());
+    }
+
+    public static String createRequest(RaidType raidType, Region region, String note, List<String> partyMembers) {
+        if (partyMembers.size() > 3 || partyMembers.stream().anyMatch(name -> name == null
+                || !name.matches("[A-Za-z0-9_]{1,16}"))
+                || partyMembers.stream().map(name -> name.toLowerCase(java.util.Locale.ROOT)).distinct().count() != partyMembers.size()) {
+            throw new IllegalArgumentException("Select at most three distinct party members with resolved Minecraft names.");
+        }
         note = LfgNoteText.sanitizeForSubmission(note);
         var object = new JsonObject();
         object.addProperty("raid_type", raidType.name());
+        if (!partyMembers.isEmpty()) {
+            var members = new JsonArray();
+            partyMembers.forEach(members::add);
+            object.add("party_members", members);
+        }
         object.addProperty("region", region.name());
         if (note == null || note.isBlank()) object.add("note", JsonNull.INSTANCE);
         else object.addProperty("note", note);

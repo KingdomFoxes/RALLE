@@ -6,8 +6,6 @@ import com.wynntils.core.text.StyledText;
 import com.wynntils.handlers.chat.event.ChatMessageEvent;
 import com.wynntils.handlers.chat.type.RecipientType;
 import com.wynntils.models.territories.TerritoryAttackTimer;
-import com.wynntils.models.worlds.event.WorldStateEvent;
-import com.wynntils.models.worlds.type.WorldState;
 import com.wynntils.utils.render.TextRenderTask;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -29,11 +27,13 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
     private final QueueAnnouncementParser parser;
     private final QueueAttributionTracker tracker;
     private boolean registered;
-    private SessionIdentity sessionIdentity;
+    private final QueueAttributionSession session;
+    private boolean usable;
 
     WynntilsQueueAttributionIntegration(QueueAnnouncementParser parser, QueueAttributionTracker tracker) {
         this.parser = Objects.requireNonNull(parser, "parser");
         this.tracker = Objects.requireNonNull(tracker, "tracker");
+        this.session = new QueueAttributionSession(tracker);
     }
 
     @Override public boolean ready() {
@@ -57,15 +57,8 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
     }
 
     @Override public void tick(Minecraft minecraft) {
-        SessionIdentity current = currentIdentity(minecraft);
-        if (!current.equals(sessionIdentity)) {
-            tracker.clear();
-            sessionIdentity = current;
-        }
-        if (!current.usable()) {
-            tracker.clear();
-            return;
-        }
+        usable = session.update(minecraft.getUser().getProfileId().toString(), Models.Guild.getGuildName());
+        if (!usable) return;
 
         List<AttackTimerSnapshot> timers = Models.GuildAttackTimer.getAttackTimers().stream()
                 .map(timer -> new AttackTimerSnapshot(timer.territoryName(), timer.timerEnd()))
@@ -91,7 +84,7 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
     @SubscribeEvent(receiveCanceled = true)
     public void onChatMessage(ChatMessageEvent.Match event) {
         try {
-            if (!registered || sessionIdentity == null || !sessionIdentity.usable()) return;
+            if (!registered || !usable || !ready()) return;
             if (event.getRecipientType() == RecipientType.GUILD || event.getRecipientType() == RecipientType.INFO) {
                 GuildChatIdentityResolver.resolve(event.getMessage().getComponent())
                         .flatMap(message -> parser.parse(message, territoryNames()))
@@ -103,24 +96,11 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
         }
     }
 
-    @SubscribeEvent
-    public void onWorldStateChanged(WorldStateEvent event) {
-        try {
-            if (event.getNewState() != WorldState.WORLD
-                    || event.getOldState() != event.getNewState()
-                    || event.isFirstJoinWorld()) {
-                clear();
-            }
-        } catch (RuntimeException | LinkageError exception) {
-            QueueAttributionService.fail(exception);
-        }
-    }
-
     @Override public void decorateTimer(Object timerObject, Object taskObject) {
         if (!(timerObject instanceof TerritoryAttackTimer timer) || !(taskObject instanceof TextRenderTask task)) return;
         Component decorated = QueueAttributionFormatter.format(
                 task.getText().getComponent(),
-                tracker.attributionFor(timer.territoryName()),
+                usable ? tracker.attributionFor(timer.territoryName()) : java.util.Optional.empty(),
                 Minecraft.getInstance().getUser().getName(),
                 Component.translatable("ralle.war.queue.unknown"), QueueAttributionService.selfColor());
         task.setText(StyledText.fromComponent(decorated));
@@ -136,8 +116,8 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
     }
 
     @Override public void clear() {
-        tracker.clear();
-        sessionIdentity = null;
+        session.clear();
+        usable = false;
     }
 
     private void observeCapture(Component component) {
@@ -149,30 +129,4 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
         if (canonical != null) tracker.captured(canonical);
     }
 
-    private static SessionIdentity currentIdentity(Minecraft minecraft) {
-        String guild = Objects.requireNonNullElse(Models.Guild.getGuildName(), "").strip();
-        String character = Models.Character.hasCharacter()
-                ? Objects.requireNonNullElse(Models.Character.getId(), "") : "";
-        return new SessionIdentity(
-                minecraft.getUser().getProfileId().toString(),
-                minecraft.getUser().getName(),
-                Models.WorldState.getCurrentWorldName(),
-                guild,
-                character);
-    }
-
-    private record SessionIdentity(String accountId, String accountName, String world, String guild, String character) {
-        SessionIdentity {
-            accountId = Objects.requireNonNullElse(accountId, "");
-            accountName = Objects.requireNonNullElse(accountName, "");
-            world = Objects.requireNonNullElse(world, "");
-            guild = Objects.requireNonNullElse(guild, "");
-            character = Objects.requireNonNullElse(character, "");
-        }
-
-        boolean usable() {
-            return !accountId.isBlank() && !accountName.isBlank() && !world.isBlank()
-                    && !guild.isBlank() && !character.isBlank();
-        }
-    }
 }

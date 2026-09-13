@@ -4,6 +4,8 @@ import net.minecraft.client.GuiMessageTag;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.FontDescription;
+import net.minecraft.resources.Identifier;
 import net.minecraft.network.chat.Style;
 import net.minecraft.util.FormattedCharSequence;
 import org.joml.Matrix3x2f;
@@ -50,6 +52,23 @@ class ChatGraphicsTransformTest {
         assertEquals(0xFF000000, transformed.getShadowColor());
         assertEquals(original.getColor(), transformed.getColor());
         assertSame(hover, transformed.getHoverEvent());
+    }
+
+    @Test
+    void partialFullShadowsTheBadgeSilhouetteOnceAndExemptsItsOverlappingForeground() {
+        var pill = new FontDescription.Resource(Identifier.fromNamespaceAndPath("minecraft", "banner/pill"));
+        var star = new FontDescription.Resource(Identifier.fromNamespaceAndPath("ralle", "guild_rank_star"));
+        var unrelated = new FontDescription.Resource(Identifier.fromNamespaceAndPath("example", "icons"));
+
+        var background = Style.EMPTY.withFont(pill).withColor(0x55FFFF).withoutShadow();
+        var foreground = Style.EMPTY.withFont(pill).withColor(0).withShadowColor(0x80112233);
+        var stars = Style.EMPTY.withFont(star).withColor(0);
+        assertEquals(0xFF000000, ChatTextShadowStyles.partialFull(background).getShadowColor());
+        assertEquals(Style.NO_SHADOW, ChatTextShadowStyles.partialFull(foreground).getShadowColor());
+        assertEquals(Style.NO_SHADOW, ChatTextShadowStyles.partialFull(stars).getShadowColor());
+        assertEquals(0xFF000000,
+                ChatTextShadowStyles.partialFull(Style.EMPTY.withFont(unrelated).withoutShadow()).getShadowColor());
+        assertEquals(unrelated, ChatTextShadowStyles.partialFull(Style.EMPTY.withFont(unrelated)).getFont());
     }
 
     @Test

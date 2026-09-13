@@ -41,7 +41,10 @@ platform ports. It must not depend on a concrete settings screen.
   and composes the styled prefix onto every rendered line,
   so transformations and transparent chat screenshots include timestamps without
   changing source messages, signatures, tags, logging, or interaction metadata.
-- `sound`: client-only registered UI sound events and playback adapters. Chat
+- `sound`: client-only registered UI sound events and playback adapters. LFG
+  playback and its notification-setting check run on the Minecraft client executor:
+  REST/live-event store observers may run on worker threads and must never mutate
+  SoundEngine's active-sound maps directly. Chat
   selection injects this narrow port, while its Minecraft implementation owns
   parent-setting gates, count-to-cue mapping, rate limiting, and coalescing.
   Raid LFG discovery cards own their lifecycle cues. The shared join-result
@@ -54,8 +57,24 @@ platform ports. It must not depend on a concrete settings screen.
   synchronized-state observer owns the same cue for later members joining the
   viewer's lobby, even when the browser is closed or no HUD card is present.
   Reconnect snapshots remain silent. Cancelling a join countdown is silent.
-  Packaged RALLE sounds use original processed-xylophone assets and perform no
-  network activity.
+  Chat Selection Sounds reveals a local Instrument choice, persisted as
+  `chat.chat-selection-instrument`: `xylophone` (default), `acoustic-guitar`,
+  `bass-guitar`, `piano`, or `drums`. Missing or invalid saved choices fall back
+  to xylophone. Both sound and screenshot toggles gate playback and visibility.
+  Melodic banks cap at ten D-major notes in instrument-specific registers:
+  xylophone D5 through F-sharp 6, acoustic guitar D3 through F-sharp 4,
+  bass D2 through F-sharp 3, and piano D4 through F-sharp 5.
+  Copy success plays the root then its octave 80 ms later.
+  Drums map counts 1 through 5+ to bass drum, floor tom, low tom, high tom, and
+  snare; successful copying plays one crash. All banks share the 40 ms rate
+  limit and latest-count coalescing; cancellation/failure remain silent.
+  Packaged chat sounds are original procedural synthesis. The offline generator
+  is `tools/generate_chat_instruments.py`; provenance accompanies the assets
+  in `licenses/ralle-sounds/README.txt`. The guitar uses a plucked-string model;
+  bass has stronger upper harmonics and level, while drums retain audible
+  stick/beater transients and membrane resonance. Generator `--previews` writes
+  audition WAVs to `build/audio-previews` without per-preview normalization.
+  Playback performs no network activity.
 - `lfg`: strict Fox protocol, authentication, live connection, immutable lobby
   projection, and Raid LFG orchestration. It remains inert until enabled and
   connected to Wynncraft.
@@ -148,26 +167,30 @@ scissor. It does not intercept input. A known active attack timer suppresses bot
 RALLE labels so Wynntils' real timer remains authoritative. Labels remain anchored
 above and below the centered guild tag or HQ crown without collision or territory
 fit checks, including when zoomed out. Overlap with names and neighboring
-territories is intentional; the map viewport scissor still applies. Labels
-use Wynntils' own font renderer and four-direction outline at native size with
+territories is intentional; the map viewport scissor still applies. On another
+guild's HQ, the queue estimate sits below its crown, just as ordinary territories
+place it below their guild tag. Labels use Wynntils' own font renderer and
+four-direction outline at native size with
 pixel-aligned origins; they never shrink to fractional scales to fit a territory.
 Unexpected adapter or linkage failures are logged once and disable only this
 overlay for the remainder of the client session.
 
-`WynntilsTerritorySnapshotSource` projects the current guild identity and
-advancement-backed territory information without retaining mutable Wynntils
-objects. Links are normalized as bidirectional and references to missing nodes
-are ignored. `TerritoryRouteCalculator` performs breadth-first search from the
-single owned HQ through territories regardless of their owner. Owned destinations use the same distance result,
-representing the documented hypothetical ownership change. Missing identity,
-missing or multiple owned HQs, or globally unavailable input yields `Unknown`.
-Missing information or disagreement between advancement and profile ownership
-marks only the affected territory as unreliable. Unrelated stale territories do
-not invalidate a verified route. Unreliable destinations and HQs yield `Unknown`;
-routes never traverse unreliable nodes, and an unsuccessful search that reaches
-one yields `Unknown` instead of claiming disconnection. A genuinely
-disconnected destination also yields `Unknown`; HQ yields `0` without a
-duration.
+`WynntilsTerritorySnapshotSource` projects the current guild identity, all known
+territory-profile endpoints, and advancement-backed links without retaining
+mutable Wynntils objects. Links are normalized as bidirectional; a territory
+without advancement details can still use reciprocal links reported by neighbors.
+`TerritoryRouteCalculator` performs breadth-first search from the single owned HQ
+through territories regardless of owner or disagreement between ownership sources.
+Ownership reliability determines HQ identification and the guild-holding color
+scale, not physical connectivity. This prevents newly captured foreign territories
+from blocking shortcuts and inflating both distance and provisional duration.
+Owned destinations use the same hypothetical distance result. A complete ownership
+projection showing that the player's guild owns no territories renders red
+`No Hq!` without a duration. Missing identity, an incomplete ownership projection,
+missing or multiple owned HQs while holdings remain, unreliable HQ ownership, or
+globally unavailable input yields `Unknown`. A destination unreachable through known links also yields
+`Unknown`; HQ yields `0` without a duration. Links absent from all available
+advancement data cannot be inferred from geographic adjacency.
 
 `HqInspectionService` invalidates its route cache whenever the complete immutable
 snapshot changes, covering guild identity, HQ, ownership, and connections, and
@@ -185,7 +208,10 @@ formula; zoom and the furthest territory on the world map do not affect the scal
 durations remain white. This formula excludes border penalties, taxes, routing
 detours, and attack-eligibility cooldowns. Release remains blocked until the
 formula is compared with current in-game attack previews and its fixtures are
-updated if necessary.
+updated if necessary. Wynncraft's 1.20.4 Hotfix #3 documented a temporary,
+gradually increasing timer for repeated free wars, but neither its increment nor
+decay window is public and Wynntils' territory snapshot exposes no authoritative
+penalty state. RALLE therefore does not fabricate that server-side value.
 
 ## War queue attribution
 
@@ -201,7 +227,11 @@ While enabled in an active Wynncraft world, a lazily registered Wynntils Match
 listener validates the complete current guild indicator, rank pill, speaker, and
 body envelope before accepting `{territory} defense is {level}`. All six pinned
 defense values are accepted, and the territory must equal a canonical Wynntils
-territory name after only narrow whitespace normalization. Character nicknames
+territory name after narrow whitespace normalization. Before matching the body,
+the parser replaces Wynncraft's exact newline-plus-continuation-glyph prefix
+(`U+CFFFC U+E001 U+D0006` followed by a space) with a space. This accepts
+server-wrapped territory names and defense levels while rejecting other line
+breaks and appended text. Character nicknames
 resolve through hover metadata applying to the speaker span; direct names must be
 valid Minecraft IGNs. The observer never cancels or edits chat and performs no
 commands, polling, HTTP requests, or backend work.
@@ -211,15 +241,20 @@ resolving incoming guild announcements or capture messages. Client ticks reconci
 active timers and session identity without rebuilding the full territory-name set.
 
 Announcements may wait up to ten seconds for the matching timer model entry.
-First observed sender wins for one continuously active territory countdown;
-duplicates are idempotent and conflicts do not overwrite it. Attribution follows
-timer-record replacement and end-time drift, but is dropped on observed absence,
-expiry, a verified capture message, setting disable, disconnect, world/server or
-character-selection transition, or account/guild/character identity change.
-Pending and active metadata are each capped at 512 territories. No component,
-chat history, or completed attribution is persisted. A cancellation and requeue
-that occurs entirely between observations with an indistinguishable timer cannot
-be proven to be a new generation.
+First observed sender wins for one territory countdown; duplicates are idempotent
+and conflicts do not overwrite it. A bounded memory cache preserves attribution
+through world/server switches, character selection, reconnects, and temporary empty
+timer lists. Returning timers must match the territory and cached end time within
+ten seconds; clearly different countdowns cannot inherit the old sender. Cached
+entries expire at their timer end and are removed on verified capture, setting
+disable, integration failure, or an observed account/guild change. Missing guild
+data during loading pauses attribution rather than clearing the known scope.
+Pending, active, and cached metadata are each capped at 512 territories. No
+component, chat history, or completed attribution is persisted to disk. A
+cancellation and requeue with an indistinguishable end time cannot be proven to be
+a new generation. Manual verification should cover switching worlds with multiple
+named timers, returning after expiry, captures during timer reload, and changing
+accounts or guilds.
 
 An optional version-gated mixin decorates only the row task returned by
 `TerritoryAttackTimerOverlay#lambda$render$0` and its separate editor preview.
@@ -288,11 +323,18 @@ deletion-marker replacement, then clears or prunes with the corresponding
 in-memory chat history.
 
 OW-like Chat Tabbing is gated only by the opt-in `chat.chat-type-tabbing` setting.
-Its latest valid outgoing `/msg` recipient and last selected stable chat type are
-connection-local memory only. A new empty ChatScreen restores that type without
+Incoming DM observation uses Fabric `ALLOW_GAME`, ignores action-bar messages,
+and requires Wynncraft plus the enabled setting. It verifies the private-message
+indicator/color and the local recipient, resolving nickname hover metadata on
+the name spans. It does not select DM when another channel is selected. An empty
+open DM channel refreshes to the latest contact; a non-empty draft keeps its
+destination. Unrecognized envelopes are ignored; no chat is cancelled or resent.
+Its latest valid outgoing `/msg` recipient or incoming Wynncraft DM sender and
+last selected stable chat type are connection-local memory only.
+A new empty ChatScreen restores that type without
 overriding command-key input or drafts, while disconnecting clears both values.
 The Fabric outgoing-command observer does not mutate or resend commands. The
-ChatScreen integration cycles `[Guild]`, `[Party]`, `[latest outgoing DM username]`,
+ChatScreen integration cycles `[Guild]`, `[Party]`, `[latest DM username]`,
 and `[All]`, consuming only an unmodified Tab on an empty message body.
 The channel label is rendered beside the EditBox, outside its editable contents,
 and included in its narration label. Deletion, selection, copy, and cut operate
@@ -304,6 +346,31 @@ History navigation restores the draft's channel when returning to the current
 input. Resizing preserves the channel. Drafts and normal commands retain
 Minecraft's Tab completion. The Show Who Queued color action uses the shared
 palette icon followed by `Click to edit color` in the existing control lane.
+
+`WynncraftChatInputController` gates passive text-entry detection on Wynncraft,
+a local player, and OW-like Chat Tabbing. `WynncraftInputPrompts` normalizes bounded
+server text, including wrapped lines and supplementary spacing glyphs. It accepts
+market search/quantity/price prompts and anchored instructions to enter names,
+amounts, prices, or searches in chat. Player-message prefixes and slash-command
+instructions do not match. `ChatInputRequestTracker` correlates input-menu clicks
+with a matching server close within five seconds. Add Ally in a Diplomacy menu
+and Recruit a Friend use screenshot-confirmed labels; pet rename/name controls
+and explicit chat-input tooltip instructions provide additional detection.
+Player-inventory slots, non-pickup clicks, navigation, mismatched/expired closes,
+manual closes, menu replacement, and disabled/off-server behavior do not switch.
+
+Narrow Minecraft mixins observe the menu click before mutation, system chat before
+`ChatListener.handleSystemMessage`, and server versus local menu closes separately.
+Fabric chat callbacks alone miss prompts hidden by Wynntils' enclosing listener
+wrapper. No Wynntils classes are required and no packet, message, or click is
+cancelled or generated. A monotonically changing local revision updates an open
+ChatScreen's label, layout, and narration before input/rendering. Saved channel
+drafts retain their body while selecting All. Slash commands remain commands.
+All is a one-time selection, not a forced input mode: normal Tab cycling remains
+available, and All stays selected after submission/cancellation to keep retries
+safe. No automatic restoration guesses server completion. Pending menu evidence
+clears on new actions, sent chat, timeout, menu replacement, manual close,
+feature disable, and disconnect. No new setting, keybind, or saved data is added.
 
 Custom HUD placements are stored separately in
 `config/ralle-hud-layout.properties`. Resizable elements such as the v1 chat
@@ -351,10 +418,12 @@ backend starts its 120-second presence grace only after the player's final authe
 lost; reconnecting cancels that grace, while expiry closes only the synchronized LFG lobby.
 
 The packaged protocol-v1 base URL is fixed to
-`https://kingdomfoxes.com/api/ralle/v1`. There is no runtime setting, JVM property, or automatic
-fallback. Explicitly constructed development and test gateways may use insecure HTTP and WebSocket
-transports only for loopback hosts. The JDK gateway is pinned to HTTP/1.1 so local requests do not
-attempt an `h2c` upgrade that a local HTTP server may not support.
+`https://kingdomfoxes.com/api/ralle/v1`. There is no player-facing setting or automatic fallback.
+The Gradle development command `./gradlew runClient -PlocalBackend` supplies the fixed, process-only
+development override `http://127.0.0.1:8001/api/ralle/v1`; ordinary runs and packaged builds remain
+on production. Explicitly constructed development and test gateways may use insecure HTTP and
+WebSocket transports only for loopback hosts. The JDK gateway is pinned to HTTP/1.1 so local
+requests do not attempt an `h2c` upgrade that a local HTTP server may not support.
 
 Authentication uses `POST /auth/challenge`, Minecraft's session `joinServer` proof, then
 `POST /auth/complete`. The issued bearer credential is never persisted. `GET /lobbies` provides a
@@ -445,6 +514,58 @@ held. Create maps 1–6 to Dailies, NOTG, NOL, TCC, TNA, and TWP and derives
 EU/NA/AS from locally synchronized Wynncraft server labels. Kick maps 2–4 to a
 captured member UUID and revalidates that member before mutation.
 
+Two independent local booleans can replace the Create and Kick chords with a transparent,
+non-pausing selector wheel. A wheel opens only from synchronized normal gameplay, owns input
+for that modifier hold and selects only by direct control hover. Create submits at most once
+per hold. Kick accepts another fresh left click after the previous accepted kick animation
+finishes (or a failed request returns), with at most one kick request pending. Its session captures raid or lobby/member UUID
+identities and revalidates current capabilities, region, lobby identity, host authority, target
+membership, and pending mutations immediately before submission. Releasing the modifier,
+Escape, focus loss, invalid synchronized state, or replacement by another screen cancels it.
+Notification-card hit regions and the keybind Action Bar are inactive while the wheel owns input.
+Both selectors render curved annular segments around an empty center. Create places each
+native raid item above its short label; Kick embeds player heads in a smaller ring. Hit testing
+uses the annular segments and their fixed outward envelopes, not rectangular content bounds.
+Each segment independently eases outward five logical pixels over 120 ms and returns smoothly
+on deselection. Geometry and content share the same viewport scale. Cached pixel scanlines
+keep curved rendering crisp without recalculating the raster every frame.
+Both wheels use a clean navy interior with white/gold outlines, omitting gray highlights and
+black edge-depth pixels. Kick keeps three-member geometry unchanged; one member uses just
+the top 120-degree segment, and two use equally sized top/bottom segments. Its roster tracks
+the synchronized lobby while open, resets stale index-based hover/motion on changes, and
+revalidates each UUID before submission. Accepted kicks play the bundled Realistic Explosion
+sprite (17 frames, 80 ms/frame) at the submitted target's saved position and the user-selected
+explosion sound once; failed requests never animate. Roster updates may arrive before the
+mutation response without moving or discarding that saved effect position. A delayed response
+cannot animate or change a newer wheel. Release/Escape still closes immediately.
+
+Create captures the selected clean segment, current resource-pack raid item, and selected-font
+label once into a screen-owned GPU texture, warmed on hover. During success, one composite
+quad samples that texture and the bundled 64-frame dust-motion atlas; there are no runtime
+random/hash calculations, pixel-by-pixel fill calls, repeated scissor/item/text draws, or GPU
+readbacks. The original pixel drift (up to six logical pixels upward/rightward), opacity, and
+overlap paint order are baked offline from the original animation formula. Each atlas texel
+encodes two source contributors; four pages retain up to eight overlapping pixels. The 4096px
+RGBA atlas occupies a fixed 64 MiB on the GPU and is warmed with the hover snapshot before
+playback. Its 256px pattern exactly covers wheel coordinates -128 through 127 and repeats for
+larger custom-font geometry. Eight pixels of capture padding retain outward-flying dust.
+The outward movement, 80%-of-sound dissolve duration, 100 ms empty hold, and exit
+creation cue remain. Snapshots are disposed on resize, prompt suspension and screen removal;
+failed capture uses bounded ordinary rendering and removes the segment halfway through the
+same presentation interval. Raid ItemStacks are reused for the screen's lifetime.
+`GuiCaptureTargetOverride` provides the existing isolated GUI target routing for both screenshot
+capture and wheel capture, without sharing their GUI render states or feature enablement.
+Dust-only preparation is offline in `tools/bake_create_dust.py` (NumPy/Pillow); the complete
+asset preparation entry point remains `tools/prepare_wheel_assets.py`. Provenance is packaged under
+`licenses/ralle-wheel-assets/README.txt`. To run the optional native shader smoke test, set
+`RALLE_GPU_TEST=1` and run `test --tests '*CreateWheelGpuTest'`. It uses an invisible OpenGL
+window to check the shipped shader and premade mask alpha; actual Minecraft frame-time and
+Wynntils compatibility checks still require an in-game run.
+
+Raw presses and physical-key tick recovery both choose the enabled wheel instead of entering
+the legacy chord. Closing on release cannot re-arm the release guard; closing while held waits
+until both physical modifiers are released. Screen replacement also clears the active owner.
+
 Keybind-only feedback is held in `LfgActionBarState` and rendered by the fixed
 HUD overlay above the crosshair. Raid titles use the same centralized
 raid-name/item mapping as the browser and notification cards. Join remains
@@ -463,7 +584,9 @@ controller only while the authoritative host lobby is full.
 Automatic Raid Requeue is the tenth mapping and defaults to Unbound. It is independent of the Fox
 LFG service toggle, but is inert unless explicitly bound and connected to Wynncraft. While bound,
 `AutoRaidRequeueController` listens to non-overlay server game messages for the fixed Wynncraft Ready Up prompt from any
-queue initiator, including the local player. Signed player chat is excluded. Announcement and Ready Up
+queue initiator, including the local player. Observation uses Fabric's `ALLOW_GAME` event before display
+filtering or rewriting, always allowing the message through. Nicknames and their hover identities do not
+restrict detection: only the raid and Ready Up text matter. Signed player chat and action bars are excluded. Announcement and Ready Up
 lines may arrive together or within 40 client ticks; newer announcements replace pending ones. It stores
 only the recognized fixed raid ID in `config/ralle-auto-requeue.properties`. Activation sends one
 `/pf` command and follows a bounded three-menu state machine: scan the main raid area through the
@@ -506,7 +629,12 @@ snapshots and future non-screen local actions still qualify for the external
 party-status option. This covers Discord and future keybind creation without
 assigning authority to client-reported member source labels. Abandoned
 registrations expire after one minute. Persistent party-status cards track
-roster and lobby changes and do not passively expire, but an authoritative
+roster and lobby changes and do not passively expire while below capacity. Full
+cards retain their controls for ten seconds, then use the standard 500 ms slide-out.
+Repeated full updates do not extend this deadline; reopening before exit cancels
+it, and refilling starts a fresh ten seconds. This also applies to manual spectator
+pop-outs and cards first shown already full. Automatic full dismissal suppresses
+snapshot-driven redisplay until departure or an explicit new pop-out. An authoritative
 departure, kick, or disband closes the viewer's card. Every expanded browser
 card also has an explicit full-width neutral `Pop out` control which creates the
 same persistent HUD presentation and closes the browser.
@@ -577,3 +705,62 @@ The public rank decoder gives an explicit boolean `prime_minister: true` precede
 over the base Fox rank in `ranks` (for example Lord). It stores `PRIME MINISTER` in
 the local snapshot/cache so the existing renderer emits PM in title-bearing pills.
 Absent, false, or malformed PM flags retain normal Fox-rank decoding.
+
+### Creating LFG with an existing Wynncraft party
+
+Creation feedback is shared by `LfgCreationFeedback` and localized under
+`ralle.lfg.create.*`. The browser renders it inline without discarding the form;
+number-key creation uses the Action Bar; the selector wheel uses its status area
+and falls back to the Action Bar when dismissed. Both compact displays wrap long
+feedback at the available screen width. `Creating party…` appears only after the
+existing-party choice, immediately before submission. Cancellation is silent.
+A changed imported roster reports `Your party changed. Please try again!`
+without switching to solo creation.
+
+Unavailable service feedback is `Raid LFG is unavailable. Please try again
+later!`; unexpected failures use `Please try again!`. A recruiting-lobby conflict
+uses `Party for this raid already exists!` and refreshes listings while retaining
+the browser form. Specific access, protocol, region, occupancy, and rate-limit
+reasons remain actionable. Arbitrary exception/backend diagnostics are not used
+as create-result copy. Disabled browser Create controls expose their reason in
+the tooltip, and offline create key presses provide local Action Bar feedback.
+
+The service's existing pending mutation and fresh-snapshot reconciliation remain
+authoritative: `Checking party status…` replaces processing feedback during an
+uncertain transport outcome, and duplicate submissions remain blocked. A terminal
+unconfirmed result asks the player to reconnect and check status rather than
+inviting an immediate retry. Request completion never reopens a dismissed form.
+Wheel failures remain readable for 3.5 seconds, with Escape still available, and
+never play success sounds or animations.
+
+`WynncraftPartyCreation` is the shared pre-create path for the browser, create
+chord, and selector wheel. On supported optional Wynntils installations it reads
+`Models.Party` without requesting data or issuing commands. Wynntils' party
+model extracts canonical names from nickname hover metadata in party events.
+Only a known local party leader with other members gets the confirmation. The
+browser mounts the compact confirmation over its existing create form; keybind
+creation mounts the same framed content over gameplay. Escape cancels creation.
+Party, solo, and cancel choices are explicit and never persisted. Oversized
+parties cannot be imported; no subset is silently selected. After confirmation,
+the connection, viewer, party leader, and complete roster are rechecked.
+
+The optional `party_members` create-request array contains at most three
+distinct canonical Minecraft usernames, excluding the host. Empty imports omit
+the field, preserving ordinary protocol-v1 requests. A backend without the new
+field rejects the request; the client never silently retries it as solo creation.
+Party import therefore requires deploying the matching Fox backend change.
+
+Fox resolves every imported identity through Wynncraft, accepts guests from any
+guild or no guild, and reserves host plus guests atomically under the existing
+capacity/uniqueness rules. Guests use the existing `MANUAL` member source; no
+session, eligibility, or player authorization is conferred by being imported.
+The party roster is a host-declared reservation, not server-verified proof of
+Wynncraft party membership. Guildless guests have protocol-v1 presentation
+metadata UUID `00000000-0000-0000-0000-000000000000`, name `No guild`, tag `-`,
+and neutral color `#697487`; that marker is never accepted for authentication.
+Ambiguous or unresolved names fail rather than being guessed as another account.
+Guest identity failures, duplicate identities, host duplication, existing LFG
+occupancy, and oversized parties leave no partial lobby. Accepted replays return
+the original transaction. No data is saved or transmitted before an explicit
+create action. Without a supported party-data provider, ordinary creation remains
+available and no existing-party prompt is inferred.

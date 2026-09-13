@@ -52,7 +52,7 @@ public final class HttpGuildRankGateway implements GuildRankGateway {
     }
 
     static String defaultEndpoint() {
-        String lfgBase = HttpLfgGateway.DEFAULT_BASE_URL;
+        String lfgBase = HttpLfgGateway.configuredBaseUrl();
         int apiIndex = lfgBase.indexOf("/api/ralle/v1");
         if (apiIndex < 0) throw new IllegalStateException("RALLE backend URL does not contain /api/ralle/v1");
         return lfgBase.substring(0, apiIndex) + "/api/ranks";
