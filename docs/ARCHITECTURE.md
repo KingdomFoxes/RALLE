@@ -57,8 +57,24 @@ platform ports. It must not depend on a concrete settings screen.
   synchronized-state observer owns the same cue for later members joining the
   viewer's lobby, even when the browser is closed or no HUD card is present.
   Reconnect snapshots remain silent. Cancelling a join countdown is silent.
-  Packaged RALLE sounds use original processed-xylophone assets and perform no
-  network activity.
+  Chat Selection Sounds reveals a local Instrument choice, persisted as
+  `chat.chat-selection-instrument`: `xylophone` (default), `acoustic-guitar`,
+  `bass-guitar`, `piano`, or `drums`. Missing or invalid saved choices fall back
+  to xylophone. Both sound and screenshot toggles gate playback and visibility.
+  Melodic banks cap at ten D-major notes in instrument-specific registers:
+  xylophone D5 through F-sharp 6, acoustic guitar D3 through F-sharp 4,
+  bass D2 through F-sharp 3, and piano D4 through F-sharp 5.
+  Copy success plays the root then its octave 80 ms later.
+  Drums map counts 1 through 5+ to bass drum, floor tom, low tom, high tom, and
+  snare; successful copying plays one crash. All banks share the 40 ms rate
+  limit and latest-count coalescing; cancellation/failure remain silent.
+  Packaged chat sounds are original procedural synthesis. The offline generator
+  is `tools/generate_chat_instruments.py`; provenance accompanies the assets
+  in `licenses/ralle-sounds/README.txt`. The guitar uses a plucked-string model;
+  bass has stronger upper harmonics and level, while drums retain audible
+  stick/beater transients and membrane resonance. Generator `--previews` writes
+  audition WAVs to `build/audio-previews` without per-preview normalization.
+  Playback performs no network activity.
 - `lfg`: strict Fox protocol, authentication, live connection, immutable lobby
   projection, and Raid LFG orchestration. It remains inert until enabled and
   connected to Wynncraft.

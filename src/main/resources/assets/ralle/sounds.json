@@ -55,5 +55,122 @@
   },
   "lfg.fungus_break_4": {
     "sounds": [{ "name": "minecraft:block/fungus/break4" }]
+  },
+  "ui.acoustic_guitar.copy_success": {
+    "sounds": [{ "name": "ralle:ui/acoustic_guitar/copy_success" }]
+  },
+  "ui.bass_guitar.d2": {
+    "sounds": [{ "name": "ralle:ui/bass_guitar/d2" }]
+  },
+  "ui.bass_guitar.e2": {
+    "sounds": [{ "name": "ralle:ui/bass_guitar/e2" }]
+  },
+  "ui.bass_guitar.f_sharp_2": {
+    "sounds": [{ "name": "ralle:ui/bass_guitar/f_sharp_2" }]
+  },
+  "ui.bass_guitar.g2": {
+    "sounds": [{ "name": "ralle:ui/bass_guitar/g2" }]
+  },
+  "ui.bass_guitar.a2": {
+    "sounds": [{ "name": "ralle:ui/bass_guitar/a2" }]
+  },
+  "ui.bass_guitar.b2": {
+    "sounds": [{ "name": "ralle:ui/bass_guitar/b2" }]
+  },
+  "ui.bass_guitar.c_sharp_3": {
+    "sounds": [{ "name": "ralle:ui/bass_guitar/c_sharp_3" }]
+  },
+  "ui.bass_guitar.d3": {
+    "sounds": [{ "name": "ralle:ui/bass_guitar/d3" }]
+  },
+  "ui.bass_guitar.e3": {
+    "sounds": [{ "name": "ralle:ui/bass_guitar/e3" }]
+  },
+  "ui.bass_guitar.f_sharp_3": {
+    "sounds": [{ "name": "ralle:ui/bass_guitar/f_sharp_3" }]
+  },
+  "ui.bass_guitar.copy_success": {
+    "sounds": [{ "name": "ralle:ui/bass_guitar/copy_success" }]
+  },
+  "ui.piano.d5": {
+    "sounds": [{ "name": "ralle:ui/piano/d5" }]
+  },
+  "ui.piano.e5": {
+    "sounds": [{ "name": "ralle:ui/piano/e5" }]
+  },
+  "ui.piano.f_sharp_5": {
+    "sounds": [{ "name": "ralle:ui/piano/f_sharp_5" }]
+  },
+  "ui.piano.copy_success": {
+    "sounds": [{ "name": "ralle:ui/piano/copy_success" }]
+  },
+  "ui.drums.bass_drum": {
+    "sounds": [{ "name": "ralle:ui/drums/bass_drum" }]
+  },
+  "ui.drums.floor_tom": {
+    "sounds": [{ "name": "ralle:ui/drums/floor_tom" }]
+  },
+  "ui.drums.low_tom": {
+    "sounds": [{ "name": "ralle:ui/drums/low_tom" }]
+  },
+  "ui.drums.high_tom": {
+    "sounds": [{ "name": "ralle:ui/drums/high_tom" }]
+  },
+  "ui.drums.snare": {
+    "sounds": [{ "name": "ralle:ui/drums/snare" }]
+  },
+  "ui.drums.crash": {
+    "sounds": [{ "name": "ralle:ui/drums/crash" }]
+  },
+  "ui.acoustic_guitar.d3": {
+    "sounds": [{ "name": "ralle:ui/acoustic_guitar/d3" }]
+  },
+  "ui.acoustic_guitar.e3": {
+    "sounds": [{ "name": "ralle:ui/acoustic_guitar/e3" }]
+  },
+  "ui.acoustic_guitar.f_sharp_3": {
+    "sounds": [{ "name": "ralle:ui/acoustic_guitar/f_sharp_3" }]
+  },
+  "ui.acoustic_guitar.g3": {
+    "sounds": [{ "name": "ralle:ui/acoustic_guitar/g3" }]
+  },
+  "ui.acoustic_guitar.a3": {
+    "sounds": [{ "name": "ralle:ui/acoustic_guitar/a3" }]
+  },
+  "ui.acoustic_guitar.b3": {
+    "sounds": [{ "name": "ralle:ui/acoustic_guitar/b3" }]
+  },
+  "ui.acoustic_guitar.c_sharp_4": {
+    "sounds": [{ "name": "ralle:ui/acoustic_guitar/c_sharp_4" }]
+  },
+  "ui.acoustic_guitar.d4": {
+    "sounds": [{ "name": "ralle:ui/acoustic_guitar/d4" }]
+  },
+  "ui.acoustic_guitar.e4": {
+    "sounds": [{ "name": "ralle:ui/acoustic_guitar/e4" }]
+  },
+  "ui.acoustic_guitar.f_sharp_4": {
+    "sounds": [{ "name": "ralle:ui/acoustic_guitar/f_sharp_4" }]
+  },
+  "ui.piano.d4": {
+    "sounds": [{ "name": "ralle:ui/piano/d4" }]
+  },
+  "ui.piano.e4": {
+    "sounds": [{ "name": "ralle:ui/piano/e4" }]
+  },
+  "ui.piano.f_sharp_4": {
+    "sounds": [{ "name": "ralle:ui/piano/f_sharp_4" }]
+  },
+  "ui.piano.g4": {
+    "sounds": [{ "name": "ralle:ui/piano/g4" }]
+  },
+  "ui.piano.a4": {
+    "sounds": [{ "name": "ralle:ui/piano/a4" }]
+  },
+  "ui.piano.b4": {
+    "sounds": [{ "name": "ralle:ui/piano/b4" }]
+  },
+  "ui.piano.c_sharp_5": {
+    "sounds": [{ "name": "ralle:ui/piano/c_sharp_5" }]
   }
 }

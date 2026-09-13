@@ -3,18 +3,22 @@ package org.kingdomfoxes.ralle.sound;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
+import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
+import org.kingdomfoxes.ralle.settings.RalleSettings;
 
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 public final class MinecraftChatSelectionSoundPlayer implements ChatSelectionSoundPlayer {
     static final long SELECTION_RATE_LIMIT_MILLIS = 40L;
     private static final float VOLUME = 0.35F;
 
     private final BooleanSupplier enabled;
+    private final Supplier<ChatSelectionInstrument> instrument;
     private final Consumer<RalleSoundCue> output;
     private final LongSupplier clock;
 
@@ -25,6 +29,7 @@ public final class MinecraftChatSelectionSoundPlayer implements ChatSelectionSou
     public MinecraftChatSelectionSoundPlayer(Minecraft minecraft, SettingsRegistry settings) {
         this(
                 soundGate(settings),
+                instrumentChoice(settings),
                 cue -> minecraft.getSoundManager().play(
                         SimpleSoundInstance.forUI(RalleSoundEvents.event(cue), 1.0F, VOLUME)
                 ),
@@ -37,7 +42,17 @@ public final class MinecraftChatSelectionSoundPlayer implements ChatSelectionSou
             Consumer<RalleSoundCue> output,
             LongSupplier clock
     ) {
+        this(enabled, () -> ChatSelectionInstrument.XYLOPHONE, output, clock);
+    }
+
+    MinecraftChatSelectionSoundPlayer(
+            BooleanSupplier enabled,
+            Supplier<ChatSelectionInstrument> instrument,
+            Consumer<RalleSoundCue> output,
+            LongSupplier clock
+    ) {
         this.enabled = Objects.requireNonNull(enabled, "enabled");
+        this.instrument = Objects.requireNonNull(instrument, "instrument");
         this.output = Objects.requireNonNull(output, "output");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -61,7 +76,7 @@ public final class MinecraftChatSelectionSoundPlayer implements ChatSelectionSou
     @Override
     public void playCopySuccess() {
         pendingCount = 0;
-        if (enabled.getAsBoolean()) output.accept(RalleSoundCue.CHAT_COPY_SUCCESS);
+        if (enabled.getAsBoolean()) output.accept(instrument.get().copySuccess());
     }
 
     @Override
@@ -86,24 +101,12 @@ public final class MinecraftChatSelectionSoundPlayer implements ChatSelectionSou
     }
 
     static RalleSoundCue cueForCount(int logicalMessageCount) {
-        return switch (Math.min(logicalMessageCount, 10)) {
-            case 1 -> RalleSoundCue.XYLOPHONE_D5;
-            case 2 -> RalleSoundCue.XYLOPHONE_E5;
-            case 3 -> RalleSoundCue.XYLOPHONE_F_SHARP_5;
-            case 4 -> RalleSoundCue.XYLOPHONE_G5;
-            case 5 -> RalleSoundCue.XYLOPHONE_A5;
-            case 6 -> RalleSoundCue.XYLOPHONE_B5;
-            case 7 -> RalleSoundCue.XYLOPHONE_C_SHARP_6;
-            case 8 -> RalleSoundCue.XYLOPHONE_D6;
-            case 9 -> RalleSoundCue.XYLOPHONE_E6;
-            case 10 -> RalleSoundCue.XYLOPHONE_F_SHARP_6;
-            default -> throw new IllegalArgumentException("logicalMessageCount must be positive");
-        };
+        return ChatSelectionInstrument.XYLOPHONE.cueForCount(logicalMessageCount);
     }
 
     private void playSelectionNow(int logicalMessageCount, long now) {
         pendingCount = 0;
-        output.accept(cueForCount(logicalMessageCount));
+        output.accept(instrument.get().cueForCount(logicalMessageCount));
         lastSelectionPlayedAt = now;
         hasPlayedSelection = true;
     }
@@ -112,5 +115,10 @@ public final class MinecraftChatSelectionSoundPlayer implements ChatSelectionSou
         BooleanSetting screenshotsEnabled = settings.setting("chat-screenshot-enabled", BooleanSetting.class);
         BooleanSetting soundsEnabled = settings.setting("chat-selection-sounds", BooleanSetting.class);
         return () -> screenshotsEnabled.value() && soundsEnabled.value();
+    }
+
+    static Supplier<ChatSelectionInstrument> instrumentChoice(SettingsRegistry settings) {
+        ChoiceSetting choice = settings.setting(RalleSettings.CHAT_SELECTION_INSTRUMENT_ID, ChoiceSetting.class);
+        return () -> ChatSelectionInstrument.fromSetting(choice.value());
     }
 }

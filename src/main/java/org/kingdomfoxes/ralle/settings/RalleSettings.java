@@ -13,6 +13,7 @@ import org.kingdomfoxes.ralle.api.settings.CustomPanelEntry;
 import java.util.List;
 
 public final class RalleSettings {
+    public static final String CHAT_SELECTION_INSTRUMENT_ID = "chat-selection-instrument";
     public static final String INTERFACE_FONT_ID = "interface-font";
     public static final String INTERNAL_GUILD_RANKS_ID = "internal-guild-ranks";
     public static final String GUILD_RANK_STYLE_ID = "guild-rank-style";
@@ -74,7 +75,9 @@ public final class RalleSettings {
                                 toggle("chat-screenshot-enabled"),
                                 toggle("chat-screenshot-snap-to-text"),
                                 toggle("chat-screenshot-smooth-expansion"),
-                                toggle("chat-selection-sounds")
+                                toggle("chat-selection-sounds"),
+                                choice(CHAT_SELECTION_INSTRUMENT_ID, "xylophone",
+                                        "xylophone", "acoustic-guitar", "bass-guitar", "piano", "drums")
                         )
                 )
         ));
@@ -135,6 +138,7 @@ public final class RalleSettings {
         registry.requireEnabled("chat-screenshot-snap-to-text", "chat-screenshot-enabled");
         registry.requireEnabled("chat-screenshot-smooth-expansion", "chat-screenshot-enabled");
         registry.requireEnabled("chat-selection-sounds", "chat-screenshot-enabled");
+        registry.requireEnabled(CHAT_SELECTION_INSTRUMENT_ID, "chat-selection-sounds");
         registry.requireEnabled(QUEUE_SELF_COLOR_ID, WAR_QUEUE_ATTRIBUTION_ENABLED_ID);
         registry.requireEnabled(HQ_DISTANCE_KEYBIND_ID, HQ_DISTANCE_ENABLED_ID);
         registry.requireEnabled(CONSUMABLE_HIGHLIGHT_RULES_ID, CONSUMABLE_HIGHLIGHTS_ENABLED_ID);
