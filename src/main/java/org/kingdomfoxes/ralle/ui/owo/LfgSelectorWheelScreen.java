@@ -1,5 +1,7 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
+import org.kingdomfoxes.ralle.lfg.client.LfgCreationFeedback;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -106,6 +108,18 @@ public final class LfgSelectorWheelScreen extends Screen {
 
     @Override public void tick() {
         if (minecraft.screen != this) return;
+        if (mode == Mode.CREATE) {
+            if (createFailureUntil > 0 && System.currentTimeMillis() >= createFailureUntil) {
+                cancelAndClose();
+                return;
+            }
+            if (service.pendingCreate() && model.state() == SelectorWheelModel.State.SUBMITTED)
+                status = Component.translatable(LfgCreationFeedback.progress(service));
+            else if (model.state() == SelectorWheelModel.State.SELECTING) {
+                var reason = LfgCreationFeedback.unavailable(service);
+                status = reason == null ? null : Component.translatable(reason);
+            }
+        }
         if (mode == Mode.KICK) {
             refreshKickRoster();
             if (explosionStarted >= 0 && KickWheelAnimation.finished(explosionStarted, System.currentTimeMillis())) {
@@ -179,8 +193,13 @@ public final class LfgSelectorWheelScreen extends Screen {
                 ? entries.get(model.hovered()).label()
                 : Component.translatable(mode == Mode.CREATE ? "ralle.lfg.wheel.create.hint" : "ralle.lfg.wheel.kick.hint");
         int color = statusFailure ? 0xFFFF6B6B : model.hovered() >= 0 && mode == Mode.KICK ? ACCENT : MUTED;
-        graphics.drawCenteredString(font, RalleTypography.body(below), width / 2,
-                Math.min(height - 12, height / 2 + (int) Math.ceil((outerRadius + 12) * wheelScale)), color);
+        var lines = font.split(RalleTypography.body(below), Math.max(1, width - 24));
+        int statusY = Math.min(height - lines.size() * (font.lineHeight + 2) - 4,
+                height / 2 + (int) Math.ceil((outerRadius + 12) * wheelScale));
+        for (var line : lines) {
+            graphics.drawString(font, line, (width - font.width(line)) / 2, statusY, color, true);
+            statusY += font.lineHeight + 2;
+        }
     }
 
     private void drawRaid(GuiGraphics graphics, Entry entry, int x, int y, boolean hovered) {
@@ -236,8 +255,11 @@ public final class LfgSelectorWheelScreen extends Screen {
         }
     }
 
+    private long createFailureUntil;
+
     private boolean retainsCreatePresentation() {
-        return mode == Mode.CREATE && model.state() == SelectorWheelModel.State.SUBMITTED && !statusFailure;
+        return mode == Mode.CREATE && model.state() == SelectorWheelModel.State.SUBMITTED
+                && (!statusFailure || System.currentTimeMillis() < createFailureUntil);
     }
 
     public void suspendForPartyPrompt() { partyPromptOpen = true; }
@@ -266,7 +288,7 @@ public final class LfgSelectorWheelScreen extends Screen {
         if (!enabled(entry) || !physicalKeyDown(minecraft.getWindow().handle(), initiatingKey)) return true;
         if (!model.submit()) return true;
         statusFailure = false;
-        status = Component.translatable(mode == Mode.CREATE ? "ralle.lfg.wheel.creating" : "ralle.lfg.wheel.kicking");
+        status = mode == Mode.CREATE ? null : Component.translatable("ralle.lfg.wheel.kicking");
         if (mode == Mode.CREATE) controller.submitWheelCreate(entry.raid(), this::feedback);
         else {
             pendingKickId = entry.memberId();
@@ -320,6 +342,7 @@ public final class LfgSelectorWheelScreen extends Screen {
         if (minecraft.screen != this) return;
         statusFailure = !success;
         status = message;
+        if (!success && mode == Mode.CREATE) createFailureUntil = System.currentTimeMillis() + 3500;
         if (success && mode == Mode.CREATE && creationAnimation == null && minecraft.screen == this) {
             prepareSnapshot(model.hovered());
             long duration = CreateWheelSounds.created(minecraft);

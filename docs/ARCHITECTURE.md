@@ -685,6 +685,31 @@ Absent, false, or malformed PM flags retain normal Fox-rank decoding.
 
 ### Creating LFG with an existing Wynncraft party
 
+Creation feedback is shared by `LfgCreationFeedback` and localized under
+`ralle.lfg.create.*`. The browser renders it inline without discarding the form;
+number-key creation uses the Action Bar; the selector wheel uses its status area
+and falls back to the Action Bar when dismissed. Both compact displays wrap long
+feedback at the available screen width. `Creating party…` appears only after the
+existing-party choice, immediately before submission. Cancellation is silent.
+A changed imported roster reports `Your party changed. Please try again!`
+without switching to solo creation.
+
+Unavailable service feedback is `Raid LFG is unavailable. Please try again
+later!`; unexpected failures use `Please try again!`. A recruiting-lobby conflict
+uses `Party for this raid already exists!` and refreshes listings while retaining
+the browser form. Specific access, protocol, region, occupancy, and rate-limit
+reasons remain actionable. Arbitrary exception/backend diagnostics are not used
+as create-result copy. Disabled browser Create controls expose their reason in
+the tooltip, and offline create key presses provide local Action Bar feedback.
+
+The service's existing pending mutation and fresh-snapshot reconciliation remain
+authoritative: `Checking party status…` replaces processing feedback during an
+uncertain transport outcome, and duplicate submissions remain blocked. A terminal
+unconfirmed result asks the player to reconnect and check status rather than
+inviting an immediate retry. Request completion never reopens a dismissed form.
+Wheel failures remain readable for 3.5 seconds, with Escape still available, and
+never play success sounds or animations.
+
 `WynncraftPartyCreation` is the shared pre-create path for the browser, create
 chord, and selector wheel. On supported optional Wynntils installations it reads
 `Models.Party` without requesting data or issuing commands. Wynntils' party

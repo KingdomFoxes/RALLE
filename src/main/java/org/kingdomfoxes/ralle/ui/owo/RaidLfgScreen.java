@@ -4,6 +4,7 @@ import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.DropdownComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
+import org.kingdomfoxes.ralle.lfg.client.LfgCreationFeedback;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.container.GridLayout;
@@ -79,6 +80,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private FlowLayout root;
     private FlowLayout gridHost;
     private LabelComponent footerStatus;
+    private Runnable updateCreateFeedback = () -> {};
     private ButtonComponent createButton;
     private ButtonComponent refreshButton;
     private ButtonComponent statusButton;
@@ -221,6 +223,13 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     public void tick() {
         super.tick();
+        updateCreateFeedback.run();
+        if (createButton != null) {
+            var reason = LfgCreationFeedback.unavailable(service);
+            createButton.active = reason == null;
+            createButton.tooltip(RalleTheme.ui(reason == null ? Component.literal("Create a raid lobby")
+                    : Component.translatable(reason)));
+        }
         var state = service.store().state();
         if (scrollTargetComponent != null) {
             scroll.scrollTo(scrollTargetComponent);
@@ -947,14 +956,25 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var overlayHolder = new OverlayContainer<?>[1];
         var submit = UIComponents.button(RalleTheme.ui(Component.literal("Create")), ignored -> {
             ignored.active = false;
-            error.text(RalleTheme.ui(Component.literal("Creating..."))).color(RalleTheme.MUTED);
+            error.text(Component.empty());
+            var submitted = new boolean[1];
+            var finished = new boolean[1];
+            updateCreateFeedback = () -> {
+                if (finished[0] || overlayHolder[0].parent() == null) return;
+                if (submitted[0]) error.text(RalleTheme.ui(Component.translatable(
+                        LfgCreationFeedback.progress(service)))).color(RalleTheme.MUTED);
+            };
             var statusSuppression = new LfgNotificationManager.PartyStatusSuppression[1];
             org.kingdomfoxes.ralle.lfg.client.WynncraftPartyCreation.create(
                     service, selectedRaid[0], selectedRegion[0], noteValue[0], () -> {
+                        submitted[0] = true;
+                        updateCreateFeedback.run();
                         if (notifications != null) statusSuppression[0] = notifications.suppressNextMainUiPartyStatus();
                     }).whenComplete((mutation, failure) -> {
                 if (statusSuppression[0] != null) statusSuppression[0].close();
                 minecraft.execute(() -> {
+                    finished[0] = true;
+                    if (minecraft.screen != this || overlayHolder[0].parent() == null) return;
                     if (failure == null) {
                         soundTracker.actionCompleted("create", null, sounds);
                         if (notifications != null && notifications.mainUiAutoPopOutEnabled()) {
@@ -970,16 +990,17 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                         refreshFromService(true);
                         return;
                     }
-                    var cause = unwrap(failure);
-                    if (cause instanceof LfgGatewayException gateway
-                            && "RAID_ALREADY_LISTED".equals(gateway.error().code())) {
-                        overlayHolder[0].remove();
+                    var message = LfgCreationFeedback.failure(failure);
+                    ignored.active = LfgCreationFeedback.unavailable(service) == null;
+                    error.text(RalleTheme.ui(message == null ? Component.empty() : Component.translatable(message)))
+                            .color(Color.ofRgb(0xFF6B6B));
+                    updateCreateFeedback = () -> {
+                        if (overlayHolder[0].parent() != null)
+                            ignored.active = LfgCreationFeedback.unavailable(service) == null;
+                    };
+                    if (LfgCreationFeedback.key("already-exists").equals(message)) {
+                        service.refresh();
                         refreshFromService(true);
-                    } else {
-                        ignored.active = true;
-                        error.text(RalleTheme.ui(Component.literal(cause.getMessage() == null
-                                        ? "Lobby creation failed." : cause.getMessage())))
-                                .color(Color.ofRgb(0xFF6B6B));
                     }
                 });
             });
@@ -994,6 +1015,14 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var overlay = new RalleModalOverlay<>(content);
         overlayHolder[0] = overlay;
         root.child(overlay);
+        updateCreateFeedback = () -> {
+            if (overlay.parent() == null) return;
+            var reason = LfgCreationFeedback.unavailable(service);
+            submit.active = reason == null;
+            error.text(RalleTheme.ui(reason == null ? Component.empty() : Component.translatable(reason)))
+                    .color(RalleTheme.MUTED);
+        };
+        updateCreateFeedback.run();
     }
 
     private void openStatusDropdown(ButtonComponent trigger) {

@@ -23,7 +23,7 @@ public final class WynncraftPartyCreation {
             LfgProtocol.RaidType raid, LfgProtocol.Region region, String note, Runnable beforeSubmit) {
         var viewer = service.store().state().viewer();
         if (service.lifecycle() != RaidLfgService.LifecycleState.ONLINE || viewer == null) {
-            return CompletableFuture.failedFuture(new IllegalStateException("Raid LFG is offline."));
+            return CompletableFuture.failedFuture(new LfgCreationFeedback.CreationException("unavailable"));
         }
         var party = current(viewer.ign());
         if (party.isEmpty()) {
@@ -38,14 +38,14 @@ public final class WynncraftPartyCreation {
             }
             if (minecraft.getConnection() != connection || service.lifecycle() != RaidLfgService.LifecycleState.ONLINE
                     || !viewer.equals(service.store().state().viewer())) {
-                return CompletableFuture.failedFuture(new IllegalStateException("Connection changed. Create the lobby again."));
+                return CompletableFuture.failedFuture(new LfgCreationFeedback.CreationException("connection-changed"));
             }
             if (choice == WynncraftPartyQueuePrompt.Choice.SOLO) {
                 beforeSubmit.run();
                 return service.create(raid, region, note);
             }
             if (!current(viewer.ign()).equals(party)) {
-                return CompletableFuture.failedFuture(new IllegalStateException("Your Wynncraft party changed. Create the lobby again."));
+                return CompletableFuture.failedFuture(new LfgCreationFeedback.CreationException("party-changed"));
             }
             beforeSubmit.run();
             return service.createWithParty(raid, region, note, party.get());
