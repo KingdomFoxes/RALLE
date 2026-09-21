@@ -4,6 +4,8 @@ import org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocolException;
 import org.kingdomfoxes.ralle.lfg.protocol.StrictLfgJson;
+import org.kingdomfoxes.ralle.platform.SharedHttpTransport;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,15 +40,11 @@ public final class HttpLfgGateway implements LfgGateway {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(12);
     static final int MAX_HTTP_BODY_BYTES = StrictLfgJson.MAX_DOCUMENT_CHARS * 4;
 
-    private final HttpClient client;
+    private final Supplier<HttpClient> client;
     private final URI baseUri;
 
     public HttpLfgGateway() {
-        this(HttpClient.newBuilder()
-                        .connectTimeout(Duration.ofSeconds(8))
-                        .version(HttpClient.Version.HTTP_1_1)
-                        .build(),
-                configuredBaseUrl());
+        this(SharedHttpTransport.shared(), configuredBaseUrl());
     }
 
     public static String configuredBaseUrl() {
@@ -58,7 +56,11 @@ public final class HttpLfgGateway implements LfgGateway {
     }
 
     public HttpLfgGateway(HttpClient client, String baseUrl) {
-        this.client = client;
+        this(() -> client, baseUrl);
+    }
+
+    public HttpLfgGateway(Supplier<HttpClient> client, String baseUrl) {
+        this.client = java.util.Objects.requireNonNull(client, "client");
         this.baseUri = validateBase(baseUrl);
     }
 
@@ -187,7 +189,7 @@ public final class HttpLfgGateway implements LfgGateway {
                 listener.onFailure(error);
             }
         };
-        return client.newWebSocketBuilder()
+        return client.get().newWebSocketBuilder()
                 .connectTimeout(REQUEST_TIMEOUT)
                 .header("Authorization", "Bearer " + bearerToken)
                 .header("X-Ralle-Removal-Reasons", "1")
@@ -197,7 +199,8 @@ public final class HttpLfgGateway implements LfgGateway {
     }
 
     private <T> CompletableFuture<T> get(String path, String token, Function<String, T> decoder) {
-        var builder = HttpRequest.newBuilder(resolve(path)).timeout(REQUEST_TIMEOUT).GET();
+        var builder = HttpRequest.newBuilder(resolve(path)).timeout(REQUEST_TIMEOUT)
+                .version(HttpClient.Version.HTTP_1_1).GET();
         authorize(builder, token);
         return send(builder.build(), decoder, false, 0);
     }
@@ -205,6 +208,7 @@ public final class HttpLfgGateway implements LfgGateway {
     private <T> CompletableFuture<T> post(String path, String token, UUID key, String body,
                                           Function<String, T> decoder, boolean retryTransport) {
         var builder = HttpRequest.newBuilder(resolve(path)).timeout(REQUEST_TIMEOUT)
+                .version(HttpClient.Version.HTTP_1_1)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body));
         authorize(builder, token);
@@ -214,7 +218,7 @@ public final class HttpLfgGateway implements LfgGateway {
 
     private <T> CompletableFuture<T> send(HttpRequest request, Function<String, T> decoder,
                                           boolean retryTransport, int attempt) {
-        return client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
+        return client.get().sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
                 .handle((response, failure) -> {
                     if (failure != null) {
                         if (retryTransport && attempt == 0) return send(request, decoder, true, 1);

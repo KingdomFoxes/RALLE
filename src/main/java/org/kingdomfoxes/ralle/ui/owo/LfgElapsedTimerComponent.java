@@ -8,8 +8,9 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 
-import java.time.Duration;
 import java.time.Instant;
+import net.minecraft.locale.Language;
+import java.util.function.ToIntFunction;
 
 /** Client-rendered age of a lobby owned by the synchronized viewer. */
 final class LfgElapsedTimerComponent extends BaseUIComponent {
@@ -22,6 +23,7 @@ final class LfgElapsedTimerComponent extends BaseUIComponent {
     static final int RED = 0xFFFF3333;
 
     private final Instant createdAt;
+    private final TextCache textCache = new TextCache();
 
     LfgElapsedTimerComponent(Instant createdAt) {
         this.createdAt = createdAt;
@@ -30,20 +32,60 @@ final class LfgElapsedTimerComponent extends BaseUIComponent {
 
     @Override
     public void draw(OwoUIGraphics graphics, int mouseX, int mouseY, float partialTicks, float delta) {
-        drawCentered(graphics, Minecraft.getInstance().font, x + width / 2, y, createdAt, Instant.now());
+        textCache.drawCentered(graphics, Minecraft.getInstance().font, x + width / 2, y, createdAt, Instant.now());
     }
 
-    static void drawCentered(GuiGraphics graphics, Font font, int centerX, int top,
-                             Instant createdAt, Instant now) {
-        var display = display(createdAt, now);
-        var text = RalleTypography.body(Component.literal(display.text()));
-        graphics.drawString(font, text, centerX - font.width(text) / 2, top + 2, display.color(), false);
+    /** One entry per browser component or visible notification; never keyed globally by lobby. */
+    static final class TextCache {
+        private final ToIntFunction<Component> measure;
+        private long seconds = -1;
+        private boolean karla;
+        private Object font;
+        private Object language;
+        private long resources;
+        private RenderedText rendered;
+
+        TextCache() { this(text -> Minecraft.getInstance().font.width(text)); }
+        TextCache(ToIntFunction<Component> measure) { this.measure = measure; }
+
+        void drawCentered(GuiGraphics graphics, Font font, int centerX, int top,
+                          Instant createdAt, Instant now) {
+            var value = resolve(elapsedSeconds(createdAt, now), RalleTypography.usesKarla(),
+                    font, Language.getInstance(), RalleTypography.resourceVersion());
+            graphics.drawString(font, value.text(), centerX - value.width() / 2, top + 2, value.color(), false);
+        }
+
+        RenderedText resolve(long elapsed, boolean usesKarla, Object fontIdentity,
+                             Object languageIdentity, long resourceVersion) {
+            if (rendered == null || seconds != elapsed || karla != usesKarla || font != fontIdentity
+                    || language != languageIdentity || resources != resourceVersion) {
+                var display = display(elapsed);
+                var text = RalleTypography.body(Component.literal(display.text()));
+                rendered = new RenderedText(text, measure.applyAsInt(text), display.color());
+                seconds = elapsed;
+                karla = usesKarla;
+                font = fontIdentity;
+                language = languageIdentity;
+                resources = resourceVersion;
+            }
+            return rendered;
+        }
     }
+
+    record RenderedText(Component text, int width, int color) {}
 
     static Display display(Instant createdAt, Instant now) {
-        long seconds = createdAt == null || now == null
-                ? 0L
-                : Math.max(0L, Duration.between(createdAt, now).getSeconds());
+        return display(elapsedSeconds(createdAt, now));
+    }
+
+    static long elapsedSeconds(Instant createdAt, Instant now) {
+        if (createdAt == null || now == null) return 0;
+        long seconds = now.getEpochSecond() - createdAt.getEpochSecond();
+        if (now.getNano() < createdAt.getNano()) seconds--;
+        return Math.max(0, seconds);
+    }
+
+    private static Display display(long seconds) {
         int color = seconds < 5 * 60L ? GREEN : seconds < 10 * 60L ? YELLOW : RED;
         return new Display(format(seconds), color);
     }

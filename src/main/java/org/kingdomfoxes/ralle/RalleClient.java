@@ -114,6 +114,7 @@ public final class RalleClient implements ClientModInitializer {
         settings.seal();
         placements.seal();
         RalleTypography.bind(settings);
+        RalleTypography.registerResourceInvalidation();
         HqDistanceOverlay.configureKeybind(settings.setting(RalleSettings.HQ_DISTANCE_KEYBIND_ID, KeybindSetting.class));
         QueueAttributionService.configureColor(settings.setting(RalleSettings.QUEUE_SELF_COLOR_ID,
                 org.kingdomfoxes.ralle.api.settings.ColorSetting.class));
@@ -129,6 +130,8 @@ public final class RalleClient implements ClientModInitializer {
         var minecraft = Minecraft.getInstance();
         var diagnostics = new RalleDiagnostics(minecraft, FabricLoader.getInstance().getGameDir());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> diagnostics.close());
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client ->
+                org.kingdomfoxes.ralle.platform.SharedHttpTransport.shared().close());
         var consumableHighlights = new ConsumableHighlightService(
                 minecraft,
                 settings.setting(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID, BooleanSetting.class),

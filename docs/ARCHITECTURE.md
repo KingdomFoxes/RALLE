@@ -16,6 +16,11 @@ platform ports. It must not depend on a concrete settings screen.
 - `api.hud`: normalized, resolution-independent HUD element placement and local
   persistence owned by RALLE.
 - `ui.owo`: the owo-lib adapter that renders the settings registry.
+  `SettingsNavigationState` keeps navigation in memory immediately and writes
+  changed snapshots after 300 ms of scroll inactivity. Explicit page changes and
+  screen removal (including opening the HUD editor) flush immediately; identical
+  snapshots do not write. Search scrolling never replaces the saved page position.
+  Failed writes preserve memory and retry after the idle delay without breaking UI.
 - `chat`: Minecraft chat integration and Wynntils compatibility boundary.
   Narrow graphics transforms implement message direction,
   horizontal alignment, and four shadow styles while retaining vanilla chat
@@ -426,6 +431,17 @@ on production. Explicitly constructed development and test gateways may use inse
 WebSocket transports only for loopback hosts. The JDK gateway is pinned to HTTP/1.1 so local
 requests do not attempt an `h2c` upgrade that a local HTTP server may not support.
 
+The LFG and public guild-rank gateways share `platform.SharedHttpTransport`.
+Constructing either gateway does not initialize a JDK client or send a request;
+the first enabled consumer initializes the transport once. Its connect timeout is
+eight seconds; individual HTTP/WebSocket operations retain their twelve-second
+timeouts. LFG HTTP requests explicitly use HTTP/1.1; rank requests retain the JDK
+default negotiation. Bearers and idempotency keys remain request-local, and the
+shared client has no cookie handler or authenticator. Feature disable/disconnect
+closes its live connection without destroying the shared transport. Client shutdown
+shuts down the owned client without waiting on open sockets or initializing an
+unused client. Injected test clients remain caller-owned.
+
 Authentication uses `POST /auth/challenge`, Minecraft's session `joinServer` proof, then
 `POST /auth/complete`. The issued bearer credential is never persisted. `GET /lobbies` provides a
 complete authorized snapshot; create, join, leave, disband, kick, lock/unlock, and ping use
@@ -660,6 +676,13 @@ nonfunctional shortcut.
 The host's expanded browser cards and persistent party-status card derive a live lobby-age timer
 locally from the synchronized lobby creation instant. Collapsed browser cards omit the timer. The
 timer is normally omitted on another player's lobby and adds no stored timer state.
+Each browser timer and visible notification caches its formatted component and
+logical width by elapsed second, selected font, language, font renderer and resource
+reload generation. Font/language reloads invalidate measurements after their
+reloaders finish. GUI scale uses the same logical width. Frozen timeout cards reuse
+the same `30:00` presentation. HUD timer entries are evicted when cards disappear;
+raid preview stacks are private render-only values bounded by the raid enum, and
+both caches clear on disconnect. There are no globally exposed mutable item stacks.
 
 The only persisted LFG values are local opt-in, notification, sound, keybind,
 HUD-placement settings, and the single last-raid ID used by Automatic Raid Requeue. Whether a card

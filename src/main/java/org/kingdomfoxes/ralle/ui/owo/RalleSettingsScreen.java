@@ -677,8 +677,9 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             scroll.scrollToImmediately(pendingScrollProgress);
             pendingScrollProgress = null;
         }
-        if (!query.isEmpty() || activePage == SettingsNavigationState.Page.ABOUT) return;
-        if (Math.abs(scroll.progress() - lastSavedScroll) > .005) persistNavigation();
+        if (query.isEmpty() && activePage != SettingsNavigationState.Page.ABOUT
+                && Double.compare(scroll.progress(), lastSavedScroll) != 0) persistNavigation();
+        navigation.flushIfIdle();
     }
 
     private void updateGuildRankRefreshButton(ButtonComponent button) {
@@ -692,12 +693,12 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void persistNavigation() {
-        if (activePage == SettingsNavigationState.Page.ABOUT || selectedCategory == null) return;
-        lastSavedScroll = scroll == null ? 0 : scroll.progress();
+        if (!query.isEmpty() || activePage == SettingsNavigationState.Page.ABOUT || selectedCategory == null) return;
+        lastSavedScroll = pendingScrollProgress != null ? pendingScrollProgress : scroll == null ? 0 : scroll.progress();
         if (activePage == SettingsNavigationState.Page.CATEGORY) {
-            navigation.showCategory(selectedCategory, lastSavedScroll);
+            navigation.remember(SettingsNavigationState.Snapshot.categoryPage(selectedCategory, lastSavedScroll));
         } else {
-            navigation.showSubcategory(selectedCategory, selectedSubcategory, lastSavedScroll);
+            navigation.remember(SettingsNavigationState.Snapshot.subcategoryPage(selectedCategory, selectedSubcategory, lastSavedScroll));
         }
     }
 
@@ -736,6 +737,13 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         } catch (IllegalArgumentException ignored) {
             return RalleTheme.ui(Component.translatable("ralle.settings.keybind.unbound"));
         }
+    }
+
+    @Override
+    public void removed() {
+        persistNavigation();
+        navigation.flush();
+        super.removed();
     }
 
     @Override

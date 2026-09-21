@@ -58,6 +58,10 @@ public final class LfgNotificationOverlay {
     private final LfgDisbandConfirmation disbandConfirmation;
     private final LfgKeybindHints keybindHints;
     private List<HitRegion> hitRegions = List.of();
+    private final java.util.Map<UUID, LfgElapsedTimerComponent.TextCache> timers = new java.util.HashMap<>();
+    // Private, render-only stacks: no caller can mutate a shared global item preview.
+    private final java.util.Map<LfgProtocol.RaidType, ItemStack> raidPreviews =
+            new java.util.EnumMap<>(LfgProtocol.RaidType.class);
 
     public LfgNotificationOverlay(Minecraft minecraft, RaidLfgService service,
                                   LfgNotificationManager notifications,
@@ -102,11 +106,16 @@ public final class LfgNotificationOverlay {
 
     public void tick() {
         notifications.tick();
+        if (minecraft.level == null) {
+            timers.clear();
+            raidPreviews.clear();
+        }
     }
 
     private void render(GuiGraphics graphics, int mouseX, int mouseY, boolean interactive) {
         try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.LFG_OVERLAY_RENDER)) {
             var cards = notifications.visibleCards();
+            timers.keySet().removeIf(id -> cards.stream().noneMatch(card -> card.lobby().lobbyId().equals(id)));
             if (cards.isEmpty()) {
                 hitRegions = List.of();
                 return;
@@ -167,7 +176,8 @@ public final class LfgNotificationOverlay {
         graphics.renderOutline(bounds.x(), bounds.y(), bounds.width(), bounds.height(), OUTLINE);
 
         var lobby = card.lobby();
-        graphics.renderItem(new ItemStack(RaidPresentation.item(lobby.raidType())), bounds.x() + 7, bounds.y() + 6);
+        graphics.renderItem(raidPreviews.computeIfAbsent(lobby.raidType(),
+                raid -> new ItemStack(RaidPresentation.item(raid))), bounds.x() + 7, bounds.y() + 6);
         var close = closeBounds(bounds);
         int titleWidth = Math.max(20, close.x() - (bounds.x() + 28) - 6);
         graphics.drawString(minecraft.font,
@@ -204,7 +214,7 @@ public final class LfgNotificationOverlay {
             }
         }
         if (showElapsedTimer) {
-            LfgElapsedTimerComponent.drawCentered(
+            timers.computeIfAbsent(lobby.lobbyId(), ignored -> new LfgElapsedTimerComponent.TextCache()).drawCentered(
                     graphics, minecraft.font, bounds.x() + bounds.width() / 2, bounds.y() + 46,
                     lobby.createdAt(), timerNow(card, java.time.Instant.now()));
         }

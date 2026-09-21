@@ -1,6 +1,8 @@
 package org.kingdomfoxes.ralle.chat.rank;
 
 import org.kingdomfoxes.ralle.lfg.client.HttpLfgGateway;
+import org.kingdomfoxes.ralle.platform.SharedHttpTransport;
+import java.util.function.Supplier;
 
 import java.io.IOException;
 import java.net.URI;
@@ -19,22 +21,26 @@ public final class HttpGuildRankGateway implements GuildRankGateway {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(12);
     private static final int MAX_BODY_BYTES = StrictGuildRankJson.MAX_DOCUMENT_CHARS * 4;
 
-    private final HttpClient client;
+    private final Supplier<HttpClient> client;
     private final URI endpoint;
 
     public HttpGuildRankGateway() {
-        this(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build(), defaultEndpoint());
+        this(SharedHttpTransport.shared(), defaultEndpoint());
     }
 
     public HttpGuildRankGateway(HttpClient client, String endpoint) {
-        this.client = client;
+        this(() -> client, endpoint);
+    }
+
+    public HttpGuildRankGateway(Supplier<HttpClient> client, String endpoint) {
+        this.client = java.util.Objects.requireNonNull(client, "client");
         this.endpoint = validateEndpoint(endpoint);
     }
 
     @Override
     public CompletableFuture<Map<String, String>> fetchTitles() {
         var request = HttpRequest.newBuilder(endpoint).timeout(REQUEST_TIMEOUT).GET().build();
-        return client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream()).thenApply(response -> {
+        return client.get().sendAsync(request, HttpResponse.BodyHandlers.ofInputStream()).thenApply(response -> {
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 try (var ignored = response.body()) {
                     // Close the bounded response stream before reporting the public API failure.

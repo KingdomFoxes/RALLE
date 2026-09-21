@@ -10,32 +10,63 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.function.LongSupplier;
 
 /** Persists settings-screen navigation separately from feature settings. */
 public final class SettingsNavigationState {
     private static final Logger LOGGER = LoggerFactory.getLogger(SettingsNavigationState.class);
     private final Path path;
+    static final long SAVE_IDLE_MILLIS = 300;
+    private final LongSupplier clock;
     private Snapshot snapshot;
+    private Snapshot saved;
+    private long changedAt;
 
     public SettingsNavigationState(Path path, SettingsRegistry registry) {
+        this(path, registry, () -> System.nanoTime() / 1_000_000L);
+    }
+
+    SettingsNavigationState(Path path, SettingsRegistry registry, LongSupplier clock) {
         this.path = Objects.requireNonNull(path, "path");
+        this.clock = Objects.requireNonNull(clock, "clock");
         this.snapshot = load(Objects.requireNonNull(registry, "registry"));
+        this.saved = snapshot;
     }
 
     public Snapshot snapshot() { return snapshot; }
 
     public void showAbout() {
-        snapshot = Snapshot.aboutPage();
-        save();
+        remember(Snapshot.aboutPage());
+        flush();
     }
 
     public void showCategory(String categoryId, double scrollProgress) {
-        snapshot = Snapshot.categoryPage(categoryId, scrollProgress);
-        save();
+        remember(Snapshot.categoryPage(categoryId, scrollProgress));
+        flush();
     }
 
     public void showSubcategory(String categoryId, String subcategoryId, double scrollProgress) {
-        snapshot = Snapshot.subcategoryPage(categoryId, subcategoryId, scrollProgress);
+        remember(Snapshot.subcategoryPage(categoryId, subcategoryId, scrollProgress));
+        flush();
+    }
+
+    /** Scroll tracking updates memory immediately, including subcategory tracking. */
+    public void remember(Snapshot next) {
+        Objects.requireNonNull(next, "next");
+        if (snapshot.equals(next)) return;
+        snapshot = next;
+        changedAt = clock.getAsLong();
+    }
+
+    public void flushIfIdle() {
+        if (clock.getAsLong() - changedAt >= SAVE_IDLE_MILLIS) flush();
+    }
+
+    /** Also called on removal, including opening the HUD editor or disconnecting. */
+    public void flush() {
+        if (snapshot.equals(saved)) return;
+        // Back off after an I/O failure instead of retrying every client tick.
+        changedAt = clock.getAsLong();
         save();
     }
 
@@ -104,6 +135,7 @@ public final class SettingsNavigationState {
             try (var writer = Files.newBufferedWriter(path)) {
                 properties.store(writer, "RALLE settings screen navigation");
             }
+            saved = snapshot;
         } catch (IOException exception) {
             LOGGER.warn("Could not save RALLE settings navigation to {}", path, exception);
         }

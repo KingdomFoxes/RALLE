@@ -16,6 +16,64 @@ class SettingsNavigationStateTest {
     @TempDir Path directory;
 
     @Test
+    void longScrollStaysInMemoryUntilIdleAndIdenticalSnapshotsDoNotWrite() throws Exception {
+        var path = directory.resolve("navigation.properties");
+        var clock = new java.util.concurrent.atomic.AtomicLong();
+        var state = new SettingsNavigationState(path, registry(), clock::get);
+        state.showCategory("chat", 0);
+        var initial = Files.readString(path);
+        for (int step = 1; step <= 100; step++) {
+            clock.addAndGet(50);
+            state.remember(SettingsNavigationState.Snapshot.categoryPage("chat", step / 100d));
+            state.flushIfIdle();
+            assertEquals(initial, Files.readString(path));
+            assertEquals(step / 100d, state.snapshot().scrollProgress());
+        }
+        clock.addAndGet(SettingsNavigationState.SAVE_IDLE_MILLIS - 1);
+        state.flushIfIdle();
+        assertEquals(initial, Files.readString(path));
+        clock.incrementAndGet();
+        state.flushIfIdle();
+        assertEquals(1, new SettingsNavigationState(path, registry()).snapshot().scrollProgress());
+
+        var marker = java.nio.file.attribute.FileTime.fromMillis(1000);
+        Files.setLastModifiedTime(path, marker);
+        state.showCategory("chat", 1);
+        state.flush();
+        assertEquals(marker, Files.getLastModifiedTime(path));
+    }
+
+    @Test
+    void closeFlushesFinalSmallScrollAndPageChangesFlushImmediately() {
+        var path = directory.resolve("navigation.properties");
+        var state = new SettingsNavigationState(path, registry(), () -> 0);
+        state.showSubcategory("chat", "screenshots", .5);
+        state.remember(SettingsNavigationState.Snapshot.subcategoryPage("chat", "screenshots", .501));
+        state.flush(); // Screen.removed flushes even before the debounce expires.
+        assertEquals(.501, new SettingsNavigationState(path, registry()).snapshot().scrollProgress());
+        state.remember(SettingsNavigationState.Snapshot.subcategoryPage("chat", "screenshots", .7));
+        state.showAbout();
+        assertTrue(new SettingsNavigationState(path, registry()).snapshot().about());
+    }
+
+    @Test
+    void failedSaveKeepsMemoryAndRetriesAfterIdle() throws Exception {
+        var parent = directory.resolve("blocked");
+        Files.writeString(parent, "not a directory");
+        var path = parent.resolve("navigation.properties");
+        var clock = new java.util.concurrent.atomic.AtomicLong();
+        var state = new SettingsNavigationState(path, registry(), clock::get);
+        state.showCategory("chat", .75);
+        assertEquals(.75, state.snapshot().scrollProgress());
+        Files.delete(parent);
+        state.flushIfIdle();
+        assertFalse(Files.exists(path));
+        clock.set(SettingsNavigationState.SAVE_IDLE_MILLIS);
+        state.flushIfIdle();
+        assertEquals(.75, new SettingsNavigationState(path, registry()).snapshot().scrollProgress());
+    }
+
+    @Test
     void firstVisitUsesAboutAndLaterVisitsRestoreEveryPageKind() {
         var registry = registry();
         var path = directory.resolve("ralle-settings-ui.properties");

@@ -19,8 +19,22 @@ public final class RalleTypography {
     private static final FontDescription KARLA_BODY = resource("karla_bold_ui");
     private static final FontDescription KARLA_COMPACT = resource("karla_bold_ui_small");
     private static Supplier<String> selectedFont = () -> VANILLA;
+    private static long resourceVersion;
 
     private RalleTypography() {}
+
+    /** Called once by bootstrap; reload invalidates cached glyph measurements. */
+    public static void registerResourceInvalidation() {
+        var loader = net.fabricmc.fabric.api.resource.v1.ResourceLoader.get(
+                net.minecraft.server.packs.PackType.CLIENT_RESOURCES);
+        var id = Identifier.fromNamespaceAndPath("ralle", "typography_cache");
+        loader.registerReloader(id,
+                (net.minecraft.server.packs.resources.ResourceManagerReloadListener) manager -> resourceVersion++);
+        loader.addReloaderOrdering(net.fabricmc.fabric.api.resource.v1.reloader.ResourceReloaderKeys.Client.FONTS, id);
+        loader.addReloaderOrdering(net.fabricmc.fabric.api.resource.v1.reloader.ResourceReloaderKeys.Client.LANGUAGES, id);
+    }
+
+    static long resourceVersion() { return resourceVersion; }
 
     public static void bind(SettingsRegistry settings) {
         Objects.requireNonNull(settings, "settings");
