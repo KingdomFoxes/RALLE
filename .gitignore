@@ -8,3 +8,11 @@ run/
 *.iml
 *.ipr
 *.iws
+
+# Generated review artifacts; keep review generators, notes and patches tracked.
+outputs/**/*.png
+outputs/**/*.xlsx
+outputs/**/*.inspect.ndjson
+outputs/**/inventory.json
+outputs/**/*.tar.gz
+prototypes/ralle-settings-site.tar.gz

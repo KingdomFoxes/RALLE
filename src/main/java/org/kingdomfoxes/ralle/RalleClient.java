@@ -9,7 +9,6 @@ import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
-import org.kingdomfoxes.ralle.api.feature.FeatureRegistry;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
@@ -78,7 +77,6 @@ public final class RalleClient implements ClientModInitializer {
         FullShadowRenderingStrategy.registerCompositor();
         RalleSoundEvents.register();
 
-        var features = new FeatureRegistry();
         var configDirectory = FabricLoader.getInstance().getConfigDir();
         boolean existingInstall = RalleOnboardingNotice.hasExistingConfig(configDirectory);
         var settings = new SettingsRegistry(configDirectory.resolve("ralle.properties"));
@@ -113,7 +111,6 @@ public final class RalleClient implements ClientModInitializer {
                 LfgNotificationOverlay.CARD_HEIGHT,
                 HudPlacementRegistry.PlacementPolicy.FIXED_SIDE_ANCHORED
         ));
-        features.seal();
         settings.seal();
         placements.seal();
         RalleTypography.bind(settings);
@@ -195,7 +192,6 @@ public final class RalleClient implements ClientModInitializer {
                 new MinecraftChatSelectionSoundPlayer(Minecraft.getInstance(), settings)
         );
         context = new RalleContext(
-                features,
                 settings,
                 new OwoSettingsScreenFactory(settings, chatLayout, navigation, guildRanks, consumableHighlights.store()),
                 chatLayout,

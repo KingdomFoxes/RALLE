@@ -10,7 +10,8 @@ choices do not leak into product logic.
 then seals registration. Feature code may depend on RALLE APIs and narrow
 platform ports. It must not depend on a concrete settings screen.
 
-- `api.feature`: feature lifecycle and registration contracts.
+- `api.feature`: shared identifier validation for settings and HUD registration.
+  Bootstrap composes services directly; there is no separate feature registry.
 - `api.settings`: UI-independent categories and entries owned by RALLE.
 - `api.hud`: normalized, resolution-independent HUD element placement and local
   persistence owned by RALLE.

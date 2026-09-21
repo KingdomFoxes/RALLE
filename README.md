@@ -1,8 +1,8 @@
 # RALLE
 
 Raid Alliance Logistics Liaison Equipment is a client-side Fabric mod for
-Minecraft 1.21.11. The current foundation includes lifecycle composition, a
-RALLE-owned feature and settings registry, local settings persistence, and a
+Minecraft 1.21.11. The current foundation includes lifecycle composition,
+RALLE-owned settings and HUD registries, local settings persistence, and a
 searchable owo-lib settings screen opened with `/ralle settings`.
 The distributable RALLE jar bundles its compatible owo-lib version, so users do
 not need to install owo-lib separately. Fabric API remains a required separate
