@@ -18,6 +18,7 @@ public final class LfgJoinController {
     public static final Duration COUNTDOWN_DURATION = Duration.ofSeconds(3);
 
     private final RaidLfgService service;
+    private final LfgStateAccess stateAccess;
     private final LongSupplier clockMillis;
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private UUID lobbyId;
@@ -28,75 +29,86 @@ public final class LfgJoinController {
 
     LfgJoinController(RaidLfgService service, LongSupplier clockMillis) {
         this.service = service;
+        this.stateAccess = service.stateAccess();
         this.clockMillis = clockMillis;
     }
 
-    public synchronized boolean start(UUID requestedLobbyId) {
-        if (phase.terminal()) clear();
-        if (phase != Phase.IDLE || requestedLobbyId == null || !joinable(lobby(requestedLobbyId))) return false;
-        lobbyId = requestedLobbyId;
-        startedAtMillis = clockMillis.getAsLong();
-        phase = Phase.COUNTDOWN;
-        outcome = Outcome.NONE;
-        failureText = null;
-        notifyListeners();
-        return true;
-    }
-
-    public synchronized boolean cancel() {
-        if (phase != Phase.COUNTDOWN) return false;
-        clear();
-        notifyListeners();
-        return true;
-    }
-
-    public synchronized void tick() {
-        if (phase != Phase.COUNTDOWN) return;
-        var current = lobby(lobbyId);
-        if (!joinable(current)) {
-            finish(current != null && current.members().size() >= current.capacity()
-                    ? Outcome.PARTY_FILLED : Outcome.PARTY_UNAVAILABLE, null);
-            return;
+    public boolean start(UUID requestedLobbyId) {
+        try (var stateScope = stateAccess.enter()) {
+            if (phase.terminal()) clear();
+            if (phase != Phase.IDLE || requestedLobbyId == null || !joinable(lobby(requestedLobbyId))) return false;
+            lobbyId = requestedLobbyId;
+            startedAtMillis = clockMillis.getAsLong();
+            phase = Phase.COUNTDOWN;
+            outcome = Outcome.NONE;
+            failureText = null;
+            notifyListeners();
+            return true;
         }
-        if (clockMillis.getAsLong() - startedAtMillis < COUNTDOWN_DURATION.toMillis()) return;
-
-        phase = Phase.SUBMITTING;
-        notifyListeners();
-        var submittedLobbyId = lobbyId;
-        service.join(submittedLobbyId).whenComplete((mutation, failure) -> {
-            synchronized (LfgJoinController.this) {
-                if (!submittedLobbyId.equals(lobbyId) || phase != Phase.SUBMITTING) return;
-                if (failure == null) {
-                    finish(Outcome.ACCEPTED, null);
-                } else {
-                    var authoritative = lobby(submittedLobbyId);
-                    if (!joinable(authoritative)) {
-                        finish(authoritative != null && authoritative.members().size() >= authoritative.capacity()
-                                ? Outcome.PARTY_FILLED : Outcome.PARTY_UNAVAILABLE, null);
-                    } else {
-                        var mapped = mapFailure(unwrap(failure));
-                        finish(mapped.outcome(), mapped.text());
-                    }
-                }
-            }
-        });
     }
 
-    public synchronized Snapshot snapshot() {
-        long remaining = phase == Phase.COUNTDOWN
-                ? Math.max(0, COUNTDOWN_DURATION.toMillis() - (clockMillis.getAsLong() - startedAtMillis))
-                : 0;
-        int seconds = remaining == 0 ? 0 : (int) Math.ceil(remaining / 1000d);
-        double fraction = phase == Phase.COUNTDOWN
-                ? Math.clamp(remaining / (double) COUNTDOWN_DURATION.toMillis(), 0d, 1d)
-                : 0d;
-        return new Snapshot(lobbyId, phase, seconds, fraction, outcome, failureText);
-    }
-
-    public synchronized void acknowledge(UUID expectedLobbyId) {
-        if (phase.terminal() && java.util.Objects.equals(lobbyId, expectedLobbyId)) {
+    public boolean cancel() {
+        try (var stateScope = stateAccess.enter()) {
+            if (phase != Phase.COUNTDOWN) return false;
             clear();
             notifyListeners();
+            return true;
+        }
+    }
+
+    public void tick() {
+        try (var stateScope = stateAccess.enter()) {
+            if (phase != Phase.COUNTDOWN) return;
+            var current = lobby(lobbyId);
+            if (!joinable(current)) {
+                finish(current != null && current.members().size() >= current.capacity()
+                        ? Outcome.PARTY_FILLED : Outcome.PARTY_UNAVAILABLE, null);
+                return;
+            }
+            if (clockMillis.getAsLong() - startedAtMillis < COUNTDOWN_DURATION.toMillis()) return;
+
+            phase = Phase.SUBMITTING;
+            notifyListeners();
+            var submittedLobbyId = lobbyId;
+            service.join(submittedLobbyId).whenComplete((mutation, failure) -> {
+                try (var callbackScope = stateAccess.enter()) {
+                    if (!submittedLobbyId.equals(lobbyId) || phase != Phase.SUBMITTING) return;
+                    if (failure == null) {
+                        finish(Outcome.ACCEPTED, null);
+                    } else {
+                        var authoritative = lobby(submittedLobbyId);
+                        if (!joinable(authoritative)) {
+                            finish(authoritative != null && authoritative.members().size() >= authoritative.capacity()
+                                    ? Outcome.PARTY_FILLED : Outcome.PARTY_UNAVAILABLE, null);
+                        } else {
+                            var mapped = mapFailure(unwrap(failure));
+                            finish(mapped.outcome(), mapped.text());
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    public Snapshot snapshot() {
+        try (var stateScope = stateAccess.enter()) {
+            long remaining = phase == Phase.COUNTDOWN
+                    ? Math.max(0, COUNTDOWN_DURATION.toMillis() - (clockMillis.getAsLong() - startedAtMillis))
+                    : 0;
+            int seconds = remaining == 0 ? 0 : (int) Math.ceil(remaining / 1000d);
+            double fraction = phase == Phase.COUNTDOWN
+                    ? Math.clamp(remaining / (double) COUNTDOWN_DURATION.toMillis(), 0d, 1d)
+                    : 0d;
+            return new Snapshot(lobbyId, phase, seconds, fraction, outcome, failureText);
+        }
+    }
+
+    public void acknowledge(UUID expectedLobbyId) {
+        try (var stateScope = stateAccess.enter()) {
+            if (phase.terminal() && java.util.Objects.equals(lobbyId, expectedLobbyId)) {
+                clear();
+                notifyListeners();
+            }
         }
     }
 
@@ -163,7 +175,7 @@ public final class LfgJoinController {
     }
 
     private void notifyListeners() {
-        for (var listener : listeners) listener.run();
+        for (var listener : listeners) stateAccess.afterUnlock(listener);
     }
 
     private static Throwable unwrap(Throwable failure) {

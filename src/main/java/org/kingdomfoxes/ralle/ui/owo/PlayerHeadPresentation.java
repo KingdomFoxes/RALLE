@@ -11,15 +11,16 @@ import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import org.kingdomfoxes.ralle.ui.BoundedAsyncCache;
 
 /** Shared asynchronous skin, fallback, hat-layer, and guild-border presentation. */
 public final class PlayerHeadPresentation {
-    private static final ConcurrentMap<UUID, CompletableFuture<PlayerSkin>> SKINS = new ConcurrentHashMap<>();
-    private static final ConcurrentMap<UUID, PlayerSkin> RESOLVED = new ConcurrentHashMap<>();
+    private static final BoundedAsyncCache<UUID, PlayerSkin> SKINS =
+            new BoundedAsyncCache<>(256, 8, 30_000, System::currentTimeMillis);
 
     private PlayerHeadPresentation() {}
+
+    public static void clearSession() { SKINS.clear(); }
 
     public static void draw(GuiGraphics graphics, Minecraft minecraft, LfgProtocol.Member member,
                             int x, int y, int faceSize, int borderColor) {
@@ -33,18 +34,13 @@ public final class PlayerHeadPresentation {
     }
 
     private static PlayerSkin resolve(Minecraft minecraft, UUID id, String name) {
-        var existing = RESOLVED.get(id);
-        if (existing != null) return existing;
         var fallback = DefaultPlayerSkin.get(id);
-        SKINS.computeIfAbsent(id, ignored -> {
+        return SKINS.get(id, fallback, ignored -> {
             var partial = new GameProfile(id, name);
             return CompletableFuture.supplyAsync(() -> minecraft.services().profileResolver()
                             .fetchById(id).orElse(partial))
                     .thenCompose(minecraft.getSkinManager()::get)
-                    .thenApply(skin -> skin.orElse(fallback))
-                    .exceptionally(error -> fallback)
-                    .whenComplete((skin, error) -> RESOLVED.put(id, skin));
+                    .thenApply(skin -> skin.orElse(null));
         });
-        return fallback;
     }
 }

@@ -47,6 +47,12 @@ platform ports. It must not depend on a concrete settings screen.
   and composes the styled prefix onto every rendered line,
   so transformations and transparent chat screenshots include timestamps without
   changing source messages, signatures, tags, logging, or interaction metadata.
+  `ChatProjectionCache` reuses wrapping by message identity and retains only messages
+  contributing to the wrapped-line ceiling. It appends lines in final newest-first
+  order and stops at that ceiling. Deleted markers have distinct identities. Width,
+  timestamp/indicator settings and retention changes invalidate the projection;
+  explicit vanilla refreshes and font/language resource reloads discard wrapping.
+  Frozen screenshot selection continues to defer incoming-message projection.
 - `sound`: client-only registered UI sound events and playback adapters. LFG
   playback and its notification-setting check run on the Minecraft client executor:
   REST/live-event store observers may run on worker threads and must never mutate
@@ -562,9 +568,14 @@ quad samples that texture and the bundled 64-frame dust-motion atlas; there are 
 random/hash calculations, pixel-by-pixel fill calls, repeated scissor/item/text draws, or GPU
 readbacks. The original pixel drift (up to six logical pixels upward/rightward), opacity, and
 overlap paint order are baked offline from the original animation formula. Each atlas texel
-encodes two source contributors; four pages retain up to eight overlapping pixels. The 4096px
-RGBA atlas occupies a fixed 64 MiB on the GPU and is warmed with the hover snapshot before
-playback. Its 256px pattern exactly covers wheel coordinates -128 through 127 and repeats for
+encodes two source contributors; four logical pages retain up to eight overlapping pixels.
+Identical 8x8 tiles are stored once, with an RGB tile index in the last 128 texture rows.
+The packed 2048x2728 RGBA8 level contains 22,347,776 bytes (21.31 MiB), compared with
+64 MiB for the original atlas. This is a decoded-size calculation, not measured GPU residency.
+The shader uses exact index/data texel fetches, adding one lookup per contributor page.
+The offline generator verifies all 64 frames byte-for-byte after reconstruction.
+The texture is warmed with the hover snapshot before playback.
+Its 256px pattern exactly covers wheel coordinates -128 through 127 and repeats for
 larger custom-font geometry. Eight pixels of capture padding retain outward-flying dust.
 The outward movement, 80%-of-sound dissolve duration, 100 ms empty hold, and exit
 creation cue remain. Snapshots are disposed on resize, prompt suspension and screen removal;

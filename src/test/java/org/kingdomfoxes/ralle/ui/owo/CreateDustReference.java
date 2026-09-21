@@ -11,6 +11,13 @@ final class CreateDustReference {
         return ImageIO.read(Path.of("src/main/resources/assets/ralle/textures/gui/wheel/create_dissolve.png").toFile());
     }
 
+    static int contributor(BufferedImage atlas, int x, int y) {
+        int index = y / 8 * 512 + x / 8;
+        int encoded = atlas.getRGB(index % 2048, atlas.getHeight() - 128 + index / 2048);
+        int tile = (encoded >> 16 & 255) | (encoded >> 8 & 255) << 8 | (encoded & 255) << 16;
+        return atlas.getRGB(tile % 256 * 8 + x % 8, tile / 256 * 8 + y % 8);
+    }
+
     static double threshold(int x, int y) {
         int hash = x * 0x1f123bb5 ^ y * 0x5f356495;
         hash ^= hash >>> 16;
@@ -35,7 +42,7 @@ final class CreateDustReference {
                 int ax = frame % 8 * 256 + Math.floorMod(x - w / 2 + 128, 256);
                 int ay = frame / 8 * 256 + Math.floorMod(y - h / 2 + 128, 256);
                 for (int page = 0; page < 4; page++) {
-                    int packed = atlas.getRGB(ax + page % 2 * 2048, ay + page / 2 * 2048);
+                    int packed = contributor(atlas, ax + page % 2 * 2048, ay + page / 2 * 2048);
                     for (int pair = 0; pair < 2; pair++) {
                         int code = pair == 0 ? packed >> 16 & 255 : packed & 255;
                         int opacity = pair == 0 ? packed >> 8 & 255 : packed >>> 24;

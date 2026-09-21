@@ -21,6 +21,17 @@ public final class ChatBehaviorService {
     private final BooleanSetting textShadowEnabled;
     private final ChoiceSetting textShadow;
     private RenderedMessageSettings previousRenderedMessageSettings;
+    private volatile boolean resourcesChanged;
+
+    public void registerResourceInvalidation() {
+        var loader = net.fabricmc.fabric.api.resource.v1.ResourceLoader.get(
+                net.minecraft.server.packs.PackType.CLIENT_RESOURCES);
+        var id = net.minecraft.resources.Identifier.fromNamespaceAndPath("ralle", "chat_projection_cache");
+        loader.registerReloader(id,
+                (net.minecraft.server.packs.resources.ResourceManagerReloadListener) manager -> resourcesChanged = true);
+        loader.addReloaderOrdering(net.fabricmc.fabric.api.resource.v1.reloader.ResourceReloaderKeys.Client.FONTS, id);
+        loader.addReloaderOrdering(net.fabricmc.fabric.api.resource.v1.reloader.ResourceReloaderKeys.Client.LANGUAGES, id);
+    }
 
     public ChatBehaviorService(Minecraft minecraft, SettingsRegistry settings) {
         this.minecraft = minecraft;
@@ -99,7 +110,9 @@ public final class ChatBehaviorService {
 
     public void tick() {
         var current = renderedMessageSettings();
-        if (!current.equals(previousRenderedMessageSettings) && minecraft.gui != null) {
+        boolean reloadProjection = resourcesChanged && projectionEnabled();
+        resourcesChanged = false;
+        if ((!current.equals(previousRenderedMessageSettings) || reloadProjection) && minecraft.gui != null) {
             minecraft.gui.getChat().rescaleChat();
         }
         previousRenderedMessageSettings = current;

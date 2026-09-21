@@ -13,6 +13,7 @@ public final class HqDistanceOverlay {
     private static InspectionKeybind keybind;
     private static HqInspectionService service;
     private static boolean failed;
+    private static long clientTick;
 
     private HqDistanceOverlay() {}
 
@@ -47,12 +48,15 @@ public final class HqDistanceOverlay {
 
     public static void clear() {
         if (service != null) service.clear();
+        service = null;
     }
+
+    public static void tick() { clientTick++; }
 
     private static HqInspectionService inspectionService() {
         if (service == null) {
             service = new HqInspectionService(
-                    new WynntilsTerritorySnapshotSource(),
+                    new TickCachedTerritorySource(new WynntilsTerritorySnapshotSource(), () -> clientTick),
                     new TerritoryRouteCalculator(),
                     new ProvisionalQueueDurationEstimator());
         }

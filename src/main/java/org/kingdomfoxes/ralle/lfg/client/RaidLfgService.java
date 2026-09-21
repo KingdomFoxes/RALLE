@@ -45,7 +45,8 @@ public final class RaidLfgService {
     private final DoubleSupplier jitter;
     private final LfgNotificationSink notifications;
     private final PartyCommandExecutor partyCommands;
-    private final RaidLfgStore store = new RaidLfgStore();
+    private final LfgStateAccess stateAccess = new LfgStateAccess();
+    private final RaidLfgStore store = new RaidLfgStore(stateAccess);
     private final LfgJoinController joinController;
     private final Set<String> pending = new HashSet<>();
     private final Map<UUID, Long> pingCooldowns = new HashMap<>();
@@ -62,6 +63,7 @@ public final class RaidLfgService {
     private boolean awaitingSnapshot;
     private boolean authenticationInFlight;
     private CompletableFuture<LfgProtocol.Snapshot> synchronizationFuture;
+    private boolean synchronizationPending;
     private CompletableFuture<LfgProtocol.Snapshot> refreshFuture;
     private int reconnectAttempt;
     private long reconnectAtMillis;
@@ -106,6 +108,7 @@ public final class RaidLfgService {
         this.joinController = new LfgJoinController(this, clockMillis);
     }
 
+    LfgStateAccess stateAccess() { return stateAccess; }
     public RaidLfgStore store() { return store; }
     public LfgJoinController joinController() { return joinController; }
     public LifecycleState lifecycle() { return lifecycle; }
@@ -114,70 +117,81 @@ public final class RaidLfgService {
     public void clearFocus() { focusLobbyId = null; }
     public void focusLobby(UUID lobbyId) { focusLobbyId = lobbyId; }
 
-    public synchronized int pingCooldownSeconds(UUID lobbyId) {
-        long remaining = pingCooldowns.getOrDefault(lobbyId, 0L) - clockMillis.getAsLong();
-        if (remaining <= 0) {
-            pingCooldowns.remove(lobbyId);
-            return 0;
+    public int pingCooldownSeconds(UUID lobbyId) {
+        try (var stateScope = stateAccess.enter()) {
+            long remaining = pingCooldowns.getOrDefault(lobbyId, 0L) - clockMillis.getAsLong();
+            if (remaining <= 0) {
+                pingCooldowns.remove(lobbyId);
+                return 0;
+            }
+            return (int) Math.ceil(remaining / 1000d);
         }
-        return (int) Math.ceil(remaining / 1000d);
     }
 
-    public synchronized void connectionChanged() {
-        contextKey = "";
+    public void connectionChanged() {
+        try (var stateScope = stateAccess.enter()) {
+            contextKey = "";
+        }
     }
 
-    public synchronized boolean pending(UUID lobbyId, String action) {
-        return pending.contains(pendingKey(lobbyId, action));
+    public boolean pending(UUID lobbyId, String action) {
+        try (var stateScope = stateAccess.enter()) {
+            return pending.contains(pendingKey(lobbyId, action));
+        }
     }
 
-    public synchronized boolean pendingCreate() {
-        return pending.contains("create");
+    public boolean pendingCreate() {
+        try (var stateScope = stateAccess.enter()) {
+            return pending.contains("create");
+        }
     }
 
     /** Reevaluate every client tick; it performs no network request outside the opt-in Wynncraft state. */
-    public synchronized void tick() {
-        joinController.tick();
-        var host = normalizedHost(environment.serverHost());
-        var nextContext = environment.enabled() + "|" + host + "|" + environment.playerId();
-        if (!nextContext.equals(contextKey)) {
-            contextKey = nextContext;
-            invalidate(environment.enabled() ? LifecycleState.NOT_ON_WYNNCRAFT : LifecycleState.DISABLED,
-                    environment.enabled() ? "Connect to Wynncraft to use Raid LFG." : "Raid LFG is disabled in settings.");
-        }
-        if (!environment.enabled()) return;
-        if (!isWynncraft(host)) {
-            if (lifecycle != LifecycleState.NOT_ON_WYNNCRAFT) {
-                invalidate(LifecycleState.NOT_ON_WYNNCRAFT, "Connect to Wynncraft to use Raid LFG.");
+    public void tick() {
+        try (var stateScope = stateAccess.enter()) {
+            joinController.tick();
+            var host = normalizedHost(environment.serverHost());
+            var nextContext = environment.enabled() + "|" + host + "|" + environment.playerId();
+            if (!nextContext.equals(contextKey)) {
+                contextKey = nextContext;
+                invalidate(environment.enabled() ? LifecycleState.NOT_ON_WYNNCRAFT : LifecycleState.DISABLED,
+                        environment.enabled() ? "Connect to Wynncraft to use Raid LFG." : "Raid LFG is disabled in settings.");
             }
-            return;
-        }
-        if (lifecycle == LifecycleState.NOT_ON_WYNNCRAFT || lifecycle == LifecycleState.DISABLED) {
-            authenticate();
-        } else if (lifecycle == LifecycleState.RECONNECTING && clockMillis.getAsLong() >= reconnectAtMillis) {
-            authenticate();
-        } else if (lifecycle == LifecycleState.ONLINE && renewal == null && renewalExpiresAt != null
-                && clockMillis.getAsLong() >= renewalRetryAtMillis) {
-            beginRenewal(renewalExpiresAt);
-        }
-        if (renewalExpiresAt != null && bearerToken != null
-                && clockMillis.getAsLong() >= renewalExpiresAt.toEpochMilli()) {
-            enterRenewalReadOnly();
+            if (!environment.enabled()) return;
+            if (!isWynncraft(host)) {
+                if (lifecycle != LifecycleState.NOT_ON_WYNNCRAFT) {
+                    invalidate(LifecycleState.NOT_ON_WYNNCRAFT, "Connect to Wynncraft to use Raid LFG.");
+                }
+                return;
+            }
+            if (lifecycle == LifecycleState.NOT_ON_WYNNCRAFT || lifecycle == LifecycleState.DISABLED) {
+                authenticate();
+            } else if (lifecycle == LifecycleState.RECONNECTING && clockMillis.getAsLong() >= reconnectAtMillis) {
+                authenticate();
+            } else if (lifecycle == LifecycleState.ONLINE && renewal == null && renewalExpiresAt != null
+                    && clockMillis.getAsLong() >= renewalRetryAtMillis) {
+                beginRenewal(renewalExpiresAt);
+            }
+            if (renewalExpiresAt != null && bearerToken != null
+                    && clockMillis.getAsLong() >= renewalExpiresAt.toEpochMilli()) {
+                enterRenewalReadOnly();
+            }
         }
     }
 
     public CompletableFuture<LfgProtocol.Snapshot> refresh() {
         final String token;
         final long expected;
-        synchronized (this) {
+        try (var callbackScope = stateAccess.enter()) {
             if (refreshFuture != null && !refreshFuture.isDone()) return refreshFuture;
             if (bearerToken == null || lifecycle != LifecycleState.ONLINE) {
                 if (!environment.enabled() || !isWynncraft(normalizedHost(environment.serverHost()))
                         || lifecycle == LifecycleState.OUTDATED || lifecycle == LifecycleState.INELIGIBLE) {
                     return unavailableFuture();
                 }
-                if (synchronizationFuture == null || synchronizationFuture.isDone()) {
+                if (synchronizationFuture == null || !synchronizationPending) {
                     synchronizationFuture = new CompletableFuture<>();
+                    synchronizationPending = true;
                 }
                 reconnectAtMillis = clockMillis.getAsLong();
                 if (!authenticationInFlight && renewal == null) authenticate();
@@ -189,7 +203,7 @@ public final class RaidLfgService {
             statusMessage = "Refreshing complete lobby state...";
         }
         var request = gateway.snapshot(token).thenApply(snapshot -> {
-            synchronized (this) {
+            try (var callbackScope = stateAccess.enter()) {
                 if (expected != generation) return snapshot;
                 requireProtocol(snapshot.protocolVersion());
                 store.replace(snapshot, RaidLfgStore.UpdateOrigin.SNAPSHOT);
@@ -199,10 +213,10 @@ public final class RaidLfgService {
             }
             return snapshot;
         }).whenComplete((ignored, failure) -> {
-            synchronized (this) { refreshFuture = null; }
+            try (var callbackScope = stateAccess.enter()) { refreshFuture = null; }
             if (failure != null) handleAsyncFailure(expected, failure, true);
         });
-        synchronized (this) { refreshFuture = request; }
+        try (var callbackScope = stateAccess.enter()) { refreshFuture = request; }
         return request;
     }
 
@@ -211,15 +225,17 @@ public final class RaidLfgService {
      * Disabled and off-Wynncraft contexts remain inert, and an authentication or synchronization
      * already in progress is not restarted.
      */
-    public synchronized void requestRefresh() {
-        if (!environment.enabled() || !isWynncraft(normalizedHost(environment.serverHost()))) return;
-        if (lifecycle == LifecycleState.AUTHENTICATING || lifecycle == LifecycleState.SYNCING) return;
-        if (lifecycle == LifecycleState.ONLINE) {
-            refresh();
-            return;
+    public void requestRefresh() {
+        try (var stateScope = stateAccess.enter()) {
+            if (!environment.enabled() || !isWynncraft(normalizedHost(environment.serverHost()))) return;
+            if (lifecycle == LifecycleState.AUTHENTICATING || lifecycle == LifecycleState.SYNCING) return;
+            if (lifecycle == LifecycleState.ONLINE) {
+                refresh();
+                return;
+            }
+            reconnectAttempt = 0;
+            authenticate();
         }
-        reconnectAttempt = 0;
-        authenticate();
     }
 
     public CompletableFuture<LfgProtocol.Mutation> create(LfgProtocol.RaidType raid,
@@ -276,7 +292,7 @@ public final class RaidLfgService {
         return mutate(new PendingMutation("ping", lobbyId, null, null, null, false, null),
                 (token, key) -> gateway.ping(token, lobbyId, key))
                 .thenApply(mutation -> {
-                    synchronized (this) {
+                    try (var callbackScope = stateAccess.enter()) {
                         pingCooldowns.put(lobbyId, clockMillis.getAsLong() + PING_COOLDOWN_MILLIS);
                     }
                     return mutation;
@@ -286,7 +302,7 @@ public final class RaidLfgService {
     private CompletableFuture<LfgProtocol.Mutation> mutate(PendingMutation operation, MutationCall call) {
         final String key = pendingKey(operation.lobbyId, operation.action);
         final String token;
-        synchronized (this) {
+        try (var callbackScope = stateAccess.enter()) {
             if (lifecycle != LifecycleState.ONLINE || bearerToken == null) return unavailableFuture();
             if (!pending.add(key)) return CompletableFuture.failedFuture(new IllegalStateException("That action is already pending."));
             token = bearerToken;
@@ -302,121 +318,128 @@ public final class RaidLfgService {
         return operation.result;
     }
 
-    private synchronized void completeKnownMutation(PendingMutation operation, LfgProtocol.Mutation mutation) {
-        if (operation.result.isDone()) return;
-        try {
-            requireProtocol(mutation.protocolVersion());
-            if (Objects.equals(operation.contextKey, contextKey)) {
-                if (operation.removesLobby()) {
-                    store.remove(mutation.revision(), mutation.lobby().lobbyId(), RaidLfgStore.UpdateOrigin.LOCAL_MUTATION);
-                } else {
-                    store.apply(mutation);
+    private void completeKnownMutation(PendingMutation operation, LfgProtocol.Mutation mutation) {
+        try (var stateScope = stateAccess.enter()) {
+            if (operation.completed || operation.result.isDone()) return;
+            try {
+                requireProtocol(mutation.protocolVersion());
+                if (Objects.equals(operation.contextKey, contextKey)) {
+                    if (operation.removesLobby()) {
+                        store.remove(mutation.revision(), mutation.lobby().lobbyId(), RaidLfgStore.UpdateOrigin.LOCAL_MUTATION);
+                    } else {
+                        store.apply(mutation);
+                    }
+                    runAcceptedCommand(operation);
                 }
-                runAcceptedCommand(operation);
+                pending.remove(operation.pendingKey);
+                unknownMutations.remove(operation.pendingKey);
+                if (lifecycle == LifecycleState.ONLINE) statusMessage = "Live";
+                operation.complete(stateAccess, mutation);
+            } catch (RuntimeException exception) {
+                pending.remove(operation.pendingKey);
+                operation.fail(stateAccess, exception);
             }
-            pending.remove(operation.pendingKey);
-            unknownMutations.remove(operation.pendingKey);
-            if (lifecycle == LifecycleState.ONLINE) statusMessage = "Live";
-            operation.result.complete(mutation);
-        } catch (RuntimeException exception) {
-            pending.remove(operation.pendingKey);
-            operation.result.completeExceptionally(exception);
         }
     }
 
-    private synchronized void completeFailedMutation(PendingMutation operation, Throwable cause) {
-        if (operation.result.isDone()) return;
-        LOGGER.warn("Raid LFG mutation failed: action={}, failureType={}",
-                operation.action, cause.getClass().getSimpleName());
-        if (!Objects.equals(operation.contextKey, contextKey)) {
+    private void completeFailedMutation(PendingMutation operation, Throwable cause) {
+        try (var stateScope = stateAccess.enter()) {
+            if (operation.completed || operation.result.isDone()) return;
+            LOGGER.warn("Raid LFG mutation failed: action={}, failureType={}",
+                    operation.action, cause.getClass().getSimpleName());
+            if (!Objects.equals(operation.contextKey, contextKey)) {
+                pending.remove(operation.pendingKey);
+                operation.fail(stateAccess, new LfgMutationOutcomeUnknownException(
+                        operation.action, operation.idempotencyKey,
+                        "Raid LFG context changed before the action could be confirmed."));
+                return;
+            }
+            if (cause instanceof LfgGatewayException gatewayFailure && gatewayFailure.transportFailure()) {
+                unknownMutations.put(operation.pendingKey, operation);
+                statusMessage = "Action submitted, but live synchronization was lost. Reconnecting to confirm…";
+                scheduleReconnect(statusMessage, gatewayFailure.error().retryAfterSeconds());
+                return;
+            }
             pending.remove(operation.pendingKey);
-            operation.result.completeExceptionally(new LfgMutationOutcomeUnknownException(
-                    operation.action, operation.idempotencyKey,
-                    "Raid LFG context changed before the action could be confirmed."));
-            return;
-        }
-        if (cause instanceof LfgGatewayException gatewayFailure && gatewayFailure.transportFailure()) {
-            unknownMutations.put(operation.pendingKey, operation);
-            statusMessage = "Action submitted, but live synchronization was lost. Reconnecting to confirm…";
-            scheduleReconnect(statusMessage, gatewayFailure.error().retryAfterSeconds());
-            return;
-        }
-        pending.remove(operation.pendingKey);
-        if (cause instanceof LfgGatewayException gatewayFailure) {
-            var error = gatewayFailure.error();
-            statusMessage = error.message();
-            if ("RAID_ALREADY_LISTED".equals(error.code()) && error.returnedLobby() != null) {
-                store.remember(error.returnedLobby());
-                focusLobbyId = error.returnedLobby().lobbyId();
+            if (cause instanceof LfgGatewayException gatewayFailure) {
+                var error = gatewayFailure.error();
+                statusMessage = error.message();
+                if ("RAID_ALREADY_LISTED".equals(error.code()) && error.returnedLobby() != null) {
+                    store.remember(error.returnedLobby());
+                    focusLobbyId = error.returnedLobby().lobbyId();
+                }
+                if (gatewayFailure.status() == 401) restartAuthentication();
+                else if (isIneligible(error, gatewayFailure.status())) {
+                    terminalState(LifecycleState.INELIGIBLE, error.message());
+                } else if (isUnsupportedProtocol(error, gatewayFailure.status())) {
+                    terminalState(LifecycleState.OUTDATED, error.message());
+                } else if (error.retryable() && !"RATE_LIMITED".equals(error.code())) {
+                    scheduleReconnect(error.message(), error.retryAfterSeconds());
+                }
+            } else if (cause instanceof TerminalException terminal
+                    && "UNSUPPORTED_PROTOCOL".equals(terminal.code)) {
+                terminalState(LifecycleState.OUTDATED, terminal.getMessage());
+            } else {
+                statusMessage = cause.getMessage() == null || cause.getMessage().isBlank()
+                        ? "The host action failed."
+                        : cause.getMessage();
             }
-            if (gatewayFailure.status() == 401) restartAuthentication();
-            else if (isIneligible(error, gatewayFailure.status())) {
-                terminalState(LifecycleState.INELIGIBLE, error.message());
-            } else if (isUnsupportedProtocol(error, gatewayFailure.status())) {
-                terminalState(LifecycleState.OUTDATED, error.message());
-            } else if (error.retryable() && !"RATE_LIMITED".equals(error.code())) {
-                scheduleReconnect(error.message(), error.retryAfterSeconds());
-            }
-        } else if (cause instanceof TerminalException terminal
-                && "UNSUPPORTED_PROTOCOL".equals(terminal.code)) {
-            terminalState(LifecycleState.OUTDATED, terminal.getMessage());
-        } else {
-            statusMessage = cause.getMessage() == null || cause.getMessage().isBlank()
-                    ? "The host action failed."
-                    : cause.getMessage();
+            operation.fail(stateAccess, cause);
         }
-        operation.result.completeExceptionally(cause);
     }
 
-    private synchronized void authenticate() {
-        if (authenticationInFlight || renewal != null) return;
-        closeLive();
-        bearerToken = null;
-        awaitingSnapshot = false;
-        authenticationInFlight = true;
-        if (synchronizationFuture == null || synchronizationFuture.isDone()) {
-            synchronizationFuture = new CompletableFuture<>();
-        }
-        lifecycle = LifecycleState.AUTHENTICATING;
-        statusMessage = "Authenticating Minecraft account...";
-        long expected = ++generation;
-        gateway.status()
-                .thenCompose(status -> {
-                    requireCurrent(expected);
-                    if (!status.enabled()) throw terminal("LFG_DISABLED", "Raid LFG is currently unavailable.");
-                    if (status.protocolVersion() != LfgProtocol.VERSION) {
-                        throw terminal("UNSUPPORTED_PROTOCOL", "Fox Raid LFG uses an incompatible protocol.");
-                    }
-                    return gateway.challenge(environment.playerId(), environment.ign());
-                })
-                .thenCompose(challenge -> {
-                    requireCurrent(expected);
-                    requireProtocol(challenge.protocolVersion());
-                    return sessionProof.prove(challenge.serverId()).thenApply(ignored -> challenge);
-                })
-                .thenCompose(challenge -> gateway.complete(challenge.challengeId()))
-                .thenCompose(session -> {
-                    synchronized (this) {
+    private void authenticate() {
+        try (var stateScope = stateAccess.enter()) {
+            if (authenticationInFlight || renewal != null) return;
+            closeLive();
+            bearerToken = null;
+            awaitingSnapshot = false;
+            authenticationInFlight = true;
+            if (synchronizationFuture == null || !synchronizationPending) {
+                synchronizationFuture = new CompletableFuture<>();
+                synchronizationPending = true;
+            }
+            lifecycle = LifecycleState.AUTHENTICATING;
+            statusMessage = "Authenticating Minecraft account...";
+            long expected = ++generation;
+            gateway.status()
+                    .thenCompose(status -> {
                         requireCurrent(expected);
-                        requireProtocol(session.protocolVersion());
-                        bearerToken = session.accessToken();
-                        lifecycle = LifecycleState.SYNCING;
-                        statusMessage = "Synchronizing live lobbies...";
-                        awaitingSnapshot = true;
-                    }
-                    return gateway.connectLive(session.accessToken(), liveListener(expected));
-                })
-                .thenAccept(connection -> {
-                    synchronized (this) {
-                        if (expected != generation) connection.close();
-                        else liveConnection = connection;
-                    }
-                })
-                .exceptionally(failure -> {
-                    synchronized (this) { authenticationInFlight = false; }
-                    handleAsyncFailure(expected, failure, false);
-                    return null;
-                });
+                        if (!status.enabled()) throw terminal("LFG_DISABLED", "Raid LFG is currently unavailable.");
+                        if (status.protocolVersion() != LfgProtocol.VERSION) {
+                            throw terminal("UNSUPPORTED_PROTOCOL", "Fox Raid LFG uses an incompatible protocol.");
+                        }
+                        return gateway.challenge(environment.playerId(), environment.ign());
+                    })
+                    .thenCompose(challenge -> {
+                        requireCurrent(expected);
+                        requireProtocol(challenge.protocolVersion());
+                        return sessionProof.prove(challenge.serverId()).thenApply(ignored -> challenge);
+                    })
+                    .thenCompose(challenge -> gateway.complete(challenge.challengeId()))
+                    .thenCompose(session -> {
+                        try (var callbackScope = stateAccess.enter()) {
+                            requireCurrent(expected);
+                            requireProtocol(session.protocolVersion());
+                            bearerToken = session.accessToken();
+                            lifecycle = LifecycleState.SYNCING;
+                            statusMessage = "Synchronizing live lobbies...";
+                            awaitingSnapshot = true;
+                        }
+                        return gateway.connectLive(session.accessToken(), liveListener(expected));
+                    })
+                    .thenAccept(connection -> {
+                        try (var callbackScope = stateAccess.enter()) {
+                            if (expected != generation) connection.close();
+                            else liveConnection = connection;
+                        }
+                    })
+                    .exceptionally(failure -> {
+                        try (var callbackScope = stateAccess.enter()) { authenticationInFlight = false; }
+                        handleAsyncFailure(expected, failure, false);
+                        return null;
+                    });
+        }
     }
 
     private LfgGateway.LiveListener liveListener(long expected) {
@@ -427,51 +450,53 @@ public final class RaidLfgService {
         };
     }
 
-    private synchronized void beginRenewal(Instant expiresAt) {
-        if (expiresAt == null || authenticationInFlight) return;
-        if (renewalExpiresAt == null || expiresAt.isBefore(renewalExpiresAt)) renewalExpiresAt = expiresAt;
-        if (renewal != null) return;
-        if (clockMillis.getAsLong() < renewalRetryAtMillis) return;
-        if (lifecycle != LifecycleState.ONLINE && bearerToken == null) return;
-        long id = ++renewalSequence;
-        renewal = new RenewalAttempt(id);
-        gateway.status()
-                .thenCompose(status -> {
-                    requireRenewal(id);
-                    if (!status.enabled()) throw terminal("LFG_DISABLED", "Raid LFG is currently unavailable.");
-                    if (status.protocolVersion() != LfgProtocol.VERSION) {
-                        throw terminal("UNSUPPORTED_PROTOCOL", "Fox Raid LFG uses an incompatible protocol.");
-                    }
-                    return gateway.challenge(environment.playerId(), environment.ign());
-                })
-                .thenCompose(challenge -> {
-                    requireRenewal(id);
-                    requireProtocol(challenge.protocolVersion());
-                    return sessionProof.prove(challenge.serverId()).thenApply(ignored -> challenge);
-                })
-                .thenCompose(challenge -> gateway.complete(challenge.challengeId()))
-                .thenCompose(session -> {
-                    synchronized (this) {
-                        var attempt = requireRenewal(id);
-                        requireProtocol(session.protocolVersion());
-                        attempt.token = session.accessToken();
-                    }
-                    return gateway.connectLive(session.accessToken(), renewalListener(id));
-                })
-                .thenAccept(connection -> {
-                    synchronized (this) {
-                        var attempt = renewal;
-                        if (attempt == null || attempt.id != id) connection.close();
-                        else {
-                            attempt.connection = connection;
-                            tryCommitRenewal(attempt);
+    private void beginRenewal(Instant expiresAt) {
+        try (var stateScope = stateAccess.enter()) {
+            if (expiresAt == null || authenticationInFlight) return;
+            if (renewalExpiresAt == null || expiresAt.isBefore(renewalExpiresAt)) renewalExpiresAt = expiresAt;
+            if (renewal != null) return;
+            if (clockMillis.getAsLong() < renewalRetryAtMillis) return;
+            if (lifecycle != LifecycleState.ONLINE && bearerToken == null) return;
+            long id = ++renewalSequence;
+            renewal = new RenewalAttempt(id);
+            gateway.status()
+                    .thenCompose(status -> {
+                        requireRenewal(id);
+                        if (!status.enabled()) throw terminal("LFG_DISABLED", "Raid LFG is currently unavailable.");
+                        if (status.protocolVersion() != LfgProtocol.VERSION) {
+                            throw terminal("UNSUPPORTED_PROTOCOL", "Fox Raid LFG uses an incompatible protocol.");
                         }
-                    }
-                })
-                .exceptionally(failure -> {
-                    renewalFailed(id, unwrap(failure));
-                    return null;
-                });
+                        return gateway.challenge(environment.playerId(), environment.ign());
+                    })
+                    .thenCompose(challenge -> {
+                        requireRenewal(id);
+                        requireProtocol(challenge.protocolVersion());
+                        return sessionProof.prove(challenge.serverId()).thenApply(ignored -> challenge);
+                    })
+                    .thenCompose(challenge -> gateway.complete(challenge.challengeId()))
+                    .thenCompose(session -> {
+                        try (var callbackScope = stateAccess.enter()) {
+                            var attempt = requireRenewal(id);
+                            requireProtocol(session.protocolVersion());
+                            attempt.token = session.accessToken();
+                        }
+                        return gateway.connectLive(session.accessToken(), renewalListener(id));
+                    })
+                    .thenAccept(connection -> {
+                        try (var callbackScope = stateAccess.enter()) {
+                            var attempt = renewal;
+                            if (attempt == null || attempt.id != id) connection.close();
+                            else {
+                                attempt.connection = connection;
+                                tryCommitRenewal(attempt);
+                            }
+                        }
+                    })
+                    .exceptionally(failure -> {
+                        renewalFailed(id, unwrap(failure));
+                        return null;
+                    });
+        }
     }
 
     private LfgGateway.LiveListener renewalListener(long id) {
@@ -485,75 +510,81 @@ public final class RaidLfgService {
         };
     }
 
-    private synchronized void receiveRenewalFrame(long id, LfgProtocol.LiveFrame frame) {
-        var attempt = renewal;
-        if (attempt == null || attempt.id != id) return;
-        try {
-            if (attempt.snapshot == null) {
-                if (!(frame instanceof LfgProtocol.SnapshotFrame snapshotFrame)) {
-                    throw new LfgProtocolException("Fox sent a renewal update before the required snapshot.");
+    private void receiveRenewalFrame(long id, LfgProtocol.LiveFrame frame) {
+        try (var stateScope = stateAccess.enter()) {
+            var attempt = renewal;
+            if (attempt == null || attempt.id != id) return;
+            try {
+                if (attempt.snapshot == null) {
+                    if (!(frame instanceof LfgProtocol.SnapshotFrame snapshotFrame)) {
+                        throw new LfgProtocolException("Fox sent a renewal update before the required snapshot.");
+                    }
+                    requireProtocol(snapshotFrame.snapshot().protocolVersion());
+                    attempt.snapshot = snapshotFrame.snapshot();
+                } else {
+                    if (attempt.bufferedFrames.size() >= COMMAND_DEDUPLICATION_LIMIT) {
+                        throw new LfgProtocolException("Too many live frames arrived during credential renewal.");
+                    }
+                    attempt.bufferedFrames.add(frame);
                 }
-                requireProtocol(snapshotFrame.snapshot().protocolVersion());
-                attempt.snapshot = snapshotFrame.snapshot();
-            } else {
-                if (attempt.bufferedFrames.size() >= COMMAND_DEDUPLICATION_LIMIT) {
-                    throw new LfgProtocolException("Too many live frames arrived during credential renewal.");
-                }
-                attempt.bufferedFrames.add(frame);
+                tryCommitRenewal(attempt);
+            } catch (RuntimeException failure) {
+                renewalFailed(id, failure);
             }
-            tryCommitRenewal(attempt);
-        } catch (RuntimeException failure) {
-            renewalFailed(id, failure);
         }
     }
 
-    private synchronized void tryCommitRenewal(RenewalAttempt attempt) {
-        if (renewal != attempt || attempt.connection == null || attempt.snapshot == null) return;
-        var old = liveConnection;
-        generation++;
-        liveConnection = attempt.connection;
-        bearerToken = attempt.token;
-        awaitingSnapshot = false;
-        store.replace(attempt.snapshot, RaidLfgStore.UpdateOrigin.SNAPSHOT);
-        reconcileUnknownMutations(attempt.snapshot);
-        lifecycle = LifecycleState.ONLINE;
-        statusMessage = "Live";
-        reconnectAttempt = 0;
-        renewalRetryAttempt = 0;
-        renewalRetryAtMillis = 0;
-        renewalExpiresAt = null;
-        renewal = null;
-        if (old != null && old != liveConnection) old.close();
-        long activeGeneration = generation;
-        for (var frame : attempt.bufferedFrames) applyLive(activeGeneration, frame);
+    private void tryCommitRenewal(RenewalAttempt attempt) {
+        try (var stateScope = stateAccess.enter()) {
+            if (renewal != attempt || attempt.connection == null || attempt.snapshot == null) return;
+            var old = liveConnection;
+            generation++;
+            liveConnection = attempt.connection;
+            bearerToken = attempt.token;
+            awaitingSnapshot = false;
+            store.replace(attempt.snapshot, RaidLfgStore.UpdateOrigin.SNAPSHOT);
+            reconcileUnknownMutations(attempt.snapshot);
+            lifecycle = LifecycleState.ONLINE;
+            statusMessage = "Live";
+            reconnectAttempt = 0;
+            renewalRetryAttempt = 0;
+            renewalRetryAtMillis = 0;
+            renewalExpiresAt = null;
+            renewal = null;
+            if (old != null && old != liveConnection) old.close();
+            long activeGeneration = generation;
+            for (var frame : attempt.bufferedFrames) applyLive(activeGeneration, frame);
+        }
     }
 
-    private synchronized void renewalFailed(long id, Throwable failure) {
-        var attempt = renewal;
-        if (attempt == null || attempt.id != id) return;
-        if (attempt.connection != null) attempt.connection.close();
-        renewal = null;
-        var cause = unwrap(failure);
-        if (cause instanceof StaleGenerationException) return;
-        if (cause instanceof LfgGatewayException gatewayFailure) {
-            var error = gatewayFailure.error();
-            if (isIneligible(error, gatewayFailure.status())) {
-                terminalState(LifecycleState.INELIGIBLE, error.message());
-                return;
+    private void renewalFailed(long id, Throwable failure) {
+        try (var stateScope = stateAccess.enter()) {
+            var attempt = renewal;
+            if (attempt == null || attempt.id != id) return;
+            if (attempt.connection != null) attempt.connection.close();
+            renewal = null;
+            var cause = unwrap(failure);
+            if (cause instanceof StaleGenerationException) return;
+            if (cause instanceof LfgGatewayException gatewayFailure) {
+                var error = gatewayFailure.error();
+                if (isIneligible(error, gatewayFailure.status())) {
+                    terminalState(LifecycleState.INELIGIBLE, error.message());
+                    return;
+                }
+                if (isUnsupportedProtocol(error, gatewayFailure.status())) {
+                    terminalState(LifecycleState.OUTDATED, error.message());
+                    return;
+                }
+                scheduleRenewalRetry(error.retryAfterSeconds());
+            } else if (cause instanceof LfgProtocolException) {
+                LOGGER.error("Fox returned incompatible Raid LFG renewal data: {}", cause.getMessage(), cause);
+                terminalUnavailable("Fox returned incompatible Raid LFG data.");
+            } else if (cause instanceof TerminalException terminal) {
+                if ("UNSUPPORTED_PROTOCOL".equals(terminal.code)) terminalState(LifecycleState.OUTDATED, terminal.getMessage());
+                else terminalUnavailable(terminal.getMessage());
+            } else {
+                scheduleRenewalRetry(null);
             }
-            if (isUnsupportedProtocol(error, gatewayFailure.status())) {
-                terminalState(LifecycleState.OUTDATED, error.message());
-                return;
-            }
-            scheduleRenewalRetry(error.retryAfterSeconds());
-        } else if (cause instanceof LfgProtocolException) {
-            LOGGER.error("Fox returned incompatible Raid LFG renewal data: {}", cause.getMessage(), cause);
-            terminalUnavailable("Fox returned incompatible Raid LFG data.");
-        } else if (cause instanceof TerminalException terminal) {
-            if ("UNSUPPORTED_PROTOCOL".equals(terminal.code)) terminalState(LifecycleState.OUTDATED, terminal.getMessage());
-            else terminalUnavailable(terminal.getMessage());
-        } else {
-            scheduleRenewalRetry(null);
         }
     }
 
@@ -577,127 +608,140 @@ public final class RaidLfgService {
         reconnectAtMillis = Math.max(clockMillis.getAsLong(), renewalRetryAtMillis);
     }
 
-    private synchronized RenewalAttempt requireRenewal(long id) {
-        if (renewal == null || renewal.id != id) throw new StaleGenerationException();
-        return renewal;
-    }
-
-    private synchronized void applyLive(long expected, LfgProtocol.LiveFrame frame) {
-        if (expected != generation) return;
-        if (awaitingSnapshot && !(frame instanceof LfgProtocol.SnapshotFrame)) {
-            terminalUnavailable("Fox sent a live update before the required snapshot.");
-            return;
-        }
-        if (frame instanceof LfgProtocol.SnapshotFrame snapshotFrame) {
-            requireProtocol(snapshotFrame.snapshot().protocolVersion());
-            store.replace(snapshotFrame.snapshot(), RaidLfgStore.UpdateOrigin.SNAPSHOT);
-            reconcileUnknownMutations(snapshotFrame.snapshot());
-            awaitingSnapshot = false;
-            authenticationInFlight = false;
-            reconnectAttempt = 0;
-            renewalExpiresAt = null;
-            renewalRetryAttempt = 0;
-            renewalRetryAtMillis = 0;
-            lifecycle = LifecycleState.ONLINE;
-            statusMessage = "Live";
-            if (synchronizationFuture != null) synchronizationFuture.complete(snapshotFrame.snapshot());
-        } else if (frame instanceof LfgProtocol.UpsertFrame upsert) {
-            requireProtocol(upsert.protocolVersion());
-            store.upsert(upsert.revision(), upsert.lobby(), RaidLfgStore.UpdateOrigin.LIVE);
-        } else if (frame instanceof LfgProtocol.RemoveFrame remove) {
-            requireProtocol(remove.protocolVersion());
-            store.remove(remove.revision(), remove.lobbyId(), RaidLfgStore.UpdateOrigin.LIVE, remove.reason());
-        } else if (frame instanceof LfgProtocol.PartyPingFrame ping) {
-            requireProtocol(ping.protocolVersion());
-            focusLobbyId = ping.lobbyId();
-            notifications.partyPing(ping);
-        } else if (frame instanceof LfgProtocol.PartyKickCommandFrame command) {
-            requireProtocol(command.protocolVersion());
-            if (rememberCommand(command.eventId())) partyCommands.kick(command.targetIgn());
-        } else if (frame instanceof LfgProtocol.SessionExpiringFrame expiring) {
-            requireProtocol(expiring.protocolVersion());
-            beginRenewal(expiring.expiresAt());
-        } else if (frame instanceof LfgProtocol.ErrorFrame error) {
-            applyLiveError(error.error());
+    private RenewalAttempt requireRenewal(long id) {
+        try (var stateScope = stateAccess.enter()) {
+            if (renewal == null || renewal.id != id) throw new StaleGenerationException();
+            return renewal;
         }
     }
 
-    private synchronized void liveClosed(long expected, int statusCode, String reason) {
-        if (expected != generation) return;
-        var code = reason == null ? "" : reason.strip().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
-        if (statusCode == 4401 || "UNAUTHORIZED".equals(code)) {
-            if (renewal != null) enterRenewalReadOnly();
-            else {
-                authenticationInFlight = false;
-                restartAuthentication();
+    private void applyLive(long expected, LfgProtocol.LiveFrame frame) {
+        try (var stateScope = stateAccess.enter()) {
+            if (expected != generation) return;
+            if (awaitingSnapshot && !(frame instanceof LfgProtocol.SnapshotFrame)) {
+                terminalUnavailable("Fox sent a live update before the required snapshot.");
+                return;
             }
-        } else if (statusCode == 4403 || "INELIGIBLE".equals(code) || "INELIGIBLE_GUILD".equals(code)) {
-            terminalState(LifecycleState.INELIGIBLE, "Alliance access is unavailable.");
-        } else if (statusCode == 4406 || "UNSUPPORTED_PROTOCOL".equals(code)) {
-            terminalState(LifecycleState.OUTDATED, "Fox Raid LFG uses an incompatible protocol.");
-        } else if ("WYNNCRAFT_UNAVAILABLE".equals(code) || "UPSTREAM_UNAVAILABLE".equals(code)
-                || "TRANSPORT_FAILURE".equals(code) || statusCode < 4000) {
-            if (renewal != null) enterRenewalReadOnly();
-            else scheduleReconnect("Live connection lost. Reconnecting...");
-        } else {
-            terminalUnavailable("Fox rejected the live connection.");
+            if (frame instanceof LfgProtocol.SnapshotFrame snapshotFrame) {
+                requireProtocol(snapshotFrame.snapshot().protocolVersion());
+                store.replace(snapshotFrame.snapshot(), RaidLfgStore.UpdateOrigin.SNAPSHOT);
+                reconcileUnknownMutations(snapshotFrame.snapshot());
+                awaitingSnapshot = false;
+                authenticationInFlight = false;
+                reconnectAttempt = 0;
+                renewalExpiresAt = null;
+                renewalRetryAttempt = 0;
+                renewalRetryAtMillis = 0;
+                lifecycle = LifecycleState.ONLINE;
+                statusMessage = "Live";
+                if (synchronizationPending) {
+                    synchronizationPending = false;
+                    stateAccess.complete(synchronizationFuture, snapshotFrame.snapshot());
+                }
+            } else if (frame instanceof LfgProtocol.UpsertFrame upsert) {
+                requireProtocol(upsert.protocolVersion());
+                store.upsert(upsert.revision(), upsert.lobby(), RaidLfgStore.UpdateOrigin.LIVE);
+            } else if (frame instanceof LfgProtocol.RemoveFrame remove) {
+                requireProtocol(remove.protocolVersion());
+                store.remove(remove.revision(), remove.lobbyId(), RaidLfgStore.UpdateOrigin.LIVE, remove.reason());
+            } else if (frame instanceof LfgProtocol.PartyPingFrame ping) {
+                requireProtocol(ping.protocolVersion());
+                focusLobbyId = ping.lobbyId();
+                stateAccess.afterUnlock(() -> notifications.partyPing(ping));
+            } else if (frame instanceof LfgProtocol.PartyKickCommandFrame command) {
+                requireProtocol(command.protocolVersion());
+                if (rememberCommand(command.eventId())) stateAccess.afterUnlock(() -> partyCommands.kick(command.targetIgn()));
+            } else if (frame instanceof LfgProtocol.SessionExpiringFrame expiring) {
+                requireProtocol(expiring.protocolVersion());
+                beginRenewal(expiring.expiresAt());
+            } else if (frame instanceof LfgProtocol.ErrorFrame error) {
+                applyLiveError(error.error());
+            }
         }
     }
 
-    private synchronized void handleAsyncFailure(long expected, Throwable failure, boolean connectedPhase) {
-        if (expected != generation) return;
-        var cause = unwrap(failure);
-        if (cause instanceof StaleGenerationException) return;
-        if (cause instanceof LfgGatewayException gatewayFailure) {
-            var error = gatewayFailure.error();
-            if (gatewayFailure.status() == 401) {
+    private void liveClosed(long expected, int statusCode, String reason) {
+        try (var stateScope = stateAccess.enter()) {
+            if (expected != generation) return;
+            var code = reason == null ? "" : reason.strip().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+            if (statusCode == 4401 || "UNAUTHORIZED".equals(code)) {
                 if (renewal != null) enterRenewalReadOnly();
                 else {
                     authenticationInFlight = false;
-                    scheduleReconnect("Authentication expired. Reconnecting...", error.retryAfterSeconds());
+                    restartAuthentication();
                 }
-                return;
+            } else if (statusCode == 4403 || "INELIGIBLE".equals(code) || "INELIGIBLE_GUILD".equals(code)) {
+                terminalState(LifecycleState.INELIGIBLE, "Alliance access is unavailable.");
+            } else if (statusCode == 4406 || "UNSUPPORTED_PROTOCOL".equals(code)) {
+                terminalState(LifecycleState.OUTDATED, "Fox Raid LFG uses an incompatible protocol.");
+            } else if ("WYNNCRAFT_UNAVAILABLE".equals(code) || "UPSTREAM_UNAVAILABLE".equals(code)
+                    || "TRANSPORT_FAILURE".equals(code) || statusCode < 4000) {
+                if (renewal != null) enterRenewalReadOnly();
+                else scheduleReconnect("Live connection lost. Reconnecting...");
+            } else {
+                terminalUnavailable("Fox rejected the live connection.");
             }
-            if (isIneligible(error, gatewayFailure.status())) {
-                terminalState(LifecycleState.INELIGIBLE, error.message());
-                return;
-            }
-            if (isUnsupportedProtocol(error, gatewayFailure.status())) {
-                terminalState(LifecycleState.OUTDATED, error.message());
-                return;
-            }
-            switch (error.code()) {
-                case "UNSUPPORTED_PROTOCOL" -> terminalState(LifecycleState.OUTDATED, error.message());
-                case "INELIGIBLE", "INELIGIBLE_GUILD" -> terminalState(LifecycleState.INELIGIBLE, error.message());
-                case "UNAUTHORIZED", "INVALID_CHALLENGE" -> scheduleReconnect("Authentication expired. Reconnecting...");
-                default -> {
-                    if (gatewayFailure.transportFailure() || error.retryable()) {
-                        if (renewal != null && connectedPhase) enterRenewalReadOnly();
-                        else scheduleReconnect(error.message(), error.retryAfterSeconds());
-                    }
-                    else terminalUnavailable(error.message());
-                }
-            }
-        } else if (cause instanceof LfgProtocolException) {
-            LOGGER.error("Fox returned incompatible Raid LFG data: {}", cause.getMessage(), cause);
-            terminalUnavailable("Fox returned incompatible Raid LFG data.");
-        } else if (cause instanceof TerminalException terminal) {
-            if ("UNSUPPORTED_PROTOCOL".equals(terminal.code)) terminalState(LifecycleState.OUTDATED, terminal.getMessage());
-            else terminalUnavailable(terminal.getMessage());
-        } else {
-            scheduleReconnect(connectedPhase ? "Live connection failed. Reconnecting..." : "Authentication failed. Reconnecting...");
         }
     }
 
-    private synchronized void restartAuthentication() {
-        if (!environment.enabled() || !isWynncraft(normalizedHost(environment.serverHost()))) return;
-        if (authenticationInFlight) return;
-        if (renewal != null) {
-            enterRenewalReadOnly();
-            return;
+    private void handleAsyncFailure(long expected, Throwable failure, boolean connectedPhase) {
+        try (var stateScope = stateAccess.enter()) {
+            if (expected != generation) return;
+            var cause = unwrap(failure);
+            if (cause instanceof StaleGenerationException) return;
+            if (cause instanceof LfgGatewayException gatewayFailure) {
+                var error = gatewayFailure.error();
+                if (gatewayFailure.status() == 401) {
+                    if (renewal != null) enterRenewalReadOnly();
+                    else {
+                        authenticationInFlight = false;
+                        scheduleReconnect("Authentication expired. Reconnecting...", error.retryAfterSeconds());
+                    }
+                    return;
+                }
+                if (isIneligible(error, gatewayFailure.status())) {
+                    terminalState(LifecycleState.INELIGIBLE, error.message());
+                    return;
+                }
+                if (isUnsupportedProtocol(error, gatewayFailure.status())) {
+                    terminalState(LifecycleState.OUTDATED, error.message());
+                    return;
+                }
+                switch (error.code()) {
+                    case "UNSUPPORTED_PROTOCOL" -> terminalState(LifecycleState.OUTDATED, error.message());
+                    case "INELIGIBLE", "INELIGIBLE_GUILD" -> terminalState(LifecycleState.INELIGIBLE, error.message());
+                    case "UNAUTHORIZED", "INVALID_CHALLENGE" -> scheduleReconnect("Authentication expired. Reconnecting...");
+                    default -> {
+                        if (gatewayFailure.transportFailure() || error.retryable()) {
+                            if (renewal != null && connectedPhase) enterRenewalReadOnly();
+                            else scheduleReconnect(error.message(), error.retryAfterSeconds());
+                        }
+                        else terminalUnavailable(error.message());
+                    }
+                }
+            } else if (cause instanceof LfgProtocolException) {
+                LOGGER.error("Fox returned incompatible Raid LFG data: {}", cause.getMessage(), cause);
+                terminalUnavailable("Fox returned incompatible Raid LFG data.");
+            } else if (cause instanceof TerminalException terminal) {
+                if ("UNSUPPORTED_PROTOCOL".equals(terminal.code)) terminalState(LifecycleState.OUTDATED, terminal.getMessage());
+                else terminalUnavailable(terminal.getMessage());
+            } else {
+                scheduleReconnect(connectedPhase ? "Live connection failed. Reconnecting..." : "Authentication failed. Reconnecting...");
+            }
         }
-        lifecycle = LifecycleState.NOT_ON_WYNNCRAFT;
-        authenticate();
+    }
+
+    private void restartAuthentication() {
+        try (var stateScope = stateAccess.enter()) {
+            if (!environment.enabled() || !isWynncraft(normalizedHost(environment.serverHost()))) return;
+            if (authenticationInFlight) return;
+            if (renewal != null) {
+                enterRenewalReadOnly();
+                return;
+            }
+            lifecycle = LifecycleState.NOT_ON_WYNNCRAFT;
+            authenticate();
+        }
     }
 
     private void applyLiveError(LfgProtocol.Error error) {
@@ -749,8 +793,9 @@ public final class RaidLfgService {
         awaitingSnapshot = false;
         authenticationInFlight = false;
         failUnknownMutations(message);
-        if (synchronizationFuture != null && !synchronizationFuture.isDone()) {
-            synchronizationFuture.completeExceptionally(new IllegalStateException(message));
+        if (synchronizationPending) {
+            synchronizationPending = false;
+            stateAccess.fail(synchronizationFuture, new IllegalStateException(message));
         }
         lifecycle = state;
         statusMessage = message;
@@ -764,8 +809,9 @@ public final class RaidLfgService {
         awaitingSnapshot = false;
         authenticationInFlight = false;
         failUnknownMutations("Raid LFG context changed before the action could be confirmed.");
-        if (synchronizationFuture != null && !synchronizationFuture.isDone()) {
-            synchronizationFuture.completeExceptionally(new IllegalStateException(message));
+        if (synchronizationPending) {
+            synchronizationPending = false;
+            stateAccess.fail(synchronizationFuture, new IllegalStateException(message));
         }
         pending.clear();
         pingCooldowns.clear();
@@ -795,8 +841,10 @@ public final class RaidLfgService {
         if (old != null && old.connection != null) old.connection.close();
     }
 
-    public synchronized boolean outcomeUnknown(UUID lobbyId, String action) {
-        return unknownMutations.containsKey(pendingKey(lobbyId, action));
+    public boolean outcomeUnknown(UUID lobbyId, String action) {
+        try (var stateScope = stateAccess.enter()) {
+            return unknownMutations.containsKey(pendingKey(lobbyId, action));
+        }
     }
 
     public static boolean isOutcomeUnknown(Throwable failure) {
@@ -818,14 +866,14 @@ public final class RaidLfgService {
             if (accepted) {
                 runAcceptedCommand(operation);
                 var resultLobby = lobby != null ? lobby : operation.beforeLobby;
-                operation.result.complete(new LfgProtocol.Mutation(
+                operation.complete(stateAccess, new LfgProtocol.Mutation(
                         LfgProtocol.VERSION, snapshot.revision(), resultLobby));
             } else if ("kick".equals(operation.action) || "ping".equals(operation.action)) {
-                operation.result.completeExceptionally(new LfgMutationOutcomeUnknownException(
+                operation.fail(stateAccess, new LfgMutationOutcomeUnknownException(
                         operation.action, operation.idempotencyKey,
                         "The action was submitted, but its outcome could not be confirmed after synchronization."));
             } else {
-                operation.result.completeExceptionally(new IllegalStateException(
+                operation.fail(stateAccess, new IllegalStateException(
                         "The action was not applied after synchronization."));
             }
         }
@@ -864,25 +912,29 @@ public final class RaidLfgService {
     private void runAcceptedCommand(PendingMutation operation) {
         if (operation.acceptedCommand == null || operation.commandExecuted) return;
         operation.commandExecuted = true;
-        try {
-            operation.acceptedCommand.run();
-        } catch (RuntimeException failure) {
-            LOGGER.error("Accepted Raid LFG {} action could not run its bounded party command",
-                    operation.action, failure);
-        }
+        stateAccess.afterUnlock(() -> {
+            try {
+                operation.acceptedCommand.run();
+            } catch (RuntimeException failure) {
+                LOGGER.error("Accepted Raid LFG {} action could not run its bounded party command",
+                        operation.action, failure);
+            }
+        });
     }
 
     private void failUnknownMutations(String message) {
         for (var operation : List.copyOf(unknownMutations.values())) {
             pending.remove(operation.pendingKey);
-            operation.result.completeExceptionally(new LfgMutationOutcomeUnknownException(
+            operation.fail(stateAccess, new LfgMutationOutcomeUnknownException(
                     operation.action, operation.idempotencyKey, message));
         }
         unknownMutations.clear();
     }
 
     private void requireCurrent(long expected) {
-        if (expected != generation) throw new StaleGenerationException();
+        try (var scope = stateAccess.enter()) {
+            if (expected != generation) throw new StaleGenerationException();
+        }
     }
 
     private static void requireProtocol(int version) {
@@ -957,6 +1009,17 @@ public final class RaidLfgService {
         private String contextKey;
         private LfgProtocol.Lobby beforeLobby;
         private boolean commandExecuted;
+        private boolean completed;
+
+        private void complete(LfgStateAccess access, LfgProtocol.Mutation mutation) {
+            completed = true;
+            access.complete(result, mutation);
+        }
+
+        private void fail(LfgStateAccess access, Throwable failure) {
+            completed = true;
+            access.fail(result, failure);
+        }
 
         private PendingMutation(String action, UUID lobbyId, LfgProtocol.RaidType raid,
                                 LfgProtocol.Region region, String note, boolean desiredFlag,

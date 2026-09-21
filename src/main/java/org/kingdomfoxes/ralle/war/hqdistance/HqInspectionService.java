@@ -30,8 +30,10 @@ public final class HqInspectionService {
     public HqInspection inspect(String territoryName) {
         try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.HQ_INSPECTION)) {
             var snapshot = source.snapshot();
-            if (!snapshot.equals(cachedSnapshot)) {
-                cachedSnapshot = snapshot;
+            boolean changed = snapshot != cachedSnapshot && !snapshot.equals(cachedSnapshot);
+            // Remember equal replacements too, so subsequent frames use the identity fast path.
+            cachedSnapshot = snapshot;
+            if (changed) {
                 cache.clear();
                 var projectedRoutes = routes.routes(snapshot);
                 int ownedTerritories = (int) snapshot.territories().values().stream()

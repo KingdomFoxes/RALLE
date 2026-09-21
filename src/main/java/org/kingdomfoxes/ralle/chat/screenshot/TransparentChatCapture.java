@@ -4,7 +4,6 @@ import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.pipeline.TextureTarget;
-import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -24,6 +23,8 @@ import java.util.concurrent.Executors;
 
 /** Re-renders frozen chat lines into a transparent GPU target and transfers the result locally. */
 public final class TransparentChatCapture implements ChatScreenshotCapture {
+    private static final java.util.concurrent.atomic.AtomicBoolean CAPTURE_ACTIVE =
+            new java.util.concurrent.atomic.AtomicBoolean();
     private static final Executor CLIPBOARD_EXECUTOR = Executors.newSingleThreadExecutor(task -> {
         Thread thread = new Thread(task, "RALLE image clipboard");
         thread.setDaemon(true);
@@ -46,6 +47,32 @@ public final class TransparentChatCapture implements ChatScreenshotCapture {
 
     @Override
     public void capture(Request request, Completion completion) {
+        if (!CAPTURE_ACTIVE.compareAndSet(false, true)) {
+            completion.failed(new IllegalStateException("A screenshot is still being copied. Try again shortly."));
+            return;
+        }
+        Completion guarded = new Completion() {
+            private final java.util.concurrent.atomic.AtomicBoolean finished =
+                    new java.util.concurrent.atomic.AtomicBoolean();
+            @Override public void succeeded() {
+                if (!finished.compareAndSet(false, true)) return;
+                CAPTURE_ACTIVE.set(false);
+                completion.succeeded();
+            }
+            @Override public void failed(Throwable failure) {
+                if (!finished.compareAndSet(false, true)) return;
+                CAPTURE_ACTIVE.set(false);
+                completion.failed(failure);
+            }
+        };
+        try {
+            captureOnClient(request, guarded);
+        } catch (RuntimeException | Error failure) {
+            guarded.failed(failure);
+        }
+    }
+
+    private void captureOnClient(Request request, Completion completion) {
         minecraft.execute(() -> {
             try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_CAPTURE_SUBMIT)) {
                 TextureTarget target = null;
@@ -54,8 +81,10 @@ public final class TransparentChatCapture implements ChatScreenshotCapture {
                     int visualHeight = ChatScreenshotGeometry.captureVisualHeight(
                             request.lines().size(), request.lineHeight(), request.chatScale()
                     );
-                    int pixelWidth = Math.max(1, request.visualWidth() * density);
-                    int pixelHeight = Math.max(1, visualHeight * density);
+                    var size = ChatCaptureBudget.validate(request.visualWidth(), visualHeight, density,
+                            RenderSystem.getDevice().getMaxTextureSize());
+                    int pixelWidth = size.width();
+                    int pixelHeight = size.height();
                     target = new TextureTarget("RALLE transparent chat capture", pixelWidth, pixelHeight, false);
                     RenderSystem.getDevice().createCommandEncoder().clearColorTexture(target.getColorTexture(), 0);
 
@@ -138,28 +167,24 @@ public final class TransparentChatCapture implements ChatScreenshotCapture {
                 9,
                 (long) width * height * texture.getFormat().pixelSize()
         );
-        var mapEncoder = RenderSystem.getDevice().createCommandEncoder();
-        RenderSystem.getDevice().createCommandEncoder().copyTextureToBuffer(texture, buffer, 0L, () -> {
-            try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_CAPTURE_READBACK)) {
-                try (buffer; GpuBuffer.MappedView mapped = mapEncoder.mapBuffer(buffer, true, false)) {
-                    var image = new NativeImage(width, height, false);
-                    try (image) {
-                        for (int y = 0; y < height; y++) {
-                            for (int x = 0; x < width; x++) {
-                                int abgr = mapped.data().getInt((x + y * width) * texture.getFormat().pixelSize());
-                                image.setPixelABGR(x, height - y - 1, abgr);
-                            }
-                        }
-                        byte[] rgba = toStraightAlphaRgba(image);
+        try {
+            var mapEncoder = RenderSystem.getDevice().createCommandEncoder();
+            RenderSystem.getDevice().createCommandEncoder().copyTextureToBuffer(texture, buffer, 0L, () -> {
+                try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_CAPTURE_READBACK)) {
+                    try (buffer; GpuBuffer.MappedView mapped = mapEncoder.mapBuffer(buffer, true, false)) {
+                        byte[] rgba = CapturePixels.toStraightAlphaRgba(mapped.data(), width, height);
                         clipboardExecutor.execute(() -> publish(width, height, rgba, completion));
+                    } catch (Throwable error) {
+                        completion.failed(error);
+                    } finally {
+                        target.destroyBuffers();
                     }
-                } catch (Throwable error) {
-                    completion.failed(error);
-                } finally {
-                    target.destroyBuffers();
                 }
-            }
-        }, 0);
+            }, 0);
+        } catch (RuntimeException | Error failure) {
+            buffer.close();
+            throw failure;
+        }
     }
 
     private void publish(int width, int height, byte[] rgba, Completion completion) {
@@ -171,28 +196,6 @@ public final class TransparentChatCapture implements ChatScreenshotCapture {
                 completion.failed(error);
             }
         }
-    }
-
-    static byte[] toStraightAlphaRgba(NativeImage source) {
-        byte[] rgba = new byte[Math.multiplyExact(Math.multiplyExact(source.getWidth(), source.getHeight()), 4)];
-        for (int y = 0; y < source.getHeight(); y++) {
-            for (int x = 0; x < source.getWidth(); x++) {
-                int argb = source.getPixel(x, y);
-                int alpha = argb >>> 24;
-                if (alpha > 0 && alpha < 255) {
-                    int red = Math.min(255, ((argb >>> 16) & 0xFF) * 255 / alpha);
-                    int green = Math.min(255, ((argb >>> 8) & 0xFF) * 255 / alpha);
-                    int blue = Math.min(255, (argb & 0xFF) * 255 / alpha);
-                    argb = alpha << 24 | red << 16 | green << 8 | blue;
-                }
-                int offset = (x + y * source.getWidth()) * 4;
-                rgba[offset] = (byte) (argb >>> 16);
-                rgba[offset + 1] = (byte) (argb >>> 8);
-                rgba[offset + 2] = (byte) argb;
-                rgba[offset + 3] = (byte) alpha;
-            }
-        }
-        return rgba;
     }
 
     private static FormattedCharSequence transform(FormattedCharSequence sequence, java.util.function.UnaryOperator<Style> transform) {

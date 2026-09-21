@@ -19,8 +19,9 @@ class CreateWheelAnimationTest {
 
     @Test void bakedDustMatchesOriginalTrajectoriesAndOverlapOrderForEveryFrame() throws Exception {
         var atlas = CreateDustReference.atlas();
-        assertEquals(4096, atlas.getWidth());
-        assertEquals(4096, atlas.getHeight());
+        assertEquals(2048, atlas.getWidth());
+        assertEquals(2728, atlas.getHeight());
+        assertTrue((long) atlas.getWidth() * atlas.getHeight() * 4 < 24 * 1024 * 1024);
         var source = new java.awt.image.BufferedImage(180, 180, java.awt.image.BufferedImage.TYPE_INT_ARGB);
         for (int y = 8; y < 172; y++) for (int x = 8; x < 172; x++) {
             if ((x + y) % 7 != 0) source.setRGB(x, y, 0xC0000000 | (x % 192) << 16 | (y % 192) << 8 | 80);

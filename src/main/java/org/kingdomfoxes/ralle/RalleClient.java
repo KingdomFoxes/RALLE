@@ -185,6 +185,7 @@ public final class RalleClient implements ClientModInitializer {
                 minecraft, settings, raidLfg, lfgSounds, lfgNotifications, hostPartyInvites, regionDetector,
                 actionBarState, disbandConfirmation, lockDebouncer, autoRaidRequeue);
         var chatBehavior = new ChatBehaviorService(Minecraft.getInstance(), settings);
+        chatBehavior.registerResourceInvalidation();
         var chatTypeTabs = new ChatTypeTabService();
         var chatInput = new WynncraftChatInputController(Minecraft.getInstance(),
                 () -> settings.setting(ChatTypeTabService.SETTING_ID, BooleanSetting.class).value(), chatTypeTabs);
@@ -216,6 +217,7 @@ public final class RalleClient implements ClientModInitializer {
             onboarding.postIfNeeded(body -> RalleChatMessages.post(client, body));
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            org.kingdomfoxes.ralle.ui.owo.PlayerHeadPresentation.clearSession();
             autoRaidRequeue.cancel();
             chatTypeTabs.resetSession();
             chatInput.reset();
@@ -225,6 +227,7 @@ public final class RalleClient implements ClientModInitializer {
             QueueAttributionService.disconnect();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            HqDistanceOverlay.tick();
             diagnostics.tick();
             try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_LAYOUT_TICK)) { chatLayout.tick(); }
             try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_BEHAVIOR_TICK)) { chatBehavior.tick(); }

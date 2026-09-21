@@ -3,6 +3,8 @@ RALLE selector wheel assets
 textures/gui/wheel/create_dissolve.png
 Original RALLE premade dust trajectories, opacity and overlap order, generated
 by tools/bake_create_dust.py from the original RALLE animation formula (94489fa).
+Lossless 8x8 tile dictionary packing preserves every contributor byte; the final
+128 rows encode tile addresses for the shader. Decoded RGBA8 size: 22,347,776 bytes.
 GNU GPL v3.0, like the RALLE source.
 
 textures/gui/wheel/kick_explosion.png

@@ -16,6 +16,10 @@ public final class RaidLfgStore {
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final List<LobbyChangeSink> changeSinks = new CopyOnWriteArrayList<>();
     private volatile State state = State.empty();
+    private final LfgStateAccess stateAccess;
+
+    public RaidLfgStore() { this(new LfgStateAccess()); }
+    RaidLfgStore(LfgStateAccess stateAccess) { this.stateAccess = stateAccess; }
 
     public State state() {
         return state;
@@ -31,76 +35,96 @@ public final class RaidLfgStore {
         return () -> changeSinks.remove(sink);
     }
 
-    public synchronized void replace(LfgProtocol.Snapshot snapshot) {
-        replace(snapshot, UpdateOrigin.SNAPSHOT);
-    }
-
-    public synchronized void replace(LfgProtocol.Snapshot snapshot, UpdateOrigin origin) {
-        requireVersion(snapshot.protocolVersion());
-        var previous = state.lobbies();
-        var lobbies = new LinkedHashMap<UUID, LfgProtocol.Lobby>();
-        for (var lobby : snapshot.lobbies()) lobbies.put(lobby.lobbyId(), lobby);
-        state = new State(snapshot.revision(), snapshot.viewer(), snapshot.capabilities(), lobbies);
-        emitDiff(previous, lobbies, origin);
-        notifyListeners();
-    }
-
-    public synchronized boolean apply(LfgProtocol.Mutation mutation) {
-        requireVersion(mutation.protocolVersion());
-        return upsert(mutation.revision(), mutation.lobby(), UpdateOrigin.LOCAL_MUTATION);
-    }
-
-    public synchronized boolean upsert(long globalRevision, LfgProtocol.Lobby lobby) {
-        return upsert(globalRevision, lobby, UpdateOrigin.LIVE);
-    }
-
-    public synchronized boolean upsert(long globalRevision, LfgProtocol.Lobby lobby, UpdateOrigin origin) {
-        if (globalRevision <= state.revision()) return false;
-        var updated = new LinkedHashMap<>(state.lobbies());
-        var previous = updated.put(lobby.lobbyId(), lobby);
-        state = new State(globalRevision, state.viewer(), refreshedCapabilities(updated), updated);
-        emitChange(previous, lobby, origin);
-        notifyListeners();
-        return true;
-    }
-
-    public synchronized boolean remove(long globalRevision, UUID lobbyId) {
-        return remove(globalRevision, lobbyId, UpdateOrigin.LIVE);
-    }
-
-    public synchronized boolean remove(long globalRevision, UUID lobbyId, UpdateOrigin origin) {
-        return remove(globalRevision, lobbyId, origin, null);
-    }
-
-    public synchronized boolean remove(long globalRevision, UUID lobbyId, UpdateOrigin origin, String reason) {
-        if (globalRevision <= state.revision()) return false;
-        var updated = new LinkedHashMap<>(state.lobbies());
-        var previous = updated.remove(lobbyId);
-        state = new State(globalRevision, state.viewer(), refreshedCapabilities(updated), updated);
-        if (previous != null) {
-            var change = new LobbyChange(previous, null, origin, reason);
-            for (var sink : changeSinks) sink.changed(change);
+    public void replace(LfgProtocol.Snapshot snapshot) {
+        try (var stateScope = stateAccess.enter()) {
+            replace(snapshot, UpdateOrigin.SNAPSHOT);
         }
-        notifyListeners();
-        return true;
+    }
+
+    public void replace(LfgProtocol.Snapshot snapshot, UpdateOrigin origin) {
+        try (var stateScope = stateAccess.enter()) {
+            requireVersion(snapshot.protocolVersion());
+            var previous = state.lobbies();
+            var lobbies = new LinkedHashMap<UUID, LfgProtocol.Lobby>();
+            for (var lobby : snapshot.lobbies()) lobbies.put(lobby.lobbyId(), lobby);
+            state = new State(snapshot.revision(), snapshot.viewer(), snapshot.capabilities(), lobbies);
+            emitDiff(previous, lobbies, origin);
+            notifyListeners();
+        }
+    }
+
+    public boolean apply(LfgProtocol.Mutation mutation) {
+        try (var stateScope = stateAccess.enter()) {
+            requireVersion(mutation.protocolVersion());
+            return upsert(mutation.revision(), mutation.lobby(), UpdateOrigin.LOCAL_MUTATION);
+        }
+    }
+
+    public boolean upsert(long globalRevision, LfgProtocol.Lobby lobby) {
+        try (var stateScope = stateAccess.enter()) {
+            return upsert(globalRevision, lobby, UpdateOrigin.LIVE);
+        }
+    }
+
+    public boolean upsert(long globalRevision, LfgProtocol.Lobby lobby, UpdateOrigin origin) {
+        try (var stateScope = stateAccess.enter()) {
+            if (globalRevision <= state.revision()) return false;
+            var updated = new LinkedHashMap<>(state.lobbies());
+            var previous = updated.put(lobby.lobbyId(), lobby);
+            state = new State(globalRevision, state.viewer(), refreshedCapabilities(updated), updated);
+            emitChange(previous, lobby, origin);
+            notifyListeners();
+            return true;
+        }
+    }
+
+    public boolean remove(long globalRevision, UUID lobbyId) {
+        try (var stateScope = stateAccess.enter()) {
+            return remove(globalRevision, lobbyId, UpdateOrigin.LIVE);
+        }
+    }
+
+    public boolean remove(long globalRevision, UUID lobbyId, UpdateOrigin origin) {
+        try (var stateScope = stateAccess.enter()) {
+            return remove(globalRevision, lobbyId, origin, null);
+        }
+    }
+
+    public boolean remove(long globalRevision, UUID lobbyId, UpdateOrigin origin, String reason) {
+        try (var stateScope = stateAccess.enter()) {
+            if (globalRevision <= state.revision()) return false;
+            var updated = new LinkedHashMap<>(state.lobbies());
+            var previous = updated.remove(lobbyId);
+            state = new State(globalRevision, state.viewer(), refreshedCapabilities(updated), updated);
+            if (previous != null) {
+                var change = new LobbyChange(previous, null, origin, reason);
+                for (var sink : changeSinks) stateAccess.afterUnlock(() -> sink.changed(change));
+            }
+            notifyListeners();
+            return true;
+        }
     }
 
     /** Keeps the authorized RAID_ALREADY_LISTED payload visible without inventing a global revision. */
-    public synchronized void remember(LfgProtocol.Lobby lobby) {
-        var existing = state.lobbies().get(lobby.lobbyId());
-        if (existing != null && existing.revision() >= lobby.revision()) return;
-        var updated = new LinkedHashMap<>(state.lobbies());
-        updated.put(lobby.lobbyId(), lobby);
-        state = new State(state.revision(), state.viewer(), state.capabilities(), updated);
-        emitChange(existing, lobby, UpdateOrigin.LOCAL_MUTATION);
-        notifyListeners();
+    public void remember(LfgProtocol.Lobby lobby) {
+        try (var stateScope = stateAccess.enter()) {
+            var existing = state.lobbies().get(lobby.lobbyId());
+            if (existing != null && existing.revision() >= lobby.revision()) return;
+            var updated = new LinkedHashMap<>(state.lobbies());
+            updated.put(lobby.lobbyId(), lobby);
+            state = new State(state.revision(), state.viewer(), state.capabilities(), updated);
+            emitChange(existing, lobby, UpdateOrigin.LOCAL_MUTATION);
+            notifyListeners();
+        }
     }
 
-    public synchronized void clear() {
-        var previous = state.lobbies();
-        state = State.empty();
-        for (var lobby : previous.values()) emitChange(lobby, null, UpdateOrigin.CLEAR);
-        notifyListeners();
+    public void clear() {
+        try (var stateScope = stateAccess.enter()) {
+            var previous = state.lobbies();
+            state = State.empty();
+            for (var lobby : previous.values()) emitChange(lobby, null, UpdateOrigin.CLEAR);
+            notifyListeners();
+        }
     }
 
     private void emitDiff(Map<UUID, LfgProtocol.Lobby> previous,
@@ -118,11 +142,11 @@ public final class RaidLfgStore {
 
     private void emitChange(LfgProtocol.Lobby previous, LfgProtocol.Lobby current, UpdateOrigin origin) {
         var change = new LobbyChange(previous, current, origin);
-        for (var sink : changeSinks) sink.changed(change);
+        for (var sink : changeSinks) stateAccess.afterUnlock(() -> sink.changed(change));
     }
 
     private void notifyListeners() {
-        for (var listener : listeners) listener.run();
+        for (var listener : listeners) stateAccess.afterUnlock(listener);
     }
 
     private LfgProtocol.ViewerCapabilities refreshedCapabilities(Map<UUID, LfgProtocol.Lobby> lobbies) {

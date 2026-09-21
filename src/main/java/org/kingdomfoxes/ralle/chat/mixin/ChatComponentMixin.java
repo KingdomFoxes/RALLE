@@ -52,6 +52,8 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
     @Unique private FullShadowFrameCollector ralle$fullShadowCollector;
     @Unique private List<GuiMessage> ralle$transitionMessages;
     @Unique private final ChatTimestampStore ralle$timestampStore = new ChatTimestampStore(Clock.systemDefaultZone());
+    @Unique private final org.kingdomfoxes.ralle.chat.ChatProjectionCache<GuiMessage, GuiMessage.Line>
+            ralle$projectionCache = new org.kingdomfoxes.ralle.chat.ChatProjectionCache<>();
 
     @Inject(
             method = "render(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/gui/Font;IIIZZ)V",
@@ -239,6 +241,7 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
 
     @Inject(method = "refreshTrimmedMessages", at = @At("HEAD"), require = 0)
     private void ralle$startMessageRefresh(CallbackInfo callback) {
+        ralle$projectionCache.clear();
         ralle$refreshingMessages = true;
         allMessages.forEach(ralle$timestampStore::record);
         ralle$pruneHistory();
@@ -254,6 +257,7 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
 
     @Inject(method = "clearMessages", at = @At("HEAD"), require = 0)
     private void ralle$preserveTransitionMessages(boolean clearRecentChat, CallbackInfo callback) {
+        ralle$projectionCache.clear();
         var behavior = RalleClient.context().chatBehavior();
         if (clearRecentChat && behavior.persistentChatEnabled()) {
             ralle$transitionMessages = new ArrayList<>(allMessages);
@@ -365,8 +369,9 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
             var behavior = RalleClient.context().chatBehavior();
             trimmedMessages.clear();
             int contentWidth = ralle$contentWidth();
-            for (int messageIndex = allMessages.size() - 1; messageIndex >= 0; messageIndex--) {
-                var message = allMessages.get(messageIndex);
+            int limit = behavior.effectiveHistoryLimit();
+            var layout = List.of(contentWidth, limit, behavior.chatTimestampsEnabled(), behavior.removeChatSystemIndicators());
+            trimmedMessages.addAll(ralle$projectionCache.project(allMessages, limit, layout, message -> {
                 var displayMessage = ChatSystemIndicators.withoutIndicator(
                         new GuiMessage(message.addedTime(), message.content(), null, message.tag()),
                         behavior.removeChatSystemIndicators()
@@ -379,17 +384,17 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
                         ? contentWidth
                         : Math.max(1, contentWidth - minecraft.font.width(prefix));
                 var lines = displayMessage.splitLines(minecraft.font, wrappedContentWidth);
+                var projected = new ArrayList<GuiMessage.Line>(lines.size());
                 for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
-                    trimmedMessages.addFirst(new GuiMessage.Line(
+                    projected.add(new GuiMessage.Line(
                             message.addedTime(),
                             prefix == null ? lines.get(lineIndex) : ChatTimestamps.prepend(prefix, lines.get(lineIndex)),
                             displayMessage.tag(),
                             lineIndex == lines.size() - 1
                     ));
                 }
-            }
-
-            ChatHistoryRetention.pruneOldest(trimmedMessages, behavior.effectiveHistoryLimit());
+                return projected;
+            }));
         }
     }
 
