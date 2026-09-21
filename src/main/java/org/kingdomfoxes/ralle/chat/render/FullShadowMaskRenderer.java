@@ -1,5 +1,7 @@
 package org.kingdomfoxes.ralle.chat.render;
 
+import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
+
 import com.mojang.blaze3d.ProjectionType;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -31,16 +33,18 @@ public final class FullShadowMaskRenderer extends PictureInPictureRenderer<FullS
 
     @Override
     public void prepare(FullShadowMaskState state, GuiRenderState guiRenderState, int ignoredGuiScale) {
-        if (!FullShadowRenderingStrategy.compositorAvailable() || state.lines().isEmpty()) return;
+        try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_SHADOW_PREPARE)) {
+            if (!FullShadowRenderingStrategy.compositorAvailable() || state.lines().isEmpty()) return;
 
-        try {
-            int width = Math.max(1, (state.x1() - state.x0()) * MASK_SCALE);
-            int height = Math.max(1, (state.y1() - state.y0()) * MASK_SCALE);
-            ensureTarget(width, height);
-            renderMask(state, width, height);
-            submitComposite(state, guiRenderState);
-        } catch (Throwable failure) {
-            FullShadowRenderingStrategy.disableCompositor("preparing the glyph mask", failure);
+            try {
+                int width = Math.max(1, (state.x1() - state.x0()) * MASK_SCALE);
+                int height = Math.max(1, (state.y1() - state.y0()) * MASK_SCALE);
+                ensureTarget(width, height);
+                renderMask(state, width, height);
+                submitComposite(state, guiRenderState);
+            } catch (Throwable failure) {
+                FullShadowRenderingStrategy.disableCompositor("preparing the glyph mask", failure);
+            }
         }
     }
 

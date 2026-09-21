@@ -326,6 +326,8 @@ public final class RaidLfgService {
 
     private synchronized void completeFailedMutation(PendingMutation operation, Throwable cause) {
         if (operation.result.isDone()) return;
+        LOGGER.warn("Raid LFG mutation failed: action={}, failureType={}",
+                operation.action, cause.getClass().getSimpleName());
         if (!Objects.equals(operation.contextKey, contextKey)) {
             pending.remove(operation.pendingKey);
             operation.result.completeExceptionally(new LfgMutationOutcomeUnknownException(

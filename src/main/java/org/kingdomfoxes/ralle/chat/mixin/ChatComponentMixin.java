@@ -1,5 +1,7 @@
 package org.kingdomfoxes.ralle.chat.mixin;
 
+import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
+
 import net.minecraft.client.GuiMessage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ActiveTextCollector;
@@ -359,34 +361,36 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
     }
 
     private void ralle$refreshProjectedMessages() {
-        var behavior = RalleClient.context().chatBehavior();
-        trimmedMessages.clear();
-        int contentWidth = ralle$contentWidth();
-        for (int messageIndex = allMessages.size() - 1; messageIndex >= 0; messageIndex--) {
-            var message = allMessages.get(messageIndex);
-            var displayMessage = ChatSystemIndicators.withoutIndicator(
-                    new GuiMessage(message.addedTime(), message.content(), null, message.tag()),
-                    behavior.removeChatSystemIndicators()
-            );
-            var receiveTime = ralle$timestampStore.receiveTime(message);
-            var prefix = behavior.chatTimestampsEnabled() && receiveTime != null
-                    ? ChatTimestamps.prefix(receiveTime).getVisualOrderText()
-                    : null;
-            int wrappedContentWidth = prefix == null
-                    ? contentWidth
-                    : Math.max(1, contentWidth - minecraft.font.width(prefix));
-            var lines = displayMessage.splitLines(minecraft.font, wrappedContentWidth);
-            for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
-                trimmedMessages.addFirst(new GuiMessage.Line(
-                        message.addedTime(),
-                        prefix == null ? lines.get(lineIndex) : ChatTimestamps.prepend(prefix, lines.get(lineIndex)),
-                        displayMessage.tag(),
-                        lineIndex == lines.size() - 1
-                ));
+        try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_PROJECTION)) {
+            var behavior = RalleClient.context().chatBehavior();
+            trimmedMessages.clear();
+            int contentWidth = ralle$contentWidth();
+            for (int messageIndex = allMessages.size() - 1; messageIndex >= 0; messageIndex--) {
+                var message = allMessages.get(messageIndex);
+                var displayMessage = ChatSystemIndicators.withoutIndicator(
+                        new GuiMessage(message.addedTime(), message.content(), null, message.tag()),
+                        behavior.removeChatSystemIndicators()
+                );
+                var receiveTime = ralle$timestampStore.receiveTime(message);
+                var prefix = behavior.chatTimestampsEnabled() && receiveTime != null
+                        ? ChatTimestamps.prefix(receiveTime).getVisualOrderText()
+                        : null;
+                int wrappedContentWidth = prefix == null
+                        ? contentWidth
+                        : Math.max(1, contentWidth - minecraft.font.width(prefix));
+                var lines = displayMessage.splitLines(minecraft.font, wrappedContentWidth);
+                for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
+                    trimmedMessages.addFirst(new GuiMessage.Line(
+                            message.addedTime(),
+                            prefix == null ? lines.get(lineIndex) : ChatTimestamps.prepend(prefix, lines.get(lineIndex)),
+                            displayMessage.tag(),
+                            lineIndex == lines.size() - 1
+                    ));
+                }
             }
-        }
 
-        ChatHistoryRetention.pruneOldest(trimmedMessages, behavior.effectiveHistoryLimit());
+            ChatHistoryRetention.pruneOldest(trimmedMessages, behavior.effectiveHistoryLimit());
+        }
     }
 
     @Unique

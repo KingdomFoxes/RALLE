@@ -750,6 +750,13 @@ the field, preserving ordinary protocol-v1 requests. A backend without the new
 field rejects the request; the client never silently retries it as solo creation.
 Party import therefore requires deploying the matching Fox backend change.
 
+Import rejection feedback distinguishes an occupied guest (`PARTY_MEMBER_ALREADY_ACTIVE`),
+an unresolved identity (`PARTY_IDENTITY_UNRESOLVED` or `PLAYER_NOT_FOUND`), and an invalid
+roster (`INVALID_PARTY`). Failed HTTP responses log their status, bounded error category,
+and canonical `X-Request-ID` locally for correlation with Fox diagnostics. Mutation
+failures also log the action and exception type. Bodies, credentials, rosters, notes,
+and arbitrary exception messages are excluded; no diagnostic upload is performed.
+
 Fox resolves every imported identity through Wynncraft, accepts guests from any
 guild or no guild, and reserves host plus guests atomically under the existing
 capacity/uniqueness rules. Guests use the existing `MANUAL` member source; no

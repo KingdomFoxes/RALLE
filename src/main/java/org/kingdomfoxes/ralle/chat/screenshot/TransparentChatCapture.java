@@ -1,5 +1,7 @@
 package org.kingdomfoxes.ralle.chat.screenshot;
 
+import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
+
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.platform.NativeImage;
@@ -45,36 +47,38 @@ public final class TransparentChatCapture implements ChatScreenshotCapture {
     @Override
     public void capture(Request request, Completion completion) {
         minecraft.execute(() -> {
-            TextureTarget target = null;
-            try {
-                int density = Math.max(1, minecraft.getWindow().getGuiScale());
-                int visualHeight = ChatScreenshotGeometry.captureVisualHeight(
-                        request.lines().size(), request.lineHeight(), request.chatScale()
-                );
-                int pixelWidth = Math.max(1, request.visualWidth() * density);
-                int pixelHeight = Math.max(1, visualHeight * density);
-                target = new TextureTarget("RALLE transparent chat capture", pixelWidth, pixelHeight, false);
-                RenderSystem.getDevice().createCommandEncoder().clearColorTexture(target.getColorTexture(), 0);
+            try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_CAPTURE_SUBMIT)) {
+                TextureTarget target = null;
+                try {
+                    int density = Math.max(1, minecraft.getWindow().getGuiScale());
+                    int visualHeight = ChatScreenshotGeometry.captureVisualHeight(
+                            request.lines().size(), request.lineHeight(), request.chatScale()
+                    );
+                    int pixelWidth = Math.max(1, request.visualWidth() * density);
+                    int pixelHeight = Math.max(1, visualHeight * density);
+                    target = new TextureTarget("RALLE transparent chat capture", pixelWidth, pixelHeight, false);
+                    RenderSystem.getDevice().createCommandEncoder().clearColorTexture(target.getColorTexture(), 0);
 
-                GameRendererAccessor renderer = (GameRendererAccessor) minecraft.gameRenderer;
-                renderer.ralle$getGuiRenderState().reset();
-                GuiGraphics graphics = new GuiGraphics(minecraft, renderer.ralle$getGuiRenderState(), 0, 0);
-                float projectionCompensationX = minecraft.getWindow().getGuiScaledWidth() / (float) request.visualWidth();
-                float projectionCompensationY = minecraft.getWindow().getGuiScaledHeight() / (float) visualHeight;
-                graphics.pose().scale(projectionCompensationX, projectionCompensationY);
-                graphics.pose().scale((float) request.chatScale(), (float) request.chatScale());
-                graphics.pose().translate(0.0F, (float) (ChatScreenshotTokens.VERTICAL_PADDING / request.chatScale()));
-                renderLines(graphics, request);
+                    GameRendererAccessor renderer = (GameRendererAccessor) minecraft.gameRenderer;
+                    renderer.ralle$getGuiRenderState().reset();
+                    GuiGraphics graphics = new GuiGraphics(minecraft, renderer.ralle$getGuiRenderState(), 0, 0);
+                    float projectionCompensationX = minecraft.getWindow().getGuiScaledWidth() / (float) request.visualWidth();
+                    float projectionCompensationY = minecraft.getWindow().getGuiScaledHeight() / (float) visualHeight;
+                    graphics.pose().scale(projectionCompensationX, projectionCompensationY);
+                    graphics.pose().scale((float) request.chatScale(), (float) request.chatScale());
+                    graphics.pose().translate(0.0F, (float) (ChatScreenshotTokens.VERTICAL_PADDING / request.chatScale()));
+                    renderLines(graphics, request);
 
-                TextureTarget finalTarget = target;
-                GuiCaptureTargetOverride.runWith(target, () -> renderer.ralle$getGuiRenderer().render(
-                        renderer.ralle$getFogRenderer().getBuffer(FogRenderer.FogMode.NONE)
-                ));
-                download(finalTarget, completion);
-                target = null;
-            } catch (Throwable error) {
-                if (target != null) target.destroyBuffers();
-                completion.failed(error);
+                    TextureTarget finalTarget = target;
+                    GuiCaptureTargetOverride.runWith(target, () -> renderer.ralle$getGuiRenderer().render(
+                            renderer.ralle$getFogRenderer().getBuffer(FogRenderer.FogMode.NONE)
+                    ));
+                    download(finalTarget, completion);
+                    target = null;
+                } catch (Throwable error) {
+                    if (target != null) target.destroyBuffers();
+                    completion.failed(error);
+                }
             }
         });
     }
@@ -136,32 +140,36 @@ public final class TransparentChatCapture implements ChatScreenshotCapture {
         );
         var mapEncoder = RenderSystem.getDevice().createCommandEncoder();
         RenderSystem.getDevice().createCommandEncoder().copyTextureToBuffer(texture, buffer, 0L, () -> {
-            try (buffer; GpuBuffer.MappedView mapped = mapEncoder.mapBuffer(buffer, true, false)) {
-                var image = new NativeImage(width, height, false);
-                try (image) {
-                    for (int y = 0; y < height; y++) {
-                        for (int x = 0; x < width; x++) {
-                            int abgr = mapped.data().getInt((x + y * width) * texture.getFormat().pixelSize());
-                            image.setPixelABGR(x, height - y - 1, abgr);
+            try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_CAPTURE_READBACK)) {
+                try (buffer; GpuBuffer.MappedView mapped = mapEncoder.mapBuffer(buffer, true, false)) {
+                    var image = new NativeImage(width, height, false);
+                    try (image) {
+                        for (int y = 0; y < height; y++) {
+                            for (int x = 0; x < width; x++) {
+                                int abgr = mapped.data().getInt((x + y * width) * texture.getFormat().pixelSize());
+                                image.setPixelABGR(x, height - y - 1, abgr);
+                            }
                         }
+                        byte[] rgba = toStraightAlphaRgba(image);
+                        clipboardExecutor.execute(() -> publish(width, height, rgba, completion));
                     }
-                    byte[] rgba = toStraightAlphaRgba(image);
-                    clipboardExecutor.execute(() -> publish(width, height, rgba, completion));
+                } catch (Throwable error) {
+                    completion.failed(error);
+                } finally {
+                    target.destroyBuffers();
                 }
-            } catch (Throwable error) {
-                completion.failed(error);
-            } finally {
-                target.destroyBuffers();
             }
         }, 0);
     }
 
     private void publish(int width, int height, byte[] rgba, Completion completion) {
-        try {
-            clipboard.publish(new ClipboardImage(PngEncoder.encode(width, height, rgba), width, height, rgba));
-            completion.succeeded();
-        } catch (Throwable error) {
-            completion.failed(error);
+        try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_PNG_CLIPBOARD)) {
+            try {
+                clipboard.publish(new ClipboardImage(PngEncoder.encode(width, height, rgba), width, height, rgba));
+                completion.succeeded();
+            } catch (Throwable error) {
+                completion.failed(error);
+            }
         }
     }
 

@@ -1,5 +1,7 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
+import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
+
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
@@ -103,41 +105,43 @@ public final class LfgNotificationOverlay {
     }
 
     private void render(GuiGraphics graphics, int mouseX, int mouseY, boolean interactive) {
-        var cards = notifications.visibleCards();
-        if (cards.isEmpty()) {
-            hitRegions = List.of();
-            return;
-        }
-        int viewportWidth = minecraft.getWindow().getGuiScaledWidth();
-        int viewportHeight = minecraft.getWindow().getGuiScaledHeight();
-        var anchor = placements.resolveSideAnchored(
-                ELEMENT_ID, viewportWidth, viewportHeight, SideAnchor.RIGHT,
-                Math.max(0, viewportHeight - CARD_HEIGHT - 8)
-        );
-        var stack = stackBounds(anchor, cards.size(), viewportWidth, viewportHeight);
-        var hits = new ArrayList<HitRegion>();
-        Component hoveredRosterMember = null;
-        for (int index = 0; index < cards.size(); index++) {
-            var card = cards.get(index);
-            var target = stack.get(index);
-            boolean left = anchor.x() < viewportWidth / 2;
-            int offscreen = left ? -CARD_WIDTH : viewportWidth;
-            int animatedX = (int) Math.round(offscreen + (target.x() - offscreen) * card.animationProgress());
-            var animated = new Rectangle(animatedX, target.y(), CARD_WIDTH, CARD_HEIGHT);
-            var hovered = renderCard(graphics, card, animated, mouseX, mouseY, interactive, hits);
-            if (hovered != null) hoveredRosterMember = hovered;
-        }
-        if (hoveredRosterMember != null) {
-            graphics.renderTooltip(
-                    minecraft.font,
-                    List.of(ClientTooltipComponent.create(hoveredRosterMember.getVisualOrderText())),
-                    mouseX,
-                    mouseY,
-                    DefaultTooltipPositioner.INSTANCE,
-                    null
+        try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.LFG_OVERLAY_RENDER)) {
+            var cards = notifications.visibleCards();
+            if (cards.isEmpty()) {
+                hitRegions = List.of();
+                return;
+            }
+            int viewportWidth = minecraft.getWindow().getGuiScaledWidth();
+            int viewportHeight = minecraft.getWindow().getGuiScaledHeight();
+            var anchor = placements.resolveSideAnchored(
+                    ELEMENT_ID, viewportWidth, viewportHeight, SideAnchor.RIGHT,
+                    Math.max(0, viewportHeight - CARD_HEIGHT - 8)
             );
+            var stack = stackBounds(anchor, cards.size(), viewportWidth, viewportHeight);
+            var hits = new ArrayList<HitRegion>();
+            Component hoveredRosterMember = null;
+            for (int index = 0; index < cards.size(); index++) {
+                var card = cards.get(index);
+                var target = stack.get(index);
+                boolean left = anchor.x() < viewportWidth / 2;
+                int offscreen = left ? -CARD_WIDTH : viewportWidth;
+                int animatedX = (int) Math.round(offscreen + (target.x() - offscreen) * card.animationProgress());
+                var animated = new Rectangle(animatedX, target.y(), CARD_WIDTH, CARD_HEIGHT);
+                var hovered = renderCard(graphics, card, animated, mouseX, mouseY, interactive, hits);
+                if (hovered != null) hoveredRosterMember = hovered;
+            }
+            if (hoveredRosterMember != null) {
+                graphics.renderTooltip(
+                        minecraft.font,
+                        List.of(ClientTooltipComponent.create(hoveredRosterMember.getVisualOrderText())),
+                        mouseX,
+                        mouseY,
+                        DefaultTooltipPositioner.INSTANCE,
+                        null
+                );
+            }
+            hitRegions = interactive ? List.copyOf(hits) : List.of();
         }
-        hitRegions = interactive ? List.copyOf(hits) : List.of();
     }
 
     static List<Rectangle> stackBounds(Rectangle anchor, int count, int viewportWidth, int viewportHeight) {

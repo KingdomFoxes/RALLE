@@ -1,5 +1,7 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
+import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
+
 import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.DropdownComponent;
@@ -283,33 +285,35 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void rebuildGrid() {
-        cancelUnavailableJoinCountdown();
-        kickRows.clear();
-        kickButton = null;
-        lockButton = null;
-        renderedPingSeconds = -1;
-        gridHost.clearChildren();
-        if (service.lifecycle() != RaidLfgService.LifecycleState.ONLINE) {
+        try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.LFG_GRID_REBUILD)) {
+            cancelUnavailableJoinCountdown();
+            kickRows.clear();
+            kickButton = null;
+            lockButton = null;
+            renderedPingSeconds = -1;
+            gridHost.clearChildren();
+            if (service.lifecycle() != RaidLfgService.LifecycleState.ONLINE) {
+                validateKickTargeting();
+                gridHost.child(statePanel(service.statusMessage()));
+                return;
+            }
+            var visible = service.store().state().lobbyList().stream().filter(this::matchesFilters).toList();
+            if (visible.isEmpty()) {
+                validateKickTargeting();
+                gridHost.child(statePanel("No parties match these filters."));
+                return;
+            }
+            int rows = (visible.size() + 1) / 2;
+            GridLayout grid = UIContainers.grid(Sizing.fixed(GRID_WIDTH), Sizing.content(), rows, 2);
+            grid.padding(Insets.of(2));
+            for (int i = 0; i < visible.size(); i++) {
+                var card = lobbyCard(visible.get(i));
+                grid.child(card, i / 2, i % 2);
+                if (visible.get(i).lobbyId().equals(scrollTarget)) scrollTargetComponent = card;
+            }
+            gridHost.child(grid);
             validateKickTargeting();
-            gridHost.child(statePanel(service.statusMessage()));
-            return;
         }
-        var visible = service.store().state().lobbyList().stream().filter(this::matchesFilters).toList();
-        if (visible.isEmpty()) {
-            validateKickTargeting();
-            gridHost.child(statePanel("No parties match these filters."));
-            return;
-        }
-        int rows = (visible.size() + 1) / 2;
-        GridLayout grid = UIContainers.grid(Sizing.fixed(GRID_WIDTH), Sizing.content(), rows, 2);
-        grid.padding(Insets.of(2));
-        for (int i = 0; i < visible.size(); i++) {
-            var card = lobbyCard(visible.get(i));
-            grid.child(card, i / 2, i % 2);
-            if (visible.get(i).lobbyId().equals(scrollTarget)) scrollTargetComponent = card;
-        }
-        gridHost.child(grid);
-        validateKickTargeting();
     }
 
     private FlowLayout statePanel(String message) {

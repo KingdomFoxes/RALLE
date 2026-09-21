@@ -8,6 +8,11 @@ The distributable RALLE jar bundles its compatible owo-lib version, so users do
 not need to install owo-lib separately. Fabric API remains a required separate
 mod.
 
+For local release testing, `/ralle diag start 60` records RALLE section timings
+and allocations; `/ralle diag jfr 60` also captures JVM profiling samples.
+Diagnostics are opt-in and never upload data. See [Diagnostics](docs/DIAGNOSTICS.md)
+for commands, output locations, measurement limits and repeatable test scenarios.
+
 Its chat section includes a dedicated editor for moving, resizing, and restoring the
 single chat box; placements are normalized across resolution and GUI-scale
 changes and apply in singleplayer or on any server. Message direction,

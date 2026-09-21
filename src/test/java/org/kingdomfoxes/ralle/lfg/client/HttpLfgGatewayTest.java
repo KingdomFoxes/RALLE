@@ -77,6 +77,79 @@ class HttpLfgGatewayTest {
     }
 
     @Test
+    void partyImportSendsRosterAndDecodesGuildlessManualMember() throws Exception {
+        var response = com.google.gson.JsonParser.parseString(mutationJson()).getAsJsonObject();
+        var members = response.getAsJsonObject("lobby").getAsJsonArray("members");
+        var guest = members.get(0).getAsJsonObject().deepCopy();
+        guest.addProperty("minecraft_uuid", "00000000-0000-0000-0000-000000000002");
+        guest.addProperty("ign", "Guest01");
+        guest.addProperty("role", "MEMBER");
+        guest.addProperty("source", "MANUAL");
+        var guild = guest.getAsJsonObject("guild");
+        guild.addProperty("uuid", "00000000-0000-0000-0000-000000000000");
+        guild.addProperty("name", "No guild");
+        guild.addProperty("tag", "-");
+        guild.addProperty("color", "#697487");
+        members.add(guest);
+        var requests = new ArrayList<String>();
+        var gateway = importGateway(200, response.toString(), requests);
+
+        var result = gateway.createWithParty("memory-only-token",
+                org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol.RaidType.TNA,
+                org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol.Region.EU,
+                null, List.of("Guest01"), UUID.randomUUID()).get(5, TimeUnit.SECONDS);
+
+        assertEquals(2, result.lobby().members().size());
+        assertEquals("No guild", result.lobby().members().get(1).guild().name());
+        assertEquals(1, requests.size());
+        var sent = com.google.gson.JsonParser.parseString(requests.getFirst()).getAsJsonObject();
+        assertEquals("Guest01", sent.getAsJsonArray("party_members").get(0).getAsString());
+        assertTrue(sent.get("note").isJsonNull());
+    }
+
+    @Test
+    void rejectedImportPreservesReasonAndNeverRetriesAsSolo() throws Exception {
+        var requests = new ArrayList<String>();
+        var gateway = importGateway(409,
+                "{\"error\":{\"code\":\"PARTY_MEMBER_ALREADY_ACTIVE\",\"message\":\"Occupied\",\"retryable\":false}}",
+                requests);
+        var failure = assertThrows(ExecutionException.class, () -> gateway.createWithParty("memory-only-token",
+                org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol.RaidType.TNA,
+                org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol.Region.EU,
+                null, List.of("Guest01"), UUID.randomUUID()).get(5, TimeUnit.SECONDS));
+
+        assertEquals(LfgCreationFeedback.key("already-active"), LfgCreationFeedback.failure(failure));
+        assertEquals(1, requests.size());
+        assertTrue(requests.getFirst().contains("party_members"));
+    }
+
+    private HttpLfgGateway importGateway(int status, String response, List<String> requests) throws Exception {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/ralle/v1/lobbies", exchange -> {
+            requests.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            var bytes = response.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
+        server.start();
+        return new HttpLfgGateway(HttpClient.newHttpClient(),
+                "http://127.0.0.1:" + server.getAddress().getPort() + "/api/ralle/v1");
+    }
+
+    @Test
+    void diagnosticsAcceptOnlyBoundedCodesAndCanonicalRequestIds() {
+        assertEquals("PARTY_MEMBER_ALREADY_ACTIVE", HttpLfgGateway.diagnosticCode("PARTY_MEMBER_ALREADY_ACTIVE"));
+        assertEquals("UNKNOWN", HttpLfgGateway.diagnosticCode("secret\nforged log"));
+        assertEquals("UNKNOWN", HttpLfgGateway.diagnosticCode("X".repeat(65)));
+        assertEquals("unavailable", HttpLfgGateway.diagnosticRequestId("1-1-1-1-1"));
+        assertEquals("unavailable", HttpLfgGateway.diagnosticRequestId(null));
+        assertEquals("unavailable", HttpLfgGateway.diagnosticRequestId("Bearer secret"));
+        var requestId = UUID.randomUUID().toString();
+        assertEquals(requestId, HttpLfgGateway.diagnosticRequestId(requestId));
+    }
+
+    @Test
     void genericMissingEndpointBecomesVisibleHostActionError() {
         var error = HttpLfgGateway.httpError(404, "{\"detail\":\"Not Found\"}");
 

@@ -1,5 +1,7 @@
 package org.kingdomfoxes.ralle.war.hqdistance;
 
+import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.OptionalInt;
@@ -26,22 +28,24 @@ public final class HqInspectionService {
     }
 
     public HqInspection inspect(String territoryName) {
-        var snapshot = source.snapshot();
-        if (!snapshot.equals(cachedSnapshot)) {
-            cachedSnapshot = snapshot;
-            cache.clear();
-            var projectedRoutes = routes.routes(snapshot);
-            int ownedTerritories = (int) snapshot.territories().values().stream()
-                    .filter(territory -> territory.reliable() && snapshot.guildName().equals(territory.owner()))
-                    .count();
-            int redThreshold = redThreshold(ownedTerritories);
-            if (hasDefinitivelyNoHeadquarters(snapshot)) {
-                projectedRoutes.keySet().forEach(name -> cache.put(name, NO_HEADQUARTERS));
-            } else {
-                projectedRoutes.forEach((name, route) -> cache.put(name, format(route, redThreshold)));
+        try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.HQ_INSPECTION)) {
+            var snapshot = source.snapshot();
+            if (!snapshot.equals(cachedSnapshot)) {
+                cachedSnapshot = snapshot;
+                cache.clear();
+                var projectedRoutes = routes.routes(snapshot);
+                int ownedTerritories = (int) snapshot.territories().values().stream()
+                        .filter(territory -> territory.reliable() && snapshot.guildName().equals(territory.owner()))
+                        .count();
+                int redThreshold = redThreshold(ownedTerritories);
+                if (hasDefinitivelyNoHeadquarters(snapshot)) {
+                    projectedRoutes.keySet().forEach(name -> cache.put(name, NO_HEADQUARTERS));
+                } else {
+                    projectedRoutes.forEach((name, route) -> cache.put(name, format(route, redThreshold)));
+                }
             }
+            return cache.getOrDefault(territoryName, UNKNOWN);
         }
-        return cache.getOrDefault(territoryName, UNKNOWN);
     }
 
     public boolean hasActiveAttackTimer(String territoryName) {

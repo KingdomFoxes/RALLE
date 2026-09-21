@@ -3,6 +3,7 @@ package org.kingdomfoxes.ralle;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -62,6 +63,8 @@ import org.kingdomfoxes.ralle.war.consumables.ConsumableHighlightStore;
 import org.kingdomfoxes.ralle.war.hqdistance.HqDistanceOverlay;
 import org.kingdomfoxes.ralle.war.hqdistance.WynntilsCompatibility;
 import org.kingdomfoxes.ralle.war.queue.QueueAttributionService;
+import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
+import org.kingdomfoxes.ralle.diagnostics.RalleDiagnostics;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
@@ -127,6 +130,8 @@ public final class RalleClient implements ClientModInitializer {
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), placements);
         var navigation = new SettingsNavigationState(configDirectory.resolve("ralle-settings-ui.properties"), settings);
         var minecraft = Minecraft.getInstance();
+        var diagnostics = new RalleDiagnostics(minecraft, FabricLoader.getInstance().getGameDir());
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> diagnostics.close());
         var consumableHighlights = new ConsumableHighlightService(
                 minecraft,
                 settings.setting(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID, BooleanSetting.class),
@@ -221,17 +226,18 @@ public final class RalleClient implements ClientModInitializer {
             QueueAttributionService.disconnect();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            chatLayout.tick();
-            chatBehavior.tick();
-            chatInput.tick();
-            guildRanks.tick();
-            chatScreenshots.tick();
-            raidLfg.tick();
-            lfgKeybinds.tick();
-            autoRaidRequeue.tick();
-            hostPartyInvites.tick();
-            lfgNotificationOverlay.tick();
-            QueueAttributionService.tick(client);
+            diagnostics.tick();
+            try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_LAYOUT_TICK)) { chatLayout.tick(); }
+            try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_BEHAVIOR_TICK)) { chatBehavior.tick(); }
+            try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_INPUT_TICK)) { chatInput.tick(); }
+            try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.GUILD_RANK_TICK)) { guildRanks.tick(); }
+            try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_SCREENSHOT_TICK)) { chatScreenshots.tick(); }
+            try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.LFG_SERVICE_TICK)) { raidLfg.tick(); }
+            try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.LFG_KEYBINDS_TICK)) { lfgKeybinds.tick(); }
+            try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.REQUEUE_TICK)) { autoRaidRequeue.tick(); }
+            try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.PARTY_INVITES_TICK)) { hostPartyInvites.tick(); }
+            try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.NOTIFICATIONS_TICK)) { lfgNotificationOverlay.tick(); }
+            try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.QUEUE_ATTRIBUTION_TICK)) { QueueAttributionService.tick(client); }
         });
         RaidRequeueMessages.register(autoRaidRequeue::observeChat);
         ClientSendMessageEvents.COMMAND.register(chatTypeTabs::observeSentCommand);
@@ -266,7 +272,7 @@ public final class RalleClient implements ClientModInitializer {
                             context().lfgSounds(), lfgNotifications, lockDebouncer)));
                     return 1;
                 }));
-            dispatcher.register(ralleCommand);
+            dispatcher.register(ralleCommand.then(diagnostics.command()));
         });
     }
 

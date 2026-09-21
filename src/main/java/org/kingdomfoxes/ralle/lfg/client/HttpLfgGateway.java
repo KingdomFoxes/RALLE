@@ -4,6 +4,8 @@ import org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocolException;
 import org.kingdomfoxes.ralle.lfg.protocol.StrictLfgJson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
@@ -28,6 +30,7 @@ import java.util.function.Function;
 
 /** JDK HTTP/WebSocket implementation with bearer headers and one safe mutation retry. */
 public final class HttpLfgGateway implements LfgGateway {
+    private static final Logger LOGGER = LoggerFactory.getLogger(HttpLfgGateway.class);
     public static final String PRODUCTION_BASE_URL = "https://kingdomfoxes.com/api/ralle/v1";
     public static final String LOCAL_BASE_URL = "http://127.0.0.1:8001/api/ralle/v1";
     public static final String DEFAULT_BASE_URL = PRODUCTION_BASE_URL;
@@ -224,6 +227,7 @@ public final class HttpLfgGateway implements LfgGateway {
                             return CompletableFuture.completedFuture(decoder.apply(body));
                         }
                         var error = httpError(response.statusCode(), body);
+                        logHttpFailure(request, response, diagnosticCode(error.code()));
                         var retryAfter = parseRetryAfter(response.headers().firstValue("Retry-After").orElse(null));
                         if (error.retryAfterSeconds() == null && retryAfter != null) {
                             error = new LfgProtocol.Error(error.code(), error.message(), error.retryable(),
@@ -235,9 +239,31 @@ public final class HttpLfgGateway implements LfgGateway {
                         return CompletableFuture.<T>failedFuture(new LfgGatewayException(
                                 "Fox Raid LFG returned an unreadable response.", exception));
                     } catch (RuntimeException exception) {
+                        logHttpFailure(request, response, exception.getClass().getSimpleName());
                         return CompletableFuture.<T>failedFuture(exception);
                     }
                 }).thenCompose(Function.identity());
+    }
+
+    private static void logHttpFailure(HttpRequest request, HttpResponse<?> response, String category) {
+        // Do not log bodies, headers, exception messages, notes, rosters, or bearer credentials.
+        LOGGER.warn("Raid LFG HTTP failure: method={}, status={}, category={}, requestId={}",
+                request.method(), response.statusCode(), category,
+                diagnosticRequestId(response.headers().firstValue("X-Request-ID").orElse(null)));
+    }
+
+    static String diagnosticCode(String code) {
+        return code != null && code.matches("[A-Z][A-Z0-9_]{0,63}") ? code : "UNKNOWN";
+    }
+
+    static String diagnosticRequestId(String value) {
+        if (value == null) return "unavailable";
+        try {
+            var parsed = UUID.fromString(value);
+            return parsed.toString().equalsIgnoreCase(value) ? parsed.toString() : "unavailable";
+        } catch (IllegalArgumentException invalid) {
+            return "unavailable";
+        }
     }
 
     private static String readBody(java.io.InputStream body) throws IOException {
