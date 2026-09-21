@@ -15,6 +15,7 @@ import net.minecraft.client.renderer.fog.FogRenderer;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix3x2f;
 import org.kingdomfoxes.ralle.chat.mixin.GameRendererAccessor;
+import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
 import org.kingdomfoxes.ralle.ui.render.GuiCaptureTargetOverride;
 
 import java.util.List;
@@ -40,6 +41,12 @@ final class CreateWheelSnapshot implements AutoCloseable {
     }
 
     static CreateWheelSnapshot capture(Minecraft minecraft, int extent, Consumer<GuiGraphics> draw) {
+        try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CREATE_WHEEL_CAPTURE)) {
+            return captureSegment(minecraft, extent, draw);
+        }
+    }
+
+    private static CreateWheelSnapshot captureSegment(Minecraft minecraft, int extent, Consumer<GuiGraphics> draw) {
         // Warm the shared baked atlas on hover, before accepted creation starts playback.
         minecraft.getTextureManager().getTexture(MASK);
         int density = Math.max(1, minecraft.getWindow().getGuiScale());

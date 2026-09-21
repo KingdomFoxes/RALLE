@@ -59,6 +59,44 @@ and consumable matching. Render measurements stop at CPU submission and cannot
 attribute GPU execution time. Settings rendering, general vanilla chat rendering,
 skin fetches, JSON parsing and asynchronous networking need JFR stack inspection.
 
+### Audit 16: preserve shadow batching and baked wheel playback
+
+`CHAT_SHADOW_PREPARE` measures compositor mask preparation and composite
+submission. `CHAT_SHADOW_FALLBACK_PREPARE` separately measures preparation of
+the fallback's halo layers, including screenshot fallback preparation.
+`CREATE_WHEEL_CAPTURE` measures the complete segment capture, including atlas
+warm-up and temporary renderer cleanup. It is nested within selector rendering
+when invoked there; do not add these inclusive totals together.
+
+Compare identical text, chat dimensions, opacity, GUI scale, resource pack and
+shadow settings. Record narrow and wide chat boxes separately: the compositor
+uses a 2x mask of the padded chat bounds, so mask area matters even with few
+glyphs. Separate the first wheel hover after launch/reload from subsequent
+captures and accepted dissolve playback. Use separate recordings to distinguish
+cold and warm captures; the aggregate report does not label individual hovers.
+The baked atlas, single captured segment and composite quad remain unchanged.
+These sections measure CPU-side wall time and allocation, not GPU time or retained
+texture memory. Fallback comparison and repeated open/close/reload checks still
+require an in-game run; no FPS improvement is implied.
+
+### Audit 17: preserve protocol and automation bounds
+
+Keep strict JSON shapes and the 65,536-character document limit, WebSocket
+fragment checks before concatenation, capability checks and fresh reconnect
+snapshots. Preserve finite requeue deadlines, bounded party-command queues,
+512-entry consumable matching and bounded queue-attribution metadata. Disabled
+and off-Wynncraft integrations must stay inert; compatibility failures must
+remain isolated.
+
+Regression coverage lives in `StrictLfgJsonTest` (including exact-limit and
+one-character-over-limit documents), `HttpLfgGatewayTest`, `RaidLfgServiceTest`,
+`RaidLfgStoreTest`, `HostPartyInviteControllerTest`, `RaidReadyTrackerTest`,
+`ConsumableHighlightMatcherTest` and `QueueAttributionTrackerTest`. These cover
+parsing, stale/offline/reconnect ordering, command deduplication and collection
+bounds. They do not replace live fragmented-WebSocket, server-menu timeout or
+Wynntils compatibility checks. Optimize around these protections only after
+measurement; do not remove them to shorten code.
+
 The lightweight JSON contains aggregate statistics and versions, not chat text,
 credentials, server addresses, player identities or rosters. JFR records JVM-wide
 stack/class/thread metadata; inspect it before sharing. This custom configuration

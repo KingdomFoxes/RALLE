@@ -6,6 +6,22 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class StrictLfgJsonTest {
     @Test
+    void statusAcceptsExactDocumentLimitAndRejectsOneExtraCharacter() {
+        String status = "{\"enabled\":true,\"protocol_version\":1}";
+        String bounded = status + " ".repeat(StrictLfgJson.MAX_DOCUMENT_CHARS - status.length());
+        assertTrue(StrictLfgJson.decodeStatus(bounded).enabled());
+        assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeStatus(bounded + " "));
+    }
+
+    @Test
+    void liveFrameAcceptsExactDocumentLimitAndRejectsOneExtraCharacter() {
+        String frame = "{\"type\":\"session.expiring\",\"protocol_version\":1,\"expires_at\":\"2026-07-19T20:15:00Z\"}";
+        String bounded = frame + " ".repeat(StrictLfgJson.MAX_DOCUMENT_CHARS - frame.length());
+        assertInstanceOf(LfgProtocol.SessionExpiringFrame.class, StrictLfgJson.decodeLiveFrame(bounded));
+        assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeLiveFrame(bounded + " "));
+    }
+
+    @Test
     void removalAcceptsOnlyBoundedStringReasonAndKeepsLegacyFramesCompatible() {
         var base = "{\"type\":\"lobby.remove\",\"protocol_version\":1,\"revision\":4,\"lobby_id\":\"00000000-0000-0000-0000-000000000010\"";
         assertNull(((LfgProtocol.RemoveFrame) StrictLfgJson.decodeLiveFrame(base + "}")).reason());
