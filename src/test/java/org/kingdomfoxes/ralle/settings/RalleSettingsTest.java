@@ -206,7 +206,7 @@ class RalleSettingsTest {
         assertEquals(List.of("about", "chat", "raid-lfg", "war"), categories.stream().map(value -> value.id()).toList());
         assertEquals(List.of(),
                 categories.get(0).subcategories().stream().map(value -> value.id()).toList());
-        assertEquals(List.of("edit-huds", RalleSettings.INTERFACE_FONT_ID),
+        assertEquals(List.of("edit-huds", RalleSettings.INTERFACE_FONT_ID, RalleSettings.UI_THEME_ID),
                 categories.get(0).entries().stream().map(value -> value.id()).toList());
         assertEquals(List.of(), registry.dependencies("edit-huds"));
         assertEquals(List.of("appearance", "input", "guild-ranks", "message-direction", "horizontal-alignment", "text-shadow",
@@ -372,6 +372,25 @@ class RalleSettingsTest {
         RalleSettings.register(invalid);
         invalid.seal();
         assertEquals("vanilla", invalid.setting(RalleSettings.INTERFACE_FONT_ID, ChoiceSetting.class).value());
+    }
+
+    @Test
+    void uiThemeUsesStableCatalogIdsAndFallsBackWhenSavedThemeIsRemoved() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+        var theme = registry.setting(RalleSettings.UI_THEME_ID, ChoiceSetting.class);
+        assertEquals("default", theme.value());
+        assertEquals(25, theme.choices().size());
+        theme.set("hot-chocolate");
+        assertTrue(Files.readString(path).contains("about.ui-theme=hot-chocolate"));
+
+        Files.writeString(path, "about.ui-theme=renamed-or-removed\n");
+        var restored = new SettingsRegistry(path);
+        RalleSettings.register(restored);
+        restored.seal();
+        assertEquals("default", restored.setting(RalleSettings.UI_THEME_ID, ChoiceSetting.class).value());
     }
 
     @Test

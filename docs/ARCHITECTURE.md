@@ -287,6 +287,18 @@ than inferred.
 
 ## Local settings
 
+`about.ui-theme` stores one stable catalog ID, defaulting to `default`. Its 25
+packaged entries contain submitted background, outline, accent RGB values and
+plain-text contributor IGNs. Display-name changes do not change saved IDs.
+`RallePalette` resolves semantic presentation roles at draw time, retaining the
+current Default theme colors, alpha values, geometry, fixed gray controls,
+semantic status colors and player-selected War/consumable colors. Theme changes
+are local and presentation-only; they do not trigger authentication, identity
+lookups, network requests or domain-state resets. Newly created RALLE chat
+notifications use the active accent while historical vanilla chat components
+retain their original styles. Cached selector-wheel raster faces include the
+palette revision in their key.
+
 `/ralle settings` opens the owo-lib adapter over RALLE-owned category and setting
 models. Values are stored in `config/ralle.properties`; invalid or obsolete
 values fall back to their declared defaults. Chat has no global enable setting;

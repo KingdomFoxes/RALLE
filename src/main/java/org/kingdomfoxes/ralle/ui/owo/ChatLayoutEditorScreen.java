@@ -36,10 +36,8 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
     static final int EDITOR_WINDOW_MARGIN = 3;
     static final int EDITOR_OUTER_FRAME_THICKNESS = 2;
     static final int RESIZE_CORNER_SIZE = 6;
-    private static final int CHAT_FILL = 0x88243A55;
-    private static final int CHAT_OUTLINE = 0xFFE5B94C;
-    static final int EDITOR_OUTER_FRAME = CHAT_OUTLINE;
-    static final int EDITOR_INNER_FRAME = RalleTheme.DARK_GOLD_ARGB;
+    static final int EDITOR_OUTER_FRAME = 0xFFE5B94C;
+    static final int EDITOR_INNER_FRAME = 0xFFB8832F;
     static final int EDITOR_LABEL = EDITOR_OUTER_FRAME;
     private static final int OTHER_FILL = 0x55263A5A;
     private static final int OTHER_OUTLINE = 0xFF66738A;
@@ -248,7 +246,7 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
                     interactionBounds.y(),
                     interactionBounds.right(),
                     interactionBounds.bottom(),
-                    CHAT_FILL
+                    org.kingdomfoxes.ralle.ui.theme.RallePalette.editorSelectionFill()
             );
             renderEditorFrame(
                     graphics,
@@ -259,7 +257,7 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
                     graphics,
                     selectedElementId,
                     bounds,
-                    EDITOR_LABEL,
+                    org.kingdomfoxes.ralle.ui.theme.RallePalette.editorOuterFrame(),
                     showPositionInfo ? -6 : 0
             );
             if (showPositionInfo) {
@@ -302,7 +300,8 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
                     : chatLayout.editorBounds(elementId, width, height);
             graphics.fill(otherBounds.x(), otherBounds.y(), otherBounds.right(), otherBounds.bottom(), OTHER_FILL);
             graphics.renderOutline(
-                    otherBounds.x(), otherBounds.y(), otherBounds.width(), otherBounds.height(), OTHER_OUTLINE
+                    otherBounds.x(), otherBounds.y(), otherBounds.width(), otherBounds.height(),
+                    org.kingdomfoxes.ralle.ui.theme.RallePalette.insetAccentArgb()
             );
             renderElementName(graphics, elementId, otherBounds, 0xFFA9B0BE, 0);
         }
@@ -344,7 +343,8 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
             PlacementPolicy placementPolicy
     ) {
         for (var segment : connectedFrameSegments(interactionBounds, EDITOR_OUTER_FRAME_THICKNESS)) {
-            graphics.fill(segment.x(), segment.y(), segment.right(), segment.bottom(), EDITOR_OUTER_FRAME);
+            graphics.fill(segment.x(), segment.y(), segment.right(), segment.bottom(),
+                    org.kingdomfoxes.ralle.ui.theme.RallePalette.editorOuterFrame());
         }
         var insetFrame = nestedInsetFrame(interactionBounds, EDITOR_WINDOW_MARGIN);
         graphics.renderOutline(
@@ -352,10 +352,11 @@ public final class ChatLayoutEditorScreen extends BaseOwoScreen<FlowLayout> {
                 insetFrame.y(),
                 insetFrame.width(),
                 insetFrame.height(),
-                EDITOR_INNER_FRAME
+                org.kingdomfoxes.ralle.ui.theme.RallePalette.darkAccentArgb()
         );
         for (var strip : cornerAccentStrips(insetFrame, placementPolicy)) {
-            graphics.fill(strip.x(), strip.y(), strip.right(), strip.bottom(), EDITOR_INNER_FRAME);
+            graphics.fill(strip.x(), strip.y(), strip.right(), strip.bottom(),
+                    org.kingdomfoxes.ralle.ui.theme.RallePalette.darkAccentArgb());
         }
     }
 

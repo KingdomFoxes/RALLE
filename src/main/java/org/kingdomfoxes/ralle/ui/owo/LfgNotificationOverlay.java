@@ -39,12 +39,6 @@ public final class LfgNotificationOverlay {
     public static final int CARD_HEIGHT = RalleHudElements.LFG_NOTIFICATION_HEIGHT;
     public static final int STACK_GAP = 6;
 
-    private static final int SURFACE = 0xF20A1830;
-    private static final int OUTLINE = 0xFF586985;
-    private static final int TEXT = 0xFFFFFFFF;
-    private static final int MUTED = 0xFFA9B0BE;
-    private static final int ACCENT = 0xFFF2B84B;
-    private static final int SLOT = 0xFF061126;
     private static final int REGION_GOOD = 0xFF00FF55;
     private static final int REGION_MODERATE = 0xFFFFFF00;
     private static final int REGION_POOR = 0xFFFF3333;
@@ -172,8 +166,10 @@ public final class LfgNotificationOverlay {
     private Component renderCard(GuiGraphics graphics, LfgNotificationManager.CardSnapshot card,
                                  Rectangle bounds, int mouseX, int mouseY, boolean interactive,
                                  List<HitRegion> hits) {
-        graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), SURFACE);
-        graphics.renderOutline(bounds.x(), bounds.y(), bounds.width(), bounds.height(), OUTLINE);
+        graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(),
+                org.kingdomfoxes.ralle.ui.theme.RallePalette.notificationSurface());
+        graphics.renderOutline(bounds.x(), bounds.y(), bounds.width(), bounds.height(),
+                org.kingdomfoxes.ralle.ui.theme.RallePalette.notificationOutline());
 
         var lobby = card.lobby();
         graphics.renderItem(raidPreviews.computeIfAbsent(lobby.raidType(),
@@ -182,10 +178,10 @@ public final class LfgNotificationOverlay {
         int titleWidth = Math.max(20, close.x() - (bounds.x() + 28) - 6);
         graphics.drawString(minecraft.font,
                 RalleTypography.body(Component.literal(ellipsize(RaidPresentation.name(lobby.raidType()), titleWidth))),
-                bounds.x() + 28, bounds.y() + 10, ACCENT, false);
+                bounds.x() + 28, bounds.y() + 10, org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb(), false);
 
         drawButtonFace(graphics, close, RalleButtonRenderers.Kind.DESTRUCTIVE, mouseX, mouseY, true);
-        drawCloseX(graphics, close, TEXT);
+        drawCloseX(graphics, close, org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText());
         if (interactive && card.mode() != LfgNotificationManager.CardMode.EXITING) {
             hits.add(new HitRegion(close, lobby.lobbyId(), Action.CLOSE));
         }
@@ -199,7 +195,7 @@ public final class LfgNotificationOverlay {
         String note = lobby.note() == null ? "No note" : LfgNoteText.sanitizeForDisplay(lobby.note());
         graphics.drawString(minecraft.font,
                 RalleTypography.body(Component.literal(ellipsize(note, bounds.right() - 8 - noteX))),
-                noteX, detailY, MUTED, false);
+                noteX, detailY, org.kingdomfoxes.ralle.ui.theme.RallePalette.secondaryText(), false);
 
         Component hoveredRosterMember = null;
         var viewer = service.store().state().viewer();
@@ -228,9 +224,11 @@ public final class LfgNotificationOverlay {
     private void renderRosterSlot(GuiGraphics graphics, LfgProtocol.Lobby lobby, int slot, Rectangle bounds) {
         if (slot >= lobby.members().size()) {
             graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), 0xFFFFFFFF);
-            graphics.fill(bounds.x() + 1, bounds.y() + 1, bounds.right() - 1, bounds.bottom() - 1, SLOT);
+            graphics.fill(bounds.x() + 1, bounds.y() + 1, bounds.right() - 1, bounds.bottom() - 1,
+                    org.kingdomfoxes.ralle.ui.theme.RallePalette.slotSurface());
             graphics.drawCenteredString(minecraft.font, Component.literal("+"),
-                    bounds.x() + bounds.width() / 2, bounds.y() + 6, TEXT);
+                    bounds.x() + bounds.width() / 2, bounds.y() + 6,
+                    org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText());
             return;
         }
         var member = lobby.members().get(slot);
@@ -318,7 +316,8 @@ public final class LfgNotificationOverlay {
                 }
                 graphics.drawCenteredString(minecraft.font, RalleTypography.body(
                         Component.literal(Integer.toString(card.countdownSeconds()))),
-                        countdown.x() + countdown.width() / 2, countdown.y() + 6, TEXT);
+                        countdown.x() + countdown.width() / 2, countdown.y() + 6,
+                        org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText());
                 drawButton(graphics, cancel, "Cancel", RalleButtonRenderers.Kind.DESTRUCTIVE,
                         mouseX, mouseY, true);
                 if (interactive) hits.add(new HitRegion(cancel, id, Action.CANCEL));
@@ -404,7 +403,8 @@ public final class LfgNotificationOverlay {
                             RalleButtonRenderers.Kind kind, int mouseX, int mouseY, boolean active) {
         drawButtonFace(graphics, bounds, kind, mouseX, mouseY, active);
         graphics.drawCenteredString(minecraft.font, label,
-                bounds.x() + bounds.width() / 2, bounds.y() + 6, active ? TEXT : 0xFF8D96A5);
+                bounds.x() + bounds.width() / 2, bounds.y() + 6,
+                active ? org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText() : 0xFF8D96A5);
     }
 
     private static void drawButtonFace(GuiGraphics graphics, Rectangle bounds,

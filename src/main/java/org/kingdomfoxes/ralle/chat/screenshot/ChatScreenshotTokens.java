@@ -2,6 +2,10 @@ package org.kingdomfoxes.ralle.chat.screenshot;
 
 /** Shared presentation constants for the chat screenshot overlay. */
 public final class ChatScreenshotTokens {
+    public static int selectionFill() { return org.kingdomfoxes.ralle.ui.theme.RallePalette.selectionFill(); }
+    public static int selectionGold() { return org.kingdomfoxes.ralle.ui.theme.RallePalette.selectionGoldArgb(); }
+    public static int confirmationFill() { return org.kingdomfoxes.ralle.ui.theme.RallePalette.confirmationFill(); }
+    public static int confirmationText() { return org.kingdomfoxes.ralle.ui.theme.RallePalette.surfaceText(); }
     public static final int SELECTION_FILL = 0xE6041330;
     public static final int SELECTION_GOLD = 0xFFFFC83D;
     public static final int CONFIRMATION_FILL = 0xFF041330;

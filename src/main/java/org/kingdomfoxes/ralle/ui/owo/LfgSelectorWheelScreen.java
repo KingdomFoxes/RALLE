@@ -27,9 +27,6 @@ import java.util.UUID;
 public final class LfgSelectorWheelScreen extends Screen {
     public enum Mode { CREATE, KICK }
 
-    private static final int TEXT = 0xFFFFFFFF;
-    private static final int MUTED = 0xFFA9B0BE;
-    private static final int ACCENT = 0xFFF2B84B;
     private static final int DISABLED = 0xFF697487;
     private static final int SURFACE = 0xEE0A1830;
     private static final int OUTLINE = 0xFF586985;
@@ -195,7 +192,9 @@ public final class LfgSelectorWheelScreen extends Screen {
             Component below = status != null ? status : model.hovered() >= 0 && mode == Mode.KICK
                     ? entries.get(model.hovered()).label()
                     : Component.translatable(mode == Mode.CREATE ? "ralle.lfg.wheel.create.hint" : "ralle.lfg.wheel.kick.hint");
-            int color = statusFailure ? 0xFFFF6B6B : model.hovered() >= 0 && mode == Mode.KICK ? ACCENT : MUTED;
+            int color = statusFailure ? 0xFFFF6B6B : model.hovered() >= 0 && mode == Mode.KICK
+                    ? org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb()
+                    : org.kingdomfoxes.ralle.ui.theme.RallePalette.secondaryText();
             var lines = font.split(RalleTypography.body(below), Math.max(1, width - 24));
             int statusY = Math.min(height - lines.size() * (font.lineHeight + 2) - 4,
                     height / 2 + (int) Math.ceil((outerRadius + 12) * wheelScale));
@@ -210,7 +209,9 @@ public final class LfgSelectorWheelScreen extends Screen {
         graphics.renderItem(raidItem(entry), x - 8, y - 14);
         var label = RalleTypography.body(entry.label());
         graphics.drawString(font, label, x - font.width(label) / 2, y + 5,
-                enabled(entry) || retainsCreatePresentation() ? hovered ? ACCENT : TEXT : DISABLED, false);
+                enabled(entry) || retainsCreatePresentation() ? hovered
+                        ? org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb()
+                        : org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText() : DISABLED, false);
     }
 
     private void prepareSnapshot(int index) {
@@ -224,7 +225,8 @@ public final class LfgSelectorWheelScreen extends Screen {
                 int y = (int) Math.round(bounds.centerY());
                 graphics.renderItem(raidItem(entry), x - 8, y - 14);
                 var label = RalleTypography.body(entry.label());
-                graphics.drawString(font, label, x - font.width(label) / 2, y + 5, ACCENT, false);
+                graphics.drawString(font, label, x - font.width(label) / 2, y + 5,
+                        org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb(), false);
             });
         } catch (RuntimeException | LinkageError failure) {
             snapshotFailed = true;

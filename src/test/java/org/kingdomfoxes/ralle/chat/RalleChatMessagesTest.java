@@ -30,7 +30,7 @@ class RalleChatMessagesTest {
         );
         var style = interactive.getStyle();
 
-        assertEquals(0xFFC83D, style.getColor().getValue());
+        assertEquals(org.kingdomfoxes.ralle.ui.theme.RallePalette.accent(), style.getColor().getValue());
         assertTrue(style.isBold());
         assertTrue(style.isUnderlined());
         assertEquals("/ralle lfg", assertInstanceOf(ClickEvent.RunCommand.class, style.getClickEvent()).command());

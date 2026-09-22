@@ -11,10 +11,12 @@ import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
 import org.kingdomfoxes.ralle.api.settings.CustomPanelEntry;
 
 import java.util.List;
+import org.kingdomfoxes.ralle.ui.theme.RalleThemeCatalog;
 
 public final class RalleSettings {
     public static final String CHAT_SELECTION_INSTRUMENT_ID = "chat-selection-instrument";
     public static final String INTERFACE_FONT_ID = "interface-font";
+    public static final String UI_THEME_ID = "ui-theme";
     public static final String INTERNAL_GUILD_RANKS_ID = "internal-guild-ranks";
     public static final String GUILD_RANK_STYLE_ID = "guild-rank-style";
     public static final String CONSUMABLE_HIGHLIGHTS_ENABLED_ID = "consumable-highlights-enabled";
@@ -34,7 +36,9 @@ public final class RalleSettings {
                 Component.translatable("ralle.settings.about.description"),
                 List.of(
                         action("edit-huds"),
-                        choice(INTERFACE_FONT_ID, "vanilla", "vanilla", "karla")
+                        choice(INTERFACE_FONT_ID, "vanilla", "vanilla", "karla"),
+                        choice(UI_THEME_ID, RalleThemeCatalog.DEFAULT_ID,
+                                RalleThemeCatalog.ids().toArray(String[]::new))
                 ),
                 List.of()
         ));

@@ -13,7 +13,6 @@ final class RalleToggleComponent extends ButtonComponent {
     private static final int TRACK = 0xFF263448;
     private static final int TRACK_HOVERED = 0xFF31455F;
     private static final int TRACK_DISABLED = 0xFF303846;
-    private static final int FOCUS = 0xFFF2B84B;
 
     private final BooleanSetting setting;
 
@@ -29,7 +28,8 @@ final class RalleToggleComponent extends ButtonComponent {
         int right = trackX + RalleTogglePresentation.TRACK_WIDTH;
         int bottom = trackY + RalleTogglePresentation.TRACK_HEIGHT;
         if (isFocused()) {
-            graphics.fill(trackX - 2, trackY - 2, right + 2, bottom + 2, FOCUS);
+            graphics.fill(trackX - 2, trackY - 2, right + 2, bottom + 2,
+                    org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb());
             graphics.fill(trackX - 1, trackY - 1, right + 1, bottom + 1, EDGE);
         }
         graphics.fill(trackX, trackY, right, bottom, EDGE);

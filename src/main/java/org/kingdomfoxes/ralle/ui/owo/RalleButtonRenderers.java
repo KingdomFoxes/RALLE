@@ -142,8 +142,8 @@ final class RalleButtonRenderers {
                                  Palette palette, boolean hovered, boolean active) {
         int right = x + width;
         int bottom = y + height;
-        int fill = active ? (hovered ? palette.hovered : palette.normal) : DISABLED;
-        int highlight = active ? palette.highlight : DISABLED_HIGHLIGHT;
+        int fill = active ? (hovered ? palette.hovered() : palette.normal()) : DISABLED;
+        int highlight = active ? palette.highlight() : DISABLED_HIGHLIGHT;
 
         // Two dark pixels on the bottom and right create the offset, flat-button depth.
         graphics.fill(x, y, right, bottom, EDGE);
@@ -163,7 +163,7 @@ final class RalleButtonRenderers {
     private enum Palette {
         NEUTRAL(0xFF263A5A, 0xFF324D77, TOP_LEFT_HIGHLIGHT),
         PRIMARY(0xFF238636, 0xFF2EA043, 0xFF53B564),
-        SELECTED(RalleTheme.DARK_GOLD_ARGB, 0xFFD39B3D, 0xFFE2B45F),
+        SELECTED(0xFFB8832F, 0xFFD39B3D, 0xFFE2B45F),
         DESTRUCTIVE(0xFF9F2D36, 0xFFC13B46, 0xFFE26973);
 
         private final int normal;
@@ -175,5 +175,11 @@ final class RalleButtonRenderers {
             this.hovered = hovered;
             this.highlight = highlight;
         }
+
+        int normal() { return this == SELECTED ? org.kingdomfoxes.ralle.ui.theme.RallePalette.darkAccentArgb() : normal; }
+        int hovered() { return this == SELECTED
+                ? (org.kingdomfoxes.ralle.ui.theme.RallePalette.background() == 0x041330 ? 0xFFD39B3D : org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb()) : hovered; }
+        int highlight() { return this == SELECTED
+                ? (org.kingdomfoxes.ralle.ui.theme.RallePalette.background() == 0x041330 ? 0xFFE2B45F : org.kingdomfoxes.ralle.ui.theme.RallePalette.insetAccentArgb()) : highlight; }
     }
 }

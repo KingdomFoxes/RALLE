@@ -59,7 +59,6 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             HOST_CONTROL_CONTENT_WIDTH - HOST_CONTROL_GAP - HOST_CONTROL_LEFT_WIDTH;
     private static final int KICK_CONNECTOR_THICKNESS = 2;
     private static final int KICK_OUTLINE_THICKNESS = 3;
-    private static final int KICK_READY_COLOR = 0xFFF2B84B;
     private static final int KICK_DANGER_COLOR = 0xFFFF3333;
     private static final Color REGION_GOOD = Color.ofRgb(0x00FF55);
     private static final Color REGION_MODERATE = Color.ofRgb(0xFFFF00);
@@ -208,7 +207,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
 
         var footer = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
         footer.verticalAlignment(VerticalAlignment.CENTER);
-        footerStatus = UIComponents.label(RalleTheme.ui(Component.literal("Initializing..."))).color(RalleTheme.MUTED);
+        footerStatus = UIComponents.label(RalleTheme.ui(Component.literal("Initializing..."))).color(RalleTheme.muted());
         footer.child(footerStatus);
         var spacer = UIComponents.spacer();
         spacer.verticalSizing(Sizing.fixed(0));
@@ -280,7 +279,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         boolean onlineError = online && !"Live".equals(service.statusMessage());
         footerStatus.color(onlineError ? Color.ofRgb(0xFF6B6B)
                 : online ? RalleTheme.POSITIVE : lifecycle == RaidLfgService.LifecycleState.OUTDATED
-                || lifecycle == RaidLfgService.LifecycleState.INELIGIBLE ? RalleTheme.ACCENT : RalleTheme.MUTED);
+                || lifecycle == RaidLfgService.LifecycleState.INELIGIBLE ? RalleTheme.accent() : RalleTheme.muted());
         rebuildGrid();
     }
 
@@ -320,7 +319,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var panel = UIContainers.verticalFlow(Sizing.fixed(GRID_WIDTH), Sizing.fixed(100));
         panel.horizontalAlignment(HorizontalAlignment.CENTER).verticalAlignment(VerticalAlignment.CENTER)
                 .surface(RalleSurfaces.NAVY_PANEL);
-        panel.child(UIComponents.label(RalleTheme.ui(Component.literal(message))).color(RalleTheme.MUTED).maxWidth(GRID_WIDTH - 40));
+        panel.child(UIComponents.label(RalleTheme.ui(Component.literal(message))).color(RalleTheme.muted()).maxWidth(GRID_WIDTH - 40));
         return panel;
     }
 
@@ -334,7 +333,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var raidDetails = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
         raidDetails.verticalAlignment(VerticalAlignment.CENTER);
         raidDetails.child(UIComponents.item(new ItemStack(RaidPresentation.item(lobby.raidType()))).showOverlay(false).margins(Insets.right(6)));
-        raidDetails.child(UIComponents.label(RalleTheme.ui(Component.literal(RaidPresentation.name(lobby.raidType())))).shadow(true).color(RalleTheme.ACCENT));
+        raidDetails.child(UIComponents.label(RalleTheme.ui(Component.literal(RaidPresentation.name(lobby.raidType())))).shadow(true).color(RalleTheme.accent()));
         summary.child(raidDetails);
         var spacer = UIComponents.spacer();
         spacer.verticalSizing(Sizing.fixed(0));
@@ -346,7 +345,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                 .color(RalleTheme.POSITIVE).margins(Insets.right(6)));
         if (lobby.locked()) {
             summary.child(UIComponents.label(RalleTheme.ui(Component.literal("LOCKED")))
-                    .color(RalleTheme.ACCENT).margins(Insets.right(3)));
+                    .color(RalleTheme.accent()).margins(Insets.right(3)));
         }
         if (!expanded) {
             if (joinCountdown.snapshot().activeFor(lobby.lobbyId())) {
@@ -355,7 +354,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                 summary.child(collapsedAction(lobby));
             }
         }
-        summary.child(UIComponents.label(Component.literal(expanded ? " ▼" : " ▶")).color(RalleTheme.MUTED).margins(Insets.left(6)));
+        summary.child(UIComponents.label(Component.literal(expanded ? " ▼" : " ▶")).color(RalleTheme.muted()).margins(Insets.left(6)));
         summary.mouseDown().subscribe((click, doubled) -> {
             if (expanded) expandedLobbies.remove(lobby.lobbyId());
             else expandedLobbies.add(lobby.lobbyId());
@@ -370,7 +369,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         if (lobby.note() != null && !lobby.note().isBlank()) {
             var note = LfgNoteText.sanitizeForDisplay(lobby.note());
             if (!note.isEmpty()) {
-                details.child(UIComponents.label(RalleTheme.ui(Component.literal(" " + note))).color(RalleTheme.MUTED).maxWidth(CARD_WIDTH - 54));
+                details.child(UIComponents.label(RalleTheme.ui(Component.literal(" " + note))).color(RalleTheme.muted()).maxWidth(CARD_WIDTH - 54));
             }
         }
         card.child(details);
@@ -679,7 +678,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         row.verticalAlignment(VerticalAlignment.CENTER).padding(Insets.of(2));
         if (slot >= lobby.members().size()) {
             row.child(UIComponents.item(new ItemStack(Items.GRAY_STAINED_GLASS_PANE)).showOverlay(false).margins(Insets.right(4)));
-            row.child(UIComponents.label(RalleTheme.ui(Component.literal("Open slot"))).color(RalleTheme.MUTED));
+            row.child(UIComponents.label(RalleTheme.ui(Component.literal("Open slot"))).color(RalleTheme.muted()));
             return row;
         }
         var member = lobby.members().get(slot);
@@ -792,12 +791,15 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
                         kickButton.getWidth(), kickButton.getHeight()),
                 new SelectionBox(target.x(), target.y(), target.width(), target.height()));
         drawThickLine(graphics, connector.startX(), connector.startY(),
-                connector.endX(), connector.endY(), KICK_CONNECTOR_THICKNESS, KICK_READY_COLOR);
-        int targetOutlineColor = lerpArgb(KICK_READY_COLOR, KICK_DANGER_COLOR, kickTargeting.progress());
+                connector.endX(), connector.endY(), KICK_CONNECTOR_THICKNESS,
+                org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb());
+        int targetOutlineColor = lerpArgb(org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb(),
+                KICK_DANGER_COLOR, kickTargeting.progress());
         drawThickOutline(graphics, target.x(), target.y(), target.width(), target.height(),
                 KICK_OUTLINE_THICKNESS, targetOutlineColor);
         drawThickOutline(graphics, kickButton.getX(), kickButton.getY(),
-                kickButton.getWidth(), kickButton.getHeight(), KICK_OUTLINE_THICKNESS, KICK_READY_COLOR);
+                kickButton.getWidth(), kickButton.getHeight(), KICK_OUTLINE_THICKNESS,
+                org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb());
     }
 
     private static void drawThickOutline(GuiGraphics graphics, int x, int y, int width, int height,
@@ -873,9 +875,9 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var content = UIContainers.verticalFlow(Sizing.fixed(300), Sizing.content());
         content.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
         content.child(UIComponents.label(RalleTheme.ui(Component.literal("DISBAND PARTY")))
-                .color(RalleTheme.ACCENT));
+                .color(RalleTheme.accent()));
         content.child(UIComponents.label(RalleTheme.ui(Component.literal(
-                "Disband this party? The listing will be removed for everyone."))).color(RalleTheme.MUTED).maxWidth(276));
+                "Disband this party? The listing will be removed for everyone."))).color(RalleTheme.muted()).maxWidth(276));
 
         var controls = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content()).gap(8);
         var overlayHolder = new OverlayContainer<?>[1];
@@ -930,7 +932,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         kickTargeting.reset();
         var content = UIContainers.verticalFlow(Sizing.fixed(320), Sizing.content());
         content.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
-        content.child(UIComponents.label(RalleTheme.ui(Component.literal("CREATE RAID LOBBY BRATAN"))).color(RalleTheme.ACCENT));
+        content.child(UIComponents.label(RalleTheme.ui(Component.literal("CREATE RAID LOBBY BRATAN"))).color(RalleTheme.accent()));
         var selectedRaid = new LfgProtocol.RaidType[]{LfgProtocol.RaidType.DAILIES};
         var selectedRegion = new LfgProtocol.Region[]{currentRegion};
         var raid = UIComponents.button(raidSelectionLabel(selectedRaid[0], RaidPresentation.name(selectedRaid[0]), false), ignored -> {});
@@ -966,7 +968,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             updateCreateFeedback = () -> {
                 if (finished[0] || overlayHolder[0].parent() == null) return;
                 if (submitted[0]) error.text(RalleTheme.ui(Component.translatable(
-                        LfgCreationFeedback.progress(service)))).color(RalleTheme.MUTED);
+                        LfgCreationFeedback.progress(service)))).color(RalleTheme.muted());
             };
             var statusSuppression = new LfgNotificationManager.PartyStatusSuppression[1];
             org.kingdomfoxes.ralle.lfg.client.WynncraftPartyCreation.create(
@@ -1024,7 +1026,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             var reason = LfgCreationFeedback.unavailable(service);
             submit.active = reason == null;
             error.text(RalleTheme.ui(reason == null ? Component.empty() : Component.translatable(reason)))
-                    .color(RalleTheme.MUTED);
+                    .color(RalleTheme.muted());
         };
         updateCreateFeedback.run();
     }

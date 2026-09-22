@@ -24,7 +24,7 @@ final class RalleHeader {
         var emblem = UIComponents.texture(FOX_EMBLEM, 0, 0, 159, 232, 159, 232).blend(true);
         emblem.sizing(Sizing.fixed(19), Sizing.fixed(28)).margins(Insets.right(10));
         identity.child(emblem);
-        identity.child(UIComponents.label(RalleTheme.heading(screenTitle)).lineHeight(16).shadow(false).color(RalleTheme.TEXT));
+        identity.child(UIComponents.label(RalleTheme.heading(screenTitle)).lineHeight(16).shadow(false).color(RalleTheme.text()));
         header.child(identity).child(UIComponents.spacer()).child(new HeaderAccentComponent(50, HEIGHT));
         return header;
     }

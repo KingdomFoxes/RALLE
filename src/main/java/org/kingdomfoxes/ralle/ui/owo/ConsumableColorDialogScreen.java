@@ -62,7 +62,7 @@ final class ConsumableColorDialogScreen {
                 editing ? Sizing.fixed(queueColor != null ? 134 : EDIT_FIELDS_WIDTH) : Sizing.expand(100), Sizing.content()).gap(5);
         var title = UIComponents.label(RalleTheme.ui(Component.translatable(queueColor != null ? "ralle.war.queue.color.title" : editingIndex == null
                         ? "ralle.consumables.dialog.add.title" : "ralle.consumables.dialog.color.title")))
-                .color(RalleTheme.ACCENT);
+                .color(RalleTheme.accent());
         if (queueColor != null) {
             content.child(title);
             content.child(new QueueColorPreviewComponent(draft::style));
@@ -141,6 +141,6 @@ final class ConsumableColorDialogScreen {
     }
 
     private static io.wispforest.owo.ui.component.LabelComponent label(String key) {
-        return UIComponents.label(RalleTheme.ui(Component.translatable(key))).color(RalleTheme.MUTED);
+        return UIComponents.label(RalleTheme.ui(Component.translatable(key))).color(RalleTheme.muted());
     }
 }

@@ -7,8 +7,6 @@ import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotTokens;
 
 /** Shared presentation and delivery path for RALLE-authored local chat notifications. */
 public final class RalleChatMessages {
-    private static final int PREFIX_GOLD = 0xF2B84B;
-    private static final int INTERACTIVE_GOLD = ChatScreenshotTokens.SELECTION_GOLD & 0x00FFFFFF;
     private RalleChatMessages() {}
 
     public static void post(Minecraft minecraft, Component body) {
@@ -18,7 +16,7 @@ public final class RalleChatMessages {
     public static Component notification(Component body) {
         return Component.empty()
                 .append(Component.literal("RALLE: ").withStyle(style -> style
-                        .withColor(PREFIX_GOLD)
+                        .withColor(org.kingdomfoxes.ralle.ui.theme.RallePalette.accent())
                         .withBold(true)))
                 .append(body);
     }
@@ -26,7 +24,7 @@ public final class RalleChatMessages {
     public static Component clickable(String text, ClickEvent clickEvent) {
         return Component.literal(text)
                 .withStyle(style -> style
-                        .withColor(INTERACTIVE_GOLD)
+                        .withColor(org.kingdomfoxes.ralle.ui.theme.RallePalette.accent())
                         .withBold(true)
                         .withUnderlined(true)
                         .withClickEvent(clickEvent));
