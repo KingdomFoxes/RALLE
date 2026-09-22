@@ -22,14 +22,16 @@ per-line text-snapped overlay and text-width image crop, plus processed-xylophon
 count and successful-copy feedback. Screenshotting and its sounds are disabled
 by default on new installs.
 OW-like Chat Tabbing is another disabled-by-default local input option. In an empty
-chat, unmodified Tab cycles `[Guild]`, `[Party]`, the latest outgoing `/msg`
-recipient or incoming Wynncraft DM sender as `[username]` when known, and `[All]`.
-These labels sit outside the
-editable message: Backspace, Delete, selection, and cut cannot remove them.
+chat, unmodified Tab cycles `[Guild]`, `[Party]`, each outgoing `/msg`
+recipient or incoming Wynncraft DM sender as `[username]`, and `[All]`.
+Contacts appear in the order first encountered, without duplicate names. Incoming
+DMs add a channel without changing the selected channel or a draft's destination.
+These labels sit outside the editable message: Backspace, Delete, selection, and
+cut cannot remove them.
 Sending restores the corresponding command prefix without transmitting the label.
 Typing a slash command retains command handling; message drafts retain vanilla
 Tab completion. New empty chat screens restore the last selected type. That type
-and the latest valid recipient reset when disconnecting and are never saved to disk.
+and the DM contact list reset when disconnecting and are never saved to disk.
 On Wynncraft, recognized text-entry prompts automatically select All, including
 trade-market search/quantity/price, friend recruitment, and nickname entry.
 Input-menu actions also cover Add Ally and pet naming when followed by the

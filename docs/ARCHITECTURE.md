@@ -350,15 +350,15 @@ OW-like Chat Tabbing is gated only by the opt-in `chat.chat-type-tabbing` settin
 Incoming DM observation uses Fabric `ALLOW_GAME`, ignores action-bar messages,
 and requires Wynncraft plus the enabled setting. It verifies the private-message
 indicator/color and the local recipient, resolving nickname hover metadata on
-the name spans. It does not select DM when another channel is selected. An empty
-open DM channel refreshes to the latest contact; a non-empty draft keeps its
-destination. Unrecognized envelopes are ignored; no chat is cancelled or resent.
-Its latest valid outgoing `/msg` recipient or incoming Wynncraft DM sender and
-last selected stable chat type are connection-local memory only.
-A new empty ChatScreen restores that type without
-overriding command-key input or drafts, while disconnecting clears both values.
+the name spans. Incoming DMs do not change the selected channel or DM destination.
+New contacts are appended to the Tab cycle in first-seen order; repeated names
+are matched without case sensitivity. Unrecognized envelopes are ignored; no chat
+is cancelled or resent. Its valid outgoing `/msg` recipients, incoming Wynncraft
+DM senders, and selected chat destination are connection-local memory only.
+A new empty ChatScreen restores that destination without overriding command-key
+input or drafts, while disconnecting clears that state.
 The Fabric outgoing-command observer does not mutate or resend commands. The
-ChatScreen integration cycles `[Guild]`, `[Party]`, `[latest DM username]`,
+ChatScreen integration cycles `[Guild]`, `[Party]`, each contact as `[username]`,
 and `[All]`, consuming only an unmodified Tab on an empty message body.
 The channel label is rendered beside the EditBox, outside its editable contents,
 and included in its narration label. Deletion, selection, copy, and cut operate
