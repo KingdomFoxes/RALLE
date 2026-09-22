@@ -42,8 +42,8 @@ import java.util.ArrayList;
 import java.util.Locale;
 
 public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
-    private static final int THEME_CONTROL_LANE_WIDTH = 210;
-    private static final int THEME_BUTTON_WIDTH = 190;
+    private static final int THEME_CONTROL_LANE_WIDTH = 160;
+    private static final int THEME_BUTTON_WIDTH = 150;
     private final Screen parent;
     private final SettingsRegistry settings;
     private final ChatLayoutService chatLayout;
@@ -351,15 +351,15 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         }
         boolean available = settings.available(entry.id());
         boolean themeChoice = RalleSettings.UI_THEME_ID.equals(entry.id());
-        boolean stacked = width < 540 || (themeChoice && geometry.documentWidth() < 430);
+        int themeCopyWidth = geometry.documentWidth() - SettingsScreenLayout.DOCUMENT_PADDING * 2
+                - 10 - 4 - THEME_CONTROL_LANE_WIDTH;
+        boolean stacked = width < 540 || (themeChoice && themeCopyWidth < 180);
         var row = stacked
                 ? UIContainers.verticalFlow(Sizing.fill(100), Sizing.content())
                 : UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
         row.gap(4).padding(Insets.of(5)).surface(RalleSurfaces.NAVY_ROW);
         if (!stacked) row.verticalAlignment(VerticalAlignment.CENTER);
 
-        int themeCopyWidth = geometry.documentWidth() - SettingsScreenLayout.DOCUMENT_PADDING * 2
-                - 10 - 4 - THEME_CONTROL_LANE_WIDTH;
         var copy = UIContainers.verticalFlow(stacked ? Sizing.fill(100)
                 : themeChoice ? Sizing.fixed(themeCopyWidth) : Sizing.fill(67), Sizing.content());
         copy.gap(2);
@@ -738,6 +738,10 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private Component choiceLabel(ChoiceSetting setting) {
+        if (RalleSettings.UI_THEME_ID.equals(setting.id())) {
+            return RalleTheme.dropdownLabel(Component.translatable(
+                    org.kingdomfoxes.ralle.ui.theme.RallePalette.labelKey(setting.value())));
+        }
         return RalleTheme.dropdownLabel(choiceLabel(setting, setting.value()));
     }
 
