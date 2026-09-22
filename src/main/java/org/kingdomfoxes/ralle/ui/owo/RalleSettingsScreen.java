@@ -43,7 +43,7 @@ import java.util.Locale;
 
 public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private static final int THEME_CONTROL_LANE_WIDTH = 160;
-    private static final int THEME_BUTTON_WIDTH = 150;
+    private static final int THEME_BUTTON_WIDTH = 140;
     private final Screen parent;
     private final SettingsRegistry settings;
     private final ChatLayoutService chatLayout;
