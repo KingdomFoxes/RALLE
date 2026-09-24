@@ -225,6 +225,27 @@ gradually increasing timer for repeated free wars, but neither its increment nor
 decay window is public and Wynntils' territory snapshot exposes no authoritative
 penalty state. RALLE therefore does not fabricate that server-side value.
 
+## Point and Laugh
+
+`war.point-and-laugh` is a local, top-level War text setting, empty (off) by
+default. On Wynncraft, the full server chat payload must start with either the
+observed `U+CFFFC U+E001 U+D0006` spacing/icon sequence or the continuation-line
+sequence `U+CFFFC U+E006 U+CFFFF U+E002 U+CFFFE`, followed by one space and exactly
+`Nobody logged in for the war.` (ignoring legacy color codes). This prefix was
+verified in MultiMC logs `2026-09-21-3.log.gz:3563` and `2026-09-20-2.log.gz:2876`;
+the red (`&c`) continuation form appears at `2026-09-20-2.log.gz:7981-7982`.
+Continuation glyphs are shared across channels, so matching preserves all
+sender/rank text and requires the complete payload, never a substring.
+Logger metadata such as `[System] [CHAT]` is not part of the payload. Bare prose,
+other icons, and player messages quoting even the full payload are rejected.
+A match sends one `/g {configured text}` directly through
+the connection, bypassing OW chat tab routing and the current draft. Player-chat
+prefixes, partial matches, and action-bar messages do not trigger it. Blank text
+is inert; text is single-line and limited to 254 characters to leave room for
+`g ` in the command. Duplicate triggers within one second are suppressed, with
+no queue or retries; the limiter resets on connection changes. This requires no
+Wynntils or backend service and never hides the incoming message.
+
 ## War queue attribution
 
 `war.queue-attribution-enabled` defaults to false and persists in

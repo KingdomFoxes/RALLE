@@ -212,12 +212,15 @@ public final class RalleClient implements ClientModInitializer {
                 lfgSounds,
                 consumableHighlights
         );
+        var pointAndLaugh = new org.kingdomfoxes.ralle.war.PointAndLaugh();
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            pointAndLaugh.reset();
             raidLfg.connectionChanged();
             guildRanks.connectionChanged();
             onboarding.postIfNeeded(body -> RalleChatMessages.post(client, body));
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            pointAndLaugh.reset();
             org.kingdomfoxes.ralle.ui.owo.PlayerHeadPresentation.clearSession();
             autoRaidRequeue.cancel();
             chatTypeTabs.resetSession();
@@ -243,6 +246,18 @@ public final class RalleClient implements ClientModInitializer {
             try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.QUEUE_ATTRIBUTION_TICK)) { QueueAttributionService.tick(client); }
         });
         RaidRequeueMessages.register(autoRaidRequeue::observeChat);
+        ClientReceiveMessageEvents.ALLOW_GAME.register((message, overlay) -> {
+            var client = Minecraft.getInstance();
+            var server = client.getCurrentServer();
+            var connection = client.getConnection();
+            var reply = settings.setting(RalleSettings.POINT_AND_LAUGH_ID,
+                    org.kingdomfoxes.ralle.api.settings.TextSetting.class).value();
+            if (connection != null && !reply.isBlank()) {
+                pointAndLaugh.observe(message.getString(), server != null && WynncraftHost.matches(server.ip),
+                        overlay, reply, System.nanoTime() / 1_000_000L, connection::sendCommand);
+            }
+            return true;
+        });
         ClientSendMessageEvents.COMMAND.register(chatTypeTabs::observeSentCommand);
         ClientSendMessageEvents.CHAT.register(chatTypeTabs::observeSentChat);
         ClientSendMessageEvents.CHAT.register(message -> chatInput.reset());

@@ -397,6 +397,17 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private UIComponent control(SettingsEntry entry, boolean available) {
+        if (entry instanceof org.kingdomfoxes.ralle.api.settings.TextSetting setting) {
+            var input = UIComponents.textBox(Sizing.fixed(126));
+            input.id("setting-control-" + entry.id());
+            input.verticalSizing(Sizing.fixed(20));
+            input.setMaxLength(setting.maxLength());
+            input.setMessage(RalleTheme.ui(entry.title()));
+            input.setValue(setting.value());
+            input.active = available;
+            input.onChanged().subscribe(setting::set);
+            return input;
+        }
         if (entry instanceof BooleanSetting setting) {
             var toggle = new RalleToggleComponent(setting, pressed -> toggleBoolean(setting, pressed));
             configureToggle(entry, available, toggle);

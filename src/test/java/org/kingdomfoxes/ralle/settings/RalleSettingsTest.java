@@ -20,6 +20,30 @@ class RalleSettingsTest {
     Path temporaryDirectory;
 
     @Test
+    void pointAndLaughIsAnEmptyTopLevelWarTextFieldAndPersists() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+        var setting = registry.setting(RalleSettings.POINT_AND_LAUGH_ID,
+                org.kingdomfoxes.ralle.api.settings.TextSetting.class);
+        assertEquals("", setting.value());
+        assertTrue(registry.categories().stream().filter(category -> category.id().equals("war"))
+                .findFirst().orElseThrow().entries().contains(setting));
+        setting.set("Better luck next time!");
+        var restored = new SettingsRegistry(path);
+        RalleSettings.register(restored);
+        restored.seal();
+        var saved = restored.setting(RalleSettings.POINT_AND_LAUGH_ID,
+                org.kingdomfoxes.ralle.api.settings.TextSetting.class);
+        assertEquals(setting.value(), saved.value());
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> saved.set("a\nb"));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> saved.set("x".repeat(255)));
+        saved.set("");
+        assertEquals("", saved.value());
+    }
+
+    @Test
     void everyFeatureAndKeybindDefaultsToInert() {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);

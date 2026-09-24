@@ -14,6 +14,7 @@ import java.util.List;
 import org.kingdomfoxes.ralle.ui.theme.RalleThemeCatalog;
 
 public final class RalleSettings {
+    public static final String POINT_AND_LAUGH_ID = "point-and-laugh";
     public static final String CHAT_SELECTION_INSTRUMENT_ID = "chat-selection-instrument";
     public static final String INTERFACE_FONT_ID = "interface-font";
     public static final String UI_THEME_ID = "ui-theme";
@@ -120,7 +121,8 @@ public final class RalleSettings {
                 "war",
                 Component.translatable("ralle.settings.category.war"),
                 Component.translatable("ralle.settings.category.war.description"),
-                List.of(),
+                List.of(new org.kingdomfoxes.ralle.api.settings.TextSetting(POINT_AND_LAUGH_ID,
+                        title(POINT_AND_LAUGH_ID), description(POINT_AND_LAUGH_ID), 254)),
                 List.of(
                         subcategory("attack-timers", toggle(WAR_QUEUE_ATTRIBUTION_ENABLED_ID),
                                 new org.kingdomfoxes.ralle.api.settings.ColorSetting(QUEUE_SELF_COLOR_ID,

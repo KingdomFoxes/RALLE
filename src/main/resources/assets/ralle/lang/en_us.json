@@ -52,6 +52,8 @@
   "ralle.settings.category.raid-lfg": "Raid LFG",
   "ralle.settings.category.raid-lfg.description": "Alliance Raid LFG access and local notifications.",
   "ralle.settings.category.war": "War",
+  "ralle.settings.option.point-and-laugh": "Point and Laugh",
+  "ralle.settings.option.point-and-laugh.description": "Sends a message in guild chat whenever the \"Nobody logged in for the war\" message shows up in chat. Runs the message with /g before it.",
   "ralle.settings.category.war.description": "Local tools for preparing Wynncraft guild wars.",
 
   "ralle.settings.option.edit-chat-layout": "Edit Chat Layout",
