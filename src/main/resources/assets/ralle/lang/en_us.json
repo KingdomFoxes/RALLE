@@ -188,6 +188,8 @@
   "ralle.settings.hq-distance.missing-wynntils": "Unavailable: Wynntils is not installed. Install Wynntils 4.2.7 or newer for Minecraft 1.21.11.",
   "ralle.settings.hq-distance.unsupported-wynntils": "Unavailable: Wynntils 4.2.7 or newer is required for Minecraft 1.21.11.",
   "ralle.settings.option.queue-attribution-enabled": "Show Who Queued",
+  "ralle.settings.option.queue-kof-rank-colors": "KoF rank colors",
+  "ralle.settings.option.queue-kof-rank-colors.description": "Sets the color of other player's usernames according to their rank title in Kingdom of Foxes.",
   "ralle.settings.option.queue-attribution-enabled.description": "Shows who announced each queued territory in Wynntils' Guild Attack Timer. Your name uses your chosen color (blue by default); other names are gray.",
   "ralle.settings.queue-attribution.missing-wynntils": "Unavailable: Wynntils is not installed. Install Wynntils 4.2.7 or newer for Minecraft 1.21.11 and enable its Guild Attack Timer overlay.",
   "ralle.settings.queue-attribution.unsupported-wynntils": "Unavailable: Wynntils 4.2.7 or newer is required for Minecraft 1.21.11. Enable its Guild Attack Timer overlay and defense announcements.",

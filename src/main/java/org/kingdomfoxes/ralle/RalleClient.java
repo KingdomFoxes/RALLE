@@ -145,8 +145,12 @@ public final class RalleClient implements ClientModInitializer {
                 settings.setting(RalleSettings.INTERNAL_GUILD_RANKS_ID, BooleanSetting.class),
                 settings.setting(RalleSettings.GUILD_RANK_STYLE_ID, ChoiceSetting.class),
                 () -> minecraft.getCurrentServer() == null ? "" : minecraft.getCurrentServer().ip,
-                System::currentTimeMillis
+                System::currentTimeMillis,
+                QueueAttributionService::rankColorsRequested
         );
+        QueueAttributionService.configureRankColors(
+                settings.setting(RalleSettings.QUEUE_KOF_RANK_COLORS_ID, BooleanSetting.class),
+                guildRanks::titleFor);
         var regionDetector = new MinecraftRaidRegionDetector(minecraft);
         var lfgSounds = new MinecraftLfgSoundPlayer(minecraft, settings);
         var partyCommands = new MinecraftPartyCommandExecutor(minecraft);

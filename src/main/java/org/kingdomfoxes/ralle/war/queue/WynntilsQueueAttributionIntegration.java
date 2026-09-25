@@ -102,7 +102,8 @@ final class WynntilsQueueAttributionIntegration implements QueueAttributionAdapt
                 task.getText().getComponent(),
                 usable ? tracker.attributionFor(timer.territoryName()) : java.util.Optional.empty(),
                 Minecraft.getInstance().getUser().getName(),
-                Component.translatable("ralle.war.queue.unknown"), QueueAttributionService.selfColor());
+                Component.translatable("ralle.war.queue.unknown"), QueueAttributionService.selfColor(),
+                System.currentTimeMillis(), QueueAttributionService::otherColor);
         task.setText(StyledText.fromComponent(decorated));
     }
 

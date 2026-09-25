@@ -14,8 +14,9 @@ public final class GuildSpeakerIdentity {
     static final int MAX_COMPONENTS = 256;
     static final int MAX_TEXT_LENGTH = 4096;
     private static final Pattern IGN = Pattern.compile("[A-Za-z0-9_]{1,16}");
+    // Wynncraft omits the possessive s after nicknames ending in s (for example Hephaestus').
     private static final Pattern NICKNAME_HOVER = Pattern.compile(
-            "^(.{1,64})['’]s real name is ([A-Za-z0-9_]{1,16})$"
+            "^(.{1,64})(?:['’]s|(?<=[sS])['’])\\s+real\\s+name\\s+is\\s+([A-Za-z0-9_]{1,16})$"
     );
 
     private GuildSpeakerIdentity() {}
@@ -43,7 +44,8 @@ public final class GuildSpeakerIdentity {
             sawSpeakerHover = true;
             String hoverText = boundedText(showText.value());
             if (hoverText == null) return Optional.empty();
-            var match = NICKNAME_HOVER.matcher(hoverText);
+            // Presentation whitespace may wrap the sentence, but the alias and IGN must still match exactly.
+            var match = NICKNAME_HOVER.matcher(hoverText.strip());
             if (!match.matches() || !match.group(1).equals(displayName)) return Optional.empty();
             if (resolved != null && !resolved.equalsIgnoreCase(match.group(2))) return Optional.empty();
             resolved = match.group(2);

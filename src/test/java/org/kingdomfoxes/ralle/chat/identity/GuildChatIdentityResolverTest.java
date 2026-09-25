@@ -43,6 +43,24 @@ class GuildChatIdentityResolverTest {
     }
 
     @Test
+    void acceptsBothPossessiveFormsForNamesEndingInSWithoutRelaxingIdentityChecks() {
+        for (String alias : java.util.List.of("Hephaestus", "FOXES")) {
+            for (String possessive : java.util.List.of("'", "’", "'s", "’s")) {
+                assertEquals(Optional.of("Robturne"), GuildChatIdentityResolver.resolve(
+                        message(alias, alias + possessive + " real name is Robturne", "hello"))
+                        .orElseThrow().resolvedIgn());
+            }
+        }
+        for (String hover : java.util.List.of("SomeoneElse' real name is Robturne",
+                "Hephaestus' real name is Robturne extra", "Hephaestus real name is Robturne")) {
+            assertTrue(GuildChatIdentityResolver.resolve(message("Hephaestus", hover, "hello"))
+                    .orElseThrow().resolvedIgn().isEmpty());
+        }
+        assertTrue(GuildChatIdentityResolver.resolve(message("OtherName", "OtherName' real name is Robturne", "hello"))
+                .orElseThrow().resolvedIgn().isEmpty());
+    }
+
+    @Test
     void rejectsContradictoryOrMalformedSpeakerHoverWithoutFallingBackToAlias() {
         assertTrue(GuildChatIdentityResolver.resolve(
                 message("LooksLikeIGN", "SomeoneElse's real name is Real_Player", "Ragni defense is Low"))

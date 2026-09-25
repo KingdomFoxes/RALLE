@@ -10,6 +10,33 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class QueueAttributionServiceTest {
     @Test
+    void rankLookupRequiresBothTogglesAndSupportedIntegration() {
+        var enabled = new BooleanSetting("queue-attribution-enabled", Component.empty(), Component.empty());
+        var colors = new BooleanSetting("queue-kof-rank-colors", Component.empty(), Component.empty());
+        var calls = new int[1];
+        QueueAttributionService.configure(enabled, true);
+        QueueAttributionService.configureRankColors(colors, ign -> {
+            calls[0]++;
+            return java.util.Optional.of("Prime Minister");
+        });
+        try {
+            colors.set(true);
+            assertEquals(0xAAAAAA, QueueAttributionService.otherColor("Remote"));
+            enabled.set(true);
+            assertEquals(0x8E77CC, QueueAttributionService.otherColor("Remote"));
+            colors.set(false);
+            assertEquals(0xAAAAAA, QueueAttributionService.otherColor("Remote"));
+            colors.set(true);
+            QueueAttributionService.configure(enabled, false);
+            assertEquals(0xAAAAAA, QueueAttributionService.otherColor("Remote"));
+            assertEquals(1, calls[0]);
+        } finally {
+            QueueAttributionService.configureRankColors(null, ign -> java.util.Optional.empty());
+            QueueAttributionService.configure(enabled, false);
+        }
+    }
+
+    @Test
     void disconnectAndTemporaryMissingConnectionPauseButDisableClears() throws Exception {
         var enabled = new BooleanSetting("queue-attribution-enabled", Component.literal("Queue"), Component.empty());
         enabled.set(true);

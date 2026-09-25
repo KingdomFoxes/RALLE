@@ -28,6 +28,7 @@ public final class RalleSettings {
 
     public static final String HQ_DISTANCE_KEYBIND_ID = "hq-distance-keybind";
     public static final String QUEUE_SELF_COLOR_ID = "queue-self-color";
+    public static final String QUEUE_KOF_RANK_COLORS_ID = "queue-kof-rank-colors";
     private RalleSettings() {}
 
     public static void register(SettingsRegistry registry) {
@@ -125,6 +126,7 @@ public final class RalleSettings {
                         title(POINT_AND_LAUGH_ID), description(POINT_AND_LAUGH_ID), 254)),
                 List.of(
                         subcategory("attack-timers", toggle(WAR_QUEUE_ATTRIBUTION_ENABLED_ID),
+                                toggle(QUEUE_KOF_RANK_COLORS_ID),
                                 new org.kingdomfoxes.ralle.api.settings.ColorSetting(QUEUE_SELF_COLOR_ID,
                                         title(QUEUE_SELF_COLOR_ID), description(QUEUE_SELF_COLOR_ID), 0x5555FF)),
                         subcategory("territory-map", toggle(HQ_DISTANCE_ENABLED_ID),
@@ -146,6 +148,7 @@ public final class RalleSettings {
         registry.requireEnabled("chat-selection-sounds", "chat-screenshot-enabled");
         registry.requireEnabled(CHAT_SELECTION_INSTRUMENT_ID, "chat-selection-sounds");
         registry.requireEnabled(QUEUE_SELF_COLOR_ID, WAR_QUEUE_ATTRIBUTION_ENABLED_ID);
+        registry.requireEnabled(QUEUE_KOF_RANK_COLORS_ID, WAR_QUEUE_ATTRIBUTION_ENABLED_ID);
         registry.requireEnabled(HQ_DISTANCE_KEYBIND_ID, HQ_DISTANCE_ENABLED_ID);
         registry.requireEnabled(CONSUMABLE_HIGHLIGHT_RULES_ID, CONSUMABLE_HIGHLIGHTS_ENABLED_ID);
         registry.requireEnabled("new-party-notifications", "raid-lfg-enabled");

@@ -20,6 +20,65 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GuildRankTitleTransformerTest {
     @Test
+    void resolvesApostropheOnlyPossessivesForNamesEndingInS() {
+        var snapshot = new GuildRankSnapshot(1, Map.of("MailOrderGF", "Madam", "Robturne", "Prince"));
+        var accounts = Map.of("MailOrderShurikens", "MailOrderGF", "Hephaestus", "Robturne",
+                "aurascrollslavehelps", "MailOrderGF", "aurascrollslavehelp", "MailOrderGF");
+        accounts.forEach((alias, ign) -> {
+            for (String apostrophe : List.of("'", "’")) {
+                String possessive = apostrophe + (alias.endsWith("s") ? "" : "s");
+                var hover = new HoverEvent.ShowText(Component.literal(alias + possessive + " real name is " + ign));
+                var original = Component.empty()
+                        .append(GuildRankTitleTransformer.background("STRATEGIST"))
+                        .append(GuildRankTitleTransformer.foreground("STRATEGIST"))
+                        .append(Component.literal(" " + alias + ": hello")
+                                .withStyle(style -> style.withHoverEvent(hover)));
+                for (var style : List.of(GuildRankStyle.TITLES, GuildRankStyle.STARS_AND_TITLES)) {
+                    var transformed = GuildRankTitleTransformer.apply(original, snapshot, style, true);
+                    String title = snapshot.titleFor(ign).orElseThrow();
+                    String expected = style == GuildRankStyle.TITLES
+                            ? GuildRankTitleTransformer.foreground(title)
+                            : GuildRankTitleTransformer.encodeStarsAndTitle(3, title, true).foreground();
+                    assertTrue(transformed.getString().contains(expected), alias + possessive + " / " + style);
+                    assertTrue(renderedSegments(transformed).stream().anyMatch(segment ->
+                            segment.text().contains(alias) && hover.equals(segment.style().getHoverEvent())));
+                }
+            }
+        });
+    }
+
+    @Test
+    void resolvesCanonicalRankAcrossClassNamesAndWrappedInheritedHover() {
+        var snapshot = new GuildRankSnapshot(1, Map.of("MailOrderGF", "Madam", "OtherMember", "Lord"));
+        for (String alias : List.of("MailOrderGF", "MailOrderShurikens", "OtherMember")) {
+            var original = guildMessage("STRATEGIST", alias).copy();
+            if (!alias.equals("MailOrderGF")) {
+                original.withStyle(style -> style.withHoverEvent(new HoverEvent.ShowText(
+                        Component.literal("\n" + alias + "'s real name is\nMailOrderGF\n"))));
+            }
+            for (var style : List.of(GuildRankStyle.TITLES, GuildRankStyle.STARS_AND_TITLES)) {
+                var transformed = GuildRankTitleTransformer.apply(original, snapshot, style, true);
+                String expected = style == GuildRankStyle.TITLES
+                        ? GuildRankTitleTransformer.foreground("MADAM")
+                        : GuildRankTitleTransformer.encodeStarsAndTitle(3, "MADAM", true).foreground();
+                assertTrue(transformed.getString().contains(expected), alias + " / " + style);
+            }
+        }
+    }
+
+    @Test
+    void nicknameCannotBorrowCachedRankWhenHoverIdentifiesAnotherOrInvalidPlayer() {
+        var snapshot = new GuildRankSnapshot(1, Map.of("OtherMember", "Lord"));
+        for (String hover : List.of("OtherMember's real name is UnlistedPlayer",
+                "WrongAlias's real name is OtherMember")) {
+            var original = guildMessage("STRATEGIST", "OtherMember").copy()
+                    .withStyle(style -> style.withHoverEvent(new HoverEvent.ShowText(Component.literal(hover))));
+            assertTrue(GuildRankTitleTransformer.apply(original, snapshot).getString()
+                    .contains(GuildRankTitleTransformer.foreground("STRATEGIST")));
+        }
+    }
+
+    @Test
     void primeMinisterUsesCompactPillButRetainsFullHoverTitle() {
         var snapshot = new GuildRankSnapshot(1, Map.of("maxkarson", "Prime Minister"));
         assertEquals("PRIME MINISTER", snapshot.titleFor("maxkarson").orElseThrow());

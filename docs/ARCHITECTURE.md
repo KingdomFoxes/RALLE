@@ -349,6 +349,15 @@ only the member's selected form. The member's selected Fox title stays white;
 alternative titles and slash separators are gray. The default titles style with Internal Guild
 Ranks disabled remains inert.
 
+Fox title lookup resolves the speaker identity before consulting the rank snapshot;
+a class nickname matching another cached IGN cannot override real-name hover metadata.
+The bounded speaker-only hover parser accepts presentation whitespace and line breaks
+between the words of the real-name sentence, while still requiring the exact displayed
+alias and one unambiguous IGN. It accepts both possessive forms: `nickname's` and,
+for nicknames ending in s, `nickname'`, with straight or curly apostrophes.
+Missing identity metadata cannot map an arbitrary class
+nickname to a cached account. Failed refreshes and reconnects retain the existing snapshot.
+
 The one-time installation message uses the shared local RALLE chat presentation
 and stores `message-sent=0/1` in `config/ralle-onboarding.properties`. A missing
 marker starts at `0` only when no earlier RALLE config or vanilla RALLE keybind
@@ -839,3 +848,18 @@ occupancy, and oversized parties leave no partial lobby. Accepted replays return
 the original transaction. No data is saved or transmitted before an explicit
 create action. Without a supported party-data provider, ordinary creation remains
 available and no existing-party prompt is inferred.
+
+### KoF queue rank colors
+
+`war.queue-kof-rank-colors` defaults to false and appears directly below Show
+Who Queued, depending on that toggle. It colors only other attributed usernames
+using `KofRankColors`: page through liege `#5A84D4`, Prime Minister `#8E77CC`,
+baron/viscount variants `#0EACB4`, count/marquis variants `#4DD6EC`, Viceroy
+`#FF9A19`, and Archduke/Prince/King `#FFCC00`. Unknown or unmapped names remain
+gray; arrows, timers and the local solid/rainbow username keep their formatting.
+It shares the existing Fox title cache and bounded 30-minute refresh with chat
+ranks, including Prime Minister precedence and cached fallback on failure,
+without enabling chat rank replacement. Both queue settings and supported
+Wynntils compatibility are required for this consumer to request refreshes;
+the shared service remains network-inert off Wynncraft. Rendering reads cached
+titles only. No new API, credentials or authorization are introduced.

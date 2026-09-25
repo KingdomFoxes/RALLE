@@ -281,7 +281,8 @@ class RalleSettingsTest {
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("automatic-raid-requeue-keybind"));
         assertEquals(List.of("attack-timers", "territory-map", "consumables"),
                 categories.get(3).subcategories().stream().map(value -> value.id()).toList());
-        assertEquals(List.of(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID, RalleSettings.QUEUE_SELF_COLOR_ID),
+        assertEquals(List.of(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID,
+                        RalleSettings.QUEUE_KOF_RANK_COLORS_ID, RalleSettings.QUEUE_SELF_COLOR_ID),
                 categories.get(3).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
         assertFalse(registry.setting(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID, BooleanSetting.class).value());
         assertEquals(List.of(RalleSettings.HQ_DISTANCE_ENABLED_ID, RalleSettings.HQ_DISTANCE_KEYBIND_ID),
@@ -333,6 +334,12 @@ class RalleSettingsTest {
         assertFalse(setting.value());
         setting.set(true);
         assertTrue(Files.readString(path).contains("war.queue-attribution-enabled=true"));
+        var rankColors = registry.setting(RalleSettings.QUEUE_KOF_RANK_COLORS_ID, BooleanSetting.class);
+        assertFalse(rankColors.value());
+        assertEquals(List.of(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID),
+                registry.dependencies(RalleSettings.QUEUE_KOF_RANK_COLORS_ID));
+        rankColors.set(true);
+        assertTrue(Files.readString(path).contains("war.queue-kof-rank-colors=true"));
     }
 
     @Test

@@ -34,6 +34,13 @@ public final class QueueAttributionFormatter {
 
     public static Component format(Component original, Optional<String> attributedIgn, String localIgn,
                                    Component unknownLabel, HighlightStyle selfStyle, long timeMillis) {
+        return format(original, attributedIgn, localIgn, unknownLabel, selfStyle, timeMillis,
+                ign -> KofRankColors.FALLBACK);
+    }
+
+    public static Component format(Component original, Optional<String> attributedIgn, String localIgn,
+                                   Component unknownLabel, HighlightStyle selfStyle, long timeMillis,
+                                   java.util.function.ToIntFunction<String> otherColor) {
         Objects.requireNonNull(selfStyle, "selfStyle");
         Objects.requireNonNull(original, "original");
         Objects.requireNonNull(attributedIgn, "attributedIgn");
@@ -41,7 +48,7 @@ public final class QueueAttributionFormatter {
         MutableComponent name = attributedIgn
                 .<MutableComponent>map(ign -> localIgn != null && ign.equalsIgnoreCase(localIgn)
                         ? selfName(ign, selfStyle, timeMillis)
-                        : Component.literal(ign).withStyle(ChatFormatting.GRAY))
+                        : Component.literal(ign).withStyle(style -> style.withColor(otherColor.applyAsInt(ign))))
                 .orElseGet(() -> unknownLabel.copy().withStyle(ChatFormatting.GRAY));
         return Component.empty()
                 .append(name)
