@@ -36,6 +36,7 @@ import org.kingdomfoxes.ralle.api.settings.CustomSettingsPanelRegistry;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.kingdomfoxes.ralle.chat.rank.GuildRankService;
 import org.kingdomfoxes.ralle.settings.RalleSettings;
+import org.kingdomfoxes.ralle.ui.theme.RallePalette;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -65,6 +66,9 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private double lastSavedScroll = -1;
     private SettingsScreenLayout.Geometry geometry;
     private Double pendingScrollProgress;
+    private ThemeEditorPanel themeEditor;
+    private final ArrayList<Runnable> navigationPaletteBindings = new ArrayList<>();
+    private long lastPaletteRevision = Long.MIN_VALUE;
 
     RalleSettingsScreen(
             Screen parent,
@@ -98,7 +102,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                 .horizontalAlignment(HorizontalAlignment.CENTER)
                 .verticalAlignment(VerticalAlignment.CENTER);
 
-        geometry = SettingsScreenLayout.calculate(width, height);
+        geometry = SettingsScreenLayout.calculate(width - ThemeEditorPanel.WIDTH - 12, height);
         var panel = UIContainers.verticalFlow(Sizing.fixed(geometry.panelWidth()), Sizing.fixed(geometry.panelHeight()));
         panel.gap(SettingsScreenLayout.PANEL_GAP)
                 .padding(Insets.of(SettingsScreenLayout.PANEL_PADDING))
@@ -133,7 +137,11 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         scroll.wheelStep(24).scrollbarThiccness(4).surface(RalleSurfaces.NAVY_PANEL);
         body.child(sidebar).child(scroll);
         panel.child(body);
-        root.child(panel);
+        themeEditor = new ThemeEditorPanel();
+        var group = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+        group.gap(12).verticalAlignment(VerticalAlignment.TOP);
+        group.child(themeEditor.component()).child(panel);
+        root.child(group);
 
         rebuildSidebar();
         var snapshot = navigation.snapshot();
@@ -142,6 +150,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     private void rebuildSidebar() {
         sidebarNavigation.clearChildren();
+        navigationPaletteBindings.clear();
         var entries = new ArrayList<NavigationEntry>();
         entries.add(new NavigationEntry(
                 Component.translatable("ralle.settings.about"),
@@ -203,6 +212,11 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                         buttonLeftMargin
                 )
         ));
+        navigationPaletteBindings.add(() -> {
+            int refreshedColor = entry.selected() ? RallePalette.accentArgb() : entry.subcategory()
+                    ? RallePalette.secondary() : RallePalette.primaryText();
+            button.setMessage(RalleTheme.ui(entry.label().copy().withColor(refreshedColor)));
+        });
         button.onPress(entry.pressed());
         row.child(button);
         return row;
@@ -264,7 +278,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                 .lineHeight(RalleTheme.BODY_LINE_HEIGHT).color(RalleTheme.text()).maxWidth(textWidth));
         document.child(UIComponents.label(RalleTheme.ui(Component.translatable("ralle.settings.about.disabled-notice")))
                 .lineHeight(RalleTheme.BODY_LINE_HEIGHT).color(RalleTheme.accent()).maxWidth(textWidth));
-        var links = width < 540
+        var links = documentTextWidth() < 360
                 ? UIContainers.verticalFlow(Sizing.fill(100), Sizing.content())
                 : UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
         links.gap(6);
@@ -353,7 +367,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         boolean themeChoice = RalleSettings.UI_THEME_ID.equals(entry.id());
         int themeCopyWidth = geometry.documentWidth() - SettingsScreenLayout.DOCUMENT_PADDING * 2
                 - 10 - 4 - THEME_CONTROL_LANE_WIDTH;
-        boolean stacked = width < 540 || (themeChoice && themeCopyWidth < 180);
+        boolean stacked = geometry.documentWidth() < 380 || (themeChoice && themeCopyWidth < 180);
         var row = stacked
                 ? UIContainers.verticalFlow(Sizing.fill(100), Sizing.content())
                 : UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
@@ -606,6 +620,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             // Raid LFG bindings are deliberately keyboard-only; keep waiting for a keyboard key.
             return true;
         }
+        if (themeEditor != null) themeEditor.selectInputAt(event.x(), event.y());
         return super.mouseClicked(event, doubled);
     }
 
@@ -699,6 +714,16 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     public void tick() {
         super.tick();
+        long paletteRevision = RallePalette.revision();
+        if (paletteRevision != lastPaletteRevision) {
+            lastPaletteRevision = paletteRevision;
+            navigationPaletteBindings.forEach(Runnable::run);
+            if (themeEditor != null) themeEditor.refreshPalette();
+        }
+        if (themeEditor != null) {
+            themeEditor.syncSelectedTheme();
+            themeEditor.tick();
+        }
         var rankRefresh = root.childById(ButtonComponent.class, "guild-ranks-refresh");
         if (rankRefresh != null) updateGuildRankRefreshButton(rankRefresh);
         if (pendingScrollProgress != null) {

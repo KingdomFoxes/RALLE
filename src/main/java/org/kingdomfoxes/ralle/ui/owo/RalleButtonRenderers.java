@@ -178,8 +178,8 @@ final class RalleButtonRenderers {
 
         int normal() { return this == SELECTED ? org.kingdomfoxes.ralle.ui.theme.RallePalette.darkAccentArgb() : normal; }
         int hovered() { return this == SELECTED
-                ? (org.kingdomfoxes.ralle.ui.theme.RallePalette.background() == 0x041330 ? 0xFFD39B3D : org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb()) : hovered; }
+                ? (org.kingdomfoxes.ralle.ui.theme.RallePalette.untouchedDefault() ? 0xFFD39B3D : org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb()) : hovered; }
         int highlight() { return this == SELECTED
-                ? (org.kingdomfoxes.ralle.ui.theme.RallePalette.background() == 0x041330 ? 0xFFE2B45F : org.kingdomfoxes.ralle.ui.theme.RallePalette.insetAccentArgb()) : highlight; }
+                ? (org.kingdomfoxes.ralle.ui.theme.RallePalette.untouchedDefault() ? 0xFFE2B45F : org.kingdomfoxes.ralle.ui.theme.RallePalette.insetAccentArgb()) : highlight; }
     }
 }

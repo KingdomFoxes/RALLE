@@ -13,11 +13,12 @@ final class SettingsScreenLayout {
     static final int DOCUMENT_PADDING = 8;
     static final int MINIMUM_DOCUMENT_BOTTOM_SPACE = 16;
     private static final int MAX_PANEL_WIDTH = 620;
+    private static final int MIN_PANEL_WIDTH = 360;
 
     private SettingsScreenLayout() {}
 
     static Geometry calculate(int screenWidth, int screenHeight) {
-        int panelWidth = Math.min(MAX_PANEL_WIDTH, Math.max(260, screenWidth - SCREEN_MARGIN * 2));
+        int panelWidth = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, screenWidth - SCREEN_MARGIN * 2));
         int panelHeight = Math.max(RalleHeader.HEIGHT + PANEL_GAP + PANEL_PADDING * 2 + 1,
                 screenHeight - SCREEN_MARGIN * 2);
         int bodyWidth = panelWidth - PANEL_PADDING * 2;

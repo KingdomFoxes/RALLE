@@ -9,7 +9,7 @@ class SettingsScreenLayoutTest {
     @Test
     void bodyGeometryKeepsBothColumnsInsideMatchingBoundaries() {
         var narrow = SettingsScreenLayout.calculate(320, 240);
-        assertEquals(300, narrow.panelWidth());
+        assertEquals(360, narrow.panelWidth());
         assertEquals(220, narrow.panelHeight());
         assertEquals(narrow.bodyHeight(), narrow.panelHeight()
                 - SettingsScreenLayout.PANEL_PADDING * 2
@@ -36,9 +36,9 @@ class SettingsScreenLayoutTest {
         assertEquals(415, SettingsScreenLayout.dependencyDescriptionWidth(wide.documentWidth()));
 
         var narrow = SettingsScreenLayout.calculate(320, 240);
-        assertEquals(177, narrow.documentWidth());
-        assertEquals(150, SettingsScreenLayout.descriptionWidth(narrow.documentWidth(), true));
-        assertEquals(147, SettingsScreenLayout.dependencyDescriptionWidth(narrow.documentWidth()));
+        assertEquals(220, narrow.documentWidth());
+        assertEquals(190, SettingsScreenLayout.descriptionWidth(narrow.documentWidth(), true));
+        assertEquals(190, SettingsScreenLayout.dependencyDescriptionWidth(narrow.documentWidth()));
     }
 
     @Test
@@ -46,6 +46,17 @@ class SettingsScreenLayoutTest {
         assertEquals(180, SettingsScreenLayout.anchoredScrollOffset(220, 40, 500));
         assertEquals(0, SettingsScreenLayout.anchoredScrollOffset(20, 40, 500));
         assertEquals(500, SettingsScreenLayout.anchoredScrollOffset(620, 40, 500));
+    }
+
+    @Test
+    void themeCompanionGroupKeepsTheSpecifiedGapAndFitsTheIntendedWideViewport() {
+        var settings = SettingsScreenLayout.calculate(1600 - ThemeEditorPanel.WIDTH - 12, 900);
+        int gap = 12;
+        int groupWidth = ThemeEditorPanel.WIDTH + gap + settings.panelWidth();
+        assertEquals(876, groupWidth);
+        assertTrue(settings.panelWidth() >= 360);
+        assertTrue(groupWidth <= 1600);
+        assertEquals(244, ThemeEditorPanel.WIDTH);
     }
 
 }

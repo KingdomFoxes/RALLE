@@ -50,7 +50,7 @@ final class SelectorWheelRenderer {
                 ? org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb()
                 : org.kingdomfoxes.ralle.ui.theme.RallePalette.frameArgb();
         int background = org.kingdomfoxes.ralle.ui.theme.RallePalette.background();
-        int inner = background == 0x041330 ? (selected ? 0x223552 : 0x0A1830)
+        int inner = org.kingdomfoxes.ralle.ui.theme.RallePalette.untouchedDefault() ? (selected ? 0x223552 : 0x0A1830)
                 : org.kingdomfoxes.ralle.ui.theme.RallePalette.secondarySurface();
         return (selected ? 0xF0 : 0xEE) << 24 | inner;
     }
