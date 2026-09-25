@@ -21,22 +21,20 @@ import org.kingdomfoxes.ralle.ui.theme.ThemePreviewSession;
 import org.kingdomfoxes.ralle.war.consumables.HighlightStyle;
 
 import java.util.EnumMap;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 /** Compact in-place theme preview editor. It owns no persisted state. */
 final class ThemeEditorPanel {
     static final int WIDTH = 244;
     private static final int INPUT_WIDTH = 104;
+    private static final int FIELD_WIDTH = INPUT_WIDTH - 4;
     private static final int PICKER_SIZE = 112;
     private final FlowLayout panel;
     private final Map<ThemePreviewSession.Role, TextBoxComponent> fields = new EnumMap<>(ThemePreviewSession.Role.class);
     private final Map<ThemePreviewSession.Role, ColorStyleDraft> drafts = new EnumMap<>(ThemePreviewSession.Role.class);
-    private final List<LabelBinding> labels = new ArrayList<>();
+    private final Map<ThemePreviewSession.Role, io.wispforest.owo.ui.component.LabelComponent> roleLabels = new EnumMap<>(ThemePreviewSession.Role.class);
     private final ThemePreviewSession session = RallePalette.previewSession();
-    private final LabelRef selectedMeta = new LabelRef();
-    private final LabelRef activeLabel = new LabelRef();
+    private final LabelRef titleLabel = new LabelRef();
     private final LabelRef errorLabel = new LabelRef();
     private final ButtonComponent copyButton;
     private final HsvWheelTrianglePicker picker;
@@ -51,19 +49,16 @@ final class ThemeEditorPanel {
         loadedThemeId = theme.id();
         var content = UIContainers.verticalFlow(Sizing.fixed(WIDTH), Sizing.content());
         content.gap(5).padding(Insets.of(10)).surface(RalleSurfaces.FRAMED_NAVY);
-        var title = UIComponents.label(RalleTheme.ui(Component.translatable("ralle.theme-editor.title"))).color(RalleTheme.accent());
-        labels.add(new LabelBinding(title, Component.translatable("ralle.theme-editor.title"), true));
-        content.child(title);
-        selectedMeta.label = UIComponents.label(RalleTheme.ui(Component.literal(""))).color(RalleTheme.muted()).maxWidth(WIDTH - 20);
-        content.child(selectedMeta.label);
+        titleLabel.label = UIComponents.label(title(theme)).color(RalleTheme.accent()).maxWidth(WIDTH - 20);
+        content.child(titleLabel.label);
 
         var controls = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content()).gap(8);
         var column = UIContainers.verticalFlow(Sizing.fixed(INPUT_WIDTH), Sizing.content()).gap(4);
         for (var role : ThemePreviewSession.Role.values()) {
             var group = UIContainers.verticalFlow(Sizing.fixed(INPUT_WIDTH), Sizing.content()).gap(1);
             var label = UIComponents.label(RalleTheme.ui(Component.translatable("ralle.theme-editor." + role.name().toLowerCase()))).color(RalleTheme.muted());
-            labels.add(new LabelBinding(label, Component.translatable("ralle.theme-editor." + role.name().toLowerCase()), false));
-            var input = UIComponents.textBox(Sizing.fixed(INPUT_WIDTH)).text(ThemeJsonExport.hex(color(theme, role)));
+            roleLabels.put(role, label);
+            var input = UIComponents.textBox(Sizing.fixed(FIELD_WIDTH)).text(ThemeJsonExport.hex(color(theme, role)));
             input.verticalSizing(Sizing.fixed(20));
             input.setMaxLength(7);
             fields.put(role, input);
@@ -78,8 +73,6 @@ final class ThemeEditorPanel {
         controls.child(picker);
         content.child(controls);
 
-        activeLabel.label = UIComponents.label(editingLabel(ThemePreviewSession.Role.BACKGROUND)).color(RalleTheme.accent());
-        content.child(activeLabel.label);
         var actions = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(24)).gap(4);
         errorLabel.label = UIComponents.label(Component.empty()).color(Color.ofRgb(0xFFFF6666)).maxWidth(WIDTH - 20);
         copyButton = new ThemeCopyButton(ignored -> copy());
@@ -89,7 +82,7 @@ final class ThemeEditorPanel {
         actions.child(copyButton);
         content.child(actions).child(errorLabel.label);
         panel = content;
-        refreshMetadata(theme);
+        updateActiveLabel();
     }
 
     FlowLayout component() { return panel; }
@@ -116,15 +109,15 @@ final class ThemeEditorPanel {
     private boolean fontKarla = RalleTypography.usesKarla();
 
     void refreshPalette() {
-        for (var binding : labels) binding.label.color(binding.accent ? RalleTheme.accent() : RalleTheme.muted());
-        selectedMeta.label.color(RalleTheme.muted());
-        activeLabel.label.color(RalleTheme.accent());
+        titleLabel.label.color(RalleTheme.accent());
         refreshLabelStyles();
     }
 
     private void refreshLabelStyles() {
-        for (var binding : labels) binding.label.text(RalleTheme.ui(binding.source));
-        refreshMetadata(RallePalette.theme());
+        titleLabel.label.text(title(RallePalette.theme()));
+        for (var role : ThemePreviewSession.Role.values()) {
+            roleLabels.get(role).text(RalleTheme.ui(Component.translatable("ralle.theme-editor." + role.name().toLowerCase())));
+        }
         updateActiveLabel();
     }
 
@@ -158,7 +151,7 @@ final class ThemeEditorPanel {
             errorLabel.label.text(Component.empty());
             allValid = true;
             validateAll();
-            refreshMetadata(theme);
+            titleLabel.label.text(title(theme));
             updateActiveLabel();
         }
     }
@@ -210,26 +203,19 @@ final class ThemeEditorPanel {
         }
     }
 
-    private void refreshMetadata(RalleThemeCatalog.Theme theme) {
-        String creator = theme.id().equals(RalleThemeCatalog.DEFAULT_ID) ? "RALLE" : theme.contributor();
-        selectedMeta.label.text(RalleTheme.ui(Component.literal(theme.name()
-                + (creator == null ? "" : "\n" + creator))));
+    private static Component title(RalleThemeCatalog.Theme theme) {
+        return RalleTheme.ui(Component.translatable("ralle.theme-editor.title", theme.name()));
     }
-    private void updateActiveLabel() { activeLabel.label.text(editingLabel(activeRole)); }
-    private static Component editingLabel(ThemePreviewSession.Role role) {
-        return RalleTheme.ui(Component.translatable("ralle.theme-editor.editing", Component.translatable(
-                "ralle.theme-editor." + role.name().toLowerCase())));
-    }
-    private static String title(ThemePreviewSession.Role role) {
-        return switch (role) { case BACKGROUND -> "Background"; case OUTLINE -> "Outline"; case ACCENT -> "Accent"; };
+    private void updateActiveLabel() {
+        for (var role : ThemePreviewSession.Role.values()) {
+            roleLabels.get(role).color(role == activeRole ? RalleTheme.ACCENT : RalleTheme.muted());
+        }
     }
     private static int color(RalleThemeCatalog.Theme theme, ThemePreviewSession.Role role) {
         return switch (role) { case BACKGROUND -> theme.background(); case OUTLINE -> theme.outline(); case ACCENT -> theme.accent(); };
     }
 
     private static final class LabelRef { io.wispforest.owo.ui.component.LabelComponent label; }
-    private record LabelBinding(io.wispforest.owo.ui.component.LabelComponent label, Component source, boolean accent) {}
-
     private static final class ThemeCopyButton extends ButtonComponent {
         private static final Identifier TEXTURE = Identifier.fromNamespaceAndPath("ralle", "textures/gui/theme/toolytom_head.png");
         ThemeCopyButton(java.util.function.Consumer<ButtonComponent> onPress) {
