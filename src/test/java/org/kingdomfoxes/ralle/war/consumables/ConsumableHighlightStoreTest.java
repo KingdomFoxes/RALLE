@@ -32,8 +32,15 @@ class ConsumableHighlightStoreTest {
     @Test void roundTripsEmptyAndStyledRules() {
         assertEquals(List.of(), ConsumableHighlightJson.decode(ConsumableHighlightJson.encode(List.of())));
         var rules = List.of(new ConsumableHighlightRule("Mana", List.of("water dmg"),
-                new HighlightStyle(0x123ABC, true)));
+                new HighlightStyle(0x123ABC, false, true)));
         assertEquals(rules, ConsumableHighlightJson.decode(ConsumableHighlightJson.encode(rules)));
+    }
+
+    @Test void readsLegacyV1RuleWithoutChromaField() {
+        var legacy = """
+                {"schemaVersion":1,"rules":[{"name":"Mana","aliases":[],"color":"#123ABC","rainbow":true}]}
+                """;
+        assertEquals(new HighlightStyle(0x123ABC, true), ConsumableHighlightJson.decode(legacy).getFirst().style());
     }
 
     @Test void validationFiltersBlankAliasesAndRejectsBlankLongOrNormalizedDuplicates() {

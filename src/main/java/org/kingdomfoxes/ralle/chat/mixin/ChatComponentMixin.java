@@ -35,7 +35,6 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -51,7 +50,7 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
     @Unique private boolean ralle$capturingClickableText;
     @Unique private FullShadowFrameCollector ralle$fullShadowCollector;
     @Unique private List<GuiMessage> ralle$transitionMessages;
-    @Unique private final ChatTimestampStore ralle$timestampStore = new ChatTimestampStore(Clock.systemDefaultZone());
+    @Unique private final ChatTimestampStore ralle$timestampStore = ChatTimestampStore.SESSION;
     @Unique private final org.kingdomfoxes.ralle.chat.ChatProjectionCache<GuiMessage, GuiMessage.Line>
             ralle$projectionCache = new org.kingdomfoxes.ralle.chat.ChatProjectionCache<>();
 
@@ -243,7 +242,6 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
     private void ralle$startMessageRefresh(CallbackInfo callback) {
         ralle$projectionCache.clear();
         ralle$refreshingMessages = true;
-        allMessages.forEach(ralle$timestampStore::record);
         ralle$pruneHistory();
     }
 
@@ -263,7 +261,7 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
             ralle$transitionMessages = new ArrayList<>(allMessages);
         } else {
             ralle$transitionMessages = null;
-            ralle$timestampStore.clear();
+            ralle$timestampStore.forgetAll(allMessages);
         }
     }
 
@@ -337,9 +335,8 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
     }
 
     @Inject(method = "addMessageToQueue", at = @At("TAIL"), require = 0)
-    private void ralle$recordAndPruneTimestampAfterMessageAdded(GuiMessage message, CallbackInfo callback) {
+    private void ralle$recordTimestampAfterMessageAdded(GuiMessage message, CallbackInfo callback) {
         ralle$timestampStore.record(message);
-        ralle$timestampStore.retainAll(allMessages);
     }
 
     @Inject(method = "createDeletedMarker", at = @At("RETURN"), require = 0)
@@ -403,7 +400,6 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
         int limit = RalleClient.context().chatBehavior().effectiveHistoryLimit();
         ChatHistoryRetention.pruneOldest(allMessages, limit);
         ChatHistoryRetention.pruneOldest(trimmedMessages, limit);
-        ralle$timestampStore.retainAll(allMessages);
         ((ChatComponent) (Object) this).scrollChat(0);
     }
 

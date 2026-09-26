@@ -56,7 +56,9 @@ public final class QueueAttributionFormatter {
                 .append(original);
     }
     private static MutableComponent selfName(String ign, HighlightStyle style, long timeMillis) {
-        if (!style.rainbow()) return Component.literal(ign).withStyle(s -> s.withColor(style.rgb()));
+        if (!style.rainbow() && !style.chroma()) return Component.literal(ign).withStyle(s -> s.withColor(style.rgb()));
+        if (style.chroma()) return Component.literal(ign).withStyle(s -> s.withColor(
+                ConsumableSlotBorder.rainbowColor(0f, timeMillis) & 0xFFFFFF));
         var name = Component.empty();
         for (int i = 0; i < ign.length(); i++) {
             int rgb = ConsumableSlotBorder.rainbowColor(i / (float) Math.max(1, ign.length()), timeMillis) & 0xFFFFFF;

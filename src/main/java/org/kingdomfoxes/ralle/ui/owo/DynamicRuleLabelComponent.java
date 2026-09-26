@@ -57,8 +57,8 @@ final class DynamicRuleLabelComponent extends BaseUIComponent {
     }
 
     static int colorAt(HighlightStyle style, int x, int y, long timeMillis) {
-        return style.rainbow()
-                ? ConsumableSlotBorder.rainbowColor((x + y) * .01f, timeMillis)
+        return style.rainbow() || style.chroma()
+                ? ConsumableSlotBorder.rainbowColor(style.chroma() ? 0f : (x + y) * .01f, timeMillis)
                 : 0xFF000000 | style.rgb();
     }
 

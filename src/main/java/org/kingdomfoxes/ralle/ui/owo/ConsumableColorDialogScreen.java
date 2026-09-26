@@ -88,9 +88,13 @@ final class ConsumableColorDialogScreen {
         if (queueColor == null) hexRow.child(new HighlightedSlotPreviewComponent(new WynncraftScrollPreviewItemProvider(), draft::style));
         fields.child(hexRow);
         var rainbow = UIComponents.checkbox(RalleTheme.ui(Component.translatable("ralle.consumables.field.rainbow")));
+        var chroma = UIComponents.checkbox(RalleTheme.ui(Component.translatable("ralle.consumables.field.chroma")));
         rainbow.checked(draft.rainbow());
-        rainbow.onChanged(draft::rainbow);
+        chroma.checked(draft.chroma());
+        rainbow.onChanged(value -> { draft.rainbow(value); if (value) chroma.checked(false); });
+        chroma.onChanged(value -> { draft.chroma(value); if (value) rainbow.checked(false); });
         fields.child(rainbow);
+        fields.child(chroma);
 
         var picker = new HsvWheelTrianglePicker(queueColor != null ? 128 : PICKER_SIZE, draft.rgb());
         var syncingHex = new boolean[1];

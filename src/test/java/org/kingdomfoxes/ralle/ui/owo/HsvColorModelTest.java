@@ -26,6 +26,16 @@ class HsvColorModelTest {
         assertNotEquals(original, draft.style());
     }
 
+    @Test void chromaAndRainbowAreExclusiveAndRgbSurvivesModeChanges() {
+        var draft = new ColorStyleDraft(new HighlightStyle(0x123456, false));
+        draft.chroma(true);
+        assertEquals(new HighlightStyle(0x123456, false, true), draft.style());
+        draft.rainbow(true);
+        assertEquals(new HighlightStyle(0x123456, true, false), draft.style());
+        draft.rainbow(false);
+        assertEquals(new HighlightStyle(0x123456, false, false), draft.style());
+    }
+
     @Test void triangleSupportsTheFullSaturationValueRange() {
         var original = new HsvColorModel.Hsv(.35f, .72f, .61f);
         var point = HsvColorModel.triangleSelection(original, 150);

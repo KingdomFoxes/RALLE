@@ -15,6 +15,7 @@ public final class ConsumableHighlightJson {
     public static final int SCHEMA_VERSION = 1;
     private static final Set<String> ROOT_FIELDS = Set.of("schemaVersion", "rules");
     private static final Set<String> RULE_FIELDS = Set.of("name", "aliases", "color", "rainbow");
+    private static final Set<String> RULE_FIELDS_WITH_CHROMA = Set.of("name", "aliases", "color", "rainbow", "chroma");
 
     private ConsumableHighlightJson() {}
 
@@ -40,7 +41,8 @@ public final class ConsumableHighlightJson {
             String path = "rules[" + index++ + "]";
             if (!element.isJsonObject()) throw invalid(path + " must be an object");
             var object = element.getAsJsonObject();
-            requireFields(object, RULE_FIELDS, path);
+            if (object.has("chroma")) requireFields(object, RULE_FIELDS_WITH_CHROMA, path);
+            else requireFields(object, RULE_FIELDS, path);
             var aliasesElement = object.get("aliases");
             if (aliasesElement == null || !aliasesElement.isJsonArray()) throw invalid(path + ".aliases must be an array");
             var aliases = new ArrayList<String>();
@@ -53,7 +55,8 @@ public final class ConsumableHighlightJson {
             rules.add(new ConsumableHighlightRule(
                     string(object, "name", path),
                     aliases,
-                    HighlightStyle.parse(string(object, "color", path), bool(object, "rainbow", path))
+                    HighlightStyle.parse(string(object, "color", path), bool(object, "rainbow", path),
+                            object.has("chroma") && bool(object, "chroma", path))
             ));
         }
         return ConsumableHighlightValidation.validate(rules);
@@ -72,6 +75,7 @@ public final class ConsumableHighlightJson {
             object.add("aliases", aliases);
             object.addProperty("color", rule.style().hex());
             object.addProperty("rainbow", rule.style().rainbow());
+            object.addProperty("chroma", rule.style().chroma());
             array.add(object);
         }
         root.add("rules", array);

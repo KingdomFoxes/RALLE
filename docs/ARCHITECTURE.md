@@ -877,3 +877,36 @@ without enabling chat rank replacement. Both queue settings and supported
 Wynntils compatibility are required for this consumer to request refreshes;
 the shared service remains network-inert off Wynncraft. Rendering reads cached
 titles only. No new API, credentials or authorization are introduced.
+
+### Wynntils chat timestamp retention
+
+Wynntils 4.2.7 `ChatTabService.setFocusedTab(ChatTab)` assigns the selected
+ChatComponent's existing logical and rendered lists to the visible component,
+then calls `rescaleChat`. Its `enable` consumer (`lambda$enable$3`) instead fans
+old GuiMessages out through `addMessage` into new per-tab histories. This flow
+was inspected in the pinned Modrinth `jeBTZ3Zn` binary, rather than inferred from
+rendered text or tab labels.
+
+`ChatTimestampStore.SESSION` shares weak **identity** keys across ChatComponents.
+Switching/pruning one history cannot discard receive times still owned by another
+history. Collected messages release their metadata on subsequent store access;
+explicit clears forget only the cleared history. Deletion markers inherit the
+original time while other histories can still use the original identity. No
+components, signatures, or chat text are copied into a persistent cache.
+
+The optional `WynntilsChatTimestampMixin` scopes the synchronous enable consumer
+with the original receive time, including all recipient tabs. Unknown historical
+times remain absent and never read the current clock. The scope is restored even
+on failure. Because this is a synthetic method, the hook is gated to version
+4.2.7 (including build suffixes); newer releases need their replay flow verified
+before widening that guard. Ordinary list swaps use shared metadata without any
+Wynntils hook. No tab routing, focus, filtering, or ordering is changed.
+
+Regression tests cover identity collisions, inactive tabs, replay fan-out,
+unknown history, clear isolation, deletion transfer, and nested/failing replay.
+In-game validation remains required on 4.2.7: receive messages in inactive tabs,
+switch repeatedly, enable/disable tabs after accumulating history, resize chat,
+toggle timestamps, delete/clear messages, and reconnect with persistent chat
+both off and on. Check click/hover and screenshot projection, plus vanilla chat
+without Wynntils. The repository's `run/mods` currently contains 4.1.0, so it does
+not provide the requested 4.2.7 smoke test.

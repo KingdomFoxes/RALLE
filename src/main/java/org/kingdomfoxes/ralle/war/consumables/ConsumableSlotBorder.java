@@ -17,7 +17,7 @@ public final class ConsumableSlotBorder {
 
     public static void draw(GuiGraphics graphics, int slotX, int slotY, HighlightStyle style, long timeMillis) {
         var box = geometry(slotX, slotY);
-        if (!style.rainbow()) {
+        if (!style.rainbow() && !style.chroma()) {
             int argb = 0xFF000000 | style.rgb();
             graphics.fill(box.left(), box.top(), box.right(), box.top() + 1, argb);
             graphics.fill(box.left(), box.bottom() - 1, box.right(), box.bottom(), argb);
@@ -26,6 +26,14 @@ public final class ConsumableSlotBorder {
             return;
         }
         long phaseTime = Math.floorMod(timeMillis, 10_000L);
+        if (style.chroma()) {
+            int color = rainbowColor(0f, phaseTime);
+            graphics.fill(box.left(), box.top(), box.right(), box.top() + 1, color);
+            graphics.fill(box.left(), box.bottom() - 1, box.right(), box.bottom(), color);
+            graphics.fill(box.left(), box.top() + 1, box.left() + 1, box.bottom() - 1, color);
+            graphics.fill(box.right() - 1, box.top() + 1, box.right(), box.bottom() - 1, color);
+            return;
+        }
         for (int offset = 0; offset < 18; offset++) {
             int horizontal = rainbowColor(offset / 18f, phaseTime);
             graphics.fill(box.left() + offset, box.top(), box.left() + offset + 1, box.top() + 1, horizontal);
