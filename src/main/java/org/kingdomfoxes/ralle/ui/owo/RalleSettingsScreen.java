@@ -20,6 +20,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 import org.kingdomfoxes.ralle.api.settings.ActionEntry;
@@ -403,7 +404,11 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             input.verticalSizing(Sizing.fixed(20));
             input.setMaxLength(setting.maxLength());
             input.setMessage(RalleTheme.ui(entry.title()));
-            input.setValue(setting.value());
+            input.text(setting.value());
+            if (RalleSettings.POINT_AND_LAUGH_ID.equals(setting.id())) {
+                input.setHint(RalleTheme.ui(Component.translatable("ralle.settings.option.point-and-laugh.placeholder")
+                        .withStyle(ChatFormatting.GRAY)));
+            }
             input.active = available;
             input.onChanged().subscribe(setting::set);
             return input;

@@ -172,5 +172,56 @@
   },
   "ui.piano.c_sharp_5": {
     "sounds": [{ "name": "ralle:ui/piano/c_sharp_5" }]
+  },
+  "ui.piano_recorded.d4": {
+    "sounds": [{ "name": "ralle:ui/piano_recorded/d4" }]
+  },
+  "ui.piano_recorded.e4": {
+    "sounds": [{ "name": "ralle:ui/piano_recorded/e4" }]
+  },
+  "ui.piano_recorded.f_sharp_4": {
+    "sounds": [{ "name": "ralle:ui/piano_recorded/f_sharp_4" }]
+  },
+  "ui.piano_recorded.g4": {
+    "sounds": [{ "name": "ralle:ui/piano_recorded/g4" }]
+  },
+  "ui.piano_recorded.a4": {
+    "sounds": [{ "name": "ralle:ui/piano_recorded/a4" }]
+  },
+  "ui.piano_recorded.b4": {
+    "sounds": [{ "name": "ralle:ui/piano_recorded/b4" }]
+  },
+  "ui.piano_recorded.c_sharp_5": {
+    "sounds": [{ "name": "ralle:ui/piano_recorded/c_sharp_5" }]
+  },
+  "ui.piano_recorded.d5": {
+    "sounds": [{ "name": "ralle:ui/piano_recorded/d5" }]
+  },
+  "ui.piano_recorded.e5": {
+    "sounds": [{ "name": "ralle:ui/piano_recorded/e5" }]
+  },
+  "ui.piano_recorded.f_sharp_5": {
+    "sounds": [{ "name": "ralle:ui/piano_recorded/f_sharp_5" }]
+  },
+  "ui.piano_recorded.copy_success": {
+    "sounds": [{ "name": "ralle:ui/piano_recorded/copy_success" }]
+  },
+  "ui.drums_recorded.bass_drum": {
+    "sounds": [{ "name": "ralle:ui/drums_recorded/bass_drum" }]
+  },
+  "ui.drums_recorded.floor_tom": {
+    "sounds": [{ "name": "ralle:ui/drums_recorded/floor_tom" }]
+  },
+  "ui.drums_recorded.low_tom": {
+    "sounds": [{ "name": "ralle:ui/drums_recorded/low_tom" }]
+  },
+  "ui.drums_recorded.high_tom": {
+    "sounds": [{ "name": "ralle:ui/drums_recorded/high_tom" }]
+  },
+  "ui.drums_recorded.snare": {
+    "sounds": [{ "name": "ralle:ui/drums_recorded/snare" }]
+  },
+  "ui.drums_recorded.crash": {
+    "sounds": [{ "name": "ralle:ui/drums_recorded/crash" }]
   }
 }

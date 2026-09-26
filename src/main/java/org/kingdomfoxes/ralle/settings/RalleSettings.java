@@ -83,7 +83,8 @@ public final class RalleSettings {
                                 toggle("chat-screenshot-smooth-expansion"),
                                 toggle("chat-selection-sounds"),
                                 choice(CHAT_SELECTION_INSTRUMENT_ID, "xylophone",
-                                        "xylophone", "acoustic-guitar", "bass-guitar", "piano", "drums")
+                                        "xylophone", "acoustic-guitar", "bass-guitar",
+                                        "piano-recorded", "piano", "drums-recorded", "drums")
                         )
                 )
         ));

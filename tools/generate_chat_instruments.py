@@ -122,30 +122,55 @@ def write(bank, name, signal):
 
 
 def make_previews():
-    """Audition decoded packaged files at equal playback gain; never normalize each preview."""
+    """Audition decoded packaged banks at equal gain; never normalize per preview."""
     output = ROOT.parents[4] / "build/audio-previews"
     output.mkdir(parents=True, exist_ok=True)
-    for bank in ["acoustic_guitar", "bass_guitar", "piano", "drums"]:
-        names = (note_names(BANK_OCTAVES[bank]) if bank != "drums" else
-                 ["bass_drum", "floor_tom", "low_tom", "high_tom", "snare"])
-        names += ["copy_success" if bank != "drums" else "crash"]
-        onsets = [0.2 + i * 0.5 for i in range(len(names) - 1)]
-        onsets.append(onsets[-1] + 1.0)
-        result = np.zeros(int((onsets[-1] + 1.3) * RATE))
-        for name, onset in zip(names, onsets):
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+
+    def compose(bank, names, onsets):
+        decoded = []
+        for name in names:
             path = ROOT / "sounds/ui" / bank / (name + ".ogg")
-            decoded = subprocess.check_output([imageio_ffmpeg.get_ffmpeg_exe(), "-v", "error",
-                "-i", str(path), "-f", "f32le", "-ar", str(RATE), "-ac", "1", "pipe:1"])
-            signal = np.frombuffer(decoded, dtype="<f4")
+            raw = subprocess.check_output([ffmpeg, "-v", "error", "-i", str(path),
+                "-f", "f32le", "-ar", str(RATE), "-ac", "1", "pipe:1"])
+            decoded.append(np.frombuffer(raw, dtype="<f4"))
+        size = max(int(onset * RATE) + len(signal) for onset, signal in zip(onsets, decoded))
+        result = np.zeros(size)
+        for signal, onset in zip(decoded, onsets):
             start = int(onset * RATE)
             result[start:start + len(signal)] += signal
-        assert np.max(np.abs(result)) < 1, bank
-        with wave.open(str(output / (bank + ".wav")), "wb") as wav:
+        return result
+
+    def write_preview(result, filename, gain=1.0):
+        peak = np.max(np.abs(result)) * gain
+        if peak >= 1:
+            raise ValueError(f"preview clips: {filename} peak={peak:.3f}")
+        with wave.open(str(output / filename), "wb") as wav:
             wav.setnchannels(1)
             wav.setsampwidth(2)
             wav.setframerate(RATE)
-            wav.writeframes((result * 32767).astype("<i2").tobytes())
-    print(f"Previews: {output}")
+            wav.writeframes((result * gain * 32767).astype("<i2").tobytes())
+
+    for bank in ["acoustic_guitar", "bass_guitar", "piano", "piano_recorded"]:
+        notes = note_names(BANK_OCTAVES["piano"] if bank == "piano_recorded" else BANK_OCTAVES.get(bank, 3))
+        names = notes + ["copy_success"]
+        onsets = [0.2 + i * 0.5 for i in range(len(notes))] + [0.2 + (len(notes) - 1) * 0.5 + 1.0]
+        write_preview(compose(bank, names, onsets), bank + ".wav")
+    drum_names = ["bass_drum", "floor_tom", "low_tom", "high_tom", "snare"]
+    for bank in ["drums", "drums_recorded"]:
+        names = drum_names + ["crash"]
+        onsets = [0.2 + i * 0.5 for i in range(len(drum_names))] + [0.2 + (len(drum_names) - 1) * 0.5 + 1.0]
+        write_preview(compose(bank, names, onsets), bank + ".wav")
+    rapid = []
+    for bank, notes in [("piano", note_names(4)), ("piano_recorded", note_names(4)),
+                        ("drums", drum_names), ("drums_recorded", drum_names)]:
+        names = [notes[min(i, len(notes) - 1)] for i in range(16)]
+        rapid.append((bank, compose(bank, names, [i * 0.04 for i in range(len(names))])))
+    # One shared attenuation keeps rapid old/recorded comparisons at the same gain.
+    rapid_gain = min(1.0, 0.90 / max(float(np.max(np.abs(result))) for _, result in rapid))
+    for bank, result in rapid:
+        write_preview(result, bank + "_rapid_40ms.wav", rapid_gain)
+    print(f"Previews (comparison and 40 ms bursts, common burst gain {rapid_gain:.3f}): {output}")
 
 
 def main():
@@ -188,8 +213,10 @@ def main():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--previews", action="store_true", help="also write audition WAVs under build/audio-previews")
+    parser.add_argument("--previews", action="store_true", help="regenerate old synthesized banks, then write previews")
+    parser.add_argument("--previews-only", action="store_true", help="write previews from packaged files without generating assets")
     args = parser.parse_args()
-    main()
-    if args.previews:
+    if not args.previews_only:
+        main()
+    if args.previews or args.previews_only:
         make_previews()

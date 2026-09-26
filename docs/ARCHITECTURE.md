@@ -70,9 +70,14 @@ platform ports. It must not depend on a concrete settings screen.
   viewer's lobby, even when the browser is closed or no HUD card is present.
   Reconnect snapshots remain silent. Cancelling a join countdown is silent.
   Chat Selection Sounds reveals a local Instrument choice, persisted as
-  `chat.chat-selection-instrument`: `xylophone` (default), `acoustic-guitar`,
-  `bass-guitar`, `piano`, or `drums`. Missing or invalid saved choices fall back
-  to xylophone. Both sound and screenshot toggles gate playback and visibility.
+  `chat.chat-selection-instrument`, in this order: Xylophone (`xylophone`,
+  default), Acoustic Guitar (`acoustic-guitar`), Bass Guitar (`bass-guitar`),
+  Piano (`piano-recorded`), Piano (Old) (`piano`), Drums (`drums-recorded`),
+  and Drums (Old) (`drums`). Existing saved `piano` and `drums` choices continue
+  to play the unchanged synthesized banks; only the display labels gain the
+  `(Old)` suffix. New recorded choices use separate IDs. Missing or invalid
+  saved choices fall back to xylophone. Both sound and screenshot toggles gate
+  playback and visibility.
   Melodic banks cap at ten D-major notes in instrument-specific registers:
   xylophone D5 through F-sharp 6, acoustic guitar D3 through F-sharp 4,
   bass D2 through F-sharp 3, and piano D4 through F-sharp 5.
@@ -80,9 +85,12 @@ platform ports. It must not depend on a concrete settings screen.
   Drums map counts 1 through 5+ to bass drum, floor tom, low tom, high tom, and
   snare; successful copying plays one crash. All banks share the 40 ms rate
   limit and latest-count coalescing; cancellation/failure remain silent.
-  Packaged chat sounds are original procedural synthesis. The offline generator
-  is `tools/generate_chat_instruments.py`; provenance accompanies the assets
-  in `licenses/ralle-sounds/README.txt`. The guitar uses a plucked-string model;
+  Xylophone, guitar, bass, Piano (Old), and Drums (Old) are original procedural
+  synthesis. The untagged Piano and Drums are recorded-sample banks. The offline
+  generators are `tools/generate_chat_instruments.py` for the synthesized banks
+  and `tools/import_recorded_chat_instruments.py` for importing the two recorded
+  banks from local source files. Provenance and applicable licenses accompany
+  the assets in `licenses/ralle-sounds/README.txt`. The guitar uses a plucked-string model;
   bass has stronger upper harmonics and level, while drums retain audible
   stick/beater transients and membrane resonance. Generator `--previews` writes
   audition WAVs to `build/audio-previews` without per-preview normalization.
@@ -245,6 +253,12 @@ is inert; text is single-line and limited to 254 characters to leave room for
 `g ` in the command. Duplicate triggers within one second are suppressed, with
 no queue or retries; the limiter resets on connection changes. This requires no
 Wynntils or backend service and never hides the incoming message.
+
+The settings field uses a gray `Type here...` hint only when its value is empty
+and the field is unfocused. Configured text is visible on first display without
+clicking; the initial cursor is reset to the beginning so long values show their
+start. The hint is never saved or sent, and native editing behavior remains in
+place.
 
 ## War queue attribution
 
