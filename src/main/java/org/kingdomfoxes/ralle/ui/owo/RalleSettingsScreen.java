@@ -37,6 +37,9 @@ import org.kingdomfoxes.ralle.api.settings.CustomSettingsPanelRegistry;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.kingdomfoxes.ralle.chat.rank.GuildRankService;
 import org.kingdomfoxes.ralle.settings.RalleSettings;
+import org.kingdomfoxes.ralle.cosmetics.NameplateDirectorySession;
+import org.kingdomfoxes.ralle.cosmetics.CosmeticStyleSelection;
+import org.kingdomfoxes.ralle.cosmetics.NameplateStyle;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -51,6 +54,10 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private final SettingsNavigationState navigation;
     private final GuildRankService guildRanks;
     private final CustomSettingsPanelRegistry<OwoCustomSettingsPanelContext, UIComponent> customPanels;
+    private final NameplateDirectorySession cosmetics;
+    private final CosmeticStyleSelection cosmeticStyleSelection;
+    private boolean savingNameplateColor;
+    private boolean nameplateColorSaveFailed;
     private FlowLayout root;
     private FlowLayout sidebarNavigation;
     private FlowLayout document;
@@ -73,7 +80,9 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             ChatLayoutService chatLayout,
             SettingsNavigationState navigation,
             GuildRankService guildRanks,
-            CustomSettingsPanelRegistry<OwoCustomSettingsPanelContext, UIComponent> customPanels
+            CustomSettingsPanelRegistry<OwoCustomSettingsPanelContext, UIComponent> customPanels,
+            NameplateDirectorySession cosmetics,
+            CosmeticStyleSelection cosmeticStyleSelection
     ) {
         this.parent = parent;
         this.settings = settings;
@@ -81,6 +90,8 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         this.navigation = navigation;
         this.guildRanks = guildRanks;
         this.customPanels = customPanels;
+        this.cosmetics = cosmetics;
+        this.cosmeticStyleSelection = cosmeticStyleSelection;
         var snapshot = navigation.snapshot();
         this.activePage = snapshot.page();
         this.selectedCategory = snapshot.categoryId();
@@ -333,7 +344,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         }
         var subcategory = category.subcategories().stream()
                 .filter(candidate -> candidate.id().equals(snapshot.subcategoryId())).findFirst().orElse(null);
-        if (subcategory == null) selectAbout();
+        if (subcategory == null) renderCategoryPage(category, 0);
         else renderSubcategoryPage(category, subcategory, snapshot.scrollProgress());
     }
 
@@ -456,7 +467,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             button = UIComponents.button(choiceLabel(setting), ignored -> openChoice(setting, buttonFor(entry.id())));
             button.renderer(RalleButtonRenderers.neutral());
         } else if (entry instanceof ActionEntry action) {
-            button = UIComponents.button(RalleTheme.ui(Component.translatable("ralle.settings.action.open")), ignored -> openAction(action));
+            button = UIComponents.button(RalleSettings.NAMEPLATE_COLOR_ID.equals(action.id()) ? nameplateColorLabel() : RalleTheme.ui(Component.translatable("ralle.settings.action.open")), ignored -> openAction(action));
             button.renderer(RalleButtonRenderers.neutral());
         } else if (entry instanceof KeybindSetting setting) {
             button = UIComponents.button(keybindLabel(setting), ignored -> beginKeyCapture(setting, buttonFor(entry.id())));
@@ -531,6 +542,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         DropdownComponent.openContextMenu(this, root, FlowLayout::child,
                 trigger.x(), trigger.y() + trigger.height(), menu -> {
                     for (var choice : setting.choices()) {
+                        if (RalleSettings.MATERIAL_RESOLUTION_ID.equals(setting.id()) && "recipe".equals(choice)) continue;
                         menu.button(RalleTheme.ui(choiceLabel(setting, choice)), dropdown -> {
                             double progress = scroll.progress();
                             setting.set(choice);
@@ -622,11 +634,65 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             minecraft.setScreen(new ChatLayoutEditorScreen(this, chatLayout, LfgNotificationOverlay.ELEMENT_ID));
         } else if ("edit-huds".equals(action.id())) {
             minecraft.setScreen(ChatLayoutEditorScreen.forAllEnabled(this, chatLayout, settings));
+        } else if (RalleSettings.NAMEPLATE_COLOR_ID.equals(action.id())) {
+            openNameplateColors();
         } else {
             throw new IllegalArgumentException("Unknown settings action: " + action.id());
         }
     }
 
+    private Component nameplateColorLabel() {
+        if (!savingNameplateColor && nameplateColorSaveFailed) return RalleTheme.dropdownLabel(Component.translatable("ralle.cosmetics.color.failed.short"));
+        if (savingNameplateColor) return RalleTheme.ui(Component.translatable("ralle.cosmetics.color.saving"));
+        var identity = cosmetics.cached(minecraft.getUser().getProfileId());
+        return RalleTheme.dropdownLabel(identity != null && identity.selectedStyle() != null
+                ? Component.literal(identity.selectedStyle().label())
+                : Component.translatable("ralle.cosmetics.color.none"));
+    }
+
+    private void openNameplateColors() {
+        var trigger = buttonFor(RalleSettings.NAMEPLATE_COLOR_ID);
+        if (trigger == null || savingNameplateColor) return;
+        var identity = cosmetics.cached(minecraft.getUser().getProfileId());
+        DropdownComponent.openContextMenu(this, root, FlowLayout::child,
+                trigger.x(), trigger.y() + trigger.height(), menu -> {
+                    if (identity == null) {
+                        menu.text(RalleTheme.ui(Component.translatable("ralle.cosmetics.color.unavailable")));
+                        return;
+                    }
+                    for (var style : NameplateStyle.CATALOG) {
+                        boolean allowed = NameplateStyle.allowed(style.id(), identity.grants());
+                        boolean selected = style.id().equals(identity.selectedStyleId());
+                        var label = Component.literal(style.label());
+                        if (selected || !allowed) {
+                            label.append(" (").append(Component.translatable(selected
+                                    ? "ralle.cosmetics.color.selected" : "ralle.cosmetics.color.locked.short")).append(")");
+                            menu.text(RalleTheme.ui(label));
+                        } else {
+                            menu.button(RalleTheme.ui(label), dropdown -> {
+                                root.removeChild(dropdown);
+                                savingNameplateColor = true;
+                                nameplateColorSaveFailed = false;
+                                trigger.active = false;
+                                trigger.tooltip((Component) null);
+                                trigger.setMessage(nameplateColorLabel());
+                                cosmeticStyleSelection.select(style.id()).whenComplete((accepted, failure) ->
+                                        minecraft.execute(() -> {
+                                            savingNameplateColor = false;
+                                            nameplateColorSaveFailed = failure != null;
+                                            if (minecraft.screen != this) return;
+                                            var current = buttonFor(RalleSettings.NAMEPLATE_COLOR_ID);
+                                            if (current == null) return;
+                                            current.active = settings.available(RalleSettings.NAMEPLATE_COLOR_ID);
+                                            current.setMessage(nameplateColorLabel());
+                                            if (failure != null) current.tooltip(RalleTheme.ui(
+                                                    Component.translatable("ralle.cosmetics.color.failed")));
+                                        }));
+                            });
+                        }
+                    }
+                });
+    }
     private void searchChanged(String rawQuery) {
         var next = rawQuery.strip().toLowerCase(Locale.ROOT);
         if (query.isEmpty() && !next.isEmpty()) {
@@ -704,6 +770,11 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     public void tick() {
         super.tick();
+        var colorControl = buttonFor(RalleSettings.NAMEPLATE_COLOR_ID);
+        if (colorControl != null) {
+            colorControl.setMessage(nameplateColorLabel());
+            colorControl.active = !savingNameplateColor && settings.available(RalleSettings.NAMEPLATE_COLOR_ID);
+        }
         var rankRefresh = root.childById(ButtonComponent.class, "guild-ranks-refresh");
         if (rankRefresh != null) updateGuildRankRefreshButton(rankRefresh);
         if (pendingScrollProgress != null) {

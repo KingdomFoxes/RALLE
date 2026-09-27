@@ -14,6 +14,7 @@ import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
 import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
+import org.kingdomfoxes.ralle.cosmetics.*;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
 import org.kingdomfoxes.ralle.chat.RalleChatMessages;
@@ -129,8 +130,25 @@ public final class RalleClient implements ClientModInitializer {
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), placements);
         var navigation = new SettingsNavigationState(configDirectory.resolve("ralle-settings-ui.properties"), settings);
         var minecraft = Minecraft.getInstance();
+        var cosmeticsEnabled = settings.setting(RalleSettings.NAMEPLATE_COSMETICS_ID, BooleanSetting.class);
+        var cosmeticDirectory = new NameplateDirectorySession(
+                new HttpNameplateDirectory(), cosmeticsEnabled::value,
+                () -> minecraft.getCurrentServer() == null ? "" : minecraft.getCurrentServer().ip,
+                () -> minecraft.getUser().getProfileId(), java.time.Clock.systemUTC());
+        var cosmeticStyleSelection = new CosmeticStyleSelection(
+                new HttpCosmeticSelfGateway(), new MinecraftSessionProofAdapter(minecraft),
+                cosmeticDirectory, cosmeticsEnabled::value,
+                () -> minecraft.getUser().getProfileId(), () -> minecraft.getUser().getName());
+        var cosmeticTextures = new LiquidMaterialTextures(minecraft);
+        var cosmeticReloadPending = new java.util.concurrent.atomic.AtomicBoolean();
+        var cosmeticWasEnabled = new java.util.concurrent.atomic.AtomicBoolean(cosmeticsEnabled.value());
+        net.fabricmc.fabric.api.resource.v1.ResourceLoader.get(net.minecraft.server.packs.PackType.CLIENT_RESOURCES)
+                .registerReloader(net.minecraft.resources.Identifier.fromNamespaceAndPath("ralle", "cosmetic_textures"),
+                        (net.minecraft.server.packs.resources.ResourceManagerReloadListener) manager ->
+                                cosmeticReloadPending.set(true));
         var diagnostics = new RalleDiagnostics(minecraft, FabricLoader.getInstance().getGameDir());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> diagnostics.close());
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> cosmeticTextures.close());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client ->
                 org.kingdomfoxes.ralle.platform.SharedHttpTransport.shared().close());
         var consumableHighlights = new ConsumableHighlightService(
@@ -202,7 +220,8 @@ public final class RalleClient implements ClientModInitializer {
         );
         context = new RalleContext(
                 settings,
-                new OwoSettingsScreenFactory(settings, chatLayout, navigation, guildRanks, consumableHighlights.store()),
+                new OwoSettingsScreenFactory(settings, chatLayout, navigation, guildRanks,
+                        consumableHighlights.store(), cosmeticDirectory, cosmeticStyleSelection),
                 chatLayout,
                 chatBehavior,
                 chatTypeTabs,
@@ -214,16 +233,24 @@ public final class RalleClient implements ClientModInitializer {
                 autoRaidRequeue,
                 hostPartyInvites,
                 lfgSounds,
-                consumableHighlights
+                consumableHighlights,
+                cosmeticDirectory,
+                cosmeticStyleSelection,
+                cosmeticTextures
         );
         var pointAndLaugh = new org.kingdomfoxes.ralle.war.PointAndLaugh();
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            cosmeticDirectory.clear();
+            cosmeticStyleSelection.clear();
             pointAndLaugh.reset();
             raidLfg.connectionChanged();
             guildRanks.connectionChanged();
             onboarding.postIfNeeded(body -> RalleChatMessages.post(client, body));
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            cosmeticDirectory.clear();
+            cosmeticStyleSelection.clear();
+            cosmeticTextures.close();
             pointAndLaugh.reset();
             org.kingdomfoxes.ralle.ui.owo.PlayerHeadPresentation.clearSession();
             autoRaidRequeue.cancel();
@@ -235,6 +262,19 @@ public final class RalleClient implements ClientModInitializer {
             QueueAttributionService.disconnect();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (cosmeticReloadPending.getAndSet(false)) cosmeticTextures.close();
+            var visibleCosmeticIds = new java.util.LinkedHashSet<java.util.UUID>();
+            visibleCosmeticIds.add(client.getUser().getProfileId());
+            if (client.level != null) client.level.players().forEach(player -> visibleCosmeticIds.add(player.getUUID()));
+            raidLfg.store().state().lobbyList().forEach(lobby ->
+                    lobby.members().forEach(member -> visibleCosmeticIds.add(member.minecraftUuid())));
+            cosmeticDirectory.tick(visibleCosmeticIds);
+            if (!cosmeticsEnabled.value() && cosmeticWasEnabled.getAndSet(false)) {
+                cosmeticStyleSelection.clear();
+                cosmeticTextures.close();
+            } else if (cosmeticsEnabled.value()) {
+                cosmeticWasEnabled.set(true);
+            }
             HqDistanceOverlay.tick();
             diagnostics.tick();
             try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_LAYOUT_TICK)) { chatLayout.tick(); }
@@ -307,5 +347,18 @@ public final class RalleClient implements ClientModInitializer {
 
     public static boolean initialized() {
         return context != null;
+    }
+
+    /** Read-only cosmetic projection for presentation code; never starts a request. */
+    public static CosmeticIdentity cosmetic(java.util.UUID uuid) {
+        return context == null ? null : context.cosmetics().cached(uuid);
+    }
+
+    public static long cosmeticsRevision() {
+        return context == null ? 0 : context.cosmetics().presentationRevision();
+    }
+
+    public static CosmeticAppearance cosmeticAppearance(NameplateStyle style) {
+        return context == null ? null : CosmeticAppearance.from(context.settings(), style);
     }
 }

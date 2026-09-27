@@ -14,6 +14,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import org.kingdomfoxes.ralle.RalleClient;
+import org.kingdomfoxes.ralle.cosmetics.CosmeticPresentation;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.SideAnchor;
@@ -232,8 +233,10 @@ public final class LfgNotificationOverlay {
             return;
         }
         var member = lobby.members().get(slot);
+        var cosmetic = RalleClient.cosmetic(member.minecraftUuid());
         PlayerHeadPresentation.draw(graphics, minecraft, member,
-                bounds.x(), bounds.y(), 18, rosterBorderColor(member));
+                bounds.x(), bounds.y(), 18, rosterBorderColor(member),
+                cosmetic != null && cosmetic.selectedStyle() != null ? 2 : 1);
     }
 
     private void renderControls(GuiGraphics graphics, LfgNotificationManager.CardSnapshot card,
@@ -455,10 +458,14 @@ public final class LfgNotificationOverlay {
 
     static Component rosterTooltip(LfgProtocol.Member member) {
         return RalleTheme.ui(Component.literal(
-                "[" + member.guild().tag() + "] " + member.ign()));
+                CosmeticPresentation.tooltip(member.guild().tag(), member.ign(),
+                        RalleClient.cosmetic(member.minecraftUuid()))));
     }
 
     static int rosterBorderColor(LfgProtocol.Member member) {
+        var cosmetic = RalleClient.cosmetic(member.minecraftUuid());
+        if (cosmetic != null && cosmetic.selectedStyle() != null)
+            return 0xff000000 | cosmetic.selectedStyle().midtone();
         return GuildTerritoryColors.forGuild(member.guild().tag(), member.guild().color());
     }
 

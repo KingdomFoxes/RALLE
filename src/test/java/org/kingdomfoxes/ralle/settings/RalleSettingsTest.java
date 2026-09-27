@@ -20,6 +20,38 @@ class RalleSettingsTest {
     Path temporaryDirectory;
 
     @Test
+    void cosmeticControlsDefaultOffAndPersistOnlyLocalAppearance() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+        var supporter = registry.categories().stream().filter(category -> category.id().equals("cosmetics"))
+                .findFirst().orElseThrow();
+        assertTrue(supporter.subcategories().isEmpty());
+        assertEquals(List.of(RalleSettings.NAMEPLATE_COSMETICS_ID, RalleSettings.MATERIAL_RESOLUTION_ID,
+                        RalleSettings.EFFECT_TREATMENT_ID, RalleSettings.WHITE_USERNAME_OUTLINE_ID,
+                        RalleSettings.OUTLINE_THICKNESS_ID, RalleSettings.NAMEPLATE_COLOR_ID),
+                supporter.entries().stream().map(entry -> entry.id()).toList());
+        assertFalse(registry.setting(RalleSettings.NAMEPLATE_COSMETICS_ID, BooleanSetting.class).value());
+        assertFalse(registry.available(RalleSettings.MATERIAL_RESOLUTION_ID));
+        assertEquals("recipe", registry.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).value());
+        assertEquals("plate", registry.setting(RalleSettings.EFFECT_TREATMENT_ID, ChoiceSetting.class).value());
+        assertFalse(registry.setting(RalleSettings.WHITE_USERNAME_OUTLINE_ID, BooleanSetting.class).value());
+        assertFalse(registry.available(RalleSettings.OUTLINE_THICKNESS_ID));
+        registry.setting(RalleSettings.NAMEPLATE_COSMETICS_ID, BooleanSetting.class).set(true);
+        registry.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).set("0.5");
+        registry.setting(RalleSettings.WHITE_USERNAME_OUTLINE_ID, BooleanSetting.class).set(true);
+        registry.setting(RalleSettings.OUTLINE_THICKNESS_ID, ChoiceSetting.class).set("2");
+        var restored = new SettingsRegistry(path);
+        RalleSettings.register(restored);
+        restored.seal();
+        assertEquals("0.5", restored.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).value());
+        assertEquals("2", restored.setting(RalleSettings.OUTLINE_THICKNESS_ID, ChoiceSetting.class).value());
+        assertTrue(restored.available(RalleSettings.NAMEPLATE_COLOR_ID));
+        assertFalse(Files.readString(path).contains("selected_style_id"));
+    }
+
+    @Test
     void pointAndLaughIsAnEmptyTopLevelWarTextFieldAndPersists() throws Exception {
         var path = temporaryDirectory.resolve("ralle.properties");
         var registry = new SettingsRegistry(path);
@@ -227,7 +259,7 @@ class RalleSettingsTest {
         RalleSettings.register(registry);
 
         var categories = registry.categories().stream().toList();
-        assertEquals(List.of("about", "chat", "raid-lfg", "war"), categories.stream().map(value -> value.id()).toList());
+        assertEquals(List.of("about", "chat", "raid-lfg", "cosmetics", "war"), categories.stream().map(value -> value.id()).toList());
         assertEquals(List.of(),
                 categories.get(0).subcategories().stream().map(value -> value.id()).toList());
         assertEquals(List.of("edit-huds", RalleSettings.INTERFACE_FONT_ID, RalleSettings.UI_THEME_ID),
@@ -280,17 +312,17 @@ class RalleSettingsTest {
                 registry.setting("automatic-raid-requeue-keybind", KeybindSetting.class).value());
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("automatic-raid-requeue-keybind"));
         assertEquals(List.of("attack-timers", "territory-map", "consumables"),
-                categories.get(3).subcategories().stream().map(value -> value.id()).toList());
+                categories.get(4).subcategories().stream().map(value -> value.id()).toList());
         assertEquals(List.of(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID,
                         RalleSettings.QUEUE_KOF_RANK_COLORS_ID, RalleSettings.QUEUE_SELF_COLOR_ID),
-                categories.get(3).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
+                categories.get(4).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
         assertFalse(registry.setting(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID, BooleanSetting.class).value());
         assertEquals(List.of(RalleSettings.HQ_DISTANCE_ENABLED_ID, RalleSettings.HQ_DISTANCE_KEYBIND_ID),
-                categories.get(3).subcategories().get(1).entries().stream().map(value -> value.id()).toList());
+                categories.get(4).subcategories().get(1).entries().stream().map(value -> value.id()).toList());
         assertFalse(registry.setting(RalleSettings.HQ_DISTANCE_ENABLED_ID, BooleanSetting.class).value());
         assertEquals(List.of(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID,
                         RalleSettings.CONSUMABLE_HIGHLIGHT_RULES_ID),
-                categories.get(3).subcategories().get(2).entries().stream().map(value -> value.id()).toList());
+                categories.get(4).subcategories().get(2).entries().stream().map(value -> value.id()).toList());
         assertFalse(registry.setting(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID, BooleanSetting.class).value());
         assertEquals(List.of(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID),
                 registry.dependencies(RalleSettings.CONSUMABLE_HIGHLIGHT_RULES_ID));

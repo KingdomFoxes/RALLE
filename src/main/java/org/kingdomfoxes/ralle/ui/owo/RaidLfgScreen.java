@@ -28,6 +28,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.jetbrains.annotations.NotNull;
 import org.kingdomfoxes.ralle.lfg.client.GuildTerritoryColors;
+import org.kingdomfoxes.ralle.RalleClient;
+import org.kingdomfoxes.ralle.cosmetics.CosmeticPresentation;
 import org.kingdomfoxes.ralle.lfg.client.LfgJoinController;
 import org.kingdomfoxes.ralle.lfg.client.LfgLockDebouncer;
 import org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager;
@@ -91,6 +93,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
     private UUID scrollTarget;
     private FlowLayout scrollTargetComponent;
     private long renderedRevision = Long.MIN_VALUE;
+    private long renderedCosmeticsRevision = Long.MIN_VALUE;
     private RaidLfgService.LifecycleState renderedLifecycle;
     private String renderedStatusMessage;
     private int renderedCountdownSeconds = -1;
@@ -245,6 +248,10 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         tickJoinCountdown();
         tickKickTargeting();
         tickPingCooldown();
+        if (renderedCosmeticsRevision != RalleClient.cosmeticsRevision()) {
+            renderedCosmeticsRevision = RalleClient.cosmeticsRevision();
+            rebuildGrid();
+        }
         if (renderedLockVersion != lockDebouncer.version()) {
             renderedLockVersion = lockDebouncer.version();
             rebuildGrid();
@@ -682,14 +689,28 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
             return row;
         }
         var member = lobby.members().get(slot);
+        var cosmetic = RalleClient.cosmetic(member.minecraftUuid());
+        var style = cosmetic == null ? null : cosmetic.selectedStyle();
         var head = new PlayerFaceComponent(member.minecraftUuid().toString(), member.ign(), 16,
-                GuildTerritoryColors.forGuild(member.guild().tag(), member.guild().color()));
-        head.tooltip(RalleTheme.ui(Component.literal("[" + member.guild().tag() + "]"))).margins(Insets.right(4));
+                style == null ? GuildTerritoryColors.forGuild(member.guild().tag(), member.guild().color())
+                        : 0xff000000 | style.midtone(), style == null ? 1 : 2);
+        var identityTooltip = RalleTheme.ui(Component.literal(CosmeticPresentation.tooltip(
+                member.guild().tag(), member.ign(), cosmetic)));
+        head.tooltip(identityTooltip).margins(Insets.right(4));
         row.child(head);
+        if (style != null) {
+            var name = new LiquidNameComponent(member.ign(), member.role() == LfgProtocol.MemberRole.HOST,
+                    style);
+            name.tooltip(identityTooltip);
+            row.child(name);
+        } else {
         var label = Component.empty();
         if (member.role() == LfgProtocol.MemberRole.HOST) label.append(Component.literal("★ "));
         label.append(RalleTheme.ui(Component.literal(member.ign())));
-        row.child(UIComponents.label(label).color(Color.WHITE));
+        var name = UIComponents.label(label).color(Color.WHITE);
+        name.tooltip(identityTooltip);
+        row.child(name);
+        }
         if (lobby.hostedBy(viewerId()) && member.role() != LfgProtocol.MemberRole.HOST) {
             kickRows.put(member.minecraftUuid(), row);
             row.mouseDown().subscribe((click, doubled) -> {

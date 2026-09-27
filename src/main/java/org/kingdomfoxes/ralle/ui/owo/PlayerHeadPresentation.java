@@ -24,9 +24,15 @@ public final class PlayerHeadPresentation {
 
     public static void draw(GuiGraphics graphics, Minecraft minecraft, LfgProtocol.Member member,
                             int x, int y, int faceSize, int borderColor) {
-        graphics.fill(x, y, x + faceSize + 2, y + faceSize + 2, borderColor);
+        draw(graphics, minecraft, member, x, y, faceSize, borderColor, 1);
+    }
+
+    public static void draw(GuiGraphics graphics, Minecraft minecraft, LfgProtocol.Member member,
+                            int x, int y, int faceSize, int borderColor, int borderWidth) {
+        int outerSize = faceSize + 2;
+        graphics.fill(x, y, x + outerSize, y + outerSize, borderColor);
         PlayerFaceRenderer.draw(graphics, resolve(minecraft, member.minecraftUuid(), member.ign()),
-                x + 1, y + 1, faceSize);
+                x + borderWidth, y + borderWidth, outerSize - borderWidth * 2);
     }
 
     public static int guildBorder(LfgProtocol.Member member) {

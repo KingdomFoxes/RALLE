@@ -1,0 +1,137 @@
+{
+  "schema": "ralle-nameplate-style-catalog-v1",
+  "styles": [
+    {
+      "id": "supporter-gold",
+      "role": "supporter",
+      "label": "Ralle Gold",
+      "source": "ralle-liquid-look-supporterGold.json",
+      "material": {
+        "seed": 7349,
+        "effect": "liquid",
+        "speed": 0.45,
+        "scale": 4,
+        "warp": 63,
+        "shine": 71
+      },
+      "palette": {
+        "shadow": "#8b5c20",
+        "midtone": "#e5b94c",
+        "highlight": "#fff0b5"
+      },
+      "defaultTreatment": "plate",
+      "defaultResolution": 1,
+      "notificationBorderLogicalPixels": 2
+    },
+    {
+      "id": "contributor-green",
+      "role": "contributor",
+      "label": "Contributor Green",
+      "source": "ralle-liquid-look-contributorGreen.json",
+      "material": {
+        "seed": 7349,
+        "effect": "liquid",
+        "speed": 0.45,
+        "scale": 4,
+        "warp": 63,
+        "shine": 71
+      },
+      "palette": {
+        "shadow": "#176f9b",
+        "midtone": "#62f500",
+        "highlight": "#ffffff"
+      },
+      "defaultTreatment": "plate",
+      "defaultResolution": 0.5,
+      "notificationBorderLogicalPixels": 2
+    },
+    {
+      "id": "contributor-green-alt",
+      "role": "contributor",
+      "label": "Contributor Green Alt",
+      "source": "ralle-liquid-look-contributorGreenAlt.json",
+      "material": {
+        "seed": 7349,
+        "effect": "liquid",
+        "speed": 0.45,
+        "scale": 4,
+        "warp": 63,
+        "shine": 71
+      },
+      "palette": {
+        "shadow": "#388a15",
+        "midtone": "#62f500",
+        "highlight": "#ffffff"
+      },
+      "defaultTreatment": "plate",
+      "defaultResolution": 0.5,
+      "notificationBorderLogicalPixels": 2
+    },
+    {
+      "id": "contributor-blue",
+      "role": "contributor",
+      "label": "Contributor Blue",
+      "source": "ralle-liquid-look-contributorBlue.json",
+      "material": {
+        "seed": 7349,
+        "effect": "liquid",
+        "speed": 0.45,
+        "scale": 4,
+        "warp": 63,
+        "shine": 71
+      },
+      "palette": {
+        "shadow": "#176f9b",
+        "midtone": "#00b8f5",
+        "highlight": "#ffffff"
+      },
+      "defaultTreatment": "plate",
+      "defaultResolution": 0.5,
+      "notificationBorderLogicalPixels": 2
+    },
+    {
+      "id": "admin-white",
+      "role": "admin",
+      "label": "Admin White",
+      "source": "ralle-liquid-look-adminWhite.json",
+      "material": {
+        "seed": 7349,
+        "effect": "liquid",
+        "speed": 0.45,
+        "scale": 4,
+        "warp": 63,
+        "shine": 71
+      },
+      "palette": {
+        "shadow": "#000000",
+        "midtone": "#000000",
+        "highlight": "#ffffff"
+      },
+      "defaultTreatment": "plate",
+      "defaultResolution": 0.5,
+      "notificationBorderLogicalPixels": 2
+    },
+    {
+      "id": "admin-red",
+      "role": "admin",
+      "label": "Admin Red",
+      "source": "ralle-liquid-look-adminRed.json",
+      "material": {
+        "seed": 7349,
+        "effect": "liquid",
+        "speed": 0.45,
+        "scale": 4,
+        "warp": 63,
+        "shine": 71
+      },
+      "palette": {
+        "shadow": "#000000",
+        "midtone": "#000000",
+        "highlight": "#ff0000"
+      },
+      "defaultTreatment": "plate",
+      "defaultResolution": 0.5,
+      "notificationBorderLogicalPixels": 2
+    }
+  ]
+}

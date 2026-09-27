@@ -1,6 +1,9 @@
 package org.kingdomfoxes.ralle;
 
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
+import org.kingdomfoxes.ralle.cosmetics.NameplateDirectorySession;
+import org.kingdomfoxes.ralle.cosmetics.CosmeticStyleSelection;
+import org.kingdomfoxes.ralle.cosmetics.LiquidMaterialTextures;
 import org.kingdomfoxes.ralle.api.settings.SettingsScreenFactory;
 import org.kingdomfoxes.ralle.chat.ChatBehaviorService;
 import org.kingdomfoxes.ralle.chat.ChatLayoutService;
@@ -29,6 +32,9 @@ public record RalleContext(
         AutoRaidRequeueController autoRaidRequeue,
         HostPartyInviteController hostPartyInvites,
         LfgSoundPlayer lfgSounds,
-        ConsumableHighlightService consumableHighlights
+        ConsumableHighlightService consumableHighlights,
+        NameplateDirectorySession cosmetics,
+        CosmeticStyleSelection cosmeticStyleSelection,
+        LiquidMaterialTextures cosmeticTextures
 ) {
 }
