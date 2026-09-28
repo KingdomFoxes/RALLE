@@ -674,7 +674,8 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                                 savingNameplateColor = true;
                                 nameplateColorSaveFailed = false;
                                 trigger.active = false;
-                                trigger.tooltip((Component) null);
+                                // The Component overload splits text and rejects null before select() is reached.
+                                trigger.tooltip(java.util.List.<net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent>of());
                                 trigger.setMessage(nameplateColorLabel());
                                 cosmeticStyleSelection.select(style.id()).whenComplete((accepted, failure) ->
                                         minecraft.execute(() -> {

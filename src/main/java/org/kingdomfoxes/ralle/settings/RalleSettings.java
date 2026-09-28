@@ -126,19 +126,6 @@ public final class RalleSettings {
         ));
 
         registry.registerCategory(new SettingsCategory(
-                "cosmetics",
-                Component.translatable("ralle.settings.category.cosmetics"),
-                Component.translatable("ralle.settings.category.cosmetics.description"),
-                List.of(toggle(NAMEPLATE_COSMETICS_ID),
-                        choice(MATERIAL_RESOLUTION_ID, "recipe", "recipe", "1", "2", "0.5"),
-                        choice(EFFECT_TREATMENT_ID, "plate", "text", "plate"),
-                        toggle(WHITE_USERNAME_OUTLINE_ID),
-                        choice(OUTLINE_THICKNESS_ID, "1", "1", "2"),
-                        action(NAMEPLATE_COLOR_ID)),
-                List.of()
-        ));
-
-        registry.registerCategory(new SettingsCategory(
                 "war",
                 Component.translatable("ralle.settings.category.war"),
                 Component.translatable("ralle.settings.category.war.description"),
@@ -157,6 +144,19 @@ public final class RalleSettings {
                                 customPanel(CONSUMABLE_HIGHLIGHT_RULES_ID, CONSUMABLE_HIGHLIGHT_PROVIDER_ID)
                         )
                 )
+        ));
+
+        registry.registerCategory(new SettingsCategory(
+                "cosmetics",
+                Component.translatable("ralle.settings.category.cosmetics"),
+                Component.translatable("ralle.settings.category.cosmetics.description"),
+                List.of(customPanel("nameplate-preview", "nameplate-preview"), toggle(NAMEPLATE_COSMETICS_ID),
+                        choice(MATERIAL_RESOLUTION_ID, "recipe", "recipe", "1", "2", "0.5"),
+                        choice(EFFECT_TREATMENT_ID, "plate", "text", "plate"),
+                        toggle(WHITE_USERNAME_OUTLINE_ID),
+                        choice(OUTLINE_THICKNESS_ID, "1", "1", "2"),
+                        action(NAMEPLATE_COLOR_ID)),
+                List.of()
         ));
 
         registry.requireEnabled("message-direction", "message-direction-enabled");

@@ -21,6 +21,8 @@
   "ralle.settings.keybind.reset": "Reset keybind",
 
   "ralle.settings.subcategory.appearance": "Appearance",
+  "ralle.settings.option.nameplate-preview.title": "Nameplate preview",
+  "ralle.settings.option.nameplate-preview.description": "Live Raid LFG roster and notification appearance.",
   "ralle.settings.category.cosmetics": "Supporter",
   "ralle.settings.category.cosmetics.description": "Optional Fox nameplate materials.",
   "ralle.settings.option.nameplate-cosmetics": "Nameplate Cosmetics",

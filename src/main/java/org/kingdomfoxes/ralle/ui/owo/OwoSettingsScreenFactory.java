@@ -44,6 +44,7 @@ public final class OwoSettingsScreenFactory implements SettingsScreenFactory {
     public Screen create(Screen parent) {
         var panels = new CustomSettingsPanelRegistry<OwoCustomSettingsPanelContext, UIComponent>();
         panels.register(new ConsumableHighlightsPanelProvider(consumableHighlights));
+        panels.register(new NameplatePreviewPanelProvider());
         return new RalleSettingsScreen(parent, settings, chatLayout, navigation, guildRanks, panels,
                 cosmetics, cosmeticStyleSelection);
     }

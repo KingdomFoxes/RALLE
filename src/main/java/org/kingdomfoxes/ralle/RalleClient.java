@@ -250,7 +250,7 @@ public final class RalleClient implements ClientModInitializer {
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             cosmeticDirectory.clear();
             cosmeticStyleSelection.clear();
-            cosmeticTextures.close();
+            client.execute(cosmeticTextures::close);
             pointAndLaugh.reset();
             org.kingdomfoxes.ralle.ui.owo.PlayerHeadPresentation.clearSession();
             autoRaidRequeue.cancel();

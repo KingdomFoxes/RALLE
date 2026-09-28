@@ -42,15 +42,14 @@ public abstract class AvatarNameplateMixin {
             long now = System.nanoTime();
             state.nameTag = LiquidComponentTint.apply(original, Minecraft.getInstance().font,
                     (x, y) -> {
-                        int sample = RalleClient.context().cosmeticTextures()
-                                .sample(style, appearance.resolution(), x, y, now);
-                        if (appearance.treatment() == CosmeticAppearance.Treatment.TEXT) return sample;
-                        int r = sample >> 16 & 255, g = sample >> 8 & 255, b = sample & 255;
-                        return (r * 299 + g * 587 + b * 114) / 1000 >= 128 ? 0xff081225 : 0xffffffff;
+                        if (appearance.treatment() == CosmeticAppearance.Treatment.TEXT)
+                            return RalleClient.context().cosmeticTextures().sample(style, appearance.resolution(),
+                                    x * 256 / Math.max(1, Minecraft.getInstance().font.width(original)), y * 64 / 9, now);
+                        return 0xffffffff;
                     });
         } catch (RuntimeException ignored) {
             ((CosmeticAvatarState) state).ralle$cosmetic(null, null, null);
-            state.nameTag = original.copy().withStyle(value -> value.withColor(style.midtone()));
+            state.nameTag = original.copy().withStyle(value -> value.withColor(0xffffff));
         }
     }
 
@@ -82,14 +81,10 @@ public abstract class AvatarNameplateMixin {
                 pose.scale(0.025F, -0.025F, 0.025F);
                 int light = state.lightCoords;
                 if (texture != null) {
-                    for (int start = 0; start < width + 2; start += 256) {
-                        int chunk = Math.min(256, width + 2 - start);
-                        float x0 = left + start, x1 = x0 + chunk, u1 = chunk / 256f;
-                        if (!state.isDiscrete) submitPlateChunk(collector, pose, RenderTypes.textSeeThrough(texture),
-                                x0, x1, top, bottom, u1, light, 0x80ffffff);
-                        submitPlateChunk(collector, pose, RenderTypes.text(texture),
-                                x0, x1, top, bottom, u1, light, 0xffffffff);
-                    }
+                    if (!state.isDiscrete) submitPlateChunk(collector, pose, RenderTypes.textSeeThrough(texture),
+                            left, left + width + 2, top, bottom, 1, light, 0x80ffffff);
+                    submitPlateChunk(collector, pose, RenderTypes.text(texture),
+                            left, left + width + 2, top, bottom, 1, light, 0xffffffff);
                 }
                 if (appearance.usernameOutlinePixels() > 0) {
                     UsernameSpan.find(state.nameTag, decoration.ralle$ign()).ifPresent(span -> {
@@ -103,7 +98,7 @@ public abstract class AvatarNameplateMixin {
                 pose.popPose();
             }
         } catch (RuntimeException ignored) {
-            state.nameTag = state.nameTag.copy().withStyle(value -> value.withColor(style.midtone()));
+            state.nameTag = state.nameTag.copy().withStyle(value -> value.withColor(0xffffff));
         }
     }
 
@@ -125,8 +120,8 @@ public abstract class AvatarNameplateMixin {
                                          float x0, float x1, float top, float bottom,
                                          float u1, int light, int tint) {
         collector.submitCustomGeometry(pose, renderType, (matrix, vertices) -> {
-            vertices.addVertex(matrix, x0, bottom, -0.005F).setColor(tint).setUv(0, 10 / 64f).setLight(light);
-            vertices.addVertex(matrix, x1, bottom, -0.005F).setColor(tint).setUv(u1, 10 / 64f).setLight(light);
+            vertices.addVertex(matrix, x0, bottom, -0.005F).setColor(tint).setUv(0, 1).setLight(light);
+            vertices.addVertex(matrix, x1, bottom, -0.005F).setColor(tint).setUv(u1, 1).setLight(light);
             vertices.addVertex(matrix, x1, top, -0.005F).setColor(tint).setUv(u1, 0).setLight(light);
             vertices.addVertex(matrix, x0, top, -0.005F).setColor(tint).setUv(0, 0).setLight(light);
         });

@@ -29,10 +29,10 @@ validation; the client implementation status is stated above.
   Supporters get Ralle Gold; Contributors get Green, Green Alt and Blue; Admins
   get White and Red. Preserve all six supplied styles. Cosmetic Admin never grants
   website/engineer permissions, staff access, Minecraft permissions or LFG access.
-- Apply the Liquid Gold effect to LFG names and above-head names. Add a local switch
+- Apply the Liquid Gold effect to LFG roster rows and above-head names. Add a local switch
   between gold/colored glyphs and the complete metallic nameplate with readable
   foreground lettering. The selected palette replaces the old gold-only wording.
-- Notification head borders use the selected palette, fixed at two GUI logical
+- Notification head borders animate the selected material, fixed at two GUI logical
   pixels, over the guild-color identifier; preserve slot/card geometry and other
   members' original guild outlines. Nameplate treatment never fills a head image.
 - Tooltip/narration retains canonical identity and the actual backend grant:
@@ -92,7 +92,7 @@ bounded dilation minus the original mask), behind the glyph fill and above the
 plate. Do not outline the rectangle, head, guild prefix, rank or host star. Preserve
 vanilla shadow and click/hover geometry. Reserve enough visual padding for both
 outline widths and clip safely without changing line wrapping or roster hit targets.
-Check dark plate lettering against the requested white outline and low-contrast
+Check white plate lettering against the requested white outline and low-contrast
 frames; do not silently edit the approved palettes to compensate.
 
 Confirmed color-switcher semantics: select your own nameplate color for everyone
@@ -284,3 +284,19 @@ non-actions. Saving remains an authenticated Fox mutation; pending and failed
 saves are shown on the control, and failure preserves the previous selection.
 Cosmetic HTTP requests explicitly use HTTP/1.1, matching LFG, to avoid unsupported
 cleartext HTTP/2 upgrades against the local Fox server.
+
+## September 28 presentation corrections
+
+Whole-plate treatment fills the complete LFG roster flow, including its padding.
+Browser heads retain their one-pixel guild-color border with no cosmetic border.
+Plate lettering stays white; Text treatment still colors the glyphs. The complete
+material texture fits each surface, matching the website, instead of cropping a
+small corner of its 256 x 64 recipe. Notification borders now animate that texture.
+
+Supporter appears immediately after War. Its first entry is a full-width custom
+preview panel with an enlarged roster row and an isolated notification head,
+using the shared live renderers and local preferences. It reads cached identity
+only; absent identity uses a sample gold style and grants no entitlement. While
+cosmetics are off it shows plain examples without generating material textures.
+The dropdown clears its owo tooltip with an explicitly typed empty tooltip list:
+passing a null Component throws before the API request and leaves Saving stuck.

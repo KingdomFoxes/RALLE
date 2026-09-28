@@ -692,13 +692,18 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         var cosmetic = RalleClient.cosmetic(member.minecraftUuid());
         var style = cosmetic == null ? null : cosmetic.selectedStyle();
         var head = new PlayerFaceComponent(member.minecraftUuid().toString(), member.ign(), 16,
-                style == null ? GuildTerritoryColors.forGuild(member.guild().tag(), member.guild().color())
-                        : 0xff000000 | style.midtone(), style == null ? 1 : 2);
+                GuildTerritoryColors.forGuild(member.guild().tag(), member.guild().color()), 1);
         var identityTooltip = RalleTheme.ui(Component.literal(CosmeticPresentation.tooltip(
                 member.guild().tag(), member.ign(), cosmetic)));
         head.tooltip(identityTooltip).margins(Insets.right(4));
         row.child(head);
         if (style != null) {
+            row.surface((graphics, component) -> {
+                var appearance = RalleClient.cosmeticAppearance(style);
+                if (appearance != null && appearance.treatment() == org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance.Treatment.PLATE)
+                    LiquidMaterialPresentation.plate(graphics, style, appearance,
+                            component.x(), component.y(), component.width(), component.height());
+            });
             var name = new LiquidNameComponent(member.ign(), member.role() == LfgProtocol.MemberRole.HOST,
                     style);
             name.tooltip(identityTooltip);
