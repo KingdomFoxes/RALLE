@@ -42,8 +42,8 @@ public final class CosmeticStyleSelection {
         CompletableFuture<CosmeticSelfGateway.Session> auth = session != null
                 && session.account().equals(player) && session.expiresAtMillis() > System.currentTimeMillis() + 10_000
                 ? CompletableFuture.completedFuture(session) : gateway.challenge(player, ign.get())
-                    .thenCompose(challenge -> proof.prove(challenge.serverId())
-                            .thenCompose(ignored -> gateway.complete(challenge.id())));
+                    .thenCompose(challenge -> proof.authenticate(challenge.serverId(),
+                            () -> gateway.complete(challenge.id())));
         pending = auth.thenCompose(verified -> {
             synchronized (this) {
                 if (generation != requestGeneration || !player.equals(account.get()) || !enabled.getAsBoolean()

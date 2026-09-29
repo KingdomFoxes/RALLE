@@ -158,7 +158,13 @@ public final class RalleClient implements ClientModInitializer {
                 System::currentTimeMillis
         );
         var guildRanks = new GuildRankService(
-                new HttpGuildRankGateway(),
+                new HttpGuildRankGateway(new org.kingdomfoxes.ralle.chat.rank.GuildRankCredentials(
+                        new HttpLfgGateway(), new MinecraftSessionProofAdapter(minecraft),
+                        () -> minecraft.getUser().getProfileId(), () -> minecraft.getUser().getName(),
+                        () -> (settings.setting(RalleSettings.INTERNAL_GUILD_RANKS_ID, BooleanSetting.class).value()
+                                || QueueAttributionService.rankColorsRequested())
+                                && org.kingdomfoxes.ralle.client.WynncraftHost.matches(
+                                        minecraft.getCurrentServer() == null ? "" : minecraft.getCurrentServer().ip))),
                 configDirectory.resolve("ralle-ranks.json"),
                 settings.setting(RalleSettings.INTERNAL_GUILD_RANKS_ID, BooleanSetting.class),
                 settings.setting(RalleSettings.GUILD_RANK_STYLE_ID, ChoiceSetting.class),

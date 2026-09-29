@@ -12,6 +12,26 @@ class CosmeticLookupJsonTest {
     private static final UUID PLAYER = UUID.fromString("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
 
     @Test
+    void acceptsCurrentGrantOnlyFoxResponseWithoutInventingSelection() {
+        String body = """
+                {"version":1,"players":[
+                {"minecraft_uuid":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                 "grants":["admin"],"revision":4}]}
+                """;
+        var result = CosmeticLookupJson.decode(body, List.of(PLAYER));
+        assertEquals(java.util.Set.of("admin"), result.players().getFirst().grants());
+        assertTrue(NameplateStyle.allowed("supporter-gold", result.players().getFirst().grants()));
+        assertNull(result.players().getFirst().selectedStyleId());
+        assertEquals(Duration.ofSeconds(30), result.ttl());
+        var revoked = CosmeticLookupJson.decode(body.replace("[\"admin\"]", "[]"), List.of(PLAYER));
+        assertTrue(revoked.players().getFirst().grants().isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> CosmeticLookupJson.decode(
+                body.replace("\"version\":1", "\"version\":1,\"cache_ttl_seconds\":0"), List.of(PLAYER)));
+        assertThrows(IllegalArgumentException.class, () -> CosmeticLookupJson.decode(
+                body.replace("\"revision\":4", "\"revision\":4,\"selected_style_id\":42"), List.of(PLAYER)));
+    }
+
+    @Test
     void decodesPublishedFoxFixtureAndValidatesIdentity() {
         String body = """
                 {"version":1,"cache_ttl_seconds":30,"players":[

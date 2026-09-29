@@ -493,12 +493,24 @@ on production. Explicitly constructed development and test gateways may use inse
 WebSocket transports only for loopback hosts. The JDK gateway is pinned to HTTP/1.1 so local
 requests do not attempt an `h2c` upgrade that a local HTTP server may not support.
 
-The LFG and public guild-rank gateways share `platform.SharedHttpTransport`.
+The LFG and authenticated guild-rank gateways share `platform.SharedHttpTransport`.
 Constructing either gateway does not initialize a JDK client or send a request;
 the first enabled consumer initializes the transport once. Its connect timeout is
 eight seconds; individual HTTP/WebSocket operations retain their twelve-second
-timeouts. LFG HTTP requests explicitly use HTTP/1.1; rank requests retain the JDK
-default negotiation. Bearers and idempotency keys remain request-local, and the
+timeouts. LFG and rank HTTP requests explicitly use HTTP/1.1, including loopback.
+Each enabled rank refresh obtains a short-lived Minecraft-session-proven RALLE
+credential through the existing challenge/complete API before calling `/api/ranks`
+with its bearer header. The decoder reads current `fox_rank` titles and retains
+legacy `ranks` array support; an explicit `prime_minister: true` takes precedence.
+This does not open a live LFG connection or require the
+LFG setting; Fox still enforces its current eligibility requirements. Credentials
+remain memory-only and are not saved with the presentation cache. Disable,
+disconnect, or account changes abort pending authentication before its next step.
+The Minecraft adapter serializes RALLE proof registration through backend
+verification across rank refreshes, LFG connection/renewal, and cosmetic selection,
+so concurrent features cannot replace each other's unverified session join.
+Failed verification releases the queue for the next authentication.
+Bearers and idempotency keys remain request-local, and the
 shared client has no cookie handler or authenticator. Feature disable/disconnect
 closes its live connection without destroying the shared transport. Client shutdown
 shuts down the owned client without waiting on open sockets or initializing an

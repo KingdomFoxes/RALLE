@@ -36,7 +36,9 @@ public final class CosmeticLookupJson {
         try {
             JsonObject root = JsonParser.parseString(json).getAsJsonObject();
             if (integer(root, "version") != 1) throw new IllegalArgumentException("Unsupported cosmetic response version");
-            Duration ttl = ttl(root, "cache_ttl_seconds");
+            // Fox's grant-only v1 response omits cache hints; keep the local
+            // revocation window bounded to the same 30 seconds as older v1.
+            Duration ttl = root.has("cache_ttl_seconds") ? ttl(root, "cache_ttl_seconds") : Duration.ofSeconds(30);
             JsonArray players = root.getAsJsonArray("players");
             if (players == null || players.size() != requested.size()) throw new IllegalArgumentException("Missing cosmetic results");
             List<CosmeticIdentity> identities = new ArrayList<>(players.size());
@@ -53,10 +55,12 @@ public final class CosmeticLookupJson {
                         throw new IllegalArgumentException("Invalid cosmetic grant");
                 }
                 JsonElement selected = item.get("selected_style_id");
-                if (selected == null) throw new IllegalArgumentException("Missing selected style");
-                String styleId = selected.isJsonNull() ? null : selected.getAsString();
+                if (selected != null && !selected.isJsonNull()
+                        && (!selected.isJsonPrimitive() || !selected.getAsJsonPrimitive().isString()))
+                    throw new IllegalArgumentException("Invalid selected style");
+                String styleId = selected == null || selected.isJsonNull() ? null : selected.getAsString();
                 long revision = longValue(item, "revision");
-                Duration playerTtl = ttl(item, "cache_ttl_seconds");
+                Duration playerTtl = item.has("cache_ttl_seconds") ? ttl(item, "cache_ttl_seconds") : ttl;
                 if (playerTtl.compareTo(ttl) < 0) ttl = playerTtl;
                 identities.add(new CosmeticIdentity(uuid, grants, styleId, revision));
             }

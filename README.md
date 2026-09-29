@@ -147,6 +147,9 @@ Requirements: Java 21.
 The `localBackend` Gradle property runs the development client against the
 internal Fox backend at `http://127.0.0.1:8001` instead of production. It does
 not change packaged builds.
+For IntelliJ's direct Minecraft Client launch, set the VM option
+`-Dralle.localBackend=true`. The obsolete `-Dralle.lfg.baseUrl=...` option is
+ignored. LFG, ranks, and cosmetics all follow the same local-backend flag.
 
 Import the repository root as a Gradle project in IntelliJ IDEA and select a
 Java 21 Gradle JVM.

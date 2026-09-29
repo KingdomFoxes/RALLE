@@ -26,6 +26,11 @@ class NameplateStyleTest {
 
     @Test
     void grantsFollowFoxHierarchyWithoutInferringUnknownStyles() {
+        assertTrue(NameplateStyle.available(Set.of()).isEmpty());
+        assertEquals(List.of("supporter-gold"), NameplateStyle.available(Set.of("supporter"))
+                .stream().map(NameplateStyle::id).toList());
+        assertEquals(4, NameplateStyle.available(Set.of("contributor")).size());
+        assertEquals(NameplateStyle.CATALOG, NameplateStyle.available(Set.of("admin")));
         for (var style : NameplateStyle.CATALOG) {
             assertFalse(NameplateStyle.allowed(style.id(), Set.of()));
             assertEquals(style.role().equals("supporter"), NameplateStyle.allowed(style.id(), Set.of("supporter")));

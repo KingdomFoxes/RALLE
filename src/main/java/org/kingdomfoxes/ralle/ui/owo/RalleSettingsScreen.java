@@ -660,13 +660,16 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                         menu.text(RalleTheme.ui(Component.translatable("ralle.cosmetics.color.unavailable")));
                         return;
                     }
-                    for (var style : NameplateStyle.CATALOG) {
-                        boolean allowed = NameplateStyle.allowed(style.id(), identity.grants());
+                    var available = NameplateStyle.available(identity.grants());
+                    if (available.isEmpty()) {
+                        menu.text(RalleTheme.ui(Component.translatable("ralle.cosmetics.color.no_styles")));
+                        return;
+                    }
+                    for (var style : available) {
                         boolean selected = style.id().equals(identity.selectedStyleId());
                         var label = Component.literal(style.label());
-                        if (selected || !allowed) {
-                            label.append(" (").append(Component.translatable(selected
-                                    ? "ralle.cosmetics.color.selected" : "ralle.cosmetics.color.locked.short")).append(")");
+                        if (selected) {
+                            label.append(" (").append(Component.translatable("ralle.cosmetics.color.selected")).append(")");
                             menu.text(RalleTheme.ui(label));
                         } else {
                             menu.button(RalleTheme.ui(label), dropdown -> {

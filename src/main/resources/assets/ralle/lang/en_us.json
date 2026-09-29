@@ -45,6 +45,7 @@
   "ralle.settings.value.plate": "Whole nameplate",
   "ralle.cosmetics.color.title": "Nameplate Color",
   "ralle.cosmetics.color.none": "None",
+  "ralle.cosmetics.color.no_styles": "No nameplate styles are available for your grant.",
   "ralle.cosmetics.color.failed.short": "Save failed",
   "ralle.cosmetics.color.unavailable": "Your Fox cosmetic grant is unavailable. Try again shortly.",
   "ralle.cosmetics.color.locked": "Requires RALLE %s",

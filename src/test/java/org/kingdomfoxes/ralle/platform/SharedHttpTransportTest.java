@@ -22,7 +22,8 @@ class SharedHttpTransportTest {
             throw new AssertionError("Unused transport initialized");
         });
         new HttpLfgGateway(transport, HttpLfgGateway.PRODUCTION_BASE_URL);
-        new HttpGuildRankGateway(transport, "https://kingdomfoxes.com/api/ranks");
+        new HttpGuildRankGateway(transport, "https://kingdomfoxes.com/api/ranks",
+                () -> { throw new AssertionError("Unused credential provider initialized"); });
         assertEquals(0, starts.get());
         transport.close();
         transport.close();
@@ -73,7 +74,8 @@ class SharedHttpTransportTest {
         })) {
             String base = "http://127.0.0.1:" + server.getAddress().getPort();
             var lfg = new HttpLfgGateway(transport, base + "/api/ralle/v1");
-            var ranks = new HttpGuildRankGateway(transport, base + "/api/ranks");
+            var ranks = new HttpGuildRankGateway(transport, base + "/api/ranks",
+                    () -> java.util.concurrent.CompletableFuture.completedFuture("rank-token"));
             assertEquals(0, starts.get());
             assertEquals(0, requests.get());
             assertThrows(java.util.concurrent.ExecutionException.class,
@@ -83,7 +85,7 @@ class SharedHttpTransportTest {
             assertEquals(1, starts.get());
             assertEquals(3, requests.get());
             assertEquals("Bearer test-token", lfgAuth.get());
-            assertNull(rankAuth.get());
+            assertEquals("Bearer rank-token", rankAuth.get());
         } finally { server.stop(0); }
     }
 }

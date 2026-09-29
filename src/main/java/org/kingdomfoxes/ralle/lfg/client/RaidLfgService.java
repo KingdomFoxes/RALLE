@@ -414,9 +414,11 @@ public final class RaidLfgService {
                     .thenCompose(challenge -> {
                         requireCurrent(expected);
                         requireProtocol(challenge.protocolVersion());
-                        return sessionProof.prove(challenge.serverId()).thenApply(ignored -> challenge);
+                        return sessionProof.authenticate(challenge.serverId(), () -> {
+                            requireCurrent(expected);
+                            return gateway.complete(challenge.challengeId());
+                        });
                     })
-                    .thenCompose(challenge -> gateway.complete(challenge.challengeId()))
                     .thenCompose(session -> {
                         try (var callbackScope = stateAccess.enter()) {
                             requireCurrent(expected);
@@ -471,9 +473,11 @@ public final class RaidLfgService {
                     .thenCompose(challenge -> {
                         requireRenewal(id);
                         requireProtocol(challenge.protocolVersion());
-                        return sessionProof.prove(challenge.serverId()).thenApply(ignored -> challenge);
+                        return sessionProof.authenticate(challenge.serverId(), () -> {
+                            requireRenewal(id);
+                            return gateway.complete(challenge.challengeId());
+                        });
                     })
-                    .thenCompose(challenge -> gateway.complete(challenge.challengeId()))
                     .thenCompose(session -> {
                         try (var callbackScope = stateAccess.enter()) {
                             var attempt = requireRenewal(id);
