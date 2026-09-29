@@ -405,6 +405,12 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                             .withColor(RalleTheme.accentRgb())
             ));
         }
+        if (RalleSettings.MATERIAL_RESOLUTION_ID.equals(entry.id())) {
+            return RalleTheme.ui(Component.translatable(
+                    "ralle.settings.option.material-resolution.description",
+                    Component.translatable("ralle.settings.option.material-resolution.description.note")
+                            .withColor(RalleTheme.accentRgb())));
+        }
         return RalleTheme.ui(entry.description());
     }
 
@@ -668,32 +674,28 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                     for (var style : available) {
                         boolean selected = style.id().equals(identity.selectedStyleId());
                         var label = Component.literal(style.label());
-                        if (selected) {
-                            label.append(" (").append(Component.translatable("ralle.cosmetics.color.selected")).append(")");
-                            menu.text(RalleTheme.ui(label));
-                        } else {
-                            menu.button(RalleTheme.ui(label), dropdown -> {
-                                root.removeChild(dropdown);
-                                savingNameplateColor = true;
-                                nameplateColorSaveFailed = false;
-                                trigger.active = false;
-                                // The Component overload splits text and rejects null before select() is reached.
-                                trigger.tooltip(java.util.List.<net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent>of());
-                                trigger.setMessage(nameplateColorLabel());
-                                cosmeticStyleSelection.select(style.id()).whenComplete((accepted, failure) ->
-                                        minecraft.execute(() -> {
-                                            savingNameplateColor = false;
-                                            nameplateColorSaveFailed = failure != null;
-                                            if (minecraft.screen != this) return;
-                                            var current = buttonFor(RalleSettings.NAMEPLATE_COLOR_ID);
-                                            if (current == null) return;
-                                            current.active = settings.available(RalleSettings.NAMEPLATE_COLOR_ID);
-                                            current.setMessage(nameplateColorLabel());
-                                            if (failure != null) current.tooltip(RalleTheme.ui(
-                                                    Component.translatable("ralle.cosmetics.color.failed")));
-                                        }));
-                            });
-                        }
+                        menu.button(RalleTheme.ui(label), dropdown -> {
+                            root.removeChild(dropdown);
+                            if (selected) return;
+                            savingNameplateColor = true;
+                            nameplateColorSaveFailed = false;
+                            trigger.active = false;
+                            // The Component overload splits text and rejects null before select() is reached.
+                            trigger.tooltip(java.util.List.<net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent>of());
+                            trigger.setMessage(nameplateColorLabel());
+                            cosmeticStyleSelection.select(style.id()).whenComplete((accepted, failure) ->
+                                    minecraft.execute(() -> {
+                                        savingNameplateColor = false;
+                                        nameplateColorSaveFailed = failure != null;
+                                        if (minecraft.screen != this) return;
+                                        var current = buttonFor(RalleSettings.NAMEPLATE_COLOR_ID);
+                                        if (current == null) return;
+                                        current.active = settings.available(RalleSettings.NAMEPLATE_COLOR_ID);
+                                        current.setMessage(nameplateColorLabel());
+                                        if (failure != null) current.tooltip(RalleTheme.ui(
+                                                Component.translatable("ralle.cosmetics.color.failed")));
+                                    }));
+                        });
                     }
                 });
     }

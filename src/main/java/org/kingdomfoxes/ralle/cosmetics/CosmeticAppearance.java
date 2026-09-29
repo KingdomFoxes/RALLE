@@ -1,6 +1,5 @@
 package org.kingdomfoxes.ralle.cosmetics;
 
-import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.settings.RalleSettings;
@@ -13,10 +12,7 @@ public record CosmeticAppearance(double resolution, Treatment treatment, int use
         String selectedResolution = registry.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).value();
         double resolution = "recipe".equals(selectedResolution) ? style.defaultResolution()
                 : Double.parseDouble(selectedResolution);
-        Treatment treatment = "text".equals(registry.setting(RalleSettings.EFFECT_TREATMENT_ID,
-                ChoiceSetting.class).value()) ? Treatment.TEXT : Treatment.PLATE;
-        int outline = registry.setting(RalleSettings.WHITE_USERNAME_OUTLINE_ID, BooleanSetting.class).value()
-                ? Integer.parseInt(registry.setting(RalleSettings.OUTLINE_THICKNESS_ID, ChoiceSetting.class).value()) : 0;
-        return new CosmeticAppearance(resolution, treatment, outline);
+        // Removed viewer controls always resolve to whole-plate material without a white outline.
+        return new CosmeticAppearance(resolution, Treatment.PLATE, 0);
     }
 }

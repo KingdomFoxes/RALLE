@@ -129,16 +129,16 @@ Exact submitted RGB values; the default option label is changed only for the mod
 | Scarecrow | Robturne | #CCDEB6 | #377141 | #000000 |
 | Joker | NeonRider | #660C0C | #020202 | #BB8856 |
 | Coral Castle | ToolyTom | #FFB5C2 | #FF7B6E | #2F9FBF |
-| Tidal Tom | ToolyTom | #36986B | #235D67 | #E1C7BA |
-| Forrest Phil | ToolyTom | #87A646 | #8C613B | #535925 |
+| Tidal Tom | ToolyTom | #2A91A3 | #003888 | #3EAAE6 |
+| Forrest Phil | ToolyTom | #3C4D18 | #8C613B | #8A5525 |
 | Cartman | ToolyTom | #31AAA9 | #F8E0A4 | #A82020 |
-| Sunset Spase | ToolyTom | #FFA95A | #FF8B5A | #FF5A5A |
-| Grassy Green | ToolyTom | #A5D6A7 | #1B5E20 | #1B5E20 |
+| Sunset Spase | ToolyTom | #FF8958 | #FF5A5E | #FFC75A |
+| Grassy Green | ToolyTom | #1D6923 | #95FF9D | #75FF80 |
 | Mocha Madness | ToolyTom | #6D3B07 | #926441 | #E3B7A0 |
-| Radioactive Robert | ToolyTom | #8AFF00 | #ACFF00 | #EBFF00 |
-| Julian Jellyfish | ToolyTom | #DF94CF | #B142C2 | #5428A3 |
-| Mad Max | ToolyTom | #FEAB5B | #EC8502 | #CA5D00 |
-| False King | ToolyTom | #A8ACB2 | #90AEBD | #90AEBD |
+| Radioactive Robert | ToolyTom | #7AFF00 | #EBFF00 | #EBFF00 |
+| Julian Jellyfish | ToolyTom | #A130B2 | #FA53D7 | #B900FF |
+| Mad Max | ToolyTom | #F9B138 | #F5852E | #D2672C |
+| False King | ToolyTom | #9B9C9D | #2E566A | #90AEBD |
 | River Styx | maxkarson | #000000 | #0AF539 | #0AF539 |
 | Crimson Planet | maxkarson | #000000 | #FF1100 | #FF1100 |
 | Cyclic | maxkarson | #000000 | #00CCFF | #00CCFF |

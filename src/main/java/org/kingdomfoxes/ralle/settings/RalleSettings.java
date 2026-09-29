@@ -31,9 +31,6 @@ public final class RalleSettings {
     public static final String QUEUE_KOF_RANK_COLORS_ID = "queue-kof-rank-colors";
     public static final String NAMEPLATE_COSMETICS_ID = "nameplate-cosmetics";
     public static final String MATERIAL_RESOLUTION_ID = "material-resolution";
-    public static final String EFFECT_TREATMENT_ID = "effect-treatment";
-    public static final String WHITE_USERNAME_OUTLINE_ID = "white-username-outline";
-    public static final String OUTLINE_THICKNESS_ID = "outline-thickness";
     public static final String NAMEPLATE_COLOR_ID = "nameplate-color";
     private RalleSettings() {}
 
@@ -152,9 +149,6 @@ public final class RalleSettings {
                 Component.translatable("ralle.settings.category.cosmetics.description"),
                 List.of(customPanel("nameplate-preview", "nameplate-preview"), toggle(NAMEPLATE_COSMETICS_ID),
                         choice(MATERIAL_RESOLUTION_ID, "recipe", "recipe", "1", "2", "0.5"),
-                        choice(EFFECT_TREATMENT_ID, "plate", "text", "plate"),
-                        toggle(WHITE_USERNAME_OUTLINE_ID),
-                        choice(OUTLINE_THICKNESS_ID, "1", "1", "2"),
                         action(NAMEPLATE_COLOR_ID)),
                 List.of()
         ));
@@ -190,9 +184,6 @@ public final class RalleSettings {
         registry.requireEnabled("raid-lfg-kick-selector-wheel", "raid-lfg-enabled");
         registry.requireEnabled("automatic-raid-requeue-keybind", "raid-lfg-enabled");
         registry.requireEnabled(MATERIAL_RESOLUTION_ID, NAMEPLATE_COSMETICS_ID);
-        registry.requireEnabled(EFFECT_TREATMENT_ID, NAMEPLATE_COSMETICS_ID);
-        registry.requireEnabled(WHITE_USERNAME_OUTLINE_ID, NAMEPLATE_COSMETICS_ID);
-        registry.requireEnabled(OUTLINE_THICKNESS_ID, WHITE_USERNAME_OUTLINE_ID);
         registry.requireEnabled(NAMEPLATE_COLOR_ID, NAMEPLATE_COSMETICS_ID);
     }
 

@@ -300,3 +300,16 @@ only; absent identity uses a sample gold style and grants no entitlement. While
 cosmetics are off it shows plain examples without generating material textures.
 The dropdown clears its owo tooltip with an explicitly typed empty tooltip list:
 passing a null Component throws before the API request and leaves Saving stuck.
+
+## September 29 settings simplification (supersedes controls above)
+
+Supporter now exposes Nameplate Cosmetics, Material Resolution and Nameplate Color,
+plus its live preview. Effect Treatment, White Username Outline and Outline Thickness
+are removed. Appearance always uses whole-plate material and no white username outline;
+legacy saved values for the removed controls are ignored. Material resolution retains
+its existing saved key and choices. Its description highlights the one-logical-pixel
+CPU recommendation using the current theme accent.
+
+Nameplate Color lists only grant-eligible styles as ordinary clickable dropdown items,
+including the current style, without gray selected text or a `(Selected)` suffix.
+Choosing the current style closes the dropdown without a redundant Fox mutation.
