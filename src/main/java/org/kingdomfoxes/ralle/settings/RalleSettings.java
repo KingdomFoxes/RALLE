@@ -29,7 +29,6 @@ public final class RalleSettings {
     public static final String HQ_DISTANCE_KEYBIND_ID = "hq-distance-keybind";
     public static final String QUEUE_SELF_COLOR_ID = "queue-self-color";
     public static final String QUEUE_KOF_RANK_COLORS_ID = "queue-kof-rank-colors";
-    public static final String NAMEPLATE_COSMETICS_ID = "nameplate-cosmetics";
     public static final String MATERIAL_RESOLUTION_ID = "material-resolution";
     public static final String NAMEPLATE_COLOR_ID = "nameplate-color";
     private RalleSettings() {}
@@ -147,7 +146,7 @@ public final class RalleSettings {
                 "cosmetics",
                 Component.translatable("ralle.settings.category.cosmetics"),
                 Component.translatable("ralle.settings.category.cosmetics.description"),
-                List.of(customPanel("nameplate-preview", "nameplate-preview"), toggle(NAMEPLATE_COSMETICS_ID),
+                List.of(customPanel("nameplate-preview", "nameplate-preview"),
                         choice(MATERIAL_RESOLUTION_ID, "recipe", "recipe", "1", "2", "0.5"),
                         action(NAMEPLATE_COLOR_ID)),
                 List.of()
@@ -183,8 +182,6 @@ public final class RalleSettings {
         registry.requireEnabled("raid-lfg-kick-keybind", "raid-lfg-enabled");
         registry.requireEnabled("raid-lfg-kick-selector-wheel", "raid-lfg-enabled");
         registry.requireEnabled("automatic-raid-requeue-keybind", "raid-lfg-enabled");
-        registry.requireEnabled(MATERIAL_RESOLUTION_ID, NAMEPLATE_COSMETICS_ID);
-        registry.requireEnabled(NAMEPLATE_COLOR_ID, NAMEPLATE_COSMETICS_ID);
     }
 
     private static SettingsSubcategory subcategory(String id, org.kingdomfoxes.ralle.api.settings.SettingsEntry... entries) {

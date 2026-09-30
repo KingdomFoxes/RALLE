@@ -20,9 +20,9 @@ class RalleSettingsTest {
     Path temporaryDirectory;
 
     @Test
-    void cosmeticControlsDefaultOffAndPersistOnlyLocalAppearance() throws Exception {
+    void cosmeticControlsIgnoreLegacyToggleAndPersistOnlyLocalAppearance() throws Exception {
         var path = temporaryDirectory.resolve("ralle.properties");
-        Files.writeString(path, "cosmetics.effect-treatment=text\n"
+        Files.writeString(path, "cosmetics.nameplate-cosmetics=false\ncosmetics.effect-treatment=text\n"
                 + "cosmetics.white-username-outline=true\ncosmetics.outline-thickness=2\n");
         var registry = new SettingsRegistry(path);
         RalleSettings.register(registry);
@@ -30,17 +30,16 @@ class RalleSettingsTest {
         var supporter = registry.categories().stream().filter(category -> category.id().equals("cosmetics"))
                 .findFirst().orElseThrow();
         assertTrue(supporter.subcategories().isEmpty());
-        assertEquals(List.of("nameplate-preview", RalleSettings.NAMEPLATE_COSMETICS_ID, RalleSettings.MATERIAL_RESOLUTION_ID,
+        assertEquals(List.of("nameplate-preview", RalleSettings.MATERIAL_RESOLUTION_ID,
                         RalleSettings.NAMEPLATE_COLOR_ID),
                 supporter.entries().stream().map(entry -> entry.id()).toList());
-        assertFalse(registry.setting(RalleSettings.NAMEPLATE_COSMETICS_ID, BooleanSetting.class).value());
-        assertFalse(registry.available(RalleSettings.MATERIAL_RESOLUTION_ID));
+        assertTrue(registry.entry("nameplate-cosmetics").isEmpty());
+        assertTrue(registry.available(RalleSettings.MATERIAL_RESOLUTION_ID));
         assertEquals("recipe", registry.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).value());
         var appearance = org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance.from(registry,
                 org.kingdomfoxes.ralle.cosmetics.NameplateStyle.CATALOG.getFirst());
         assertEquals(org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance.Treatment.PLATE, appearance.treatment());
         assertEquals(0, appearance.usernameOutlinePixels());
-        registry.setting(RalleSettings.NAMEPLATE_COSMETICS_ID, BooleanSetting.class).set(true);
         registry.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).set("0.5");
         var restored = new SettingsRegistry(path);
         RalleSettings.register(restored);
@@ -48,6 +47,7 @@ class RalleSettingsTest {
         assertEquals("0.5", restored.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).value());
         assertTrue(restored.available(RalleSettings.NAMEPLATE_COLOR_ID));
         assertFalse(Files.readString(path).contains("selected_style_id"));
+        assertFalse(Files.readString(path).contains("nameplate-cosmetics"));
     }
 
     @Test

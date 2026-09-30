@@ -130,18 +130,16 @@ public final class RalleClient implements ClientModInitializer {
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), placements);
         var navigation = new SettingsNavigationState(configDirectory.resolve("ralle-settings-ui.properties"), settings);
         var minecraft = Minecraft.getInstance();
-        var cosmeticsEnabled = settings.setting(RalleSettings.NAMEPLATE_COSMETICS_ID, BooleanSetting.class);
         var cosmeticDirectory = new NameplateDirectorySession(
-                new HttpNameplateDirectory(), cosmeticsEnabled::value,
+                new HttpNameplateDirectory(), () -> true,
                 () -> minecraft.getCurrentServer() == null ? "" : minecraft.getCurrentServer().ip,
                 () -> minecraft.getUser().getProfileId(), java.time.Clock.systemUTC());
         var cosmeticStyleSelection = new CosmeticStyleSelection(
                 new HttpCosmeticSelfGateway(), new MinecraftSessionProofAdapter(minecraft),
-                cosmeticDirectory, cosmeticsEnabled::value,
+                cosmeticDirectory, () -> true,
                 () -> minecraft.getUser().getProfileId(), () -> minecraft.getUser().getName());
         var cosmeticTextures = new LiquidMaterialTextures(minecraft);
         var cosmeticReloadPending = new java.util.concurrent.atomic.AtomicBoolean();
-        var cosmeticWasEnabled = new java.util.concurrent.atomic.AtomicBoolean(cosmeticsEnabled.value());
         net.fabricmc.fabric.api.resource.v1.ResourceLoader.get(net.minecraft.server.packs.PackType.CLIENT_RESOURCES)
                 .registerReloader(net.minecraft.resources.Identifier.fromNamespaceAndPath("ralle", "cosmetic_textures"),
                         (net.minecraft.server.packs.resources.ResourceManagerReloadListener) manager ->
@@ -275,12 +273,6 @@ public final class RalleClient implements ClientModInitializer {
             raidLfg.store().state().lobbyList().forEach(lobby ->
                     lobby.members().forEach(member -> visibleCosmeticIds.add(member.minecraftUuid())));
             cosmeticDirectory.tick(visibleCosmeticIds);
-            if (!cosmeticsEnabled.value() && cosmeticWasEnabled.getAndSet(false)) {
-                cosmeticStyleSelection.clear();
-                cosmeticTextures.close();
-            } else if (cosmeticsEnabled.value()) {
-                cosmeticWasEnabled.set(true);
-            }
             HqDistanceOverlay.tick();
             diagnostics.tick();
             try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_LAYOUT_TICK)) { chatLayout.tick(); }

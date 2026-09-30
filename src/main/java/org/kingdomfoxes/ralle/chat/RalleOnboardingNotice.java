@@ -61,7 +61,7 @@ public final class RalleOnboardingNotice {
 
     public static Component body() {
         return Component.empty()
-                .append("Thank you for installing RALLE, all features are disabled by default so ")
+                .append("Thank you for installing RALLE, supporter nameplates are always on and other features are disabled by default so ")
                 .append(RalleChatMessages.clickable("Click here", new ClickEvent.RunCommand("/ralle settings")))
                 .append(" or use /ralle settings to configure it");
     }

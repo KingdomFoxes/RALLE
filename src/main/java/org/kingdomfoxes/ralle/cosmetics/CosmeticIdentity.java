@@ -19,6 +19,11 @@ public record CosmeticIdentity(UUID minecraftUuid, Set<String> grants, String se
         return selectedStyleId == null ? null : NameplateStyle.byId(selectedStyleId).orElse(null);
     }
 
+    /** Settings access follows Fox grants even before the player selects a style. */
+    public boolean hasNameplateAccess() {
+        return !NameplateStyle.available(grants).isEmpty();
+    }
+
     public static CosmeticIdentity neutral(UUID uuid, long revision) {
         return new CosmeticIdentity(uuid, Set.of(), null, revision);
     }

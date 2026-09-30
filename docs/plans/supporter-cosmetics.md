@@ -41,10 +41,10 @@ validation; the client implementation status is stated above.
 - Management belongs inside the existing website API Diagnostics → RALLE Users
   view. Allow manual grant/removal for all three roles, including people who have
   not used the mod. Resolve IGN to UUID on the backend. Ko-fi automation is deferred.
-- Cosmetics and optional white outlines are disabled by default. With cosmetics
-  off, neither rendering nor network requests change. Resolution, treatment and outline preferences
-  remain local; the user explicitly approved synchronizing their own selected
-  style ID through Fox so other enabled clients see that choice.
+- Nameplates are always on, with bounded Wynncraft-only Fox lookups. Material
+  resolution remains local; the selected style ID synchronizes through Fox.
+  Whole-plate treatment and no username outline are fixed. The September 30
+  settings update below supersedes the earlier proposed controls.
 
 ## Approved style inputs and proposed settings
 
@@ -73,8 +73,8 @@ Required in-game controls, implemented via the existing settings registry:
 
 | Control | Choices / behavior |
 | --- | --- |
-| Nameplate Cosmetics | Off by default; owns rendering and network gating |
-| Material Resolution | Exactly website choices: 1 logical pixel · crisp (1), 2 logical pixels · chunky (2), Half pixel · smooth (0.5) |
+| Nameplate Cosmetics | Removed; nameplates are always on |
+| Material Resolution | 1 logical pixel (1), 2 logical pixels (2), 0.5 logical pixels (0.5) |
 | Effect Treatment | Text / Whole nameplate; apply consistently to LFG and world name surfaces |
 | White Username Outline | Off by default; white glyph outline around the username only |
 | Outline Thickness | 1 px / 2 px; available when the outline toggle is on |
@@ -296,8 +296,7 @@ small corner of its 256 x 64 recipe. Notification borders now animate that textu
 Supporter appears immediately after War. Its first entry is a full-width custom
 preview panel with an enlarged roster row and an isolated notification head,
 using the shared live renderers and local preferences. It reads cached identity
-only; absent identity uses a sample gold style and grants no entitlement. While
-cosmetics are off it shows plain examples without generating material textures.
+only; absent identity uses a sample gold style and grants no entitlement.
 The dropdown clears its owo tooltip with an explicitly typed empty tooltip list:
 passing a null Component throws before the API request and leaves Saving stuck.
 
@@ -313,3 +312,19 @@ CPU recommendation using the current theme accent.
 Nameplate Color lists only grant-eligible styles as ordinary clickable dropdown items,
 including the current style, without gray selected text or a `(Selected)` suffix.
 Choosing the current style closes the dropdown without a redundant Fox mutation.
+
+## September 30 supporter access update (supersedes toggle above)
+
+Nameplate Cosmetics is removed; nameplates and bounded Wynncraft-only lookups
+are always active, ignoring the legacy saved toggle. The page retains its live
+preview, Material Resolution, and Nameplate Color controls. Resolution labels
+show only their pixel sizes, with no crisp/chunky/smooth suffixes.
+
+Everyone can open Supporter and see its preview. Without a cached qualifying Fox
+grant, cover only that settings viewport with a 60%-transparent navy pane (40%
+opacity) and a centered framed-navy RALLE box containing the gold
+`These features are locked to supporters!` message. Apply the same lock only to
+Supporter content in search results. Keep other settings and navigation usable.
+Supporter, Contributor and Admin grants unlock controls without requiring an
+existing selected style. Unknown/offline/revoked grants remain locked; previews
+never authenticate and Fox remains authoritative for style selection.

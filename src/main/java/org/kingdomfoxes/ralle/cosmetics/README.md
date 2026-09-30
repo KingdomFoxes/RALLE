@@ -25,12 +25,33 @@ it must not invalidate otherwise valid website-assigned grants.
 Responses without cache TTL hints use a local 30-second cache lifetime. Older
 responses may supply root/player `cache_ttl_seconds` and `selected_style_id`;
 supplied values remain strictly validated, and the shortest TTL is used.
-UUID matching, grant validation, revision checks, and disabled-feature network
-gating still apply. A grant does not imply a selected style.
+UUID matching, grant validation, revision checks, and Wynncraft-only network
+gating still apply. Nameplates are always on; bounded public lookups run on client
+ticks for the local account and visible world/LFG players. The removed local
+`cosmetics.nameplate-cosmetics` toggle is ignored, including old saved `false`
+values. A grant does not imply a selected style.
 
 Shared personal style selection uses Fox's cosmetic challenge/complete and
 authenticated `PUT /me/style` endpoints. Fox validates current grants at write
 time and publishes the selected ID in later lookups for other RALLE clients.
 The Nameplate Color dropdown lists only styles allowed by the current grant;
-the selected entry is non-actionable, and an empty grant has an explicit empty
-state. Older grants-only servers remain readable but must upgrade for saving.
+choosing the selected entry closes the dropdown without a mutation. Older
+grants-only servers remain readable but must upgrade for saving.
+
+## Supporter settings
+
+Supporter remains navigable for every account. The enlarged roster/head previews
+always render using the cached selected style or the bundled gold sample. They
+never authenticate or grant access. Missing identity or an empty grant covers
+only the Supporter content viewport (or its search-result content) with a
+60%-transparent navy pane (40% opacity) and a centered framed-navy RALLE box
+containing the gold message `These features are locked to supporters!`. The compact
+box centers each line horizontally and centers the visible text block vertically.
+Sidebar navigation, search and other settings remain usable.
+Supporter, Contributor and Admin grants unlock the controls even before a style
+is selected. Controls and dropdown actions recheck access as cached grants change;
+Fox still validates the current grant when saving the selected style.
+
+Material Resolution remains a local preference with labels `1 logical pixel`,
+`2 logical pixels`, and `0.5 logical pixels`. Existing saved values and the
+recipe-derived default remain compatible.

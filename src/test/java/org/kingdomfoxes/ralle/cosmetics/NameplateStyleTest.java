@@ -9,6 +9,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class NameplateStyleTest {
     @Test
+    void supporterSettingsAccessRequiresFoxGrantsButNotASelectedStyle() {
+        var uuid = java.util.UUID.randomUUID();
+        assertFalse(CosmeticIdentity.neutral(uuid, 0).hasNameplateAccess());
+        for (String grant : List.of("supporter", "contributor", "admin")) {
+            assertTrue(new CosmeticIdentity(uuid, Set.of(grant), null, 1).hasNameplateAccess());
+        }
+    }
+
+    @Test
     void catalogPreservesApprovedRecipesAndFoxOrder() {
         assertEquals(List.of("supporter-gold", "contributor-green", "contributor-green-alt",
                 "contributor-blue", "admin-white", "admin-red"),

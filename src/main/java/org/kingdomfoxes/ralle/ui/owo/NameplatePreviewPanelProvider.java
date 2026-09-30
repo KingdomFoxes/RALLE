@@ -8,11 +8,9 @@ import net.minecraft.client.gui.components.PlayerFaceRenderer;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.network.chat.Component;
 import org.kingdomfoxes.ralle.RalleClient;
-import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.CustomSettingsPanelProvider;
 import org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance;
 import org.kingdomfoxes.ralle.cosmetics.NameplateStyle;
-import org.kingdomfoxes.ralle.settings.RalleSettings;
 
 /** Local, read-only examples; reads cached identity and never authenticates or selects a style. */
 final class NameplatePreviewPanelProvider implements CustomSettingsPanelProvider<OwoCustomSettingsPanelContext, UIComponent> {
@@ -42,8 +40,7 @@ final class NameplatePreviewPanelProvider implements CustomSettingsPanelProvider
             var style = identity != null && identity.selectedStyle() != null
                     ? identity.selectedStyle() : NameplateStyle.CATALOG.getFirst();
             var settings = RalleClient.context().settings();
-            var appearance = settings.setting(RalleSettings.NAMEPLATE_COSMETICS_ID, BooleanSetting.class).value()
-                    ? CosmeticAppearance.from(settings, style) : null;
+            var appearance = CosmeticAppearance.from(settings, style);
             var username = RalleTheme.ui(Component.literal(minecraft.getUser().getName()));
             var star = RalleTheme.ui(Component.literal("★ "));
             int logicalWidth = notification ? 20 : Math.max(130, minecraft.font.width(username) + minecraft.font.width(star) + 28);
