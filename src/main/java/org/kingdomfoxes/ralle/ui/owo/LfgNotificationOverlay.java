@@ -234,14 +234,10 @@ public final class LfgNotificationOverlay {
         }
         var member = lobby.members().get(slot);
         var cosmetic = RalleClient.cosmetic(member.minecraftUuid());
+        var style = cosmetic == null ? null : cosmetic.selectedStyle();
         PlayerHeadPresentation.draw(graphics, minecraft, member,
                 bounds.x(), bounds.y(), 18, rosterBorderColor(member),
-                cosmetic != null && cosmetic.selectedStyle() != null ? 2 : 1);
-        if (cosmetic != null && cosmetic.selectedStyle() != null) {
-            var style = cosmetic.selectedStyle();
-            LiquidMaterialPresentation.border(graphics, style, RalleClient.cosmeticAppearance(style),
-                    bounds.x(), bounds.y(), bounds.width());
-        }
+                style, style == null ? null : RalleClient.cosmeticAppearance(style));
     }
 
     private void renderControls(GuiGraphics graphics, LfgNotificationManager.CardSnapshot card,

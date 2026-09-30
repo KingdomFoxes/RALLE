@@ -8,6 +8,8 @@ import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.world.entity.player.PlayerSkin;
 import org.kingdomfoxes.ralle.lfg.client.GuildTerritoryColors;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
+import org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance;
+import org.kingdomfoxes.ralle.cosmetics.NameplateStyle;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -24,15 +26,28 @@ public final class PlayerHeadPresentation {
 
     public static void draw(GuiGraphics graphics, Minecraft minecraft, LfgProtocol.Member member,
                             int x, int y, int faceSize, int borderColor) {
-        draw(graphics, minecraft, member, x, y, faceSize, borderColor, 1);
+        draw(graphics, resolve(minecraft, member.minecraftUuid(), member.ign()),
+                x, y, faceSize + 2, borderColor, null, null);
     }
 
     public static void draw(GuiGraphics graphics, Minecraft minecraft, LfgProtocol.Member member,
-                            int x, int y, int faceSize, int borderColor, int borderWidth) {
-        int outerSize = faceSize + 2;
-        graphics.fill(x, y, x + outerSize, y + outerSize, borderColor);
-        PlayerFaceRenderer.draw(graphics, resolve(minecraft, member.minecraftUuid(), member.ign()),
-                x + borderWidth, y + borderWidth, outerSize - borderWidth * 2);
+                            int x, int y, int faceSize, int borderColor,
+                            NameplateStyle style, CosmeticAppearance appearance) {
+        draw(graphics, resolve(minecraft, member.minecraftUuid(), member.ign()),
+                x, y, faceSize + 2, borderColor, style, appearance);
+    }
+
+    /** Notification and settings preview share a two-pixel material frame, then a one-pixel guild ring. */
+    static void draw(GuiGraphics graphics, PlayerSkin skin, int x, int y, int outerSize,
+                     int borderColor, NameplateStyle style, CosmeticAppearance appearance) {
+        int materialInset = style != null && appearance != null ? 2 : 0;
+        if (materialInset > 0)
+            LiquidMaterialPresentation.plate(graphics, style, appearance, x, y, outerSize, outerSize);
+        // Cover the center of one full material quad. No scissor strips can bleed or obscure the guild ring.
+        graphics.fill(x + materialInset, y + materialInset,
+                x + outerSize - materialInset, y + outerSize - materialInset, borderColor);
+        int faceInset = materialInset + 1;
+        PlayerFaceRenderer.draw(graphics, skin, x + faceInset, y + faceInset, outerSize - faceInset * 2);
     }
 
     public static int guildBorder(LfgProtocol.Member member) {

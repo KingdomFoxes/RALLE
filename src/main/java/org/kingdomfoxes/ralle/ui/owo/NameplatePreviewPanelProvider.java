@@ -4,7 +4,6 @@ import io.wispforest.owo.ui.base.BaseUIComponent;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.PlayerFaceRenderer;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.network.chat.Component;
 import org.kingdomfoxes.ralle.RalleClient;
@@ -53,12 +52,9 @@ final class NameplatePreviewPanelProvider implements CustomSettingsPanelProvider
                     LiquidMaterialPresentation.plate(graphics, style, appearance, 0, 0, logicalWidth, 22);
                 int headX = notification ? 0 : 2, headY = notification ? 0 : 2;
                 int size = notification ? 20 : 18;
-                graphics.fill(headX, headY, headX + size, headY + size, 0xffd9b248);
                 var skin = minecraft.player == null ? DefaultPlayerSkin.get(account) : minecraft.player.getSkin();
-                int inset = notification && appearance != null ? 2 : 1;
-                PlayerFaceRenderer.draw(graphics, skin, headX + inset, headY + inset, size - inset * 2);
-                if (notification && appearance != null)
-                    LiquidMaterialPresentation.border(graphics, style, appearance, 0, 0, size);
+                PlayerHeadPresentation.draw(graphics, skin, headX, headY, size, 0xffd9b248,
+                        notification ? style : null, notification ? appearance : null);
                 if (!notification)
                     LiquidNameComponent.drawName(graphics, star, username, style, appearance, 26, (22 - minecraft.font.lineHeight) / 2);
             } finally { graphics.pose().popMatrix(); }

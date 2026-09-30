@@ -1,6 +1,8 @@
 package org.kingdomfoxes.ralle.cosmetics;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.FilterMode;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
@@ -25,7 +27,7 @@ public final class LiquidMaterialTextures implements AutoCloseable {
         if (entry == null) {
             int width = LiquidMaterial.width(resolution), height = LiquidMaterial.height(resolution);
             var image = new NativeImage(width, height, true);
-            var texture = new DynamicTexture(() -> "RALLE liquid nameplate " + style.id(), image);
+            var texture = new MaterialTexture(style, image);
             var id = Identifier.fromNamespaceAndPath("ralle", "dynamic/liquid_nameplate_" + NEXT_ID.incrementAndGet());
             minecraft.getTextureManager().register(id, texture);
             entry = new Entry(id, texture, new int[width * height]);
@@ -62,6 +64,16 @@ public final class LiquidMaterialTextures implements AutoCloseable {
     }
 
     private record Key(String styleId, double resolution) {}
+
+    /** Interpolate the fitted recipe rather than repeating uneven nearest-neighbor columns. */
+    private static final class MaterialTexture extends DynamicTexture {
+        MaterialTexture(NameplateStyle style, NativeImage image) {
+            super(() -> "RALLE liquid nameplate " + style.id(), image);
+            // The recipe is not tileable. Clamp edges so interpolation cannot wrap to the opposite side.
+            sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR);
+        }
+    }
+
     private static final class Entry {
         final Identifier id;
         final DynamicTexture texture;

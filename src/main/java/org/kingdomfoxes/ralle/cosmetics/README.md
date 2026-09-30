@@ -55,3 +55,17 @@ Fox still validates the current grant when saving the selected style.
 Material Resolution remains a local preference with labels `1 logical pixel`,
 `2 logical pixels`, and `0.5 logical pixels`. Existing saved values and the
 recipe-derived default remain compatible.
+
+## Material and head rendering
+
+The shared GUI/world material texture uses the cached GPU linear sampler with
+clamped edges. Interpolation smooths uneven texel bands when the complete recipe
+is fitted to a scaled plate; texture dimensions, CPU frame generation and the
+30 Hz update limit are unchanged. No mipmaps or extra frame buffers are added.
+
+Notification heads and their enlarged Supporter preview draw one complete
+material quad first, then a one-pixel guild-color ring inset by the two-pixel
+material frame, then the skin. Both rings fit inside the existing 20-pixel head
+bounds (the skin is 14 pixels). This replaces four scissored overlays that covered
+the guild ring and could leave stray edges when scaled. Browser heads retain
+their existing one-pixel guild ring and 16-pixel skin.

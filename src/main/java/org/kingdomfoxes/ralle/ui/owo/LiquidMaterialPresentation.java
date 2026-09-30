@@ -24,18 +24,5 @@ final class LiquidMaterialPresentation {
             graphics.fill(x, y, x + width, y + height, 0xff000000 | style.shadow());
         }
     }
-
-    static void border(GuiGraphics graphics, NameplateStyle style, CosmeticAppearance appearance,
-                       int x, int y, int size) {
-        if (appearance == null) return;
-        // Scissor the same full-surface mapping to four strips, leaving the skin untouched.
-        int[][] strips = {{x, y, x + size, y + 2}, {x, y + size - 2, x + size, y + size},
-                {x, y + 2, x + 2, y + size - 2}, {x + size - 2, y + 2, x + size, y + size - 2}};
-        for (var strip : strips) {
-            graphics.enableScissor(strip[0], strip[1], strip[2], strip[3]);
-            try { plate(graphics, style, appearance, x, y, size, size); }
-            finally { graphics.disableScissor(); }
-        }
-    }
 }
 
