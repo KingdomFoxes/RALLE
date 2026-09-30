@@ -19,7 +19,6 @@ import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.SideAnchor;
 import org.kingdomfoxes.ralle.api.hud.RalleHudElements;
-import org.kingdomfoxes.ralle.lfg.client.GuildTerritoryColors;
 import org.kingdomfoxes.ralle.lfg.client.HostPartyInviteController;
 import org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager;
 import org.kingdomfoxes.ralle.lfg.client.LfgDisbandConfirmation;
@@ -464,10 +463,7 @@ public final class LfgNotificationOverlay {
     }
 
     static int rosterBorderColor(LfgProtocol.Member member) {
-        var cosmetic = RalleClient.cosmetic(member.minecraftUuid());
-        if (cosmetic != null && cosmetic.selectedStyle() != null)
-            return 0xff000000 | cosmetic.selectedStyle().midtone();
-        return GuildTerritoryColors.forGuild(member.guild().tag(), member.guild().color());
+        return PlayerHeadPresentation.guildBorder(member);
     }
 
     static java.time.Instant timerNow(LfgNotificationManager.CardSnapshot card, java.time.Instant now) {

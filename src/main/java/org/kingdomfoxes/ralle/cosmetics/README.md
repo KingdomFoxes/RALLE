@@ -66,6 +66,14 @@ is fitted to a scaled plate; texture dimensions, CPU frame generation and the
 Notification heads and their enlarged Supporter preview draw one complete
 material quad first, then a one-pixel guild-color ring inset by the two-pixel
 material frame, then the skin. Both rings fit inside the existing 20-pixel head
-bounds (the skin is 14 pixels). This replaces four scissored overlays that covered
+bounds (the skin is 14 pixels). The inner ring always uses the guild territory
+color; cosmetic palette colors apply only to the outer material frame. This replaces four scissored overlays that covered
 the guild ring and could leave stray edges when scaled. Browser heads retain
 their existing one-pixel guild ring and 16-pixel skin.
+
+Kick modifier-wheel heads reuse the same material-frame renderer with the cached
+Fox-selected style and local material resolution. Their existing 18-pixel bounds
+contain the two-pixel material frame, one-pixel guild ring, and 12-pixel skin;
+players without a selected style retain the ordinary guild ring and 16-pixel skin.
+Rendering never initiates cosmetic requests; the existing tick lookup already
+includes synchronized lobby members.

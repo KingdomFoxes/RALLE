@@ -37,7 +37,7 @@ public final class PlayerHeadPresentation {
                 x, y, faceSize + 2, borderColor, style, appearance);
     }
 
-    /** Notification and settings preview share a two-pixel material frame, then a one-pixel guild ring. */
+    /** Notification, Kick wheel, and settings preview share a two-pixel material frame, then a one-pixel guild ring. */
     static void draw(GuiGraphics graphics, PlayerSkin skin, int x, int y, int outerSize,
                      int borderColor, NameplateStyle style, CosmeticAppearance appearance) {
         int materialInset = style != null && appearance != null ? 2 : 0;

@@ -1,6 +1,7 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
 import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
+import org.kingdomfoxes.ralle.RalleClient;
 
 import org.kingdomfoxes.ralle.lfg.client.LfgCreationFeedback;
 
@@ -279,8 +280,12 @@ public final class LfgSelectorWheelScreen extends Screen {
     private void drawPlayer(GuiGraphics graphics, Entry entry, int x, int y, boolean hovered) {
         var member = currentMember(entry.memberId());
         int border = member == null ? DISABLED : PlayerHeadPresentation.guildBorder(member);
-        if (member != null) PlayerHeadPresentation.draw(graphics, minecraft, member, x - 9, y - 9, 16, border);
-        else graphics.fill(x - 8, y - 8, x + 8, y + 8, 0xFF27344A);
+        if (member != null) {
+            var cosmetic = RalleClient.cosmetic(member.minecraftUuid());
+            var style = cosmetic == null ? null : cosmetic.selectedStyle();
+            PlayerHeadPresentation.draw(graphics, minecraft, member, x - 9, y - 9, 16, border,
+                    style, style == null ? null : RalleClient.cosmeticAppearance(style));
+        } else graphics.fill(x - 8, y - 8, x + 8, y + 8, 0xFF27344A);
     }
 
     @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
