@@ -360,6 +360,41 @@ class GuildRankTitleTransformerTest {
     }
 
     @Test
+    void prunedApiResponseUsesTheChatPillForWynncraftRankHover() {
+        var snapshot = new GuildRankSnapshot(1L, StrictGuildRankJson.decodeApi("""
+                {"total_members":3,"members":[
+                  {"uuid":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","name":"maxkarson",
+                   "fox_rank":"Liege","prime_minister":false},
+                  {"uuid":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","name":"ToolyTom",
+                   "fox_rank":"Lord","prime_minister":true},
+                  {"uuid":"cccccccc-cccc-cccc-cccc-cccccccccccc","name":"NoTitle",
+                   "fox_rank":null,"prime_minister":false}
+                ]}
+                """));
+        var suffixes = Map.of("maxkarson", " - Lord/Lady/Liege",
+                "ToolyTom", " - Prime Minister", "NoTitle", "");
+
+        for (var style : GuildRankStyle.values()) {
+            for (String rank : List.of("STRATEGIST", "CAPTAIN")) {
+                suffixes.forEach((player, suffix) -> {
+                    var transformed = GuildRankTitleTransformer.apply(
+                            guildMessage(rank, player), snapshot, style, true);
+                    var pillHovers = renderedSegments(transformed).stream()
+                            .map(segment -> segment.style().getHoverEvent())
+                            .filter(HoverEvent.ShowText.class::isInstance)
+                            .map(HoverEvent.ShowText.class::cast)
+                            .map(hover -> hover.value().getString())
+                            .toList();
+
+                    assertTrue(pillHovers.size() >= 2, style + " / " + rank + " / " + player);
+                    assertTrue(pillHovers.stream().allMatch((rank + suffix)::equals),
+                            style + " / " + rank + " / " + player);
+                });
+            }
+        }
+    }
+
+    @Test
     void addsExpandedGuildAndFoxRanksToTheWholePillHover() {
         var transformed = GuildRankTitleTransformer.apply(
                 guildMessage("STRATEGIST", "maxkarson"),

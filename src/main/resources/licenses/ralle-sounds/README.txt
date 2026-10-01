@@ -4,9 +4,8 @@ Retained procedural banks
 -------------------------
 The xylophone, acoustic guitar, bass guitar, Piano (Old), and Drums (Old)
 assets are RALLE-authored procedural audio distributed under the repository's
-GNU GPL v3.0 license. Reproduce these banks with tools/generate_chat_instruments.py.
-The generator preserves the xylophone bank and never writes into either
-recorded bank directory.
+GNU GPL v3.0 license. The game plays the packaged OGG files directly;
+offline generation tools are not required to build or run the mod.
 
 Recorded Piano
 --------------
@@ -63,16 +62,9 @@ high_tom          45-Pearl12Tom-3.flac               45          3       5d3a3b8
 snare             38-PearlSnare-3.flac               38          3       5de6946051d73f689390d56e4e208ff791b6cd6855cfa820078db62a4eb60bf3
 crash             49-SabianAA16Crash-3.flac           49          3       e9c94a6c7bff785d4f0dd35e14838b7e36c1023ab647389d69e182a9f874cda3
 
-Reproducible local import
--------------------------
-Download the listed Salamander v8 FLAC files from
+Source recordings
+-----------------
+The listed Salamander v8 FLAC files are available from
 https://raw.githubusercontent.com/sfzinstruments/SalamanderGrandPiano/3382bf9496bba2486f5ab0de55a264d1dfc38404/Samples/ and the listed AVL FLAC files from the
-pinned AVL repository. Place them under build/audio-sources/salamander-v3/ and
-build/audio-sources/avl-drumkits/Samples/ using the exact filenames above.
-Run tools/import_recorded_chat_instruments.py from the repository root. The
-tool requires NumPy and imageio-ffmpeg, performs no network access, and writes
-only sounds/ui/piano_recorded/ and sounds/ui/drums_recorded/. The normal game
-uses only the packaged OGG files and performs no downloading or sample
-processing. To make comparison WAVs from the packaged OGGs without regenerating
-any assets, run tools/generate_chat_instruments.py --previews-only; output is
-unshipped under build/audio-previews/.
+pinned AVL repository using the exact filenames above. The normal game uses
+only the packaged OGG files and performs no downloading or sample processing.

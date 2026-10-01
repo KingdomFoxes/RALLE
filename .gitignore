@@ -9,10 +9,13 @@ run/
 *.ipr
 *.iws
 
-# Generated review artifacts; keep review generators, notes and patches tracked.
-outputs/**/*.png
-outputs/**/*.xlsx
-outputs/**/*.inspect.ndjson
-outputs/**/inventory.json
-outputs/**/*.tar.gz
-prototypes/ralle-settings-site.tar.gz
+# Local development instructions and checkouts.
+/AGENTS.md
+/.agents/
+/.worktrees/
+
+# Local experiments and generated review artifacts are not release source.
+/colors/
+/outputs/
+/prototypes/
+/build_settings_workbook.mjs
