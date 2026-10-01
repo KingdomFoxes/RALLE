@@ -1,5 +1,7 @@
 package org.kingdomfoxes.ralle.chat.mixin;
 
+import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
+
 import net.minecraft.client.GuiMessage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ActiveTextCollector;
@@ -33,7 +35,6 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,7 +50,9 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
     @Unique private boolean ralle$capturingClickableText;
     @Unique private FullShadowFrameCollector ralle$fullShadowCollector;
     @Unique private List<GuiMessage> ralle$transitionMessages;
-    @Unique private final ChatTimestampStore ralle$timestampStore = new ChatTimestampStore(Clock.systemDefaultZone());
+    @Unique private final ChatTimestampStore ralle$timestampStore = ChatTimestampStore.SESSION;
+    @Unique private final org.kingdomfoxes.ralle.chat.ChatProjectionCache<GuiMessage, GuiMessage.Line>
+            ralle$projectionCache = new org.kingdomfoxes.ralle.chat.ChatProjectionCache<>();
 
     @Inject(
             method = "render(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/gui/Font;IIIZZ)V",
@@ -237,8 +240,8 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
 
     @Inject(method = "refreshTrimmedMessages", at = @At("HEAD"), require = 0)
     private void ralle$startMessageRefresh(CallbackInfo callback) {
+        ralle$projectionCache.clear();
         ralle$refreshingMessages = true;
-        allMessages.forEach(ralle$timestampStore::record);
         ralle$pruneHistory();
     }
 
@@ -252,12 +255,13 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
 
     @Inject(method = "clearMessages", at = @At("HEAD"), require = 0)
     private void ralle$preserveTransitionMessages(boolean clearRecentChat, CallbackInfo callback) {
+        ralle$projectionCache.clear();
         var behavior = RalleClient.context().chatBehavior();
         if (clearRecentChat && behavior.persistentChatEnabled()) {
             ralle$transitionMessages = new ArrayList<>(allMessages);
         } else {
             ralle$transitionMessages = null;
-            ralle$timestampStore.clear();
+            ralle$timestampStore.forgetAll(allMessages);
         }
     }
 
@@ -331,9 +335,8 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
     }
 
     @Inject(method = "addMessageToQueue", at = @At("TAIL"), require = 0)
-    private void ralle$recordAndPruneTimestampAfterMessageAdded(GuiMessage message, CallbackInfo callback) {
+    private void ralle$recordTimestampAfterMessageAdded(GuiMessage message, CallbackInfo callback) {
         ralle$timestampStore.record(message);
-        ralle$timestampStore.retainAll(allMessages);
     }
 
     @Inject(method = "createDeletedMarker", at = @At("RETURN"), require = 0)
@@ -359,34 +362,37 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
     }
 
     private void ralle$refreshProjectedMessages() {
-        var behavior = RalleClient.context().chatBehavior();
-        trimmedMessages.clear();
-        int contentWidth = ralle$contentWidth();
-        for (int messageIndex = allMessages.size() - 1; messageIndex >= 0; messageIndex--) {
-            var message = allMessages.get(messageIndex);
-            var displayMessage = ChatSystemIndicators.withoutIndicator(
-                    new GuiMessage(message.addedTime(), message.content(), null, message.tag()),
-                    behavior.removeChatSystemIndicators()
-            );
-            var receiveTime = ralle$timestampStore.receiveTime(message);
-            var prefix = behavior.chatTimestampsEnabled() && receiveTime != null
-                    ? ChatTimestamps.prefix(receiveTime).getVisualOrderText()
-                    : null;
-            int wrappedContentWidth = prefix == null
-                    ? contentWidth
-                    : Math.max(1, contentWidth - minecraft.font.width(prefix));
-            var lines = displayMessage.splitLines(minecraft.font, wrappedContentWidth);
-            for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
-                trimmedMessages.addFirst(new GuiMessage.Line(
-                        message.addedTime(),
-                        prefix == null ? lines.get(lineIndex) : ChatTimestamps.prepend(prefix, lines.get(lineIndex)),
-                        displayMessage.tag(),
-                        lineIndex == lines.size() - 1
-                ));
-            }
+        try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_PROJECTION)) {
+            var behavior = RalleClient.context().chatBehavior();
+            trimmedMessages.clear();
+            int contentWidth = ralle$contentWidth();
+            int limit = behavior.effectiveHistoryLimit();
+            var layout = List.of(contentWidth, limit, behavior.chatTimestampsEnabled(), behavior.removeChatSystemIndicators());
+            trimmedMessages.addAll(ralle$projectionCache.project(allMessages, limit, layout, message -> {
+                var displayMessage = ChatSystemIndicators.withoutIndicator(
+                        new GuiMessage(message.addedTime(), message.content(), null, message.tag()),
+                        behavior.removeChatSystemIndicators()
+                );
+                var receiveTime = ralle$timestampStore.receiveTime(message);
+                var prefix = behavior.chatTimestampsEnabled() && receiveTime != null
+                        ? ChatTimestamps.prefix(receiveTime).getVisualOrderText()
+                        : null;
+                int wrappedContentWidth = prefix == null
+                        ? contentWidth
+                        : Math.max(1, contentWidth - minecraft.font.width(prefix));
+                var lines = displayMessage.splitLines(minecraft.font, wrappedContentWidth);
+                var projected = new ArrayList<GuiMessage.Line>(lines.size());
+                for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
+                    projected.add(new GuiMessage.Line(
+                            message.addedTime(),
+                            prefix == null ? lines.get(lineIndex) : ChatTimestamps.prepend(prefix, lines.get(lineIndex)),
+                            displayMessage.tag(),
+                            lineIndex == lines.size() - 1
+                    ));
+                }
+                return projected;
+            }));
         }
-
-        ChatHistoryRetention.pruneOldest(trimmedMessages, behavior.effectiveHistoryLimit());
     }
 
     @Unique
@@ -394,7 +400,6 @@ abstract class ChatComponentMixin implements ChatScreenshotSource {
         int limit = RalleClient.context().chatBehavior().effectiveHistoryLimit();
         ChatHistoryRetention.pruneOldest(allMessages, limit);
         ChatHistoryRetention.pruneOldest(trimmedMessages, limit);
-        ralle$timestampStore.retainAll(allMessages);
         ((ChatComponent) (Object) this).scrollChat(0);
     }
 

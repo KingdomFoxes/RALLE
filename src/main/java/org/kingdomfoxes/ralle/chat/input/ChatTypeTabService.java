@@ -7,7 +7,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
- * Holds connection-local chat type and direct-message recipient state.
+ * Holds connection-local chat type and direct-message contact state.
  * Command observation never changes, cancels, or resends the outgoing command.
  */
 public final class ChatTypeTabService {
@@ -25,7 +25,8 @@ public final class ChatTypeTabService {
     private static final Pattern EXPLICIT_PREFIX = Pattern.compile(
             "^/(?:g |p |msg [A-Za-z0-9_]{3,16} )", Pattern.CASE_INSENSITIVE);
 
-    private String lastDirectMessageRecipient;
+    private final List<String> directMessageContacts = new ArrayList<>();
+    private String selectedDirectMessageRecipient;
     private ChatType lastChatType;
     private long inputRequestRevision;
     private boolean inputSelectedAll;
@@ -77,8 +78,7 @@ public final class ChatTypeTabService {
         inputSelectedAll = false;
         var matcher = DIRECT_MESSAGE.matcher(command);
         if (matcher.matches() && !matcher.group(2).isBlank()) {
-            var recipient = matcher.group(1);
-            lastDirectMessageRecipient = recipient;
+            selectedDirectMessageRecipient = addContact(matcher.group(1));
             lastChatType = ChatType.DIRECT_MESSAGE;
         } else if (matchesCompleteMessage(GUILD_MESSAGE, command)) {
             rememberPrefix(GUILD_PREFIX);
@@ -92,16 +92,11 @@ public final class ChatTypeTabService {
         if (!message.isBlank()) rememberPrefix(ALL_CHAT_PREFIX);
     }
 
-    /** Incoming DMs update the cycle, without selecting a different chat type. */
+    /** Incoming DMs add a contact without changing the selected channel or draft destination. */
     public void observeIncomingSender(String sender) {
         if (sender != null && sender.matches("[A-Za-z0-9_]{3,16}")) {
-            lastDirectMessageRecipient = sender;
+            addContact(sender);
         }
-    }
-
-    public String refreshEmptyChannel(String prefix, String body) {
-        return body.isEmpty() && prefix != null && DIRECT_MESSAGE_PREFIX.matcher(prefix).matches()
-                && lastDirectMessageRecipient != null ? "/msg " + lastDirectMessageRecipient + " " : prefix;
     }
 
     /** Returns the last selected chat type for a newly opened empty chat. */
@@ -110,9 +105,9 @@ public final class ChatTypeTabService {
         return switch (lastChatType) {
             case GUILD -> Optional.of(GUILD_PREFIX);
             case PARTY -> Optional.of(PARTY_PREFIX);
-            case DIRECT_MESSAGE -> lastDirectMessageRecipient == null
+            case DIRECT_MESSAGE -> selectedDirectMessageRecipient == null
                     ? Optional.empty()
-                    : Optional.of("/msg " + lastDirectMessageRecipient + " ");
+                    : Optional.of("/msg " + selectedDirectMessageRecipient + " ");
             case ALL -> Optional.of(ALL_CHAT_PREFIX);
         };
     }
@@ -127,9 +122,10 @@ public final class ChatTypeTabService {
             chatType = ChatType.PARTY;
         } else if (ALL_CHAT_PREFIX.equals(prefix)) {
             chatType = ChatType.ALL;
-        } else if (lastDirectMessageRecipient != null
-                && prefix.equals("/msg " + lastDirectMessageRecipient + " ")) {
+        } else if (DIRECT_MESSAGE_PREFIX.matcher(prefix).matches()
+                && contact(prefix.substring(5).strip()) != null) {
             chatType = ChatType.DIRECT_MESSAGE;
+            selectedDirectMessageRecipient = contact(prefix.substring(5).strip());
         } else {
             return;
         }
@@ -140,7 +136,8 @@ public final class ChatTypeTabService {
 
     /** Clears connection-local tab state after leaving a world or server. */
     public void resetSession() {
-        lastDirectMessageRecipient = null;
+        directMessageContacts.clear();
+        selectedDirectMessageRecipient = null;
         lastChatType = null;
         inputSelectedAll = false;
         inputRequestRevision++;
@@ -157,7 +154,11 @@ public final class ChatTypeTabService {
 
         var prefixes = cyclePrefixes();
         int currentIndex = prefixes.indexOf(lastInsertedPrefix);
-        // An open screen may still hold the previous DM target (especially a draft).
+        if (currentIndex < 0 && DIRECT_MESSAGE_PREFIX.matcher(lastInsertedPrefix).matches()) {
+            String known = contact(lastInsertedPrefix.substring(5).strip());
+            if (known != null) currentIndex = prefixes.indexOf("/msg " + known + " ");
+        }
+        // An open screen may still hold a DM prefix that is no longer in this session.
         if (currentIndex < 0 && DIRECT_MESSAGE_PREFIX.matcher(lastInsertedPrefix).matches()) {
             return Optional.of(ALL_CHAT_PREFIX);
         }
@@ -169,8 +170,8 @@ public final class ChatTypeTabService {
         var prefixes = new ArrayList<String>();
         prefixes.add(GUILD_PREFIX);
         prefixes.add(PARTY_PREFIX);
-        if (lastDirectMessageRecipient != null) {
-            prefixes.add("/msg " + lastDirectMessageRecipient + " ");
+        for (String contact : directMessageContacts) {
+            prefixes.add("/msg " + contact + " ");
         }
         prefixes.add(ALL_CHAT_PREFIX);
         return List.copyOf(prefixes);
@@ -179,6 +180,20 @@ public final class ChatTypeTabService {
     private static boolean matchesCompleteMessage(Pattern pattern, String command) {
         var matcher = pattern.matcher(command);
         return matcher.matches() && !matcher.group(1).isBlank();
+    }
+
+    private String addContact(String name) {
+        String existing = contact(name);
+        if (existing != null) return existing;
+        directMessageContacts.add(name);
+        return name;
+    }
+
+    private String contact(String name) {
+        for (String existing : directMessageContacts) {
+            if (existing.equalsIgnoreCase(name)) return existing;
+        }
+        return null;
     }
 
     private enum ChatType {

@@ -17,6 +17,114 @@ class RaidLfgServiceTest {
     private static final UUID GUILD = UUID.fromString("00000000-0000-0000-0000-000000000100");
 
     @Test
+    void newContextGetsFreshSynchronizationBeforeOldFailureCallbacksAreDelivered() {
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var service = service(gateway, env);
+        service.tick();
+        var original = service.refresh();
+        service.connectionChanged();
+        service.tick();
+        var replacement = service.refresh();
+        assertNotSame(original, replacement);
+        assertTrue(original.isCompletedExceptionally());
+        assertFalse(replacement.isDone());
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+        assertEquals(snapshot(), replacement.join());
+    }
+
+    @Test
+    void failedJoinCallbackCannotHoldUpClientTickOrCancellation() throws Exception {
+        var gateway = new FakeGateway();
+        gateway.joinFuture = new CompletableFuture<>();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var now = new java.util.concurrent.atomic.AtomicLong();
+        var service = new RaidLfgService(gateway, env, ignored -> CompletableFuture.completedFuture(null),
+                now::get, () -> .5);
+        service.tick();
+        var base = snapshot();
+        var host = hostedLobby(false);
+        var viewer = new LfgProtocol.PlayerIdentity(UUID.randomUUID(), "Joiner", base.viewer().guild());
+        var open = new LfgProtocol.Lobby(host.lobbyId(), host.raidType(), host.region(), host.note(),
+                host.visibility(), host.status(), false, host.hostMinecraftUuid(), host.hostGuildUuid(),
+                host.createdAt(), host.lastActivityAt(), host.revision(), 4, host.members(),
+                new LfgProtocol.LobbyCapabilities(true, false, Map.of()));
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(new LfgProtocol.Snapshot(1, 1, viewer,
+                base.capabilities(), List.of(open))));
+        assertTrue(service.joinController().start(open.lobbyId()));
+        now.set(3000);
+        service.tick();
+        assertEquals(LfgJoinController.Phase.SUBMITTING, service.joinController().snapshot().phase());
+        var callbackEntered = new java.util.concurrent.CountDownLatch(1);
+        var releaseCallback = new java.util.concurrent.CountDownLatch(1);
+        service.joinController().observe(() -> {
+            if (service.joinController().snapshot().phase() != LfgJoinController.Phase.FAILED) return;
+            callbackEntered.countDown();
+            try { releaseCallback.await(5, java.util.concurrent.TimeUnit.SECONDS); }
+            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+        });
+        var threads = java.util.concurrent.Executors.newFixedThreadPool(2, task -> {
+            var thread = new Thread(task); thread.setDaemon(true); return thread;
+        });
+        try {
+            var failure = threads.submit(() -> gateway.joinFuture.completeExceptionally(new IllegalStateException("rejected")));
+            assertTrue(callbackEntered.await(2, java.util.concurrent.TimeUnit.SECONDS));
+            threads.submit(() -> {
+                service.tick();
+                assertFalse(service.pending(open.lobbyId(), "join"));
+                service.joinController().acknowledge(open.lobbyId());
+                assertTrue(service.joinController().start(open.lobbyId()));
+                assertTrue(service.joinController().cancel());
+            }).get(2, java.util.concurrent.TimeUnit.SECONDS);
+            releaseCallback.countDown();
+            failure.get(2, java.util.concurrent.TimeUnit.SECONDS);
+            assertEquals(LfgJoinController.Phase.IDLE, service.joinController().snapshot().phase());
+        } finally {
+            releaseCallback.countDown();
+            threads.shutdownNow();
+        }
+    }
+
+    @Test
+    void storeListenersRunAfterServiceAndStoreLocksAreReleased() throws Exception {
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var service = service(gateway, env);
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        service.store().observeLobbyChanges(change -> {
+            entered.countDown();
+            try { release.await(5, java.util.concurrent.TimeUnit.SECONDS); }
+            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+        });
+        var threads = java.util.concurrent.Executors.newFixedThreadPool(2, task -> {
+            var thread = new Thread(task); thread.setDaemon(true); return thread;
+        });
+        try {
+            var live = threads.submit(() -> gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 2, hostedLobby(true))));
+            assertTrue(entered.await(2, java.util.concurrent.TimeUnit.SECONDS));
+            threads.submit(() -> {
+                service.tick();
+                assertTrue(service.store().remove(3, hostedLobby(true).lobbyId()));
+            }).get(2, java.util.concurrent.TimeUnit.SECONDS);
+            release.countDown();
+            live.get(2, java.util.concurrent.TimeUnit.SECONDS);
+            assertEquals(3, service.store().state().revision());
+        } finally {
+            release.countDown();
+            threads.shutdownNow();
+        }
+    }
+
+    @Test
     void disabledAndNonWynncraftStatesMakeNoRequests() {
         var gateway = new FakeGateway();
         var env = new MutableEnvironment();
@@ -613,6 +721,7 @@ class RaidLfgServiceTest {
         CompletableFuture<LfgProtocol.Mutation> createFuture;
         CompletableFuture<LfgProtocol.Mutation> disbandFuture;
         CompletableFuture<LfgProtocol.Mutation> kickFuture;
+        CompletableFuture<LfgProtocol.Mutation> joinFuture;
         LfgProtocol.Mutation kickResult;
         LfgProtocol.Mutation lockResult;
         boolean requestedLocked;
@@ -644,7 +753,9 @@ class RaidLfgServiceTest {
             createKeys.add(idempotencyKey);
             return createFuture == null ? unsupported() : createFuture;
         }
-        @Override public CompletableFuture<LfgProtocol.Mutation> join(String bearerToken, UUID lobbyId, UUID idempotencyKey) { return unsupported(); }
+        @Override public CompletableFuture<LfgProtocol.Mutation> join(String bearerToken, UUID lobbyId, UUID idempotencyKey) {
+            return joinFuture == null ? unsupported() : joinFuture;
+        }
         @Override public CompletableFuture<LfgProtocol.Mutation> leave(String bearerToken, UUID lobbyId, UUID idempotencyKey) { return unsupported(); }
         @Override public CompletableFuture<LfgProtocol.Mutation> disband(String bearerToken, UUID lobbyId, UUID idempotencyKey) {
             if (disbandFuture != null) return disbandFuture;

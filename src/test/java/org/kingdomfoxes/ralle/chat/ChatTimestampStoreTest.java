@@ -50,24 +50,91 @@ class ChatTimestampStoreTest {
 
         store.transfer(original, replacement);
 
-        assertNull(store.receiveTime(original));
+        assertEquals(store.receiveTime(original), store.receiveTime(replacement));
         assertEquals(LocalDateTime.of(2026, 8, 26, 12, 34, 56), store.receiveTime(replacement));
     }
 
     @Test
-    void prunesAndClearsWithLogicalHistory() {
+    void clearingOneHistoryPreservesOtherTabs() {
         var store = new ChatTimestampStore(Clock.fixed(NOW, ZONE));
         var retained = message("Retained");
         var removed = message("Removed");
         store.record(retained);
         store.record(removed);
 
-        store.retainAll(List.of(retained));
+        store.forgetAll(List.of(removed));
         assertEquals(1, store.size());
         assertNull(store.receiveTime(removed));
 
-        store.clear();
+        store.forgetAll(List.of(retained));
         assertEquals(0, store.size());
+    }
+
+    @Test
+    void tabSwitchesAndRefreshesKeepInactiveHistoryTimesWithoutReadingClock() {
+        var clock = new AdvancingClock();
+        var store = new ChatTimestampStore(clock);
+        var guild = message("Same");
+        var party = message("Same");
+        store.record(guild);
+        var guildTime = store.receiveTime(guild);
+        store.record(party);
+        var partyTime = store.receiveTime(party);
+        org.junit.jupiter.api.Assertions.assertNotEquals(guildTime, partyTime);
+        // Wynntils swaps the actual history lists; it does not receive these messages again.
+        for (var history : List.of(List.of(guild), List.of(party), List.of(guild))) {
+            assertEquals(history.getFirst() == guild ? guildTime : partyTime,
+                    store.receiveTime(history.getFirst()));
+        }
+        assertEquals(2, clock.reads);
+    }
+
+    @Test
+    void enablingTabsTransfersOriginalTimeToEveryRecipientAndDoesNotStampUnknownHistory() {
+        var clock = new AdvancingClock();
+        var store = new ChatTimestampStore(clock);
+        var original = message("Hello");
+        store.record(original);
+        var firstTab = message("Hello");
+        var secondTab = message("Hello");
+        store.replay(original, () -> {
+            store.record(firstTab);
+            store.record(secondTab);
+            store.record(firstTab);
+        });
+        assertEquals(store.receiveTime(original), store.receiveTime(firstTab));
+        assertEquals(store.receiveTime(original), store.receiveTime(secondTab));
+        var unknownReplay = message("Hello");
+        store.replay(message("Hello"), () -> store.record(unknownReplay));
+        assertNull(store.receiveTime(unknownReplay));
+        assertEquals(1, clock.reads);
+    }
+
+    @Test
+    void nestedAndFailedReplaysRestoreCaptureForNewMessages() {
+        var clock = new AdvancingClock();
+        var store = new ChatTimestampStore(clock);
+        var original = message("Original");
+        store.record(original);
+        var replay = message("Replay");
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
+                store.replay(original, () -> {
+                    store.replay(message("Unknown"), () -> {});
+                    store.record(replay);
+                    throw new IllegalStateException("failed replay");
+                }));
+        assertEquals(store.receiveTime(original), store.receiveTime(replay));
+        var fresh = message("Original");
+        store.record(fresh);
+        org.junit.jupiter.api.Assertions.assertNotEquals(store.receiveTime(original), store.receiveTime(fresh));
+        assertEquals(2, clock.reads);
+    }
+
+    private static final class AdvancingClock extends Clock {
+        private int reads;
+        @Override public ZoneId getZone() { return ZONE; }
+        @Override public Clock withZone(ZoneId zone) { throw new UnsupportedOperationException(); }
+        @Override public Instant instant() { return NOW.plusSeconds(reads++ * 60L); }
     }
 
     private GuiMessage message(String text) {

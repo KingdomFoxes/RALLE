@@ -21,13 +21,14 @@ class ChatSelectionInstrumentTest {
     void melodicBanksKeepTheSameIntervalsInTheirOwnRegisters() {
         var notes = List.of("D5", "E5", "F_SHARP_5", "G5", "A5", "B5", "C_SHARP_6", "D6", "E6", "F_SHARP_6");
         for (var bank : List.of(ChatSelectionInstrument.XYLOPHONE, ChatSelectionInstrument.ACOUSTIC_GUITAR,
-                ChatSelectionInstrument.BASS_GUITAR, ChatSelectionInstrument.PIANO)) {
+                ChatSelectionInstrument.BASS_GUITAR, ChatSelectionInstrument.PIANO,
+                ChatSelectionInstrument.PIANO_RECORDED)) {
             for (int count = 1; count <= 10; count++) {
                 String note = notes.get(count - 1);
                 int shift = switch (bank) {
                     case ACOUSTIC_GUITAR -> 2;
                     case BASS_GUITAR -> 3;
-                    case PIANO -> 1;
+                    case PIANO, PIANO_RECORDED -> 1;
                     default -> 0;
                 };
                 note = note.replace("5", Integer.toString(5 - shift)).replace("6", Integer.toString(6 - shift));
@@ -44,6 +45,11 @@ class ChatSelectionInstrumentTest {
                 RalleSoundCue.DRUMS_SNARE), java.util.stream.IntStream.rangeClosed(1, 6)
                 .mapToObj(ChatSelectionInstrument.DRUMS::cueForCount).toList());
         assertEquals(RalleSoundCue.DRUMS_CRASH, ChatSelectionInstrument.DRUMS.copySuccess());
+        assertEquals(List.of(RalleSoundCue.DRUMS_RECORDED_BASS_DRUM, RalleSoundCue.DRUMS_RECORDED_FLOOR_TOM,
+                RalleSoundCue.DRUMS_RECORDED_LOW_TOM, RalleSoundCue.DRUMS_RECORDED_HIGH_TOM,
+                RalleSoundCue.DRUMS_RECORDED_SNARE, RalleSoundCue.DRUMS_RECORDED_SNARE),
+                java.util.stream.IntStream.rangeClosed(1, 6).mapToObj(ChatSelectionInstrument.DRUMS_RECORDED::cueForCount).toList());
+        assertEquals(RalleSoundCue.DRUMS_RECORDED_CRASH, ChatSelectionInstrument.DRUMS_RECORDED.copySuccess());
     }
 
     @ParameterizedTest
@@ -88,7 +94,8 @@ class ChatSelectionInstrumentTest {
         var registry = registry(path);
         var choice = registry.setting(RalleSettings.CHAT_SELECTION_INSTRUMENT_ID, ChoiceSetting.class);
         assertEquals("xylophone", choice.value());
-        assertEquals(List.of("xylophone", "acoustic-guitar", "bass-guitar", "piano", "drums"), choice.choices());
+        assertEquals(List.of("xylophone", "acoustic-guitar", "bass-guitar", "piano-recorded", "piano",
+                "drums-recorded", "drums"), choice.choices());
         assertFalse(registry.visible(choice.id()));
         registry.setting("chat-screenshot-enabled", BooleanSetting.class).set(true);
         assertFalse(registry.visible(choice.id()));
@@ -105,6 +112,25 @@ class ChatSelectionInstrumentTest {
         Files.writeString(path, "chat.chat-selection-instrument=unknown\n");
         assertEquals("xylophone", registry(path).setting(choice.id(), ChoiceSetting.class).value());
         assertEquals(ChatSelectionInstrument.XYLOPHONE, ChatSelectionInstrument.fromSetting("unknown"));
+        choice.set("piano-recorded");
+        assertEquals("piano-recorded", registry(path).setting(choice.id(), ChoiceSetting.class).value());
+        assertTrue(Files.readString(path).contains("chat.chat-selection-instrument=piano-recorded"));
+        assertEquals(ChatSelectionInstrument.PIANO, ChatSelectionInstrument.fromSetting("piano"));
+        assertEquals(RalleSoundCue.PIANO_D4, ChatSelectionInstrument.fromSetting("piano").cueForCount(1));
+        assertEquals(RalleSoundCue.PIANO_RECORDED_D4, ChatSelectionInstrument.fromSetting("piano-recorded").cueForCount(1));
+    }
+
+    @Test
+    void recordedInstrumentChoiceLabelsKeepTheOldIdsClearlyMarked() throws Exception {
+        try (var input = getClass().getClassLoader().getResourceAsStream("assets/ralle/lang/en_us.json")) {
+            assertNotNull(input);
+            var language = com.google.gson.JsonParser.parseString(new String(input.readAllBytes(),
+                    java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+            assertEquals("Piano", language.get("ralle.settings.value.piano-recorded").getAsString());
+            assertEquals("Piano (Old)", language.get("ralle.settings.value.piano").getAsString());
+            assertEquals("Drums", language.get("ralle.settings.value.drums-recorded").getAsString());
+            assertEquals("Drums (Old)", language.get("ralle.settings.value.drums").getAsString());
+        }
     }
 
     private static SettingsRegistry registry(Path path) {

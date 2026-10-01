@@ -114,6 +114,55 @@ class GuildRankServiceTest {
         assertTrue(service.apply(original).getString().contains("\uE100\uE100"));
     }
 
+    @Test
+    void queueConsumerRefreshesWithoutEnablingChatChangesAndStopsWhenDisabled() {
+        var queueEnabled = new boolean[]{false};
+        var host = new String[]{"wynncraft.com"};
+        var now = new long[]{1L};
+        var gateway = new TrackingGateway();
+        var service = new GuildRankService(gateway, temporaryDirectory.resolve("queue-ranks.json"),
+                setting(), styleSetting(), () -> host[0], () -> now[0], () -> queueEnabled[0]);
+        service.tick();
+        assertEquals(0, gateway.calls);
+        queueEnabled[0] = true;
+        service.tick();
+        assertEquals(1, gateway.calls);
+        assertEquals("SIR", service.titleFor("MAXKARSON").orElseThrow());
+        var message = guildMessage("CAPTAIN", "maxkarson");
+        assertSame(message, service.apply(message));
+        queueEnabled[0] = false;
+        now[0] += GuildRankService.REFRESH_INTERVAL.toMillis();
+        service.tick();
+        assertEquals(1, gateway.calls);
+        queueEnabled[0] = true;
+        host[0] = "example.org";
+        service.tick();
+        assertEquals(1, gateway.calls);
+        assertTrue(service.titleFor("maxkarson").isEmpty());
+    }
+
+    @Test
+    void diskSnapshotResolvesChangedClassNameAfterReconnectAndFailedRefresh() throws Exception {
+        var cachePath = temporaryDirectory.resolve("class-ranks.json");
+        new GuildRankCache(cachePath).save(new GuildRankSnapshot(1L, Map.of("MailOrderGF", "Madam")));
+        var enabled = setting();
+        enabled.set(true);
+        var service = new GuildRankService(
+                () -> CompletableFuture.failedFuture(new IllegalStateException("offline")),
+                cachePath, enabled, styleSetting(), () -> "wynncraft.com", () -> 2L);
+        for (String name : java.util.List.of("MailOrderGF", "MailOrderShurikens")) {
+            service.connectionChanged();
+            service.tick();
+            var message = guildMessage("STRATEGIST", name).copy();
+            if (!name.equals("MailOrderGF")) {
+                message.withStyle(style -> style.withHoverEvent(new net.minecraft.network.chat.HoverEvent.ShowText(
+                        Component.literal(name + "'s real name is MailOrderGF"))));
+            }
+            assertTrue(service.apply(message).getString().contains(GuildRankTitleTransformer.foreground("MADAM")));
+        }
+        assertEquals("MADAM", new GuildRankCache(cachePath).load().titleFor("MailOrderGF").orElseThrow());
+    }
+
     private static BooleanSetting setting() {
         return new BooleanSetting("internal-guild-ranks", Component.literal("Ranks"), Component.empty());
     }

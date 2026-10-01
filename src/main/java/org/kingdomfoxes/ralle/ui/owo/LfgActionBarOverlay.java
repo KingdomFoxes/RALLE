@@ -84,9 +84,9 @@ public final class LfgActionBarOverlay {
 
     private static int color(LfgActionBarState.Tone tone) {
         return switch (tone) {
-            case NORMAL -> 0xFFFFFFFF;
-            case ACCENT -> 0xFFF2B84B;
-            case MUTED -> 0xFFA9B0BE;
+            case NORMAL -> org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText();
+            case ACCENT -> org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb();
+            case MUTED -> org.kingdomfoxes.ralle.ui.theme.RallePalette.secondaryText();
             case DANGER -> 0xFFFF6B6B;
             case POSITIVE -> 0xFF67D391;
         };

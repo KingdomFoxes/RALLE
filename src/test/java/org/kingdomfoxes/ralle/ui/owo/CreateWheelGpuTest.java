@@ -59,13 +59,13 @@ class CreateWheelGpuTest {
             source.flip();
             int input = texture(GL_TEXTURE0, 128, 128, source);
             var image = ImageIO.read(Path.of("src/main/resources/assets/ralle/textures/gui/wheel/create_dissolve.png").toFile());
-            var pixels = BufferUtils.createByteBuffer(4096 * 4096 * 4);
-            for (int y = 0; y < 4096; y++) for (int x = 0; x < 4096; x++) {
+            var pixels = BufferUtils.createByteBuffer(image.getWidth() * image.getHeight() * 4);
+            for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) {
                 int color = image.getRGB(x, y);
                 pixels.put((byte) (color >> 16)).put((byte) (color >> 8)).put((byte) color).put((byte) (color >>> 24));
             }
             pixels.flip();
-            int mask = texture(GL_TEXTURE1, 4096, 4096, pixels);
+            int mask = texture(GL_TEXTURE1, image.getWidth(), image.getHeight(), pixels);
             int output = texture(GL_TEXTURE2, 128, 128, null);
             int framebuffer = glGenFramebuffers();
             glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);

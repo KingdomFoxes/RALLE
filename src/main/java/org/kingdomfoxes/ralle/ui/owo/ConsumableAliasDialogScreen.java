@@ -20,9 +20,9 @@ final class ConsumableAliasDialogScreen {
         var content = UIContainers.verticalFlow(Sizing.fixed(320), Sizing.content());
         content.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
         content.child(UIComponents.label(RalleTheme.ui(Component.translatable(
-                "ralle.consumables.dialog.alias.title"))).color(RalleTheme.ACCENT));
+                "ralle.consumables.dialog.alias.title"))).color(RalleTheme.accent()));
         content.child(UIComponents.label(RalleTheme.ui(Component.translatable(
-                "ralle.consumables.field.aliases"))).color(RalleTheme.MUTED));
+                "ralle.consumables.field.aliases"))).color(RalleTheme.muted()));
         var input = UIComponents.textBox(Sizing.fill(100));
         input.setMaxLength(512);
         content.child(input);

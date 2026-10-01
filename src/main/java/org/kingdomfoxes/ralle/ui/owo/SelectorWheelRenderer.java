@@ -14,7 +14,8 @@ final class SelectorWheelRenderer {
     private SelectorWheelRenderer() {}
 
     static void draw(GuiGraphics graphics, SelectorWheelModel.Sector sector, int dx, int dy, boolean selected) {
-        for (var run : FACES.computeIfAbsent(new Face(sector, selected), SelectorWheelRenderer::rasterize)) {
+        for (var run : FACES.computeIfAbsent(new Face(sector, selected,
+                org.kingdomfoxes.ralle.ui.theme.RallePalette.revision()), SelectorWheelRenderer::rasterize)) {
             graphics.fill(run.left() + dx, run.y() + dy, run.right() + dx, run.y() + dy + 1, run.color());
         }
     }
@@ -45,13 +46,18 @@ final class SelectorWheelRenderer {
 
     static int color(SelectorWheelModel.Sector sector, double x, double y, boolean selected) {
         if (!sector.contains(x, y, 0)) return 0;
-        if (!sector.contains(x, y, 1)) return selected ? 0xFF000000 | RalleTheme.ACCENT_RGB : 0xFFFFFFFF;
-        return selected ? 0xF0223552 : 0xEE0A1830;
+        if (!sector.contains(x, y, 1)) return selected
+                ? org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb()
+                : org.kingdomfoxes.ralle.ui.theme.RallePalette.frameArgb();
+        int background = org.kingdomfoxes.ralle.ui.theme.RallePalette.background();
+        int inner = background == 0x041330 ? (selected ? 0x223552 : 0x0A1830)
+                : org.kingdomfoxes.ralle.ui.theme.RallePalette.secondarySurface();
+        return (selected ? 0xF0 : 0xEE) << 24 | inner;
     }
 
     static int createColor(SelectorWheelModel.Sector sector, double x, double y, boolean selected) {
         return color(sector, x, y, selected);
     }
-    private record Face(SelectorWheelModel.Sector sector, boolean selected) {}
+    private record Face(SelectorWheelModel.Sector sector, boolean selected, long revision) {}
     private record Run(int left, int right, int y, int color) {}
 }

@@ -64,7 +64,7 @@ class RalleOnboardingNoticeTest {
     void bodyUsesExactCopyAndClickableSettingsLink() {
         var body = RalleOnboardingNotice.body();
 
-        assertEquals("Thank you for installing RALLE, all features are disabled by default so "
+        assertEquals("Thank you for installing RALLE, supporter nameplates are always on and other features are disabled by default so "
                 + "Click here or use /ralle settings to configure it", body.getString());
 
         var span = body.getSiblings().stream()

@@ -12,6 +12,12 @@ class ConsumableSlotBorderTest {
         assertEquals(18, geometry.height());
     }
 
+    @Test void chromaIsUniformAcrossPositionsAndChangesOverTime() {
+        var first = ConsumableSlotBorder.rainbowColor(0f, 100);
+        assertEquals(first, ConsumableSlotBorder.rainbowColor(0f, 100));
+        org.junit.jupiter.api.Assertions.assertNotEquals(first, ConsumableSlotBorder.rainbowColor(0f, 900));
+    }
+
     @Test void rainbowIsDeterministicPositionalAndFullyOpaque() {
         int first = ConsumableSlotBorder.rainbowColor(0f, 500);
         assertEquals(first, ConsumableSlotBorder.rainbowColor(0f, 500));

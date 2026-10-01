@@ -47,7 +47,9 @@ public final class LfgCreationFeedback {
                 case "WYNNCRAFT_UNAVAILABLE", "UPSTREAM_UNAVAILABLE", "TRANSPORT_FAILURE" -> key("unavailable");
                 case "INELIGIBLE", "INELIGIBLE_GUILD" -> key("ineligible");
                 case "UNSUPPORTED_PROTOCOL" -> key("outdated");
-                case "PLAYER_ALREADY_ACTIVE" -> key("already-active");
+                case "PLAYER_ALREADY_ACTIVE", "PARTY_MEMBER_ALREADY_ACTIVE" -> key("already-active");
+                case "PARTY_IDENTITY_UNRESOLVED", "PLAYER_NOT_FOUND" -> key("party-unresolved");
+                case "INVALID_PARTY" -> key("party-invalid");
                 case "RATE_LIMITED" -> key("rate-limited");
                 default -> gateway.status() >= 500 ? key("unavailable") : key("failed");
             };

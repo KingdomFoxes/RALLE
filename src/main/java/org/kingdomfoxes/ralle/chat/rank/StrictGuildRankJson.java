@@ -7,7 +7,7 @@ import com.google.gson.JsonParser;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Bounded decoder for the public rank response and the smaller local cache format. */
+/** Bounded decoder for the authenticated rank response and the smaller local cache format. */
 final class StrictGuildRankJson {
     static final int MAX_DOCUMENT_CHARS = 1_000_000;
     private static final int MAX_MEMBERS = 1_000;
@@ -35,6 +35,15 @@ final class StrictGuildRankJson {
             if (primeMinister != null && primeMinister.isJsonPrimitive()
                     && primeMinister.getAsJsonPrimitive().isBoolean() && primeMinister.getAsBoolean()) {
                 titles.put(player, "PRIME MINISTER");
+                continue;
+            }
+            // Current Fox responses use a single title; retain older array responses.
+            if (member.has("fox_rank")) {
+                var value = member.get("fox_rank");
+                if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()) {
+                    String title = GuildRankSnapshot.normalizeTitle(value.getAsString());
+                    if (title != null) titles.put(player, title);
+                }
                 continue;
             }
             var ranksElement = member.get("ranks");

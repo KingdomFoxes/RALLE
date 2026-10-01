@@ -45,11 +45,11 @@ public final class WynncraftPartyQueuePrompt extends BaseOwoScreen<FlowLayout> {
         var content = UIContainers.verticalFlow(Sizing.fixed(300), Sizing.content());
         content.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
         content.child(UIComponents.label(RalleTheme.ui(Component.translatable("ralle.lfg.party-queue.title")))
-                .color(RalleTheme.ACCENT).maxWidth(276));
+                .color(RalleTheme.accent()).maxWidth(276));
         content.child(UIComponents.label(RalleTheme.ui(Component.translatable("ralle.lfg.party-queue.body",
                 String.join(", ", members)))).maxWidth(276));
         if (members.size() > 3) content.child(UIComponents.label(RalleTheme.ui(
-                Component.translatable("ralle.lfg.party-queue.too-large"))).color(RalleTheme.MUTED).maxWidth(276));
+                Component.translatable("ralle.lfg.party-queue.too-large"))).color(RalleTheme.muted()).maxWidth(276));
         var party = UIComponents.button(RalleTheme.ui(Component.translatable("ralle.lfg.party-queue.yes")),
                 ignored -> choose.accept(Choice.PARTY));
         party.horizontalSizing(Sizing.fill(100));

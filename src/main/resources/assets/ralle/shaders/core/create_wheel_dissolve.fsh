@@ -6,6 +6,17 @@ in vec2 texCoord0;
 in vec4 vertexColor;
 out vec4 fragColor;
 
+ivec4 contributorsAt(ivec2 logicalPixel) {
+    ivec2 tile = logicalPixel / 8;
+    int index = tile.y * 512 + tile.x;
+    int indexStart = textureSize(Sampler1, 0).y - 128;
+    ivec3 encoded = ivec3(round(texelFetch(Sampler1,
+            ivec2(index % 2048, indexStart + index / 2048), 0).rgb * 255.0));
+    int id = encoded.r + encoded.g * 256 + encoded.b * 65536;
+    ivec2 packedPixel = ivec2(id % 256, id / 256) * 8 + logicalPixel % 8;
+    return ivec4(round(texelFetch(Sampler1, packedPixel, 0) * 255.0));
+}
+
 void main() {
     // Vertex red selects a premade frame; green is capture pixel density.
     int frame = int(round(vertexColor.r * 255.0));
@@ -18,7 +29,7 @@ void main() {
     // Each page stores two source pixels. Composite collisions in the old raster's paint order.
     for (int page = 0; page < 4; page++) {
         vec2 pageOffset = vec2(page % 2, page / 2) * 2048.0;
-        ivec4 contributors = ivec4(round(texture(Sampler1, (atlasPixel + pageOffset) / 4096.0) * 255.0));
+        ivec4 contributors = contributorsAt(ivec2(atlasPixel + pageOffset));
         for (int pair = 0; pair < 2; pair++) {
             int code = contributors[pair * 2];
             if (code == 0) continue;

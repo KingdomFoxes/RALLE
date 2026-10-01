@@ -6,7 +6,6 @@ import io.wispforest.owo.ui.core.Sizing;
 
 /** Stacks one navigation button and paints its non-interactive rail segment above it. */
 final class SettingsNavigationRailComponent extends StackLayout {
-    private static final int GOLD = 0xFFF2B84B;
     private final SettingsNavigationRailGeometry.Shape shape;
     private final int visualHeight;
 
@@ -30,7 +29,7 @@ final class SettingsNavigationRailComponent extends StackLayout {
                     y + segment.y(),
                     x + segment.x() + segment.width(),
                     y + segment.y() + segment.height(),
-                    GOLD
+                    org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb()
             );
         }
     }

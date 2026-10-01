@@ -29,7 +29,7 @@ class ChatTypeTabServiceTest {
     }
 
     @Test
-    void incomingMessageAddsAndUpdatesTabWithoutChangingSelectedTypeOrDraftDestination() {
+    void incomingMessagesAddTabsWithoutChangingSelectedTypeOrDraftDestination() {
         var service = new ChatTypeTabService();
         service.rememberPrefix("/p ");
         service.observeIncomingSender("FirstFox");
@@ -37,11 +37,11 @@ class ChatTypeTabServiceTest {
         assertEquals(Optional.of("/p "), service.prefixForNewChat());
         service.rememberPrefix("/msg FirstFox ");
         service.observeIncomingSender("NewFox");
+        assertEquals(Optional.of("/msg FirstFox "), service.prefixForNewChat());
+        assertEquals(Optional.of("/msg NewFox "), service.nextPrefix("/msg FirstFox ", "/msg FirstFox "));
+        service.rememberPrefix("/msg NewFox ");
         assertEquals(Optional.of("/msg NewFox "), service.prefixForNewChat());
-        assertEquals("/msg NewFox ", service.refreshEmptyChannel("/msg FirstFox ", ""));
-        assertEquals("/msg FirstFox ", service.refreshEmptyChannel("/msg FirstFox ", "draft"));
-        assertEquals("/p ", service.refreshEmptyChannel("/p ", ""));
-        assertEquals(Optional.of(""), service.nextPrefix("/msg FirstFox ", "/msg FirstFox "));
+        assertEquals(Optional.of(""), service.nextPrefix("/msg NewFox ", "/msg NewFox "));
         service.resetSession();
         assertEquals(Optional.of(""), service.nextPrefix("/p ", "/p "));
     }
@@ -51,6 +51,7 @@ class ChatTypeTabServiceTest {
         assertEquals("[Guild]", ChatTypeTabService.channelLabel("/g "));
         assertEquals("[Party]", ChatTypeTabService.channelLabel("/p "));
         assertEquals("[FoxFriend]", ChatTypeTabService.channelLabel("/msg FoxFriend "));
+        assertEquals(0xFFFF55FF, ChatTypeTabService.channelColor("/msg FoxFriend "));
         assertEquals("[All]", ChatTypeTabService.channelLabel(""));
         assertEquals("/g hello", ChatTypeTabService.outgoingMessage("hello", "/g "));
         assertEquals("/p hello", ChatTypeTabService.outgoingMessage("hello", "/p "));
@@ -99,12 +100,26 @@ class ChatTypeTabServiceTest {
     }
 
     @Test
-    void latestCompleteDirectMessageReplacesThePreviousRecipient() {
+    void completeDirectMessagesAddDistinctRecipientsToTheCycle() {
         var service = new ChatTypeTabService();
         service.observeSentCommand("msg FirstFox hello");
         service.observeSentCommand("/msg NewFox_123 another message");
 
-        assertEquals(Optional.of("/msg NewFox_123 "), service.nextPrefix("/p ", "/p "));
+        assertEquals(Optional.of("/msg FirstFox "), service.nextPrefix("/p ", "/p "));
+        assertEquals(Optional.of("/msg NewFox_123 "), service.nextPrefix("/msg FirstFox ", "/msg FirstFox "));
+        assertEquals(Optional.of("/msg NewFox_123 "), service.prefixForNewChat());
+    }
+
+    @Test
+    void repeatedContactsIgnoreCaseWithoutAddingDuplicateTabs() {
+        var service = new ChatTypeTabService();
+        service.observeIncomingSender("FriendFox");
+        service.observeSentCommand("msg friendfox hello");
+        service.observeIncomingSender("FRIENDFOX");
+
+        assertEquals(Optional.of("/msg FriendFox "), service.nextPrefix("/p ", "/p "));
+        assertEquals(Optional.of(""), service.nextPrefix("/msg FriendFox ", "/msg FriendFox "));
+        assertEquals(Optional.of("/msg FriendFox "), service.prefixForNewChat());
     }
 
     @Test
@@ -129,10 +144,11 @@ class ChatTypeTabServiceTest {
         assertEquals(Optional.of("/msg abc "), service.nextPrefix("/p ", "/p "));
 
         service.observeSentCommand("msg abcdefghijklmnop hello");
-        assertEquals(Optional.of("/msg abcdefghijklmnop "), service.nextPrefix("/p ", "/p "));
+        assertEquals(Optional.of("/msg abcdefghijklmnop "), service.nextPrefix("/msg abc ", "/msg abc "));
 
         service.observeSentCommand("msg abcdefghijklmnopq hello");
-        assertEquals(Optional.of("/msg abcdefghijklmnop "), service.nextPrefix("/p ", "/p "));
+        assertEquals(Optional.of("/msg abcdefghijklmnop "), service.prefixForNewChat());
+        assertEquals(Optional.of(""), service.nextPrefix("/msg abcdefghijklmnop ", "/msg abcdefghijklmnop "));
     }
 
     @Test
@@ -156,7 +172,7 @@ class ChatTypeTabServiceTest {
     }
 
     @Test
-    void selectedDirectMessageTypeUsesTheLatestRecipient() {
+    void selectedDirectMessageTypeUsesTheSentRecipient() {
         var service = new ChatTypeTabService();
         service.observeSentCommand("msg FirstFox hello");
         service.rememberPrefix("/msg FirstFox ");

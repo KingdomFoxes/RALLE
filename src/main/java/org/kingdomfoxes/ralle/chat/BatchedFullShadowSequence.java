@@ -4,6 +4,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.util.FormattedCharSink;
 import net.minecraft.util.FormattedCharSequence;
+import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +29,12 @@ public final class BatchedFullShadowSequence implements FormattedCharSequence {
     }
 
     public Font.PreparedText prepare(Font font, float x, float y, int color) {
+        try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_SHADOW_FALLBACK_PREPARE)) {
+            return prepareLayers(font, x, y, color);
+        }
+    }
+
+    private Font.PreparedText prepareLayers(Font font, float x, float y, int color) {
         var layers = new ArrayList<Font.PreparedText>(OFFSETS.size());
         for (var offset : OFFSETS) {
             layers.add(font.prepareText(

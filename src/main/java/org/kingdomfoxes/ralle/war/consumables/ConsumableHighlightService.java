@@ -1,5 +1,7 @@
 package org.kingdomfoxes.ralle.war.consumables;
 
+import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.item.ItemStack;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
@@ -36,10 +38,12 @@ public final class ConsumableHighlightService {
     }
 
     public Optional<HighlightStyle> style(ItemStack stack) {
-        if (stack == null || stack.isEmpty() || !active()) return Optional.empty();
-        var style = matcher.match(stack.getHoverName().getString());
-        if (style.isEmpty() || !WynncraftConsumableMarker.matches(stack)) return Optional.empty();
-        return style;
+        try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CONSUMABLE_MATCH)) {
+            if (stack == null || stack.isEmpty() || !active()) return Optional.empty();
+            var style = matcher.match(stack.getHoverName().getString());
+            if (style.isEmpty() || !WynncraftConsumableMarker.matches(stack)) return Optional.empty();
+            return style;
+        }
     }
 
     public long timeMillis() {

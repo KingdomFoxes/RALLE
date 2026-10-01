@@ -11,10 +11,13 @@ import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
 import org.kingdomfoxes.ralle.api.settings.CustomPanelEntry;
 
 import java.util.List;
+import org.kingdomfoxes.ralle.ui.theme.RalleThemeCatalog;
 
 public final class RalleSettings {
+    public static final String POINT_AND_LAUGH_ID = "point-and-laugh";
     public static final String CHAT_SELECTION_INSTRUMENT_ID = "chat-selection-instrument";
     public static final String INTERFACE_FONT_ID = "interface-font";
+    public static final String UI_THEME_ID = "ui-theme";
     public static final String INTERNAL_GUILD_RANKS_ID = "internal-guild-ranks";
     public static final String GUILD_RANK_STYLE_ID = "guild-rank-style";
     public static final String CONSUMABLE_HIGHLIGHTS_ENABLED_ID = "consumable-highlights-enabled";
@@ -25,6 +28,9 @@ public final class RalleSettings {
 
     public static final String HQ_DISTANCE_KEYBIND_ID = "hq-distance-keybind";
     public static final String QUEUE_SELF_COLOR_ID = "queue-self-color";
+    public static final String QUEUE_KOF_RANK_COLORS_ID = "queue-kof-rank-colors";
+    public static final String MATERIAL_RESOLUTION_ID = "material-resolution";
+    public static final String NAMEPLATE_COLOR_ID = "nameplate-color";
     private RalleSettings() {}
 
     public static void register(SettingsRegistry registry) {
@@ -34,7 +40,9 @@ public final class RalleSettings {
                 Component.translatable("ralle.settings.about.description"),
                 List.of(
                         action("edit-huds"),
-                        choice(INTERFACE_FONT_ID, "vanilla", "vanilla", "karla")
+                        choice(INTERFACE_FONT_ID, "vanilla", "vanilla", "karla"),
+                        choice(UI_THEME_ID, RalleThemeCatalog.DEFAULT_ID,
+                                RalleThemeCatalog.ids().toArray(String[]::new))
                 ),
                 List.of()
         ));
@@ -77,7 +85,8 @@ public final class RalleSettings {
                                 toggle("chat-screenshot-smooth-expansion"),
                                 toggle("chat-selection-sounds"),
                                 choice(CHAT_SELECTION_INSTRUMENT_ID, "xylophone",
-                                        "xylophone", "acoustic-guitar", "bass-guitar", "piano", "drums")
+                                        "xylophone", "acoustic-guitar", "bass-guitar",
+                                        "piano-recorded", "piano", "drums-recorded", "drums")
                         )
                 )
         ));
@@ -116,9 +125,11 @@ public final class RalleSettings {
                 "war",
                 Component.translatable("ralle.settings.category.war"),
                 Component.translatable("ralle.settings.category.war.description"),
-                List.of(),
+                List.of(new org.kingdomfoxes.ralle.api.settings.TextSetting(POINT_AND_LAUGH_ID,
+                        title(POINT_AND_LAUGH_ID), description(POINT_AND_LAUGH_ID), 254)),
                 List.of(
                         subcategory("attack-timers", toggle(WAR_QUEUE_ATTRIBUTION_ENABLED_ID),
+                                toggle(QUEUE_KOF_RANK_COLORS_ID),
                                 new org.kingdomfoxes.ralle.api.settings.ColorSetting(QUEUE_SELF_COLOR_ID,
                                         title(QUEUE_SELF_COLOR_ID), description(QUEUE_SELF_COLOR_ID), 0x5555FF)),
                         subcategory("territory-map", toggle(HQ_DISTANCE_ENABLED_ID),
@@ -131,6 +142,16 @@ public final class RalleSettings {
                 )
         ));
 
+        registry.registerCategory(new SettingsCategory(
+                "cosmetics",
+                Component.translatable("ralle.settings.category.cosmetics"),
+                Component.translatable("ralle.settings.category.cosmetics.description"),
+                List.of(customPanel("nameplate-preview", "nameplate-preview"),
+                        choice(MATERIAL_RESOLUTION_ID, "recipe", "recipe", "1", "2", "0.5"),
+                        action(NAMEPLATE_COLOR_ID)),
+                List.of()
+        ));
+
         registry.requireEnabled("message-direction", "message-direction-enabled");
         registry.requireEnabled("horizontal-alignment", "horizontal-alignment-enabled");
         registry.requireEnabled("text-shadow", "text-shadow-enabled");
@@ -140,6 +161,7 @@ public final class RalleSettings {
         registry.requireEnabled("chat-selection-sounds", "chat-screenshot-enabled");
         registry.requireEnabled(CHAT_SELECTION_INSTRUMENT_ID, "chat-selection-sounds");
         registry.requireEnabled(QUEUE_SELF_COLOR_ID, WAR_QUEUE_ATTRIBUTION_ENABLED_ID);
+        registry.requireEnabled(QUEUE_KOF_RANK_COLORS_ID, WAR_QUEUE_ATTRIBUTION_ENABLED_ID);
         registry.requireEnabled(HQ_DISTANCE_KEYBIND_ID, HQ_DISTANCE_ENABLED_ID);
         registry.requireEnabled(CONSUMABLE_HIGHLIGHT_RULES_ID, CONSUMABLE_HIGHLIGHTS_ENABLED_ID);
         registry.requireEnabled("new-party-notifications", "raid-lfg-enabled");

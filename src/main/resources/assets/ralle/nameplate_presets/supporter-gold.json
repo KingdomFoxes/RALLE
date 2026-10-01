@@ -1,0 +1,21 @@
+{
+  "schema": "ralle-supporter-look-v1",
+  "seed": 7349,
+  "effect": "liquid",
+  "speed": 0.45,
+  "scale": 4,
+  "warp": 63,
+  "shine": 71,
+  "dark": "#8b5c20",
+  "gold": "#e5b94c",
+  "light": "#fff0b5",
+  "ign": "maxkarson",
+  "guild": "Fox",
+  "font": "minecraft",
+  "supporter": true,
+  "treatment": "plate",
+  "resolution": 1,
+  "paused": false,
+  "timeSeconds": 2261.8281,
+  "notificationBorderLogicalPixels": 2
+}

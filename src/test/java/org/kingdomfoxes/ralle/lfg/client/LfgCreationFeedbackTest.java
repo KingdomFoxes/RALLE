@@ -33,6 +33,17 @@ class LfgCreationFeedbackTest {
                 new CompletionException(new LfgMutationOutcomeUnknownException("create", UUID.randomUUID(), "lost context"))));
     }
 
+    @Test void importedPartyRejectionsExplainTheCause() {
+        assertEquals(LfgCreationFeedback.key("already-active"),
+                LfgCreationFeedback.failure(error(409, "PARTY_MEMBER_ALREADY_ACTIVE")));
+        assertEquals(LfgCreationFeedback.key("party-unresolved"),
+                LfgCreationFeedback.failure(error(409, "PARTY_IDENTITY_UNRESOLVED")));
+        assertEquals(LfgCreationFeedback.key("party-unresolved"),
+                LfgCreationFeedback.failure(error(404, "PLAYER_NOT_FOUND")));
+        assertEquals(LfgCreationFeedback.key("party-invalid"),
+                LfgCreationFeedback.failure(error(409, "INVALID_PARTY")));
+    }
+
     @Test void changedRosterRetainsItsSpecificRecoveryMessage() {
         assertEquals(LfgCreationFeedback.key("party-changed"), LfgCreationFeedback.failure(
                 new CompletionException(new LfgCreationFeedback.CreationException("party-changed"))));

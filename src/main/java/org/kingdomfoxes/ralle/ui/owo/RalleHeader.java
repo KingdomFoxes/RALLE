@@ -21,10 +21,10 @@ final class RalleHeader {
         header.verticalAlignment(VerticalAlignment.CENTER).surface(RalleSurfaces.FRAMED_NAVY);
         var identity = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
         identity.verticalAlignment(VerticalAlignment.CENTER).margins(Insets.left(10));
-        var emblem = UIComponents.texture(FOX_EMBLEM, 0, 0, 159, 232, 159, 232).blend(true);
-        emblem.sizing(Sizing.fixed(19), Sizing.fixed(28)).margins(Insets.right(10));
+        var emblem = UIComponents.texture(FOX_EMBLEM, 0, 0, 777, 1186, 777, 1186).blend(true);
+        emblem.sizing(Sizing.fixed(18), Sizing.fixed(28)).margins(Insets.right(10));
         identity.child(emblem);
-        identity.child(UIComponents.label(RalleTheme.heading(screenTitle)).lineHeight(16).shadow(false).color(RalleTheme.TEXT));
+        identity.child(UIComponents.label(RalleTheme.heading(screenTitle)).lineHeight(16).shadow(false).color(RalleTheme.text()));
         header.child(identity).child(UIComponents.spacer()).child(new HeaderAccentComponent(50, HEIGHT));
         return header;
     }

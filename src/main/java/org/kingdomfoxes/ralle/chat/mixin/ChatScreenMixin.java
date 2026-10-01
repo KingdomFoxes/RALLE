@@ -75,14 +75,8 @@ abstract class ChatScreenMixin extends Screen {
     }
 
     @Inject(method = "render", at = @At("HEAD"), require = 0)
-    private void ralle$refreshInputChannel(GuiGraphics graphics, int mouseX, int mouseY, float delta, CallbackInfo callback) {
+    private void ralle$syncInputChannel(GuiGraphics graphics, int mouseX, int mouseY, float delta, CallbackInfo callback) {
         ralle$syncInputRequest();
-        if (!ralle$channelEnabled() || this.input.getValue().startsWith("/")) return;
-        String refreshed = RalleClient.context().chatTypeTabs().refreshEmptyChannel(
-                this.ralle$lastInsertedChatTypePrefix, this.input.getValue());
-        if (!java.util.Objects.equals(refreshed, this.ralle$lastInsertedChatTypePrefix)) {
-            ralle$setChatTypePrefix(refreshed);
-        }
     }
 
     @Inject(method = "render", at = @At("TAIL"), require = 0)

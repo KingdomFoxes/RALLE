@@ -10,7 +10,8 @@ import org.kingdomfoxes.ralle.client.WynncraftHost;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.Locale;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.LongSupplier;
@@ -25,6 +26,7 @@ public final class GuildRankService {
     private final GuildRankCache cache;
     private final BooleanSetting internalRanksEnabled;
     private final ChoiceSetting rankStyle;
+    private final BooleanSupplier additionalRankConsumer;
     private final Supplier<String> serverHost;
     private final LongSupplier clock;
 
@@ -43,6 +45,15 @@ public final class GuildRankService {
             Supplier<String> serverHost,
             LongSupplier clock
     ) {
+        this(gateway, cachePath, internalRanksEnabled, rankStyle, serverHost, clock, () -> false);
+    }
+
+    public GuildRankService(
+            GuildRankGateway gateway, Path cachePath, BooleanSetting internalRanksEnabled,
+            ChoiceSetting rankStyle, Supplier<String> serverHost, LongSupplier clock,
+            BooleanSupplier additionalRankConsumer
+    ) {
+        this.additionalRankConsumer = Objects.requireNonNull(additionalRankConsumer, "additionalRankConsumer");
         this.gateway = Objects.requireNonNull(gateway, "gateway");
         this.cache = new GuildRankCache(Objects.requireNonNull(cachePath, "cachePath"));
         this.internalRanksEnabled = Objects.requireNonNull(internalRanksEnabled, "internalRanksEnabled");
@@ -63,7 +74,7 @@ public final class GuildRankService {
     /** Called from the client tick; disabled and off-Wynncraft states are network-inert. */
     public void tick() {
         synchronized (this) {
-            boolean active = internalRanksEnabled.value() && onWynncraft();
+            boolean active = (internalRanksEnabled.value() || additionalRankConsumer.getAsBoolean()) && onWynncraft();
             if (!active) {
                 activeLastTick = false;
                 return;
@@ -101,6 +112,11 @@ public final class GuildRankService {
 
     public Throwable lastFailure() {
         return lastFailure;
+    }
+
+    /** Cached cosmetic lookup only; never performs I/O or grants authorization. */
+    public Optional<String> titleFor(String player) {
+        return onWynncraft() ? snapshot.titleFor(player) : Optional.empty();
     }
 
     GuildRankSnapshot snapshot() {

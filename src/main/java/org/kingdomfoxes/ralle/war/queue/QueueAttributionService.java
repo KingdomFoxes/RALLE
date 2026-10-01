@@ -16,6 +16,25 @@ public final class QueueAttributionService {
     static org.kingdomfoxes.ralle.war.consumables.HighlightStyle selfColor() {
         return selfColor == null ? new org.kingdomfoxes.ralle.war.consumables.HighlightStyle(0x5555FF, false) : selfColor.value();
     }
+    private static BooleanSetting rankColorsEnabled;
+    private static java.util.function.Function<String, java.util.Optional<String>> rankTitles = ign -> java.util.Optional.empty();
+
+    public static void configureRankColors(BooleanSetting setting,
+            java.util.function.Function<String, java.util.Optional<String>> titles) {
+        rankColorsEnabled = setting;
+        rankTitles = titles;
+    }
+
+    public static boolean rankColorsRequested() {
+        return requested() && rankColorsEnabled != null && rankColorsEnabled.value();
+    }
+
+    static int otherColor(String ign) {
+        return rankColorsRequested()
+                ? rankTitles.apply(ign).map(KofRankColors::forTitle).orElse(KofRankColors.FALLBACK)
+                : KofRankColors.FALLBACK;
+    }
+
     private static boolean supported;
     private static boolean failed;
     private static QueueAttributionAdapter integration;

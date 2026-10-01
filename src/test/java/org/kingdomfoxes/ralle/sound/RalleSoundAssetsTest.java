@@ -48,7 +48,8 @@ class RalleSoundAssetsTest {
             manifest = com.google.gson.JsonParser.parseString(new String(input.readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject();
         }
         for (var bank : List.of(ChatSelectionInstrument.ACOUSTIC_GUITAR, ChatSelectionInstrument.BASS_GUITAR,
-                ChatSelectionInstrument.PIANO, ChatSelectionInstrument.DRUMS)) {
+                ChatSelectionInstrument.PIANO, ChatSelectionInstrument.PIANO_RECORDED,
+                ChatSelectionInstrument.DRUMS, ChatSelectionInstrument.DRUMS_RECORDED)) {
             var cues = new java.util.HashSet<RalleSoundCue>();
             for (int count = 1; count <= 10; count++) cues.add(bank.cueForCount(count));
             cues.add(bank.copySuccess());
@@ -66,6 +67,18 @@ class RalleSoundAssetsTest {
                     assertTrue(new String(bytes, StandardCharsets.ISO_8859_1).contains("vorbis"), path);
                 }
             }
+        }
+        for (var cue : List.of(
+                RalleSoundCue.PIANO_RECORDED_D4, RalleSoundCue.PIANO_RECORDED_E4,
+                RalleSoundCue.PIANO_RECORDED_F_SHARP_4, RalleSoundCue.PIANO_RECORDED_G4,
+                RalleSoundCue.PIANO_RECORDED_A4, RalleSoundCue.PIANO_RECORDED_B4,
+                RalleSoundCue.PIANO_RECORDED_C_SHARP_5, RalleSoundCue.PIANO_RECORDED_D5,
+                RalleSoundCue.PIANO_RECORDED_E5, RalleSoundCue.PIANO_RECORDED_F_SHARP_5,
+                RalleSoundCue.PIANO_RECORDED_COPY_SUCCESS, RalleSoundCue.DRUMS_RECORDED_BASS_DRUM,
+                RalleSoundCue.DRUMS_RECORDED_FLOOR_TOM, RalleSoundCue.DRUMS_RECORDED_LOW_TOM,
+                RalleSoundCue.DRUMS_RECORDED_HIGH_TOM, RalleSoundCue.DRUMS_RECORDED_SNARE,
+                RalleSoundCue.DRUMS_RECORDED_CRASH)) {
+            assertNotNull(RalleSoundEvents.event(cue), cue.name());
         }
     }
 

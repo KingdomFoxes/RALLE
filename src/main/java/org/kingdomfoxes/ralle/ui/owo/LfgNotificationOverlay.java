@@ -1,5 +1,7 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
+import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
+
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
@@ -12,11 +14,11 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import org.kingdomfoxes.ralle.RalleClient;
+import org.kingdomfoxes.ralle.cosmetics.CosmeticPresentation;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.Rectangle;
 import org.kingdomfoxes.ralle.api.hud.HudPlacementRegistry.SideAnchor;
 import org.kingdomfoxes.ralle.api.hud.RalleHudElements;
-import org.kingdomfoxes.ralle.lfg.client.GuildTerritoryColors;
 import org.kingdomfoxes.ralle.lfg.client.HostPartyInviteController;
 import org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager;
 import org.kingdomfoxes.ralle.lfg.client.LfgDisbandConfirmation;
@@ -37,12 +39,6 @@ public final class LfgNotificationOverlay {
     public static final int CARD_HEIGHT = RalleHudElements.LFG_NOTIFICATION_HEIGHT;
     public static final int STACK_GAP = 6;
 
-    private static final int SURFACE = 0xF20A1830;
-    private static final int OUTLINE = 0xFF586985;
-    private static final int TEXT = 0xFFFFFFFF;
-    private static final int MUTED = 0xFFA9B0BE;
-    private static final int ACCENT = 0xFFF2B84B;
-    private static final int SLOT = 0xFF061126;
     private static final int REGION_GOOD = 0xFF00FF55;
     private static final int REGION_MODERATE = 0xFFFFFF00;
     private static final int REGION_POOR = 0xFFFF3333;
@@ -56,6 +52,10 @@ public final class LfgNotificationOverlay {
     private final LfgDisbandConfirmation disbandConfirmation;
     private final LfgKeybindHints keybindHints;
     private List<HitRegion> hitRegions = List.of();
+    private final java.util.Map<UUID, LfgElapsedTimerComponent.TextCache> timers = new java.util.HashMap<>();
+    // Private, render-only stacks: no caller can mutate a shared global item preview.
+    private final java.util.Map<LfgProtocol.RaidType, ItemStack> raidPreviews =
+            new java.util.EnumMap<>(LfgProtocol.RaidType.class);
 
     public LfgNotificationOverlay(Minecraft minecraft, RaidLfgService service,
                                   LfgNotificationManager notifications,
@@ -100,44 +100,51 @@ public final class LfgNotificationOverlay {
 
     public void tick() {
         notifications.tick();
+        if (minecraft.level == null) {
+            timers.clear();
+            raidPreviews.clear();
+        }
     }
 
     private void render(GuiGraphics graphics, int mouseX, int mouseY, boolean interactive) {
-        var cards = notifications.visibleCards();
-        if (cards.isEmpty()) {
-            hitRegions = List.of();
-            return;
-        }
-        int viewportWidth = minecraft.getWindow().getGuiScaledWidth();
-        int viewportHeight = minecraft.getWindow().getGuiScaledHeight();
-        var anchor = placements.resolveSideAnchored(
-                ELEMENT_ID, viewportWidth, viewportHeight, SideAnchor.RIGHT,
-                Math.max(0, viewportHeight - CARD_HEIGHT - 8)
-        );
-        var stack = stackBounds(anchor, cards.size(), viewportWidth, viewportHeight);
-        var hits = new ArrayList<HitRegion>();
-        Component hoveredRosterMember = null;
-        for (int index = 0; index < cards.size(); index++) {
-            var card = cards.get(index);
-            var target = stack.get(index);
-            boolean left = anchor.x() < viewportWidth / 2;
-            int offscreen = left ? -CARD_WIDTH : viewportWidth;
-            int animatedX = (int) Math.round(offscreen + (target.x() - offscreen) * card.animationProgress());
-            var animated = new Rectangle(animatedX, target.y(), CARD_WIDTH, CARD_HEIGHT);
-            var hovered = renderCard(graphics, card, animated, mouseX, mouseY, interactive, hits);
-            if (hovered != null) hoveredRosterMember = hovered;
-        }
-        if (hoveredRosterMember != null) {
-            graphics.renderTooltip(
-                    minecraft.font,
-                    List.of(ClientTooltipComponent.create(hoveredRosterMember.getVisualOrderText())),
-                    mouseX,
-                    mouseY,
-                    DefaultTooltipPositioner.INSTANCE,
-                    null
+        try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.LFG_OVERLAY_RENDER)) {
+            var cards = notifications.visibleCards();
+            timers.keySet().removeIf(id -> cards.stream().noneMatch(card -> card.lobby().lobbyId().equals(id)));
+            if (cards.isEmpty()) {
+                hitRegions = List.of();
+                return;
+            }
+            int viewportWidth = minecraft.getWindow().getGuiScaledWidth();
+            int viewportHeight = minecraft.getWindow().getGuiScaledHeight();
+            var anchor = placements.resolveSideAnchored(
+                    ELEMENT_ID, viewportWidth, viewportHeight, SideAnchor.RIGHT,
+                    Math.max(0, viewportHeight - CARD_HEIGHT - 8)
             );
+            var stack = stackBounds(anchor, cards.size(), viewportWidth, viewportHeight);
+            var hits = new ArrayList<HitRegion>();
+            Component hoveredRosterMember = null;
+            for (int index = 0; index < cards.size(); index++) {
+                var card = cards.get(index);
+                var target = stack.get(index);
+                boolean left = anchor.x() < viewportWidth / 2;
+                int offscreen = left ? -CARD_WIDTH : viewportWidth;
+                int animatedX = (int) Math.round(offscreen + (target.x() - offscreen) * card.animationProgress());
+                var animated = new Rectangle(animatedX, target.y(), CARD_WIDTH, CARD_HEIGHT);
+                var hovered = renderCard(graphics, card, animated, mouseX, mouseY, interactive, hits);
+                if (hovered != null) hoveredRosterMember = hovered;
+            }
+            if (hoveredRosterMember != null) {
+                graphics.renderTooltip(
+                        minecraft.font,
+                        List.of(ClientTooltipComponent.create(hoveredRosterMember.getVisualOrderText())),
+                        mouseX,
+                        mouseY,
+                        DefaultTooltipPositioner.INSTANCE,
+                        null
+                );
+            }
+            hitRegions = interactive ? List.copyOf(hits) : List.of();
         }
-        hitRegions = interactive ? List.copyOf(hits) : List.of();
     }
 
     static List<Rectangle> stackBounds(Rectangle anchor, int count, int viewportWidth, int viewportHeight) {
@@ -159,19 +166,22 @@ public final class LfgNotificationOverlay {
     private Component renderCard(GuiGraphics graphics, LfgNotificationManager.CardSnapshot card,
                                  Rectangle bounds, int mouseX, int mouseY, boolean interactive,
                                  List<HitRegion> hits) {
-        graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), SURFACE);
-        graphics.renderOutline(bounds.x(), bounds.y(), bounds.width(), bounds.height(), OUTLINE);
+        graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(),
+                org.kingdomfoxes.ralle.ui.theme.RallePalette.notificationSurface());
+        graphics.renderOutline(bounds.x(), bounds.y(), bounds.width(), bounds.height(),
+                org.kingdomfoxes.ralle.ui.theme.RallePalette.notificationOutline());
 
         var lobby = card.lobby();
-        graphics.renderItem(new ItemStack(RaidPresentation.item(lobby.raidType())), bounds.x() + 7, bounds.y() + 6);
+        graphics.renderItem(raidPreviews.computeIfAbsent(lobby.raidType(),
+                raid -> new ItemStack(RaidPresentation.item(raid))), bounds.x() + 7, bounds.y() + 6);
         var close = closeBounds(bounds);
         int titleWidth = Math.max(20, close.x() - (bounds.x() + 28) - 6);
         graphics.drawString(minecraft.font,
                 RalleTypography.body(Component.literal(ellipsize(RaidPresentation.name(lobby.raidType()), titleWidth))),
-                bounds.x() + 28, bounds.y() + 10, ACCENT, false);
+                bounds.x() + 28, bounds.y() + 10, org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb(), false);
 
         drawButtonFace(graphics, close, RalleButtonRenderers.Kind.DESTRUCTIVE, mouseX, mouseY, true);
-        drawCloseX(graphics, close, TEXT);
+        drawCloseX(graphics, close, org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText());
         if (interactive && card.mode() != LfgNotificationManager.CardMode.EXITING) {
             hits.add(new HitRegion(close, lobby.lobbyId(), Action.CLOSE));
         }
@@ -185,7 +195,7 @@ public final class LfgNotificationOverlay {
         String note = lobby.note() == null ? "No note" : LfgNoteText.sanitizeForDisplay(lobby.note());
         graphics.drawString(minecraft.font,
                 RalleTypography.body(Component.literal(ellipsize(note, bounds.right() - 8 - noteX))),
-                noteX, detailY, MUTED, false);
+                noteX, detailY, org.kingdomfoxes.ralle.ui.theme.RallePalette.secondaryText(), false);
 
         Component hoveredRosterMember = null;
         var viewer = service.store().state().viewer();
@@ -200,7 +210,7 @@ public final class LfgNotificationOverlay {
             }
         }
         if (showElapsedTimer) {
-            LfgElapsedTimerComponent.drawCentered(
+            timers.computeIfAbsent(lobby.lobbyId(), ignored -> new LfgElapsedTimerComponent.TextCache()).drawCentered(
                     graphics, minecraft.font, bounds.x() + bounds.width() / 2, bounds.y() + 46,
                     lobby.createdAt(), timerNow(card, java.time.Instant.now()));
         }
@@ -214,14 +224,19 @@ public final class LfgNotificationOverlay {
     private void renderRosterSlot(GuiGraphics graphics, LfgProtocol.Lobby lobby, int slot, Rectangle bounds) {
         if (slot >= lobby.members().size()) {
             graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), 0xFFFFFFFF);
-            graphics.fill(bounds.x() + 1, bounds.y() + 1, bounds.right() - 1, bounds.bottom() - 1, SLOT);
+            graphics.fill(bounds.x() + 1, bounds.y() + 1, bounds.right() - 1, bounds.bottom() - 1,
+                    org.kingdomfoxes.ralle.ui.theme.RallePalette.slotSurface());
             graphics.drawCenteredString(minecraft.font, Component.literal("+"),
-                    bounds.x() + bounds.width() / 2, bounds.y() + 6, TEXT);
+                    bounds.x() + bounds.width() / 2, bounds.y() + 6,
+                    org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText());
             return;
         }
         var member = lobby.members().get(slot);
+        var cosmetic = RalleClient.cosmetic(member.minecraftUuid());
+        var style = cosmetic == null ? null : cosmetic.selectedStyle();
         PlayerHeadPresentation.draw(graphics, minecraft, member,
-                bounds.x(), bounds.y(), 18, rosterBorderColor(member));
+                bounds.x(), bounds.y(), 18, rosterBorderColor(member),
+                style, style == null ? null : RalleClient.cosmeticAppearance(style));
     }
 
     private void renderControls(GuiGraphics graphics, LfgNotificationManager.CardSnapshot card,
@@ -304,7 +319,8 @@ public final class LfgNotificationOverlay {
                 }
                 graphics.drawCenteredString(minecraft.font, RalleTypography.body(
                         Component.literal(Integer.toString(card.countdownSeconds()))),
-                        countdown.x() + countdown.width() / 2, countdown.y() + 6, TEXT);
+                        countdown.x() + countdown.width() / 2, countdown.y() + 6,
+                        org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText());
                 drawButton(graphics, cancel, "Cancel", RalleButtonRenderers.Kind.DESTRUCTIVE,
                         mouseX, mouseY, true);
                 if (interactive) hits.add(new HitRegion(cancel, id, Action.CANCEL));
@@ -390,7 +406,8 @@ public final class LfgNotificationOverlay {
                             RalleButtonRenderers.Kind kind, int mouseX, int mouseY, boolean active) {
         drawButtonFace(graphics, bounds, kind, mouseX, mouseY, active);
         graphics.drawCenteredString(minecraft.font, label,
-                bounds.x() + bounds.width() / 2, bounds.y() + 6, active ? TEXT : 0xFF8D96A5);
+                bounds.x() + bounds.width() / 2, bounds.y() + 6,
+                active ? org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText() : 0xFF8D96A5);
     }
 
     private static void drawButtonFace(GuiGraphics graphics, Rectangle bounds,
@@ -441,11 +458,12 @@ public final class LfgNotificationOverlay {
 
     static Component rosterTooltip(LfgProtocol.Member member) {
         return RalleTheme.ui(Component.literal(
-                "[" + member.guild().tag() + "] " + member.ign()));
+                CosmeticPresentation.tooltip(member.guild().tag(), member.ign(),
+                        RalleClient.cosmetic(member.minecraftUuid()))));
     }
 
     static int rosterBorderColor(LfgProtocol.Member member) {
-        return GuildTerritoryColors.forGuild(member.guild().tag(), member.guild().color());
+        return PlayerHeadPresentation.guildBorder(member);
     }
 
     static java.time.Instant timerNow(LfgNotificationManager.CardSnapshot card, java.time.Instant now) {

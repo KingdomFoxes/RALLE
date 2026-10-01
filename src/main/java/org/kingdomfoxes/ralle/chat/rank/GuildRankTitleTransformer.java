@@ -94,13 +94,11 @@ final class GuildRankTitleTransformer {
 
         Optional<String> internalTitle = Optional.empty();
         if (useInternalRanks) {
-            internalTitle = snapshot.titleFor(match.speaker().displayName());
-            if (internalTitle.isEmpty()) {
-                int speakerEnd = match.speaker().messageStart() - 1;
-                int speakerStart = speakerEnd - match.speaker().displayName().length();
-                internalTitle = GuildSpeakerIdentity.resolve(
-                        message, match.speaker().displayName(), speakerStart, speakerEnd).flatMap(snapshot::titleFor);
-            }
+            int speakerEnd = match.speaker().messageStart() - 1;
+            int speakerStart = speakerEnd - match.speaker().displayName().length();
+            // A class nickname can itself equal another cached IGN. Resolve identity first.
+            internalTitle = GuildSpeakerIdentity.resolve(
+                    message, match.speaker().displayName(), speakerStart, speakerEnd).flatMap(snapshot::titleFor);
         }
 
         String displayedTitle = internalTitle.orElse(match.oldTitle());

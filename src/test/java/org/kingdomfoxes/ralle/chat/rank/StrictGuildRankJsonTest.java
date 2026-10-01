@@ -9,6 +9,20 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class StrictGuildRankJsonTest {
     @Test
+    void readsCurrentFoxTitlesAndPreservesPrimeMinisterPrecedence() {
+        assertEquals(Map.of("Ana", "BARONESS", "Bo", "PRIME MINISTER"),
+                StrictGuildRankJson.decodeApi("""
+                        {"members":[
+                          {"name":"Ana","fox_rank":"Baroness","prime_minister":false},
+                          {"name":"Bo","fox_rank":"Lord","prime_minister":true},
+                          {"name":"NoTitle","fox_rank":null},
+                          {"name":"Malformed","fox_rank":42},
+                          {"name":"Removed","fox_rank":null,"ranks":[{"kind":"fox","name":"Sir"}]}
+                        ]}
+                        """));
+    }
+
+    @Test
     void defaultRankEndpointFollowsTheProductionBackend() {
         assertEquals("https://kingdomfoxes.com/api/ranks", HttpGuildRankGateway.defaultEndpoint());
     }

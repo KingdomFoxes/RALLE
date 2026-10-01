@@ -20,6 +20,61 @@ class RalleSettingsTest {
     Path temporaryDirectory;
 
     @Test
+    void cosmeticControlsIgnoreLegacyToggleAndPersistOnlyLocalAppearance() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        Files.writeString(path, "cosmetics.nameplate-cosmetics=false\ncosmetics.effect-treatment=text\n"
+                + "cosmetics.white-username-outline=true\ncosmetics.outline-thickness=2\n");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+        var supporter = registry.categories().stream().filter(category -> category.id().equals("cosmetics"))
+                .findFirst().orElseThrow();
+        assertTrue(supporter.subcategories().isEmpty());
+        assertEquals(List.of("nameplate-preview", RalleSettings.MATERIAL_RESOLUTION_ID,
+                        RalleSettings.NAMEPLATE_COLOR_ID),
+                supporter.entries().stream().map(entry -> entry.id()).toList());
+        assertTrue(registry.entry("nameplate-cosmetics").isEmpty());
+        assertTrue(registry.available(RalleSettings.MATERIAL_RESOLUTION_ID));
+        assertEquals("recipe", registry.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).value());
+        var appearance = org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance.from(registry,
+                org.kingdomfoxes.ralle.cosmetics.NameplateStyle.CATALOG.getFirst());
+        assertEquals(org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance.Treatment.PLATE, appearance.treatment());
+        assertEquals(0, appearance.usernameOutlinePixels());
+        registry.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).set("0.5");
+        var restored = new SettingsRegistry(path);
+        RalleSettings.register(restored);
+        restored.seal();
+        assertEquals("0.5", restored.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).value());
+        assertTrue(restored.available(RalleSettings.NAMEPLATE_COLOR_ID));
+        assertFalse(Files.readString(path).contains("selected_style_id"));
+        assertFalse(Files.readString(path).contains("nameplate-cosmetics"));
+    }
+
+    @Test
+    void pointAndLaughIsAnEmptyTopLevelWarTextFieldAndPersists() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+        var setting = registry.setting(RalleSettings.POINT_AND_LAUGH_ID,
+                org.kingdomfoxes.ralle.api.settings.TextSetting.class);
+        assertEquals("", setting.value());
+        assertTrue(registry.categories().stream().filter(category -> category.id().equals("war"))
+                .findFirst().orElseThrow().entries().contains(setting));
+        setting.set("Better luck next time!");
+        var restored = new SettingsRegistry(path);
+        RalleSettings.register(restored);
+        restored.seal();
+        var saved = restored.setting(RalleSettings.POINT_AND_LAUGH_ID,
+                org.kingdomfoxes.ralle.api.settings.TextSetting.class);
+        assertEquals(setting.value(), saved.value());
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> saved.set("a\nb"));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> saved.set("x".repeat(255)));
+        saved.set("");
+        assertEquals("", saved.value());
+    }
+
+    @Test
     void everyFeatureAndKeybindDefaultsToInert() {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);
@@ -203,10 +258,10 @@ class RalleSettingsTest {
         RalleSettings.register(registry);
 
         var categories = registry.categories().stream().toList();
-        assertEquals(List.of("about", "chat", "raid-lfg", "war"), categories.stream().map(value -> value.id()).toList());
+        assertEquals(List.of("about", "chat", "raid-lfg", "war", "cosmetics"), categories.stream().map(value -> value.id()).toList());
         assertEquals(List.of(),
                 categories.get(0).subcategories().stream().map(value -> value.id()).toList());
-        assertEquals(List.of("edit-huds", RalleSettings.INTERFACE_FONT_ID),
+        assertEquals(List.of("edit-huds", RalleSettings.INTERFACE_FONT_ID, RalleSettings.UI_THEME_ID),
                 categories.get(0).entries().stream().map(value -> value.id()).toList());
         assertEquals(List.of(), registry.dependencies("edit-huds"));
         assertEquals(List.of("appearance", "input", "guild-ranks", "message-direction", "horizontal-alignment", "text-shadow",
@@ -257,7 +312,8 @@ class RalleSettingsTest {
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("automatic-raid-requeue-keybind"));
         assertEquals(List.of("attack-timers", "territory-map", "consumables"),
                 categories.get(3).subcategories().stream().map(value -> value.id()).toList());
-        assertEquals(List.of(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID, RalleSettings.QUEUE_SELF_COLOR_ID),
+        assertEquals(List.of(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID,
+                        RalleSettings.QUEUE_KOF_RANK_COLORS_ID, RalleSettings.QUEUE_SELF_COLOR_ID),
                 categories.get(3).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
         assertFalse(registry.setting(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID, BooleanSetting.class).value());
         assertEquals(List.of(RalleSettings.HQ_DISTANCE_ENABLED_ID, RalleSettings.HQ_DISTANCE_KEYBIND_ID),
@@ -309,6 +365,12 @@ class RalleSettingsTest {
         assertFalse(setting.value());
         setting.set(true);
         assertTrue(Files.readString(path).contains("war.queue-attribution-enabled=true"));
+        var rankColors = registry.setting(RalleSettings.QUEUE_KOF_RANK_COLORS_ID, BooleanSetting.class);
+        assertFalse(rankColors.value());
+        assertEquals(List.of(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID),
+                registry.dependencies(RalleSettings.QUEUE_KOF_RANK_COLORS_ID));
+        rankColors.set(true);
+        assertTrue(Files.readString(path).contains("war.queue-kof-rank-colors=true"));
     }
 
     @Test
@@ -372,6 +434,25 @@ class RalleSettingsTest {
         RalleSettings.register(invalid);
         invalid.seal();
         assertEquals("vanilla", invalid.setting(RalleSettings.INTERFACE_FONT_ID, ChoiceSetting.class).value());
+    }
+
+    @Test
+    void uiThemeUsesStableCatalogIdsAndFallsBackWhenSavedThemeIsRemoved() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+        var theme = registry.setting(RalleSettings.UI_THEME_ID, ChoiceSetting.class);
+        assertEquals("default", theme.value());
+        assertEquals(25, theme.choices().size());
+        theme.set("hot-chocolate");
+        assertTrue(Files.readString(path).contains("about.ui-theme=hot-chocolate"));
+
+        Files.writeString(path, "about.ui-theme=renamed-or-removed\n");
+        var restored = new SettingsRegistry(path);
+        RalleSettings.register(restored);
+        restored.seal();
+        assertEquals("default", restored.setting(RalleSettings.UI_THEME_ID, ChoiceSetting.class).value());
     }
 
     @Test

@@ -8,3 +8,14 @@ run/
 *.iml
 *.ipr
 *.iws
+
+# Local development instructions and checkouts.
+/AGENTS.md
+/.agents/
+/.worktrees/
+
+# Local experiments and generated review artifacts are not release source.
+/colors/
+/outputs/
+/prototypes/
+/build_settings_workbook.mjs

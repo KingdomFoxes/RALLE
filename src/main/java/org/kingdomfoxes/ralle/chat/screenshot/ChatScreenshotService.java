@@ -247,7 +247,7 @@ public final class ChatScreenshotService {
     public void renderLocalFill(ChatComponent.ChatGraphicsAccess graphics) {
         float opacity = lifecycle.overlayOpacity(now());
         if (opacity <= 0.0F) return;
-        int color = ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.SELECTION_FILL, opacity);
+        int color = ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.selectionFill(), opacity);
         for (Rectangle bounds : currentVisualBounds()) {
             int left = (int) Math.floor((bounds.left() - snapshot.viewportLeft()) / snapshot.chatScale())
                     - ChatScreenshotTokens.CHAT_TEXT_OFFSET;
@@ -268,7 +268,7 @@ public final class ChatScreenshotService {
         long now = now();
         float opacity = lifecycle.overlayOpacity(now);
         if (opacity <= 0.0F) return;
-        int outlineColor = ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.SELECTION_GOLD, opacity);
+        int outlineColor = ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.selectionGold(), opacity);
         graphics.enableScissor(snapshot.viewportLeft(), snapshot.viewportTop(), snapshot.viewportRight(), snapshot.viewportBottom());
         if (state() == State.DRAGGING) {
             if (visualBounds.size() == 1) drawSolid(graphics, visualBounds.getFirst(), outlineColor);
@@ -473,9 +473,9 @@ public final class ChatScreenshotService {
         graphics.fill(left, top, left + outerWidth, top + outerHeight,
                 ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.CONFIRMATION_DEPTH_COLOR, opacity));
         graphics.fill(left, top, faceRight, faceBottom,
-                ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.CONFIRMATION_FILL, opacity));
+                ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.confirmationFill(), opacity));
 
-        int gold = ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.SELECTION_GOLD, opacity);
+        int gold = ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.selectionGold(), opacity);
         int highlight = ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.CONFIRMATION_HIGHLIGHT, opacity);
         graphics.fill(left, top, faceRight, top + 1, highlight);
         graphics.fill(left, top, left + 1, faceBottom, highlight);
@@ -487,7 +487,7 @@ public final class ChatScreenshotService {
         int textY = top + ChatScreenshotTokens.OUTLINE_WIDTH
                 + ChatScreenshotTokens.CONFIRMATION_VERTICAL_PADDING;
         graphics.drawString(minecraft.font, label, textX, textY,
-                ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.CONFIRMATION_TEXT, opacity), false);
+                ChatScreenshotTokens.withOpacity(ChatScreenshotTokens.confirmationText(), opacity), false);
     }
 
     private static int centeredPosition(int contentStart, int contentEnd, int size, int viewportStart, int viewportEnd) {

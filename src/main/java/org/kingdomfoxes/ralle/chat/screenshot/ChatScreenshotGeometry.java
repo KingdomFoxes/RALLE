@@ -187,9 +187,15 @@ public final class ChatScreenshotGeometry {
     }
 
     public static int captureVisualHeight(int lineCount, int lineHeight, double chatScale) {
-        if (lineCount < 1 || lineHeight < 1 || chatScale <= 0) throw new IllegalArgumentException("Invalid capture dimensions");
+        if (lineCount < 1 || lineHeight < 1 || !Double.isFinite(chatScale) || chatScale <= 0) {
+            throw new IllegalArgumentException("Invalid capture dimensions");
+        }
+        double height = Math.ceil((double) lineCount * lineHeight * chatScale);
+        if (height > Integer.MAX_VALUE - ChatScreenshotTokens.VERTICAL_PADDING * 2) {
+            throw new IllegalArgumentException("Selection is too large to copy. Select fewer messages or lower GUI scale.");
+        }
         return Math.addExact(
-                (int) Math.ceil(lineCount * lineHeight * chatScale),
+                (int) height,
                 ChatScreenshotTokens.VERTICAL_PADDING * 2
         );
     }

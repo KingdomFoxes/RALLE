@@ -79,6 +79,37 @@ class QueueAttributionFormatterTest {
         assertEquals(ChatFormatting.RED.getColor(), segments(self).get(3).style().getColor().getValue());
     }
 
+    @Test
+    void rankColorsChangeOnlyOtherNames() {
+        var original = Component.literal("Detlas 2:32").withStyle(ChatFormatting.GOLD);
+        var style = new org.kingdomfoxes.ralle.war.consumables.HighlightStyle(0x123456, false);
+        var remote = segments(QueueAttributionFormatter.format(original, Optional.of("Remote"), "Player",
+                Component.literal("Unknown"), style, 0L, ign -> KofRankColors.forTitle("King")));
+        assertEquals(0xFFCC00, remote.get(0).style().getColor().getValue());
+        assertEquals(ChatFormatting.GRAY.getColor(), remote.get(1).style().getColor().getValue());
+        assertEquals(ChatFormatting.GOLD.getColor(), remote.get(2).style().getColor().getValue());
+        for (var ign : java.util.List.of(Optional.of("PLAYER"), Optional.<String>empty())) {
+            var row = segments(QueueAttributionFormatter.format(original, ign, "Player",
+                    Component.literal("Unknown"), style, 0L, name -> { throw new AssertionError("Unexpected lookup"); }));
+            assertEquals(ign.isPresent() ? 0x123456 : 0xAAAAAA, row.get(0).style().getColor().getValue());
+        }
+    }
+
+    @Test
+    void allRankTitleVariantsUseTheRequestedPalette() {
+        var groups = java.util.Map.of(
+                0x5A84D4, "page,squire,sir,madam,knight,lord,lady,liege",
+                0x8E77CC, "prime minister",
+                0x0EACB4, "baron,baroness,baronx,viscount,viscountess,viscountx",
+                0x4DD6EC, "count,countess,countx,marquis,marchioness,marqix",
+                0xFF9A19, "viceroy", 0xFFCC00, "archduke,prince,king");
+        groups.forEach((rgb, titles) -> {
+            for (String title : titles.split(",")) assertEquals(rgb.intValue(), KofRankColors.forTitle(title));
+        });
+        assertEquals(0xAAAAAA, KofRankColors.forTitle("unknown"));
+        assertEquals(0xAAAAAA, KofRankColors.forTitle(null));
+    }
+
     private static ArrayList<Segment> segments(Component component) {
         var result = new ArrayList<Segment>();
         component.visit((style, text) -> {

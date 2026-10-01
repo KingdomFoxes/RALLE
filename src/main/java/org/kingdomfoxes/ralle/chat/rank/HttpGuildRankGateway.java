@@ -1,6 +1,8 @@
 package org.kingdomfoxes.ralle.chat.rank;
 
 import org.kingdomfoxes.ralle.lfg.client.HttpLfgGateway;
+import org.kingdomfoxes.ralle.platform.SharedHttpTransport;
+import java.util.function.Supplier;
 
 import java.io.IOException;
 import java.net.URI;
@@ -14,30 +16,42 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-/** JDK HTTP client for the public {@code GET /api/ranks} endpoint. */
+/** JDK HTTP client for the authenticated {@code GET /api/ranks} endpoint. */
 public final class HttpGuildRankGateway implements GuildRankGateway {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(12);
     private static final int MAX_BODY_BYTES = StrictGuildRankJson.MAX_DOCUMENT_CHARS * 4;
 
-    private final HttpClient client;
+    private final Supplier<HttpClient> client;
     private final URI endpoint;
+    private final Supplier<CompletableFuture<String>> credentials;
 
-    public HttpGuildRankGateway() {
-        this(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build(), defaultEndpoint());
+    public HttpGuildRankGateway(Supplier<CompletableFuture<String>> credentials) {
+        this(SharedHttpTransport.shared(), defaultEndpoint(), credentials);
     }
 
-    public HttpGuildRankGateway(HttpClient client, String endpoint) {
-        this.client = client;
+    public HttpGuildRankGateway(Supplier<HttpClient> client, String endpoint,
+                                Supplier<CompletableFuture<String>> credentials) {
+        this.client = java.util.Objects.requireNonNull(client, "client");
         this.endpoint = validateEndpoint(endpoint);
+        this.credentials = java.util.Objects.requireNonNull(credentials, "credentials");
     }
 
     @Override
     public CompletableFuture<Map<String, String>> fetchTitles() {
-        var request = HttpRequest.newBuilder(endpoint).timeout(REQUEST_TIMEOUT).GET().build();
-        return client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream()).thenApply(response -> {
+        return credentials.get().thenCompose(this::fetchAuthenticated);
+    }
+
+    private CompletableFuture<Map<String, String>> fetchAuthenticated(String token) {
+        if (token == null || token.isBlank()) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Fox rank credential is unavailable"));
+        }
+        var request = HttpRequest.newBuilder(endpoint).timeout(REQUEST_TIMEOUT)
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("Authorization", "Bearer " + token).GET().build();
+        return client.get().sendAsync(request, HttpResponse.BodyHandlers.ofInputStream()).thenApply(response -> {
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 try (var ignored = response.body()) {
-                    // Close the bounded response stream before reporting the public API failure.
+                    // Close the bounded response stream before reporting the API failure.
                 } catch (IOException ignored) {}
                 throw new IllegalStateException("Fox rank API rejected the request (HTTP " + response.statusCode() + ")");
             }

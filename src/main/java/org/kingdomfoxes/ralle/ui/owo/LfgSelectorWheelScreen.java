@@ -1,5 +1,8 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
+import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
+import org.kingdomfoxes.ralle.RalleClient;
+
 import org.kingdomfoxes.ralle.lfg.client.LfgCreationFeedback;
 
 import net.minecraft.client.Minecraft;
@@ -25,9 +28,6 @@ import java.util.UUID;
 public final class LfgSelectorWheelScreen extends Screen {
     public enum Mode { CREATE, KICK }
 
-    private static final int TEXT = 0xFFFFFFFF;
-    private static final int MUTED = 0xFFA9B0BE;
-    private static final int ACCENT = 0xFFF2B84B;
     private static final int DISABLED = 0xFF697487;
     private static final int SURFACE = 0xEE0A1830;
     private static final int OUTLINE = 0xFF586985;
@@ -148,57 +148,61 @@ public final class LfgSelectorWheelScreen extends Screen {
     }
 
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        long now = System.currentTimeMillis();
-        int hovered = model.state() == SelectorWheelModel.State.SELECTING
-                ? hit(mouseX, mouseY) : -1;
-        if (hovered >= 0 && !enabled(entries.get(hovered))) hovered = -1;
-        if (mode == Mode.CREATE && hovered >= 0 && hovered != model.hovered()) CreateWheelSounds.hover(minecraft);
-        model.hover(hovered, now);
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(width / 2f, height / 2f);
-        graphics.pose().scale((float) wheelScale, (float) wheelScale);
-        for (int index = 0; index < entries.size(); index++) {
-            var entry = entries.get(index);
-            var bounds = geometry.get(index);
-            double offset = model.offset(index, now);
-            boolean dissolving = creationAnimation != null && index == model.hovered();
-            if (dissolving) offset += creationAnimation.extension(now);
-            int dx = (int) Math.round(Math.cos(bounds.angle()) * offset);
-            int dy = (int) Math.round(Math.sin(bounds.angle()) * offset);
-            double progress = dissolving ? creationAnimation.progress(now) : 0;
-            if (dissolving && snapshots[index] != null) {
-                snapshots[index].draw(graphics, dx, dy, progress);
-                continue;
+        try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.SELECTOR_RENDER)) {
+            long now = System.currentTimeMillis();
+            int hovered = model.state() == SelectorWheelModel.State.SELECTING
+                    ? hit(mouseX, mouseY) : -1;
+            if (hovered >= 0 && !enabled(entries.get(hovered))) hovered = -1;
+            if (mode == Mode.CREATE && hovered >= 0 && hovered != model.hovered()) CreateWheelSounds.hover(minecraft);
+            model.hover(hovered, now);
+            graphics.pose().pushMatrix();
+            graphics.pose().translate(width / 2f, height / 2f);
+            graphics.pose().scale((float) wheelScale, (float) wheelScale);
+            for (int index = 0; index < entries.size(); index++) {
+                var entry = entries.get(index);
+                var bounds = geometry.get(index);
+                double offset = model.offset(index, now);
+                boolean dissolving = creationAnimation != null && index == model.hovered();
+                if (dissolving) offset += creationAnimation.extension(now);
+                int dx = (int) Math.round(Math.cos(bounds.angle()) * offset);
+                int dy = (int) Math.round(Math.sin(bounds.angle()) * offset);
+                double progress = dissolving ? creationAnimation.progress(now) : 0;
+                if (dissolving && snapshots[index] != null) {
+                    snapshots[index].draw(graphics, dx, dy, progress);
+                    continue;
+                }
+                // If GPU capture failed, keep the ordinary bounded renderer, then remove the segment.
+                if (dissolving && progress >= .5) continue;
+                if (mode == Mode.CREATE) {
+                    SelectorWheelRenderer.drawCreate(graphics, bounds, dx, dy, index == model.hovered());
+                }
+                else {
+                    SelectorWheelRenderer.draw(graphics, bounds, dx, dy, index == model.hovered());
+                }
+                int x = (int) Math.round(bounds.centerX()) + dx;
+                int y = (int) Math.round(bounds.centerY()) + dy;
+                if (mode == Mode.CREATE) drawRaid(graphics, entry, x, y, index == model.hovered());
+                else drawPlayer(graphics, entry, x, y, index == model.hovered());
             }
-            // If GPU capture failed, keep the ordinary bounded renderer, then remove the segment.
-            if (dissolving && progress >= .5) continue;
-            if (mode == Mode.CREATE) {
-                SelectorWheelRenderer.drawCreate(graphics, bounds, dx, dy, index == model.hovered());
+            if (explosionStarted >= 0) {
+                int frame = KickWheelAnimation.frame(explosionStarted, now);
+                if (frame >= 0) graphics.blit(RenderPipelines.GUI_TEXTURED, EXPLOSION,
+                        kickX - 35, kickY - 55, frame * 71f, 0, 71, 100, 71 * 17, 100);
             }
-            else {
-                SelectorWheelRenderer.draw(graphics, bounds, dx, dy, index == model.hovered());
+            graphics.pose().popMatrix();
+            Component below = status != null ? status : model.hovered() >= 0 && mode == Mode.KICK
+                    ? entries.get(model.hovered()).label()
+                    : Component.translatable(mode == Mode.CREATE ? "ralle.lfg.wheel.create.hint" : "ralle.lfg.wheel.kick.hint");
+            int color = statusFailure ? 0xFFFF6B6B : model.hovered() >= 0 && mode == Mode.KICK
+                    ? org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb()
+                    : org.kingdomfoxes.ralle.ui.theme.RallePalette.secondaryText();
+            var lines = font.split(RalleTypography.body(below), Math.max(1, width - 24));
+            int statusY = Math.min(height - lines.size() * (font.lineHeight + 2) - 4,
+                    height / 2 + (int) Math.ceil((outerRadius + 12) * wheelScale));
+            for (var line : lines) {
+                graphics.drawString(font, line, (width - font.width(line)) / 2, statusY, color, true);
+                statusY += font.lineHeight + 2;
             }
-            int x = (int) Math.round(bounds.centerX()) + dx;
-            int y = (int) Math.round(bounds.centerY()) + dy;
-            if (mode == Mode.CREATE) drawRaid(graphics, entry, x, y, index == model.hovered());
-            else drawPlayer(graphics, entry, x, y, index == model.hovered());
-        }
-        if (explosionStarted >= 0) {
-            int frame = KickWheelAnimation.frame(explosionStarted, now);
-            if (frame >= 0) graphics.blit(RenderPipelines.GUI_TEXTURED, EXPLOSION,
-                    kickX - 35, kickY - 55, frame * 71f, 0, 71, 100, 71 * 17, 100);
-        }
-        graphics.pose().popMatrix();
-        Component below = status != null ? status : model.hovered() >= 0 && mode == Mode.KICK
-                ? entries.get(model.hovered()).label()
-                : Component.translatable(mode == Mode.CREATE ? "ralle.lfg.wheel.create.hint" : "ralle.lfg.wheel.kick.hint");
-        int color = statusFailure ? 0xFFFF6B6B : model.hovered() >= 0 && mode == Mode.KICK ? ACCENT : MUTED;
-        var lines = font.split(RalleTypography.body(below), Math.max(1, width - 24));
-        int statusY = Math.min(height - lines.size() * (font.lineHeight + 2) - 4,
-                height / 2 + (int) Math.ceil((outerRadius + 12) * wheelScale));
-        for (var line : lines) {
-            graphics.drawString(font, line, (width - font.width(line)) / 2, statusY, color, true);
-            statusY += font.lineHeight + 2;
         }
     }
 
@@ -206,7 +210,9 @@ public final class LfgSelectorWheelScreen extends Screen {
         graphics.renderItem(raidItem(entry), x - 8, y - 14);
         var label = RalleTypography.body(entry.label());
         graphics.drawString(font, label, x - font.width(label) / 2, y + 5,
-                enabled(entry) || retainsCreatePresentation() ? hovered ? ACCENT : TEXT : DISABLED, false);
+                enabled(entry) || retainsCreatePresentation() ? hovered
+                        ? org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb()
+                        : org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText() : DISABLED, false);
     }
 
     private void prepareSnapshot(int index) {
@@ -220,7 +226,8 @@ public final class LfgSelectorWheelScreen extends Screen {
                 int y = (int) Math.round(bounds.centerY());
                 graphics.renderItem(raidItem(entry), x - 8, y - 14);
                 var label = RalleTypography.body(entry.label());
-                graphics.drawString(font, label, x - font.width(label) / 2, y + 5, ACCENT, false);
+                graphics.drawString(font, label, x - font.width(label) / 2, y + 5,
+                        org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb(), false);
             });
         } catch (RuntimeException | LinkageError failure) {
             snapshotFailed = true;
@@ -273,8 +280,12 @@ public final class LfgSelectorWheelScreen extends Screen {
     private void drawPlayer(GuiGraphics graphics, Entry entry, int x, int y, boolean hovered) {
         var member = currentMember(entry.memberId());
         int border = member == null ? DISABLED : PlayerHeadPresentation.guildBorder(member);
-        if (member != null) PlayerHeadPresentation.draw(graphics, minecraft, member, x - 9, y - 9, 16, border);
-        else graphics.fill(x - 8, y - 8, x + 8, y + 8, 0xFF27344A);
+        if (member != null) {
+            var cosmetic = RalleClient.cosmetic(member.minecraftUuid());
+            var style = cosmetic == null ? null : cosmetic.selectedStyle();
+            PlayerHeadPresentation.draw(graphics, minecraft, member, x - 9, y - 9, 16, border,
+                    style, style == null ? null : RalleClient.cosmeticAppearance(style));
+        } else graphics.fill(x - 8, y - 8, x + 8, y + 8, 0xFF27344A);
     }
 
     @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {

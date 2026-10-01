@@ -40,8 +40,8 @@ final class RalleModalDialogs {
     ) {
         var content = UIContainers.verticalFlow(Sizing.fixed(320), Sizing.content());
         content.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
-        content.child(UIComponents.label(RalleTheme.ui(title)).color(RalleTheme.ACCENT));
-        content.child(UIComponents.label(RalleTheme.ui(message)).color(RalleTheme.MUTED).maxWidth(296));
+        content.child(UIComponents.label(RalleTheme.ui(title)).color(RalleTheme.accent()));
+        content.child(UIComponents.label(RalleTheme.ui(message)).color(RalleTheme.muted()).maxWidth(296));
 
         var controls = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content()).gap(8);
         @SuppressWarnings("rawtypes")

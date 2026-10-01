@@ -20,6 +20,65 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GuildRankTitleTransformerTest {
     @Test
+    void resolvesApostropheOnlyPossessivesForNamesEndingInS() {
+        var snapshot = new GuildRankSnapshot(1, Map.of("MailOrderGF", "Madam", "Robturne", "Prince"));
+        var accounts = Map.of("MailOrderShurikens", "MailOrderGF", "Hephaestus", "Robturne",
+                "aurascrollslavehelps", "MailOrderGF", "aurascrollslavehelp", "MailOrderGF");
+        accounts.forEach((alias, ign) -> {
+            for (String apostrophe : List.of("'", "’")) {
+                String possessive = apostrophe + (alias.endsWith("s") ? "" : "s");
+                var hover = new HoverEvent.ShowText(Component.literal(alias + possessive + " real name is " + ign));
+                var original = Component.empty()
+                        .append(GuildRankTitleTransformer.background("STRATEGIST"))
+                        .append(GuildRankTitleTransformer.foreground("STRATEGIST"))
+                        .append(Component.literal(" " + alias + ": hello")
+                                .withStyle(style -> style.withHoverEvent(hover)));
+                for (var style : List.of(GuildRankStyle.TITLES, GuildRankStyle.STARS_AND_TITLES)) {
+                    var transformed = GuildRankTitleTransformer.apply(original, snapshot, style, true);
+                    String title = snapshot.titleFor(ign).orElseThrow();
+                    String expected = style == GuildRankStyle.TITLES
+                            ? GuildRankTitleTransformer.foreground(title)
+                            : GuildRankTitleTransformer.encodeStarsAndTitle(3, title, true).foreground();
+                    assertTrue(transformed.getString().contains(expected), alias + possessive + " / " + style);
+                    assertTrue(renderedSegments(transformed).stream().anyMatch(segment ->
+                            segment.text().contains(alias) && hover.equals(segment.style().getHoverEvent())));
+                }
+            }
+        });
+    }
+
+    @Test
+    void resolvesCanonicalRankAcrossClassNamesAndWrappedInheritedHover() {
+        var snapshot = new GuildRankSnapshot(1, Map.of("MailOrderGF", "Madam", "OtherMember", "Lord"));
+        for (String alias : List.of("MailOrderGF", "MailOrderShurikens", "OtherMember")) {
+            var original = guildMessage("STRATEGIST", alias).copy();
+            if (!alias.equals("MailOrderGF")) {
+                original.withStyle(style -> style.withHoverEvent(new HoverEvent.ShowText(
+                        Component.literal("\n" + alias + "'s real name is\nMailOrderGF\n"))));
+            }
+            for (var style : List.of(GuildRankStyle.TITLES, GuildRankStyle.STARS_AND_TITLES)) {
+                var transformed = GuildRankTitleTransformer.apply(original, snapshot, style, true);
+                String expected = style == GuildRankStyle.TITLES
+                        ? GuildRankTitleTransformer.foreground("MADAM")
+                        : GuildRankTitleTransformer.encodeStarsAndTitle(3, "MADAM", true).foreground();
+                assertTrue(transformed.getString().contains(expected), alias + " / " + style);
+            }
+        }
+    }
+
+    @Test
+    void nicknameCannotBorrowCachedRankWhenHoverIdentifiesAnotherOrInvalidPlayer() {
+        var snapshot = new GuildRankSnapshot(1, Map.of("OtherMember", "Lord"));
+        for (String hover : List.of("OtherMember's real name is UnlistedPlayer",
+                "WrongAlias's real name is OtherMember")) {
+            var original = guildMessage("STRATEGIST", "OtherMember").copy()
+                    .withStyle(style -> style.withHoverEvent(new HoverEvent.ShowText(Component.literal(hover))));
+            assertTrue(GuildRankTitleTransformer.apply(original, snapshot).getString()
+                    .contains(GuildRankTitleTransformer.foreground("STRATEGIST")));
+        }
+    }
+
+    @Test
     void primeMinisterUsesCompactPillButRetainsFullHoverTitle() {
         var snapshot = new GuildRankSnapshot(1, Map.of("maxkarson", "Prime Minister"));
         assertEquals("PRIME MINISTER", snapshot.titleFor("maxkarson").orElseThrow());
@@ -298,6 +357,41 @@ class GuildRankTitleTransformerTest {
 
         assertEquals(strategistIndicator() + " " + combined.background() + combined.foreground()
                 + " maxkarson: hello", transformed.getString());
+    }
+
+    @Test
+    void prunedApiResponseUsesTheChatPillForWynncraftRankHover() {
+        var snapshot = new GuildRankSnapshot(1L, StrictGuildRankJson.decodeApi("""
+                {"total_members":3,"members":[
+                  {"uuid":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","name":"maxkarson",
+                   "fox_rank":"Liege","prime_minister":false},
+                  {"uuid":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","name":"ToolyTom",
+                   "fox_rank":"Lord","prime_minister":true},
+                  {"uuid":"cccccccc-cccc-cccc-cccc-cccccccccccc","name":"NoTitle",
+                   "fox_rank":null,"prime_minister":false}
+                ]}
+                """));
+        var suffixes = Map.of("maxkarson", " - Lord/Lady/Liege",
+                "ToolyTom", " - Prime Minister", "NoTitle", "");
+
+        for (var style : GuildRankStyle.values()) {
+            for (String rank : List.of("STRATEGIST", "CAPTAIN")) {
+                suffixes.forEach((player, suffix) -> {
+                    var transformed = GuildRankTitleTransformer.apply(
+                            guildMessage(rank, player), snapshot, style, true);
+                    var pillHovers = renderedSegments(transformed).stream()
+                            .map(segment -> segment.style().getHoverEvent())
+                            .filter(HoverEvent.ShowText.class::isInstance)
+                            .map(HoverEvent.ShowText.class::cast)
+                            .map(hover -> hover.value().getString())
+                            .toList();
+
+                    assertTrue(pillHovers.size() >= 2, style + " / " + rank + " / " + player);
+                    assertTrue(pillHovers.stream().allMatch((rank + suffix)::equals),
+                            style + " / " + rank + " / " + player);
+                });
+            }
+        }
     }
 
     @Test

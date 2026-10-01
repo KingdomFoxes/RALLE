@@ -53,7 +53,7 @@ final class ConsumableHighlightsPanel extends FlowLayout {
         var actions = UIContainers.verticalFlow(Sizing.fixed(ACTION_LANE_WIDTH), Sizing.fixed(220));
         actions.gap(5).padding(Insets.of(4)).surface(RalleSurfaces.NAVY_PANEL);
         status = UIComponents.label(Component.empty()).lineHeight(RalleTheme.BODY_LINE_HEIGHT)
-                .color(RalleTheme.MUTED).maxWidth(ACTION_LANE_WIDTH - 8);
+                .color(RalleTheme.muted()).maxWidth(ACTION_LANE_WIDTH - 8);
         actions.child(action("ralle.consumables.action.add", this::openAdd, RalleButtonRenderers.primary()));
         actions.child(action("ralle.consumables.action.import", this::startImport, RalleButtonRenderers.neutral()));
         actions.child(action("ralle.consumables.action.export", this::startExport, RalleButtonRenderers.neutral()));
@@ -78,7 +78,7 @@ final class ConsumableHighlightsPanel extends FlowLayout {
             var empty = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(198));
             empty.horizontalAlignment(HorizontalAlignment.CENTER).verticalAlignment(VerticalAlignment.CENTER);
             empty.child(UIComponents.label(RalleTheme.ui(Component.translatable("ralle.consumables.empty")))
-                    .color(RalleTheme.MUTED));
+                    .color(RalleTheme.muted()));
             rows.add(empty);
             list.replaceChildren(rows);
             return;
@@ -270,7 +270,7 @@ final class ConsumableHighlightsPanel extends FlowLayout {
     }
 
     private void showSuccess(String translationKey) {
-        status.color(RalleTheme.MUTED).text(RalleTheme.ui(Component.translatable(translationKey)));
+        status.color(RalleTheme.muted()).text(RalleTheme.ui(Component.translatable(translationKey)));
     }
 
     private void clearStatus() {

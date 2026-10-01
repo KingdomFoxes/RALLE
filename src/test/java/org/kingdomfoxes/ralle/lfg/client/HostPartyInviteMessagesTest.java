@@ -55,7 +55,7 @@ class HostPartyInviteMessagesTest {
 
     private static void assertInteractive(net.minecraft.network.chat.Component component) {
         var style = component.getStyle();
-        assertEquals(0xFFC83D, style.getColor().getValue());
+        assertEquals(org.kingdomfoxes.ralle.ui.theme.RallePalette.accent(), style.getColor().getValue());
         assertTrue(style.isBold());
         assertTrue(style.isUnderlined());
         assertInstanceOf(ClickEvent.Custom.class, style.getClickEvent());

@@ -1,0 +1,21 @@
+{
+  "schema": "ralle-supporter-look-v1",
+  "seed": 7349,
+  "effect": "liquid",
+  "speed": 0.45,
+  "scale": 4,
+  "warp": 63,
+  "shine": 71,
+  "dark": "#176f9b",
+  "gold": "#00b8f5",
+  "light": "#ffffff",
+  "ign": "Foxglove",
+  "guild": "Fox",
+  "font": "karla",
+  "supporter": true,
+  "treatment": "plate",
+  "resolution": 0.5,
+  "paused": false,
+  "timeSeconds": 245.6499,
+  "notificationBorderLogicalPixels": 2
+}
