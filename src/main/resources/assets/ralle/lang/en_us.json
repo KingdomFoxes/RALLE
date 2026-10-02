@@ -28,7 +28,7 @@
   "ralle.settings.option.material-resolution.description": "(More = Higher Quality) while also taking more system resources to render. %s",
   "ralle.settings.option.material-resolution.description.note": "(1 logical pixel is recommended unless you have a VERY good CPU.)",
   "ralle.settings.option.nameplate-color": "Nameplate Color",
-  "ralle.settings.option.nameplate-color.description": "Selects your color for other RALLE players to see. Fox checks your current cosmetic grant before saving it.",
+  "ralle.settings.option.nameplate-color.description": "Selects your color for other RALLE players to see. Choose None to hide your nameplate effect. Fox checks your current cosmetic grant before saving it.",
   "ralle.settings.option.show-own-nametag": "Show Own Nametag",
   "ralle.settings.option.show-own-nametag.description": "Shows your nametag in both third-person views and the inventory character preview, using the name and formatting available from the server.",
   "ralle.lfg.create.title": "CREATE RAID LOBBY",

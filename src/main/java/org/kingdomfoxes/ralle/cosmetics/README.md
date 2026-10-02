@@ -44,7 +44,14 @@ Shared personal style selection uses Fox's cosmetic challenge/complete and
 authenticated `PUT /me/style` endpoints. Fox validates current grants at write
 time and publishes the selected ID in later lookups for other RALLE clients.
 The Nameplate Color dropdown lists only styles allowed by the current grant;
-choosing the selected entry closes the dropdown without a mutation. Older
+choosing the selected entry closes the dropdown without a mutation. The first
+entry, `None`, clears the effect through the same authenticated API using
+`{"version":1,"style_id":null}`. Only Fox acceptance clears the local cached
+selection; pending or failed saves retain the previous effect. Fox publishes
+`selected_style_id:null` so other clients render ordinary names and heads without
+the RALLE material, white plate border, or added world-nameplate shadow.
+Supporter previews also show the cleared appearance for an eligible account.
+Cached grants still unlock the controls, allowing a color to be selected again. Older
 grants-only servers remain readable but must upgrade for saving.
 
 ## Supporter settings

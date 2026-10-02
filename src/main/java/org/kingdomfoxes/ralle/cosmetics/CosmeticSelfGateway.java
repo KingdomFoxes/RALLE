@@ -7,6 +7,7 @@ import java.util.concurrent.CompletableFuture;
 public interface CosmeticSelfGateway {
     CompletableFuture<Challenge> challenge(UUID account, String ign);
     CompletableFuture<Session> complete(String challengeId);
+    /** A null style ID explicitly clears the selected effect through the same authenticated API. */
     CompletableFuture<CosmeticIdentity> select(String bearer, String styleId);
 
     record Challenge(String id, String serverId) {}

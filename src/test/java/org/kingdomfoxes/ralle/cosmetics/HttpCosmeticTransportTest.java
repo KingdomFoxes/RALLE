@@ -31,7 +31,11 @@ class HttpCosmeticTransportTest {
             (lookup ? lookupBody : selectionBody).set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             // Uvicorn's HTTP/1.1 endpoint cannot accept Java's cleartext h2c upgrade.
             boolean upgrade = exchange.getRequestHeaders().containsKey("Upgrade");
-            var body = (lookup ? "{\"version\":1,\"cache_ttl_seconds\":30,\"players\":[" + identity + "]}" : identity)
+            String responseIdentity = !lookup && JsonParser.parseString(selectionBody.get()).getAsJsonObject()
+                    .get("style_id").isJsonNull()
+                    ? identity.replace("\"supporter-gold\"", "null").replace("\"revision\":1", "\"revision\":2")
+                    : identity;
+            var body = (lookup ? "{\"version\":1,\"cache_ttl_seconds\":30,\"players\":[" + identity + "]}" : responseIdentity)
                     .getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(upgrade ? 422 : 200, body.length);
             exchange.getResponseBody().write(body);
@@ -50,6 +54,14 @@ class HttpCosmeticTransportTest {
             var sent = JsonParser.parseString(selectionBody.get()).getAsJsonObject();
             assertEquals(1, sent.get("version").getAsInt());
             assertEquals("supporter-gold", sent.get("style_id").getAsString());
+            // None sends an explicit JSON null and accepts Fox's cleared selection.
+            var cleared = new HttpCosmeticSelfGateway(() -> client, base)
+                    .select("test-token", null).get(5, TimeUnit.SECONDS);
+            assertNull(cleared.selectedStyle());
+            var clearBody = JsonParser.parseString(selectionBody.get()).getAsJsonObject();
+            assertEquals(1, clearBody.get("version").getAsInt());
+            assertTrue(clearBody.has("style_id"));
+            assertTrue(clearBody.get("style_id").isJsonNull());
         } finally {
             server.stop(0);
         }

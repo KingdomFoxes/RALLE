@@ -36,10 +36,10 @@ final class NameplatePreviewPanelProvider implements CustomSettingsPanelProvider
             var minecraft = Minecraft.getInstance();
             var account = minecraft.getUser().getProfileId();
             var identity = RalleClient.context().cosmetics().cached(account);
-            var style = identity != null && identity.selectedStyle() != null
+            var style = identity != null && identity.hasNameplateAccess()
                     ? identity.selectedStyle() : NameplateStyle.CATALOG.getFirst();
             var settings = RalleClient.context().settings();
-            var appearance = CosmeticAppearance.from(settings, style);
+            var appearance = style == null ? null : CosmeticAppearance.from(settings, style);
             var username = RalleTheme.ui(Component.literal(minecraft.getUser().getName()));
             var star = RalleTheme.ui(Component.literal("★ "));
             int logicalWidth = notification ? 20 : Math.max(130, minecraft.font.width(username) + minecraft.font.width(star) + 28);

@@ -34,7 +34,8 @@ public final class CosmeticStyleSelection {
     public synchronized CompletableFuture<CosmeticIdentity> select(String styleId) {
         UUID player = account.get();
         CosmeticIdentity current = player == null ? null : directory.cached(player);
-        if (!enabled.getAsBoolean() || current == null || !NameplateStyle.allowed(styleId, current.grants()))
+        if (!enabled.getAsBoolean() || current == null || !current.hasNameplateAccess()
+                || styleId != null && !NameplateStyle.allowed(styleId, current.grants()))
             return CompletableFuture.failedFuture(new IllegalStateException("Style is unavailable"));
         if (pending != null && !pending.isDone())
             return CompletableFuture.failedFuture(new IllegalStateException("Style selection already pending"));
