@@ -15,9 +15,15 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.util.RandomSource;
 import org.joml.Matrix4f;
 
+import java.util.function.IntConsumer;
+
 /** Exercise Minecraft's real text preparation without a GPU, including an icon with a small advance. */
 final class CosmeticTestFont {
     static Font create() {
+        return create(shadow -> {});
+    }
+
+    static Font create(IntConsumer shadowColors) {
         var source = new GlyphSource() {
             @Override public BakedGlyph getGlyph(int codepoint) {
                 boolean icon = codepoint == 0xe001;
@@ -25,6 +31,7 @@ final class CosmeticTestFont {
                     @Override public GlyphInfo info() { return GlyphInfo.simple(icon ? 2 : 6); }
                     @Override public TextRenderable.Styled createGlyph(float x, float y, int color, int shadow,
                                                                        Style style, float bold, float shadowOffset) {
+                        shadowColors.accept(shadow);
                         return new Glyph(x + (icon ? -8 : 0), y + (icon ? -3 : 0),
                                 x + (icon ? 10 : 5) + bold, y + (icon ? 10 : 8), style);
                     }

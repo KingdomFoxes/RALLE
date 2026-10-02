@@ -128,7 +128,11 @@ the plate or inventory preview, and logs one local warning. Submission failures
 also log only once rather than failing silently or flooding the render log.
 Decode embedded legacy formatting before tinting so codes such as `§f` never
 become a visible prefix letter, preserving fonts, glyphs, and non-color styles.
-Lettering remains white without a username glyph outline.
+Lettering remains white without a username glyph outline. Decorated world and
+inventory labels carry Minecraft's native drop shadow in their glyph styles:
+the standard quarter-brightness shadow and font-defined offset, with alpha
+following each normal/see-through pass. This survives deferred nametag rendering,
+which disables the draw-shadow flag. Other rows retain their original shadow styles.
 
 Notification heads and their enlarged Supporter preview draw one complete
 material quad first with a one-pixel white outer edge, then a one-pixel guild-color ring inset by the white edge and two-pixel

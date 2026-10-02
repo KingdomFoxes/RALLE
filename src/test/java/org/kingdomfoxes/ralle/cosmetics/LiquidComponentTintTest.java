@@ -13,6 +13,36 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LiquidComponentTintTest {
+    @Test void decoratedLabelUsesTheNativeShadowEvenWithDeferredDrawShadowDisabled() {
+        List<Integer> shadows = new ArrayList<>();
+        var font = CosmeticTestFont.create(shadows::add);
+        var resource = new FontDescription.Resource(Identifier.fromNamespaceAndPath("example", "icons"));
+        var hover = new HoverEvent.ShowText(Component.literal("Player"));
+        var original = Component.literal("§fPlayer\ue001😀")
+                .withStyle(Style.EMPTY.withFont(resource).withHoverEvent(hover).withShadowColor(0));
+        var decorated = LiquidComponentTint.whiteWithVanillaShadow(original, font);
+        assertEquals("Player\ue001😀", decorated.getString());
+        assertEquals(0, original.getStyle().getShadowColor());
+        decorated.getVisualOrderText().accept((index, style, codepoint) -> {
+            assertEquals(resource, style.getFont());
+            assertSame(hover, style.getHoverEvent());
+            assertEquals(0xffffff, style.getColor().getValue());
+            return true;
+        });
+
+        var nativeLabel = Component.literal(decorated.getString()).withStyle(Style.EMPTY.withFont(resource));
+        for (int color : new int[] {0xffffffff, 0x80ffffff}) {
+            shadows.clear();
+            font.prepareText(nativeLabel.getVisualOrderText(), 0, 0, color, true, false, 0);
+            var expected = List.copyOf(shadows);
+            assertEquals(8, expected.size());
+            assertTrue(expected.stream().allMatch(shadow -> shadow != 0));
+            shadows.clear();
+            font.prepareText(decorated.getVisualOrderText(), 0, 0, color, false, false, 0);
+            assertEquals(expected, shadows);
+        }
+    }
+
     @Test void legacyColorsNeverBecomeExtraLettersAndResetKeepsTheInheritedFontAndHover() {
         var font = CosmeticTestFont.create();
         var resource = new FontDescription.Resource(Identifier.fromNamespaceAndPath("example", "icons"));
