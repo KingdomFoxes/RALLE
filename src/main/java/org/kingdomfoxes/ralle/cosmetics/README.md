@@ -22,7 +22,7 @@ and ordered `players` entries with `minecraft_uuid`, `grants`, and `revision`.
 An absent `selected_style_id` means no synchronized selection was supplied;
 it must not invalidate otherwise valid website-assigned grants.
 
-Responses without cache TTL hints use a local 30-second cache lifetime. Older
+Responses without cache TTL hints use a local 30-second refresh interval. Older
 responses may supply root/player `cache_ttl_seconds` and `selected_style_id`;
 supplied values remain strictly validated, and the shortest TTL is used.
 UUID matching, grant validation, revision checks, and Wynncraft-only network
@@ -30,6 +30,15 @@ gating still apply. Nameplates are always on; bounded public lookups run on clie
 ticks for the local account and visible world/LFG players. The removed local
 `cosmetics.nameplate-cosmetics` toggle is ignored, including old saved `false`
 values. A grant does not imply a selected style.
+
+TTL expiry schedules a bounded refresh without removing the last accepted
+cosmetic presentation. Keep it visible while a lookup is pending or fails;
+an unchanged successful response renews freshness without changing presentation.
+A newer accepted style, cleared selection, or grant revocation replaces it.
+Retained revisions still reject older replies after TTL expiry. The cache remains
+bounded to 256 identities and is cleared on disconnect, account/server change,
+or disable; retained cosmetic grants never authorize LFG operations, and Fox
+continues to validate personal style mutations.
 
 Shared personal style selection uses Fox's cosmetic challenge/complete and
 authenticated `PUT /me/style` endpoints. Fox validates current grants at write
@@ -93,8 +102,33 @@ is fitted to a scaled plate; texture dimensions, CPU frame generation and the
 Supporter roster plates and world/inventory nametags have a one-logical-pixel
 white border around the complete plate, independent of material resolution.
 GUI borders sit inside the plate bounds; world borders extend around the text
-background without reducing the vanilla text area. Lettering remains white
-without a username glyph outline.
+background without reducing the vanilla text area. World plates measure both
+the full label's advance and Minecraft's prepared glyph geometry, including
+resource-pack icons whose ink extends beyond their advance. Two logical pixels
+of horizontal padding sit inside the separate white border. The inventory
+viewport fits the extracted label bounds symmetrically without moving the character.
+`AvatarNameplateMixin` carries cached identity through a tightly scoped render
+callback rather than drawing from the early extracted label. The scope includes
+Wynntils' cancellable replacement callback. `NameTagMaterialMixin` decorates the
+common final `NameTagFeatureRenderer.Storage.add` path, so a replacement label
+includes its actual marker icon and suffix in measurement. Only the row containing
+the canonical IGN (or the original label) receives material; score, level and role
+rows retain their existing presentation. Nested, disabled and failed callbacks
+restore the preceding scope without leaking a player's cosmetics to another row.
+Material and border submissions remain in Minecraft's normal entity collection
+(order 0). Only the decorated label moves to order 1, after that collection's
+models and custom geometry. The label retains its exact vanilla pose, attachment,
+lighting, visibility flags, and single submission; scores and undecorated labels
+retain their original path. Geometry is captured immediately before the final
+storage submission restores its pose, after attachment, camera and scale have
+been applied, including Wynntils' scale hook. No independent guessed transform
+or duplicate early plate remains. Material depth remains behind the glyphs. A prepared
+glyph-measurement failure falls back to padded advance width instead of dropping
+the plate or inventory preview, and logs one local warning. Submission failures
+also log only once rather than failing silently or flooding the render log.
+Decode embedded legacy formatting before tinting so codes such as `§f` never
+become a visible prefix letter, preserving fonts, glyphs, and non-color styles.
+Lettering remains white without a username glyph outline.
 
 Notification heads and their enlarged Supporter preview draw one complete
 material quad first with a one-pixel white outer edge, then a one-pixel guild-color ring inset by the white edge and two-pixel

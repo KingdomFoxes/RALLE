@@ -101,10 +101,67 @@ class NameplateDirectorySessionTest {
         var session = session(directory);
         session.tick(List.of(account));
         session.acceptSelf(new CosmeticIdentity(account, Set.of("contributor"), "contributor-blue", 3));
+        clock.advance(30_000); // Revision protection must survive expiration of the refresh TTL.
         directory.reply.complete(new CosmeticLookupJson.Lookup(List.of(
                 new CosmeticIdentity(account, Set.of("contributor"), "contributor-green", 2)),
                 Duration.ofSeconds(30)));
         assertEquals("contributor-blue", session.cached(account).selectedStyleId());
+    }
+
+    @Test
+    void refreshKeepsPlateDuringPendingFailureAndUnchangedRepliesButAppliesRevocation() {
+        enabled.set(true);
+        signedIn.set(account);
+        var directory = new FakeDirectory();
+        var session = session(directory);
+        session.tick(List.of(visible));
+        directory.reply.complete(reply(visible, "supporter-gold"));
+        var identity = session.cached(visible);
+        long revision = session.presentationRevision();
+
+        clock.advance(30_000);
+        assertEquals(identity, session.cached(visible));
+        session.tick(List.of(visible));
+        assertEquals(2, directory.calls);
+        assertEquals(identity, session.cached(visible));
+        directory.reply.completeExceptionally(new RuntimeException("offline"));
+        assertEquals(identity, session.cached(visible));
+        assertEquals(revision, session.presentationRevision());
+        session.tick(List.of(visible));
+        assertEquals(2, directory.calls);
+
+        clock.advance(2_000);
+        session.tick(List.of(visible));
+        directory.reply.complete(reply(visible, "supporter-gold"));
+        assertEquals(identity, session.cached(visible));
+        assertEquals(revision, session.presentationRevision());
+        clock.advance(1_100);
+        session.tick(List.of(visible));
+        assertEquals(3, directory.calls); // Identical response renewed freshness without changing presentation.
+
+        clock.advance(30_000);
+        session.tick(List.of(visible));
+        directory.reply.complete(reply(visible, null));
+        assertNull(session.cached(visible).selectedStyle());
+        assertEquals(revision + 1, session.presentationRevision());
+        session.clear();
+        assertNull(session.cached(visible));
+    }
+
+    @Test
+    void newerStyleReplacesPlateOnlyAfterAcceptance() {
+        enabled.set(true);
+        signedIn.set(account);
+        var directory = new FakeDirectory();
+        var session = session(directory);
+        session.tick(List.of(visible));
+        directory.reply.complete(reply(visible, "supporter-gold"));
+        clock.advance(30_000);
+        session.tick(List.of(visible));
+        assertEquals("supporter-gold", session.cached(visible).selectedStyleId());
+        directory.reply.complete(new CosmeticLookupJson.Lookup(List.of(
+                new CosmeticIdentity(visible, Set.of("contributor"), "contributor-blue", 2)), Duration.ofSeconds(30)));
+        assertEquals("contributor-blue", session.cached(visible).selectedStyleId());
     }
 
     private NameplateDirectorySession session(FakeDirectory directory) {

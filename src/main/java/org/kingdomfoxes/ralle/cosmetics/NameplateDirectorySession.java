@@ -57,7 +57,7 @@ public final class NameplateDirectorySession {
         if (pending || clock.millis() < retryAfterMillis || visiblePlayers == null) return;
         var missing = new LinkedHashSet<UUID>();
         for (UUID uuid : visiblePlayers) {
-            if (uuid != null && cache.get(uuid) == null) missing.add(uuid);
+            if (uuid != null && cache.needsRefresh(uuid)) missing.add(uuid);
             if (missing.size() == CosmeticLookupJson.MAX_BATCH) break;
         }
         if (missing.isEmpty()) return;
@@ -92,7 +92,7 @@ public final class NameplateDirectorySession {
             if (current == null || identity.revision() > current.revision()
                     || identity.revision() == current.revision() && identity.equals(current)) {
                 cache.put(identity, SessionCosmeticCache.MAX_AGE);
-                presentationRevision++;
+                if (!identity.equals(current)) presentationRevision++;
             }
         }
     }
@@ -114,13 +114,16 @@ public final class NameplateDirectorySession {
         for (int i = 0; i < requested.size(); i++) {
             if (!requested.get(i).equals(result.players().get(i).minecraftUuid())) { backoff(); return; }
         }
+        boolean changed = false;
         for (CosmeticIdentity identity : result.players()) {
             CosmeticIdentity current = cache.get(identity.minecraftUuid());
             if (current == null || identity.revision() > current.revision()
-                    || identity.revision() == current.revision() && identity.equals(current))
+                    || identity.revision() == current.revision() && identity.equals(current)) {
                 cache.put(identity, result.ttl());
+                changed |= !identity.equals(current);
+            }
         }
-        presentationRevision++;
+        if (changed) presentationRevision++;
         failures = 0;
         // Fox allows 60 lookups per minute per IP. Keep crowded-world batches below that rate.
         retryAfterMillis = clock.millis() + 1_100;

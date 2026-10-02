@@ -12,6 +12,7 @@ import net.minecraft.world.entity.LivingEntity;
 import org.kingdomfoxes.ralle.cosmetics.OwnNameTagPreview;
 import org.kingdomfoxes.ralle.cosmetics.InventoryNameTagBounds;
 import org.kingdomfoxes.ralle.cosmetics.OwnNameTagVisibility;
+import org.kingdomfoxes.ralle.cosmetics.WorldNameplateBounds;
 import org.joml.Vector3f;
 import org.joml.Quaternionf;
 import org.spongepowered.asm.mixin.Mixin;
@@ -33,7 +34,8 @@ abstract class InventoryOwnNameTagMixin {
                                         @Local(argsOnly = true) LivingEntity entity) {
         var client = Minecraft.getInstance();
         if (entity == client.player && state.nameTag != null && OwnNameTagVisibility.enabled()) {
-            int width = client.font.width(state.nameTag);
+            boolean extraEars = state instanceof net.minecraft.client.renderer.entity.state.AvatarRenderState avatar && avatar.showExtraEars;
+            int width = WorldNameplateBounds.measure(client.font, state.nameTag, extraEars).centeredOuterWidth();
             if (state instanceof net.minecraft.client.renderer.entity.state.AvatarRenderState avatar && avatar.scoreText != null)
                 width = Math.max(width, client.font.width(avatar.scoreText));
             var bounds = new InventoryNameTagBounds(left, top, right, bottom)

@@ -13,20 +13,23 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class SessionCosmeticCacheTest {
     @Test
-    void expiredRevokedAndSessionMetadataCannotDecorate() {
+    void ttlRequestsRefreshWhileRevocationAndSessionClearReplacePresentation() {
         var clock = new MutableClock();
         var cache = new SessionCosmeticCache(clock);
         UUID uuid = UUID.randomUUID();
         var supporter = new CosmeticIdentity(uuid, Set.of("supporter"), "supporter-gold", 1);
         cache.put(supporter, Duration.ofSeconds(60));
         assertEquals(supporter, cache.get(uuid));
+        assertFalse(cache.needsRefresh(uuid));
         clock.advance(30_000);
-        assertNull(cache.get(uuid));
+        assertEquals(supporter, cache.get(uuid));
+        assertTrue(cache.needsRefresh(uuid));
         cache.put(supporter, Duration.ofSeconds(30));
         cache.put(CosmeticIdentity.neutral(uuid, 2), Duration.ofSeconds(30));
         assertNull(cache.get(uuid).selectedStyle());
         cache.clear();
         assertNull(cache.get(uuid));
+        assertTrue(cache.needsRefresh(uuid));
         assertThrows(IllegalArgumentException.class,
                 () -> new CosmeticIdentity(uuid, Set.of("supporter"), "admin-red", 2));
         assertThrows(IllegalArgumentException.class,
@@ -43,7 +46,18 @@ class SessionCosmeticCacheTest {
         assertEquals(SessionCosmeticCache.MAX_ENTRIES, cache.size());
         assertNull(cache.get(first));
         clock.advance(5_000);
-        assertNull(cache.get(new UUID(0, 2)));
+        assertNotNull(cache.get(new UUID(0, 2)));
+        assertTrue(cache.needsRefresh(new UUID(0, 2)));
+    }
+
+    @Test
+    void zeroTtlDoesNotBlankTheAcceptedPresentation() {
+        var cache = new SessionCosmeticCache(new MutableClock());
+        UUID uuid = UUID.randomUUID();
+        var identity = new CosmeticIdentity(uuid, Set.of("supporter"), "supporter-gold", 1);
+        cache.put(identity, Duration.ZERO);
+        assertEquals(identity, cache.get(uuid));
+        assertTrue(cache.needsRefresh(uuid));
     }
 
     private static final class MutableClock extends Clock {
