@@ -31,6 +31,7 @@ public final class RalleSettings {
     public static final String QUEUE_KOF_RANK_COLORS_ID = "queue-kof-rank-colors";
     public static final String MATERIAL_RESOLUTION_ID = "material-resolution";
     public static final String NAMEPLATE_COLOR_ID = "nameplate-color";
+    public static final String SHOW_OWN_NAMETAG_ID = "show-own-nametag";
     private RalleSettings() {}
 
     public static void register(SettingsRegistry registry) {
@@ -147,8 +148,8 @@ public final class RalleSettings {
                 Component.translatable("ralle.settings.category.cosmetics"),
                 Component.translatable("ralle.settings.category.cosmetics.description"),
                 List.of(customPanel("nameplate-preview", "nameplate-preview"),
-                        choice(MATERIAL_RESOLUTION_ID, "recipe", "recipe", "1", "2", "0.5"),
-                        action(NAMEPLATE_COLOR_ID)),
+                        choice(MATERIAL_RESOLUTION_ID, "1", "recipe", "1", "2", "0.5"),
+                        action(NAMEPLATE_COLOR_ID), toggle(SHOW_OWN_NAMETAG_ID)),
                 List.of()
         ));
 

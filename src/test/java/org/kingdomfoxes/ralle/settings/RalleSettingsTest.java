@@ -31,20 +31,26 @@ class RalleSettingsTest {
                 .findFirst().orElseThrow();
         assertTrue(supporter.subcategories().isEmpty());
         assertEquals(List.of("nameplate-preview", RalleSettings.MATERIAL_RESOLUTION_ID,
-                        RalleSettings.NAMEPLATE_COLOR_ID),
+                        RalleSettings.NAMEPLATE_COLOR_ID, RalleSettings.SHOW_OWN_NAMETAG_ID),
                 supporter.entries().stream().map(entry -> entry.id()).toList());
         assertTrue(registry.entry("nameplate-cosmetics").isEmpty());
+        assertFalse(registry.setting(RalleSettings.SHOW_OWN_NAMETAG_ID, BooleanSetting.class).value());
         assertTrue(registry.available(RalleSettings.MATERIAL_RESOLUTION_ID));
-        assertEquals("recipe", registry.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).value());
+        assertEquals("1", registry.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).value());
         var appearance = org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance.from(registry,
                 org.kingdomfoxes.ralle.cosmetics.NameplateStyle.CATALOG.getFirst());
         assertEquals(org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance.Treatment.PLATE, appearance.treatment());
         assertEquals(0, appearance.usernameOutlinePixels());
+        for (var style : org.kingdomfoxes.ralle.cosmetics.NameplateStyle.CATALOG) {
+            assertEquals(1d, org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance.from(registry, style).resolution());
+        }
         registry.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).set("0.5");
+        registry.setting(RalleSettings.SHOW_OWN_NAMETAG_ID, BooleanSetting.class).set(true);
         var restored = new SettingsRegistry(path);
         RalleSettings.register(restored);
         restored.seal();
         assertEquals("0.5", restored.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).value());
+        assertTrue(restored.setting(RalleSettings.SHOW_OWN_NAMETAG_ID, BooleanSetting.class).value());
         assertTrue(restored.available(RalleSettings.NAMEPLATE_COLOR_ID));
         assertFalse(Files.readString(path).contains("selected_style_id"));
         assertFalse(Files.readString(path).contains("nameplate-cosmetics"));

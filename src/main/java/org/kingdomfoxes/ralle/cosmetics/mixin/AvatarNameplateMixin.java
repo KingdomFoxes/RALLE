@@ -15,14 +15,21 @@ import org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance;
 import org.kingdomfoxes.ralle.cosmetics.CosmeticAvatarState;
 import org.kingdomfoxes.ralle.cosmetics.LiquidComponentTint;
 import org.kingdomfoxes.ralle.cosmetics.UsernameSpan;
+import org.kingdomfoxes.ralle.cosmetics.OwnNameTagVisibility;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** Decorates only the vanilla-extracted visible player name tag. Vanilla still submits the tag once. */
 @Mixin(AvatarRenderer.class)
 public abstract class AvatarNameplateMixin {
+    @Inject(method = "shouldShowName(Lnet/minecraft/world/entity/Avatar;D)Z", at = @At("RETURN"), cancellable = true, require = 1)
+    private void ralle$showOwnName(Avatar avatar, double distance, CallbackInfoReturnable<Boolean> callback) {
+        if (OwnNameTagVisibility.show(avatar)) callback.setReturnValue(true);
+    }
+
     @Inject(method = "extractRenderState(Lnet/minecraft/world/entity/Avatar;Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;F)V", at = @At("HEAD"))
     private void ralle$clearPreviousCosmetic(Avatar avatar, AvatarRenderState state, float partialTick, CallbackInfo ci) {
         ((CosmeticAvatarState) state).ralle$cosmetic(null, null, null);
@@ -85,6 +92,10 @@ public abstract class AvatarNameplateMixin {
                             left, left + width + 2, top, bottom, 1, light, 0x80ffffff);
                     submitPlateChunk(collector, pose, RenderTypes.text(texture),
                             left, left + width + 2, top, bottom, 1, light, 0xffffffff);
+                    if (!state.isDiscrete) submitPlateBorder(collector, pose, RenderTypes.textBackgroundSeeThrough(),
+                            left, left + width + 2, top, bottom, light, 0x80ffffff);
+                    submitPlateBorder(collector, pose, RenderTypes.textBackground(),
+                            left, left + width + 2, top, bottom, light, 0xffffffff);
                 }
                 if (appearance.usernameOutlinePixels() > 0) {
                     UsernameSpan.find(state.nameTag, decoration.ralle$ign()).ifPresent(span -> {
@@ -124,6 +135,24 @@ public abstract class AvatarNameplateMixin {
             vertices.addVertex(matrix, x1, bottom, -0.005F).setColor(tint).setUv(u1, 1).setLight(light);
             vertices.addVertex(matrix, x1, top, -0.005F).setColor(tint).setUv(u1, 0).setLight(light);
             vertices.addVertex(matrix, x0, top, -0.005F).setColor(tint).setUv(0, 0).setLight(light);
+        });
+    }
+
+    /** A one-pixel outer frame around the complete plate, preserving the vanilla text area. */
+    private static void submitPlateBorder(SubmitNodeCollector collector, PoseStack pose,
+                                          net.minecraft.client.renderer.rendertype.RenderType renderType,
+                                          float left, float right, float top, float bottom, int light, int tint) {
+        collector.submitCustomGeometry(pose, renderType, (matrix, vertices) -> {
+            for (float[] edge : new float[][] {
+                    {left - 1, right + 1, top - 1, top},
+                    {left - 1, right + 1, bottom, bottom + 1},
+                    {left - 1, left, top, bottom},
+                    {right, right + 1, top, bottom}}) {
+                vertices.addVertex(matrix, edge[0], edge[3], -0.005F).setColor(tint).setLight(light);
+                vertices.addVertex(matrix, edge[1], edge[3], -0.005F).setColor(tint).setLight(light);
+                vertices.addVertex(matrix, edge[1], edge[2], -0.005F).setColor(tint).setLight(light);
+                vertices.addVertex(matrix, edge[0], edge[2], -0.005F).setColor(tint).setLight(light);
+            }
         });
     }
 }

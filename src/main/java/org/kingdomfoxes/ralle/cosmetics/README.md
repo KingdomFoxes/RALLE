@@ -53,8 +53,35 @@ is selected. Controls and dropdown actions recheck access as cached grants chang
 Fox still validates the current grant when saving the selected style.
 
 Material Resolution remains a local preference with labels `1 logical pixel`,
-`2 logical pixels`, and `0.5 logical pixels`. Existing saved values and the
-recipe-derived default remain compatible.
+`2 logical pixels`, and `0.5 logical pixels`. New configurations default to
+`1 logical pixel` for every style. Existing saved choices, including the legacy
+recipe value, remain compatible.
+
+`cosmetics.show-own-nametag` is a local, disabled-by-default Supporter setting.
+Once enabled, it reveals the local player's normal nameplate in both F5 views
+and the survival/creative inventory character preview. First-person world
+rendering and unrelated entity previews retain their normal visibility rules.
+The control follows the existing cached-grant settings lock; rendering never
+initiates a lookup or persists anything to Fox. The saved visibility preference
+can also work outside Wynncraft, where no Fox material is resolved.
+
+The visibility hook leaves Minecraft's `EntityRenderer.getNameTag` and
+`AvatarRenderer` score extraction/submission intact. In 1.21.11, player display
+names use the received scoreboard-team prefix, suffix, color, and original text
+styles; below-name scores come from the same player state used for other players.
+RALLE's selected material is applied through the existing renderer exactly as it
+is for other players. The inventory viewport grows symmetrically, bounded by the
+screen, to accommodate the actual text without moving/scaling the character.
+Inventory extraction is scoped and restored even after an exception, so it
+cannot leak visibility into the first-person world pass.
+
+This preserves data received by the local client, rather than constructing a
+name from the IGN, tab-list name, Wynncraft API, or guessed rank symbols. There
+is no general client-only way to recover recipient-specific decorations or
+separate label entities that a server sends exclusively to other players.
+Wynntils may still replace or hide tags through its own normal nameplate options.
+Validate Wynncraft prefixes, resource-pack glyphs, scores, both F5 directions,
+inventory mouse-follow behavior, and Wynntils compatibility in-game before release.
 
 ## Material and head rendering
 
@@ -63,17 +90,24 @@ clamped edges. Interpolation smooths uneven texel bands when the complete recipe
 is fitted to a scaled plate; texture dimensions, CPU frame generation and the
 30 Hz update limit are unchanged. No mipmaps or extra frame buffers are added.
 
+Supporter roster plates and world/inventory nametags have a one-logical-pixel
+white border around the complete plate, independent of material resolution.
+GUI borders sit inside the plate bounds; world borders extend around the text
+background without reducing the vanilla text area. Lettering remains white
+without a username glyph outline.
+
 Notification heads and their enlarged Supporter preview draw one complete
-material quad first, then a one-pixel guild-color ring inset by the two-pixel
+material quad first with a one-pixel white outer edge, then a one-pixel guild-color ring inset by the white edge and two-pixel
 material frame, then the skin. Both rings fit inside the existing 20-pixel head
-bounds (the skin is 14 pixels). The inner ring always uses the guild territory
+bounds (the skin is 12 pixels). The inner ring always uses the guild territory
 color; cosmetic palette colors apply only to the outer material frame. This replaces four scissored overlays that covered
 the guild ring and could leave stray edges when scaled. Browser heads retain
 their existing one-pixel guild ring and 16-pixel skin.
 
 Kick modifier-wheel heads reuse the same material-frame renderer with the cached
 Fox-selected style and local material resolution. Their existing 18-pixel bounds
-contain the two-pixel material frame, one-pixel guild ring, and 12-pixel skin;
+contain the one-pixel white edge, two-pixel material frame, one-pixel guild ring,
+and 10-pixel skin;
 players without a selected style retain the ordinary guild ring and 16-pixel skin.
 Rendering never initiates cosmetic requests; the existing tick lookup already
 includes synchronized lobby members.

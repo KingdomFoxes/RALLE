@@ -8,6 +8,24 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ChatTypeTabServiceTest {
     @Test
+    void labelClicksAdvanceThroughEveryChannelAndKeepDraftRoutingSeparate() {
+        var service = new ChatTypeTabService();
+        service.observeIncomingSender("FriendFox");
+        service.observeIncomingSender("OtherFox");
+        String prefix = "";
+        String draft = "hello there";
+        for (String next : new String[]{"/g ", "/p ", "/msg FriendFox ", "/msg OtherFox ", ""}) {
+            prefix = service.nextChannel(prefix);
+            service.rememberPrefix(prefix);
+            assertEquals(next, prefix);
+            assertEquals(Optional.of(next), service.prefixForNewChat());
+            assertEquals(next + draft, ChatTypeTabService.outgoingMessage(draft, prefix));
+            assertEquals(Optional.empty(), service.nextPrefix(draft, prefix));
+            assertEquals("/help", ChatTypeTabService.outgoingMessage("/help", prefix));
+        }
+    }
+
+    @Test
     void serverInputSelectionOverridesPriorChannelButAllowsManualChoiceAndCommands() {
         var service = new ChatTypeTabService();
         service.observeSentCommand("msg FriendFox hello");

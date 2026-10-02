@@ -277,8 +277,6 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         document.child(identity);
         document.child(UIComponents.label(RalleTheme.ui(Component.translatable("ralle.settings.about.description")))
                 .lineHeight(RalleTheme.BODY_LINE_HEIGHT).color(RalleTheme.text()).maxWidth(textWidth));
-        document.child(UIComponents.label(RalleTheme.ui(Component.translatable("ralle.settings.about.disabled-notice")))
-                .lineHeight(RalleTheme.BODY_LINE_HEIGHT).color(RalleTheme.accent()).maxWidth(textWidth));
         var links = width < 540
                 ? UIContainers.verticalFlow(Sizing.fill(100), Sizing.content())
                 : UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
@@ -530,6 +528,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void toggleBoolean(BooleanSetting setting, ButtonComponent trigger) {
+        if (!controlAvailable(setting.id())) return;
         int triggerViewportOffset = trigger.y() - scroll.y();
         double fallbackProgress = scroll.progress();
         setting.set(!setting.value());
@@ -810,6 +809,8 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
                 resolutionControl.tooltip(java.util.List.<net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent>of());
         }
         var rankRefresh = root.childById(ButtonComponent.class, "guild-ranks-refresh");
+        var ownNameControl = buttonFor(RalleSettings.SHOW_OWN_NAMETAG_ID);
+        if (ownNameControl != null) ownNameControl.active = controlAvailable(RalleSettings.SHOW_OWN_NAMETAG_ID);
         if (rankRefresh != null) updateGuildRankRefreshButton(rankRefresh);
         if (pendingScrollProgress != null) {
             scroll.scrollToImmediately(pendingScrollProgress);
@@ -827,7 +828,8 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     private boolean controlAvailable(String id) {
         return settings.available(id) && (!(RalleSettings.NAMEPLATE_COLOR_ID.equals(id)
-                || RalleSettings.MATERIAL_RESOLUTION_ID.equals(id)) || !supporterSettingsLocked());
+                || RalleSettings.MATERIAL_RESOLUTION_ID.equals(id)
+                || RalleSettings.SHOW_OWN_NAMETAG_ID.equals(id)) || !supporterSettingsLocked());
     }
 
     private void updateGuildRankRefreshButton(ButtonComponent button) {
