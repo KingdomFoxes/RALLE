@@ -279,19 +279,33 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         document.child(identity);
         document.child(UIComponents.label(RalleTheme.ui(Component.translatable("ralle.settings.about.description")))
                 .lineHeight(RalleTheme.BODY_LINE_HEIGHT).color(RalleTheme.text()).maxWidth(textWidth));
-        var links = width < 540
-                ? UIContainers.verticalFlow(Sizing.fill(100), Sizing.content())
-                : UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+        var links = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
         links.gap(6);
         var source = UIComponents.button(RalleTheme.ui(Component.translatable("ralle.settings.about.source")), ignored ->
                 ConfirmLinkScreen.confirmLinkNow(this, "https://github.com/KingdomFoxes/RALLE"));
         var issues = UIComponents.button(RalleTheme.ui(Component.translatable("ralle.settings.about.issues")), ignored ->
                 ConfirmLinkScreen.confirmLinkNow(this, "https://github.com/KingdomFoxes/RALLE/issues"));
-        source.sizing(Sizing.fixed(110), Sizing.fixed(20));
-        source.renderer(RalleButtonRenderers.neutral());
-        issues.sizing(Sizing.fixed(110), Sizing.fixed(20));
-        issues.renderer(RalleButtonRenderers.neutral());
-        links.child(source).child(issues);
+        var support = UIComponents.button(RalleTheme.ui(Component.translatable("ralle.settings.about.support")), ignored ->
+                ConfirmLinkScreen.confirmLinkNow(this, "https://ko-fi.com/kingdomfoxes"));
+        var website = UIComponents.button(RalleTheme.ui(Component.translatable("ralle.settings.about.website")), ignored ->
+                ConfirmLinkScreen.confirmLinkNow(this, "https://kingdomfoxes.com/"));
+        var row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+        row.gap(6);
+        int rowWidth = 0;
+        for (var button : java.util.List.of(source, issues, support, website)) {
+            int buttonWidth = Math.min(textWidth, button == source ? 52 : 110);
+            if (rowWidth > 0 && rowWidth + 6 + buttonWidth > textWidth) {
+                links.child(row);
+                row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+                row.gap(6);
+                rowWidth = 0;
+            }
+            button.sizing(Sizing.fixed(buttonWidth), Sizing.fixed(20));
+            button.renderer(RalleButtonRenderers.neutral());
+            row.child(button);
+            rowWidth += (rowWidth == 0 ? 0 : 6) + buttonWidth;
+        }
+        links.child(row);
         document.child(links);
         var about = settings.categories().stream().filter(category -> "about".equals(category.id())).findFirst().orElseThrow();
         for (var entry : about.entries()) document.child(entryRow(entry));

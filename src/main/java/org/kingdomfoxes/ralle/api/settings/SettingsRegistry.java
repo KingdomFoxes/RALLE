@@ -169,6 +169,7 @@ public final class SettingsRegistry {
                 .map(entry -> (Setting<?>) entry)
                 .forEach(setting -> setting.onChanged(ignored -> save()));
         sealed = true;
+        if (!Files.exists(storagePath)) save();
     }
 
     private void load() {

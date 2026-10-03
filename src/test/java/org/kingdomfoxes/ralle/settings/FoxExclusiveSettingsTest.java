@@ -48,6 +48,24 @@ class FoxExclusiveSettingsTest {
     }
 
     @Test
+    void restoredLfgDefaultRemainsLockedUntilCurrentFoxMembershipIsConfirmed() throws Exception {
+        var path = directory.resolve("fresh.properties");
+        var allowed = new AtomicBoolean();
+        var settings = new SettingsRegistry(path);
+        RalleSettings.register(settings);
+        RalleSettings.requireFoxAccess(settings, allowed::get);
+        settings.seal();
+        assertFalse(settings.setting(RalleSettings.RAID_LFG_ENABLED_ID, BooleanSetting.class).value());
+        assertFalse(settings.visible("new-party-notifications"));
+        assertTrue(Files.readString(path).contains("raid-lfg.raid-lfg-enabled=true"));
+        allowed.set(true);
+        assertTrue(settings.setting(RalleSettings.RAID_LFG_ENABLED_ID, BooleanSetting.class).value());
+        assertTrue(settings.visible("new-party-notifications"));
+        allowed.set(false);
+        assertFalse(settings.setting(RalleSettings.RAID_LFG_ENABLED_ID, BooleanSetting.class).value());
+    }
+
+    @Test
     void runtimeAccessMasksEvenDefaultEnabledTogglesAndDirectMutations() {
         var settings = new SettingsRegistry(directory.resolve("defaults.properties"));
         var title = Component.literal("Example");

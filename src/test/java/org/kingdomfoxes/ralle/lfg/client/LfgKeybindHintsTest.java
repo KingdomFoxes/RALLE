@@ -19,6 +19,8 @@ class LfgKeybindHintsTest {
         var settings = settings();
         var hints = new LfgKeybindHints(settings);
 
+        assertEquals("Join [F2]", hints.joinLabel("Join"));
+        settings.setting(RaidLfgKeybinds.JOIN_ID, KeybindSetting.class).set(KeybindSetting.UNBOUND);
         assertEquals("Join", hints.joinLabel("Join"));
         settings.setting(RaidLfgKeybinds.JOIN_ID, KeybindSetting.class)
                 .set("key.keyboard.f2");

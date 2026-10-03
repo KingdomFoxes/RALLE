@@ -32,7 +32,7 @@ public final class RalleOnboardingNotice {
     public RalleOnboardingNotice(Path storagePath, boolean existingInstall) {
         this.storagePath = Objects.requireNonNull(storagePath, "storagePath");
         this.messageSent = load(existingInstall);
-        if (!Files.exists(storagePath) && existingInstall) save();
+        if (!Files.exists(storagePath)) save();
     }
 
     public static boolean hasExistingConfig(Path configDirectory) {
@@ -61,9 +61,17 @@ public final class RalleOnboardingNotice {
 
     public static Component body() {
         return Component.empty()
-                .append("Thank you for installing RALLE, supporter nameplates are always on and other features are disabled by default so ")
-                .append(RalleChatMessages.clickable("Click here", new ClickEvent.RunCommand("/ralle settings")))
-                .append(" or use /ralle settings to configure it");
+                .append("Thank you for installing RALLE! Certain features have been enabled by default but please explore the settings with ")
+                .append(command("/ralle settings"))
+                .append(". Access the ally raid menu with ")
+                .append(command("/ralle lfg"))
+                .append(" and edit hud elements with ")
+                .append(command("/ralle hud"))
+                .append("!\n\nWe hope to see you in the queues ;).");
+    }
+
+    private static Component command(String command) {
+        return RalleChatMessages.clickable(command, new ClickEvent.RunCommand(command));
     }
 
     int messageSent() {

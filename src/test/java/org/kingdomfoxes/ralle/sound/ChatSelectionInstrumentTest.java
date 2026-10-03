@@ -96,6 +96,9 @@ class ChatSelectionInstrumentTest {
         assertEquals("xylophone", choice.value());
         assertEquals(List.of("xylophone", "acoustic-guitar", "bass-guitar", "piano-recorded", "piano",
                 "drums-recorded", "drums"), choice.choices());
+        assertTrue(registry.visible(choice.id()));
+        registry.setting("chat-screenshot-enabled", BooleanSetting.class).set(false);
+        registry.setting("chat-selection-sounds", BooleanSetting.class).set(false);
         assertFalse(registry.visible(choice.id()));
         registry.setting("chat-screenshot-enabled", BooleanSetting.class).set(true);
         assertFalse(registry.visible(choice.id()));

@@ -26,7 +26,8 @@ including while displaying search results.
 Boolean setting's effective `value()`, so existing feature hooks cannot act on
 saved/default-enabled values while locked. The saved preference remains local
 and survives an unrelated config save; a confirmed Fox member can use it again
-without reconfiguring. Installation defaults remain off.
+without reconfiguring. Raid LFG defaults on but stays effectively off until
+current Fox membership is confirmed; internal ranks and KoF rank colors default off.
 
 This is a local feature-access check only. It neither obtains Fox credentials
 nor authorizes LFG actions. Fox's backend remains responsible for Minecraft
