@@ -1,4 +1,5 @@
 {
+  "ralle.update.available": "A new version has released! %s.",
   "ralle.settings.fox-exclusive": "(Fox exclusive)",
   "ralle.settings.fox-exclusive.locked": "Only available to Kingdom of Foxes guild members after the login guild check.",
   "ralle.settings.title": "RALLE Settings",

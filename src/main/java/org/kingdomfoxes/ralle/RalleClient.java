@@ -23,6 +23,9 @@ import org.kingdomfoxes.ralle.chat.input.ChatTypeTabService;
 import org.kingdomfoxes.ralle.chat.input.WynncraftChatInputController;
 import org.kingdomfoxes.ralle.chat.identity.DirectMessageIdentityResolver;
 import org.kingdomfoxes.ralle.client.WynncraftHost;
+import org.kingdomfoxes.ralle.update.ModrinthUpdateLookup;
+import org.kingdomfoxes.ralle.update.UpdateMessages;
+import org.kingdomfoxes.ralle.update.UpdateNotice;
 import org.kingdomfoxes.ralle.chat.rank.GuildRankService;
 import org.kingdomfoxes.ralle.chat.rank.HttpGuildRankGateway;
 import org.kingdomfoxes.ralle.chat.render.FullShadowRenderingStrategy;
@@ -94,6 +97,12 @@ public final class RalleClient implements ClientModInitializer {
                 new org.kingdomfoxes.ralle.client.HttpFoxGuildLookup()::lookup, System::currentTimeMillis);
         RalleSettings.requireFoxAccess(settings, foxGuildAccess::allowed);
         var minecraft = Minecraft.getInstance();
+        var updateLookup = new ModrinthUpdateLookup(
+                FabricLoader.getInstance().getModContainer(MOD_ID).orElseThrow()
+                        .getMetadata().getVersion().getFriendlyString(),
+                FabricLoader.getInstance().getModContainer("minecraft").orElseThrow()
+                        .getMetadata().getVersion().getFriendlyString());
+        var updateNotice = new UpdateNotice(updateLookup::lookup, () -> System.nanoTime() / 1_000_000L);
         var cosmeticDirectory = new NameplateDirectorySession(
                 new HttpNameplateDirectory(), () -> true,
                 () -> minecraft.getCurrentServer() == null ? "" : minecraft.getCurrentServer().ip,
@@ -250,6 +259,8 @@ public final class RalleClient implements ClientModInitializer {
         );
         var pointAndLaugh = new org.kingdomfoxes.ralle.war.PointAndLaugh();
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            if (client.getCurrentServer() != null) updateNotice.joined();
+            else updateNotice.disconnected();
             foxGuildAccess.joined(client.getCurrentServer() == null ? "" : client.getCurrentServer().ip,
                     client.getUser().getProfileId());
             cosmeticDirectory.clear();
@@ -260,6 +271,7 @@ public final class RalleClient implements ClientModInitializer {
             onboarding.postIfNeeded(body -> RalleChatMessages.post(client, body));
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            updateNotice.disconnected();
             foxGuildAccess.clear();
             cosmeticDirectory.clear();
             cosmeticStyleSelection.clear();
@@ -275,6 +287,7 @@ public final class RalleClient implements ClientModInitializer {
             QueueAttributionService.disconnect();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            updateNotice.tick().ifPresent(release -> RalleChatMessages.post(client, UpdateMessages.body(release)));
             foxGuildAccess.tick();
             if (cosmeticReloadPending.getAndSet(false)) cosmeticTextures.close();
             var visibleCosmeticIds = new java.util.LinkedHashSet<java.util.UUID>();
