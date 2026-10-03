@@ -20,6 +20,7 @@ public final class MinecraftRaidLfgEnvironment implements RaidLfgEnvironment {
 
     @Override
     public String serverHost() {
+        if (minecraft.getConnection() == null) return "";
         var server = minecraft.getCurrentServer();
         return server == null ? "" : server.ip;
     }

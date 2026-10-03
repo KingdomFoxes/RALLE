@@ -173,7 +173,7 @@ public final class StrictLfgJson {
     private static PlayerIdentity player(JsonObject object, String path) {
         fields(object, path, Set.of("minecraft_uuid", "ign", "guild"), Set.of());
         return new PlayerIdentity(uuid(object, "minecraft_uuid"), string(object, "ign"),
-                guild(child(object, "guild"), path + ".guild"));
+                object.get("guild").isJsonNull() ? null : guild(child(object, "guild"), path + ".guild"));
     }
 
     private static GuildIdentity guild(JsonObject object, String path) {

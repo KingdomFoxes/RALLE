@@ -61,6 +61,21 @@ class StrictLfgJsonTest {
     }
 
     @Test
+    void guildlessViewerCanAuthenticateAndSyncWithoutAllowingGuildlessLobbyMembers() {
+        String guild = "{\"uuid\":\"00000000-0000-0000-0000-000000000100\",\"name\":\"Kingdom of Foxes\",\"tag\":\"FOX\",\"color\":\"#FF8200\"}";
+        String guildless = snapshot().replaceFirst(java.util.regex.Pattern.quote(guild), "null");
+        assertNull(StrictLfgJson.decodeSnapshot(guildless).viewer().guild());
+        assertNotNull(StrictLfgJson.decodeSnapshot(guildless).lobbies().getFirst().members().getFirst().guild());
+        assertThrows(LfgProtocolException.class, () -> StrictLfgJson.decodeSnapshot(snapshot().replace(guild, "null")));
+        String session = """
+                {"access_token":"token","token_type":"Bearer","expires_in":900,
+                 "expires_at":"2026-07-19T20:15:00Z","protocol_version":1,
+                 "player":{"minecraft_uuid":"00000000-0000-0000-0000-000000000001","ign":"Player01","guild":null}}
+                """;
+        assertNull(StrictLfgJson.decodeSession(session).player().guild());
+    }
+
+    @Test
     void decodesMinimalStatusAndRejectsLegacyOrUnknownFields() {
         var status = StrictLfgJson.decodeStatus("{\"enabled\":true,\"protocol_version\":1}");
         assertTrue(status.enabled());

@@ -111,8 +111,9 @@ public final class RaidLfgService {
     LfgStateAccess stateAccess() { return stateAccess; }
     public RaidLfgStore store() { return store; }
     public LfgJoinController joinController() { return joinController; }
-    public LifecycleState lifecycle() { return lifecycle; }
-    public String statusMessage() { return statusMessage; }
+    // The socket identifies every Wynncraft client; the local toggle still gates LFG use.
+    public LifecycleState lifecycle() { return environment.enabled() ? lifecycle : LifecycleState.DISABLED; }
+    public String statusMessage() { return environment.enabled() ? statusMessage : "Raid LFG is disabled in settings."; }
     public UUID focusLobbyId() { return focusLobbyId; }
     public void clearFocus() { focusLobbyId = null; }
     public void focusLobby(UUID lobbyId) { focusLobbyId = lobbyId; }
@@ -146,18 +147,16 @@ public final class RaidLfgService {
         }
     }
 
-    /** Reevaluate every client tick; it performs no network request outside the opt-in Wynncraft state. */
+    /** Maintain the existing authenticated live connection for every Wynncraft client. */
     public void tick() {
         try (var stateScope = stateAccess.enter()) {
             joinController.tick();
             var host = normalizedHost(environment.serverHost());
-            var nextContext = environment.enabled() + "|" + host + "|" + environment.playerId();
+            var nextContext = host + "|" + environment.playerId();
             if (!nextContext.equals(contextKey)) {
                 contextKey = nextContext;
-                invalidate(environment.enabled() ? LifecycleState.NOT_ON_WYNNCRAFT : LifecycleState.DISABLED,
-                        environment.enabled() ? "Connect to Wynncraft to use Raid LFG." : "Raid LFG is disabled in settings.");
+                invalidate(LifecycleState.NOT_ON_WYNNCRAFT, "Connect to Wynncraft to use Raid LFG.");
             }
-            if (!environment.enabled()) return;
             if (!isWynncraft(host)) {
                 if (lifecycle != LifecycleState.NOT_ON_WYNNCRAFT) {
                     invalidate(LifecycleState.NOT_ON_WYNNCRAFT, "Connect to Wynncraft to use Raid LFG.");
@@ -303,7 +302,7 @@ public final class RaidLfgService {
         final String key = pendingKey(operation.lobbyId, operation.action);
         final String token;
         try (var callbackScope = stateAccess.enter()) {
-            if (lifecycle != LifecycleState.ONLINE || bearerToken == null) return unavailableFuture();
+            if (!environment.enabled() || lifecycle != LifecycleState.ONLINE || bearerToken == null) return unavailableFuture();
             if (!pending.add(key)) return CompletableFuture.failedFuture(new IllegalStateException("That action is already pending."));
             token = bearerToken;
             operation.pendingKey = key;
@@ -651,10 +650,10 @@ public final class RaidLfgService {
             } else if (frame instanceof LfgProtocol.PartyPingFrame ping) {
                 requireProtocol(ping.protocolVersion());
                 focusLobbyId = ping.lobbyId();
-                stateAccess.afterUnlock(() -> notifications.partyPing(ping));
+                if (environment.enabled()) stateAccess.afterUnlock(() -> notifications.partyPing(ping));
             } else if (frame instanceof LfgProtocol.PartyKickCommandFrame command) {
                 requireProtocol(command.protocolVersion());
-                if (rememberCommand(command.eventId())) stateAccess.afterUnlock(() -> partyCommands.kick(command.targetIgn()));
+                if (rememberCommand(command.eventId()) && environment.enabled()) stateAccess.afterUnlock(() -> partyCommands.kick(command.targetIgn()));
             } else if (frame instanceof LfgProtocol.SessionExpiringFrame expiring) {
                 requireProtocol(expiring.protocolVersion());
                 beginRenewal(expiring.expiresAt());
@@ -737,7 +736,7 @@ public final class RaidLfgService {
 
     private void restartAuthentication() {
         try (var stateScope = stateAccess.enter()) {
-            if (!environment.enabled() || !isWynncraft(normalizedHost(environment.serverHost()))) return;
+            if (!isWynncraft(normalizedHost(environment.serverHost()))) return;
             if (authenticationInFlight) return;
             if (renewal != null) {
                 enterRenewalReadOnly();

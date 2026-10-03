@@ -32,3 +32,10 @@ current Fox membership is confirmed; internal ranks and KoF rank colors default 
 This is a local feature-access check only. It neither obtains Fox credentials
 nor authorizes LFG actions. Fox's backend remains responsible for Minecraft
 session ownership, current alliance eligibility, and all LFG permissions.
+
+Every Wynncraft client uses the existing Raid LFG authentication and `/live`
+connection even while the local LFG toggle is disabled or locked. This lets
+Fox's existing `live.connected` and `live.disconnected` logs identify guildless
+users too. The toggle continues to gate LFG actions, notifications, sounds,
+and party commands. Auth and snapshot viewer identities allow a null guild;
+guildless snapshots grant no LFG capabilities. Other servers make no requests.

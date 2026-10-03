@@ -21,7 +21,8 @@ public final class MinecraftLfgSoundPlayer implements LfgSoundPlayer {
     private final Consumer<SoundInstance> playback;
 
     public MinecraftLfgSoundPlayer(Minecraft minecraft, SettingsRegistry settings) {
-        this(minecraft::execute, settings.setting("notification-sounds", BooleanSetting.class)::value,
+        this(minecraft::execute, () -> settings.setting("raid-lfg-enabled", BooleanSetting.class).value()
+                        && settings.setting("notification-sounds", BooleanSetting.class).value(),
                 sound -> minecraft.getSoundManager().play(sound));
     }
 

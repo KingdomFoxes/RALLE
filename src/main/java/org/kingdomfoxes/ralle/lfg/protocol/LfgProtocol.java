@@ -28,6 +28,7 @@ public final class LfgProtocol {
 
     public record GuildIdentity(UUID uuid, String name, String tag, String color) {}
 
+    /** Authenticated clients may be guildless; lobby members still require a guild. */
     public record PlayerIdentity(UUID minecraftUuid, String ign, GuildIdentity guild) {}
 
     public record Member(UUID minecraftUuid, String ign, GuildIdentity guild, MemberRole role,
