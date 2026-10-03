@@ -10,8 +10,25 @@ base {
     archivesName = project.archives_base_name
 }
 
+loom {
+    runs {
+        client {
+            client()
+            configName = 'Minecraft Client'
+            ideConfigGenerated = true
+            vmArg '-Ddevauth.enabled=true'
+            vmArg '-Ddevauth.account=main'
+            if (project.hasProperty('localBackend')) {
+                vmArg '-Dralle.localBackend=true'
+            }
+        }
+    }
+}
+
 repositories {
     maven { url = 'https://maven.wispforest.io/releases' }
+    maven { url = 'https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1' }
+    maven { url = 'https://api.modrinth.com/maven' }
     maven {
         url = 'https://jitpack.io'
         content { includeGroup 'com.github.kdl-org' }
@@ -24,19 +41,32 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
     modImplementation "io.wispforest:owo-lib:${project.owo_version}"
-    include "io.wispforest:owo-sentinel:${project.owo_version}"
+    include "io.wispforest:owo-lib:${project.owo_version}"
+    modCompileOnly "maven.modrinth:${project.wynntils_project_id}:${project.wynntils_version_id}"
+    modRuntimeOnly "me.djtheredstoner:DevAuth-fabric:${project.devauth_version}"
 
     testImplementation "org.junit.jupiter:junit-jupiter:5.11.4"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 }
 
 def modVersion = project.version
+def localBackend = project.hasProperty('localBackend')
 
 processResources {
     inputs.property 'version', modVersion
+    inputs.property 'localBackend', localBackend
     filesMatching('fabric.mod.json') {
         expand 'version': modVersion
     }
+    doLast {
+        def marker = new File(destinationDir, 'ralle-local-backend')
+        if (localBackend) marker.text = 'true\n'
+        else marker.delete()
+    }
+}
+
+if (localBackend) {
+    tasks.named('remapJar') { archiveClassifier = 'local-backend' }
 }
 
 tasks.withType(JavaCompile).configureEach {
