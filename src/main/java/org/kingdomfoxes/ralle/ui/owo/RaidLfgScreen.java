@@ -958,7 +958,7 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         kickTargeting.reset();
         var content = UIContainers.verticalFlow(Sizing.fixed(320), Sizing.content());
         content.gap(8).padding(Insets.of(12)).surface(RalleSurfaces.FRAMED_NAVY);
-        content.child(UIComponents.label(RalleTheme.ui(Component.literal("CREATE RAID LOBBY BRATAN"))).color(RalleTheme.accent()));
+        content.child(UIComponents.label(RalleTheme.ui(Component.translatable("ralle.lfg.create.title"))).color(RalleTheme.accent()));
         var selectedRaid = new LfgProtocol.RaidType[]{LfgProtocol.RaidType.DAILIES};
         var selectedRegion = new LfgProtocol.Region[]{currentRegion};
         var raid = UIComponents.button(raidSelectionLabel(selectedRaid[0], RaidPresentation.name(selectedRaid[0]), false), ignored -> {});

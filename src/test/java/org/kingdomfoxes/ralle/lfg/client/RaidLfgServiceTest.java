@@ -305,7 +305,7 @@ class RaidLfgServiceTest {
     }
 
     @Test
-    void disablingInvalidatesOutstandingAuthenticationCallback() {
+    void disablingKeepsOutstandingAuthenticationAndLiveConnection() {
         var gateway = new FakeGateway();
         gateway.challengeFuture = new CompletableFuture<>();
         var env = new MutableEnvironment();
@@ -318,7 +318,39 @@ class RaidLfgServiceTest {
         service.tick();
         gateway.challengeFuture.complete(new LfgProtocol.Challenge("challenge", "server-proof", 60, 1));
         assertEquals(RaidLfgService.LifecycleState.DISABLED, service.lifecycle());
-        assertEquals(0, gateway.completeCalls);
+        assertEquals(1, gateway.completeCalls);
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+        assertEquals(1, gateway.connections.size());
+        assertEquals(0, gateway.connections.getFirst().closeCalls);
+        env.enabled = true;
+        service.tick();
+        assertEquals(RaidLfgService.LifecycleState.ONLINE, service.lifecycle());
+        assertEquals(1, gateway.challengeCalls);
+    }
+
+    @Test
+    void lockedOrDisabledLfgStillConnectsButCannotMutateAndDisconnectsOffWynncraft() {
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        env.host = "wynncraft.com";
+        var service = service(gateway, env);
+        service.tick();
+        var guildless = new LfgProtocol.PlayerIdentity(PLAYER, "Player01", null);
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(new LfgProtocol.Snapshot(
+                1, 1, guildless, new LfgProtocol.ViewerCapabilities(false, false,
+                Map.of("create", "INELIGIBLE", "browse", "INELIGIBLE")), List.of())));
+        assertEquals(1, gateway.connections.size());
+        assertEquals(RaidLfgService.LifecycleState.DISABLED, service.lifecycle());
+        assertEquals(guildless, service.store().state().viewer());
+        assertThrows(CompletionException.class, () -> service.create(
+                LfgProtocol.RaidType.TNA, LfgProtocol.Region.EU, null).join());
+        assertEquals(0, gateway.createCalls);
+        gateway.listener.onClosed(4401, "expired");
+        assertEquals(2, gateway.challengeCalls);
+        env.host = "example.org";
+        service.tick();
+        assertEquals(1, gateway.connections.getLast().closeCalls);
+        assertEquals(2, gateway.challengeCalls);
     }
 
     @Test

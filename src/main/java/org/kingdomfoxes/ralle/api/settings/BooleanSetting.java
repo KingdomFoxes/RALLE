@@ -13,8 +13,11 @@ public final class BooleanSetting extends Setting<Boolean> {
 
     @Override
     public String serialize() {
-        return Boolean.toString(value());
+        return Boolean.toString(storedValue());
     }
+
+    @Override
+    protected Boolean accessDeniedValue() { return false; }
 
     @Override
     protected Boolean deserialize(String value) {

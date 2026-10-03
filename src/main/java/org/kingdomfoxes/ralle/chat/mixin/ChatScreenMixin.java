@@ -82,6 +82,15 @@ abstract class ChatScreenMixin extends Screen {
     @Inject(method = "render", at = @At("TAIL"), require = 0)
     private void ralle$renderChannel(GuiGraphics graphics, int mouseX, int mouseY, float delta, CallbackInfo callback) {
         if (!ralle$channelEnabled() || this.input.getValue().startsWith("/")) return;
+        if (ralle$channelContains(mouseX, mouseY)) {
+            int left = 2, top = this.input.getY() - 2;
+            int right = this.input.getX() - 3, bottom = this.input.getY() + this.font.lineHeight + 1;
+            int color = 0xFFFFFFFF;
+            graphics.fill(left, top, right, top + 1, color);
+            graphics.fill(left, bottom - 1, right, bottom, color);
+            graphics.fill(left, top + 1, left + 1, bottom - 1, color);
+            graphics.fill(right - 1, top + 1, right, bottom - 1, color);
+        }
         graphics.drawString(this.font, ChatTypeTabService.channelLabel(this.ralle$lastInsertedChatTypePrefix),
                 4, this.input.getY(), ChatTypeTabService.channelColor(this.ralle$lastInsertedChatTypePrefix));
     }
@@ -89,7 +98,19 @@ abstract class ChatScreenMixin extends Screen {
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true, require = 0)
     private void ralle$selectChatMessages(MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> callback) {
         if (event.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT) return;
+        ralle$syncInputRequest();
         var service = RalleClient.context().chatScreenshots();
+        if (ralle$channelEnabled() && !this.input.getValue().startsWith("/")
+                && ralle$channelContains(event.x(), event.y())) {
+            service.cancel();
+            var tabs = RalleClient.context().chatTypeTabs();
+            String prefix = tabs.nextChannel(this.ralle$lastInsertedChatTypePrefix);
+            ralle$setChatTypePrefix(prefix);
+            tabs.rememberPrefix(prefix);
+            this.setFocused(this.input);
+            callback.setReturnValue(true);
+            return;
+        }
         if (ralle$controlDown()) {
             boolean began = service.begin(
                     (ChatScreenshotSource) net.minecraft.client.Minecraft.getInstance().gui.getChat(),
@@ -233,6 +254,13 @@ abstract class ChatScreenMixin extends Screen {
             this.ralle$lastInsertedChatTypePrefix = prefix;
             this.input.setValue(value.substring(prefix.length()));
         });
+    }
+
+    @Unique
+    private boolean ralle$channelContains(double mouseX, double mouseY) {
+        return mouseX >= 2 && mouseX < this.input.getX() - 3
+                && mouseY >= this.input.getY() - 2
+                && mouseY < this.input.getY() + this.font.lineHeight + 1;
     }
 
     @Unique

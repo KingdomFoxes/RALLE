@@ -12,6 +12,7 @@ public abstract class Setting<T> implements SettingsEntry {
     private final Component description;
     private final T defaultValue;
     private T value;
+    private java.util.function.BooleanSupplier access = () -> true;
     private Consumer<Setting<?>> changeListener = ignored -> {};
 
     protected Setting(String id, Component title, Component description, T defaultValue) {
@@ -35,6 +36,21 @@ public abstract class Setting<T> implements SettingsEntry {
     }
 
     public final T value() {
+        return effectiveValue(value);
+    }
+
+    /** Runtime restrictions may mask a preference without overwriting the local saved value. */
+    protected T effectiveValue(T storedValue) {
+        return access.getAsBoolean() ? storedValue : accessDeniedValue();
+    }
+
+    protected T accessDeniedValue() { return defaultValue; }
+
+    final void requireAccess(java.util.function.BooleanSupplier allowed) {
+        access = Objects.requireNonNull(allowed, "allowed");
+    }
+
+    protected final T storedValue() {
         return value;
     }
 
@@ -44,6 +60,8 @@ public abstract class Setting<T> implements SettingsEntry {
 
     public final void set(T value) {
         var checkedValue = validate(Objects.requireNonNull(value, "value"));
+        // A stale UI callback or direct caller cannot change the saved preference while locked.
+        if (!access.getAsBoolean()) return;
         if (Objects.equals(this.value, checkedValue)) return;
 
         this.value = checkedValue;

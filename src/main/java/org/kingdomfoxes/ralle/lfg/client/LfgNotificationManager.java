@@ -66,6 +66,7 @@ public final class LfgNotificationManager {
     }
 
     private synchronized void onLobbyChange(RaidLfgStore.LobbyChange change) {
+        if (service.lifecycle() == RaidLfgService.LifecycleState.DISABLED) return;
         var viewer = service.store().state().viewer();
         if (change.current() != null && viewer != null
                 && !change.current().contains(viewer.minecraftUuid())) {
@@ -284,6 +285,12 @@ public final class LfgNotificationManager {
     }
 
     public synchronized void tick() {
+        if (service.lifecycle() == RaidLfgService.LifecycleState.DISABLED) {
+            cards.clear();
+            visible.clear();
+            queued.clear();
+            return;
+        }
         long now = clockMillis.getAsLong();
         applyJoinSnapshot(service.joinController().snapshot(), now);
 

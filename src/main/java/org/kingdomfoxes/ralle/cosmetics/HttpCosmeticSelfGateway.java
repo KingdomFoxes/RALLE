@@ -69,7 +69,8 @@ public final class HttpCosmeticSelfGateway implements CosmeticSelfGateway {
     }
 
     @Override public CompletableFuture<CosmeticIdentity> select(String bearer, String styleId) {
-        if (bearer == null || bearer.isBlank() || bearer.length() > 4096 || NameplateStyle.byId(styleId).isEmpty())
+        if (bearer == null || bearer.isBlank() || bearer.length() > 4096
+                || styleId != null && NameplateStyle.byId(styleId).isEmpty())
             throw new IllegalArgumentException("Invalid cosmetic style selection");
         JsonObject body = versioned();
         body.addProperty("style_id", styleId);

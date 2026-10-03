@@ -34,7 +34,8 @@ public final class CosmeticStyleSelection {
     public synchronized CompletableFuture<CosmeticIdentity> select(String styleId) {
         UUID player = account.get();
         CosmeticIdentity current = player == null ? null : directory.cached(player);
-        if (!enabled.getAsBoolean() || current == null || !NameplateStyle.allowed(styleId, current.grants()))
+        if (!enabled.getAsBoolean() || current == null || !directory.settingsAllowed()
+                || styleId != null && !NameplateStyle.allowed(styleId, current.grants()))
             return CompletableFuture.failedFuture(new IllegalStateException("Style is unavailable"));
         if (pending != null && !pending.isDone())
             return CompletableFuture.failedFuture(new IllegalStateException("Style selection already pending"));
@@ -49,6 +50,10 @@ public final class CosmeticStyleSelection {
                 if (generation != requestGeneration || !player.equals(account.get()) || !enabled.getAsBoolean()
                         || !player.equals(verified.account()))
                     return CompletableFuture.failedFuture(new IllegalStateException("Cosmetic session changed"));
+                var latest = directory.cached(player);
+                if (!directory.settingsAllowed() || latest == null
+                        || styleId != null && !NameplateStyle.allowed(styleId, latest.grants()))
+                    return CompletableFuture.failedFuture(new IllegalStateException("Style is unavailable"));
                 session = verified;
             }
             return gateway.select(verified.token(), styleId).whenComplete((ignored, failure) -> {

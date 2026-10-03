@@ -28,6 +28,24 @@ class LfgNotificationManagerTest {
     }
 
     @Test
+    void disabledLfgKeepsSynchronizationSilentAndClearsExistingCards() {
+        var fixture = new Fixture();
+        fixture.connect();
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 1, lobby(10, false, 1)));
+        assertEquals(1, fixture.manager.visibleCards().size());
+        fixture.environment.enabled = false;
+        fixture.manager.tick();
+        assertTrue(fixture.manager.visibleCards().isEmpty());
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 2, lobby(11, false, 1)));
+        fixture.manager.tick();
+        assertTrue(fixture.manager.visibleCards().isEmpty());
+        assertEquals(0, fixture.manager.queuedCount());
+        assertEquals(1, fixture.sounds.toastIn);
+        assertEquals(0, fixture.sounds.ready);
+        assertEquals(2, fixture.service.store().state().revision());
+    }
+
+    @Test
     void onlyQualifyingLiveChangesDiscoverAndReopenedSkipsReadyCue() {
         var fixture = new Fixture();
         fixture.connect();
@@ -667,8 +685,9 @@ class LfgNotificationManagerTest {
         final boolean[] mainUiAutoPopOutEnabled = {false};
         final Gateway gateway = new Gateway();
         final Sounds sounds = new Sounds();
+        final Environment environment = new Environment();
         final RaidLfgService service = new RaidLfgService(
-                gateway, new Environment(), ignored -> CompletableFuture.completedFuture(null),
+                gateway, environment, ignored -> CompletableFuture.completedFuture(null),
                 () -> now[0], () -> 0.5, LfgNotificationSink.IGNORE, PartyCommandExecutor.IGNORE);
         final LfgNotificationManager manager = new LfgNotificationManager(
                 service, sounds, () -> now[0], () -> true, () -> true,
@@ -701,7 +720,8 @@ class LfgNotificationManagerTest {
     }
 
     private static final class Environment implements RaidLfgEnvironment {
-        @Override public boolean enabled() { return true; }
+        boolean enabled = true;
+        @Override public boolean enabled() { return enabled; }
         @Override public String serverHost() { return "wynncraft.com"; }
         @Override public UUID playerId() { return VIEWER_ID; }
         @Override public String ign() { return "Viewer"; }

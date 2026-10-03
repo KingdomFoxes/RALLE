@@ -19,6 +19,7 @@ public final class RalleSettings {
     public static final String INTERFACE_FONT_ID = "interface-font";
     public static final String UI_THEME_ID = "ui-theme";
     public static final String INTERNAL_GUILD_RANKS_ID = "internal-guild-ranks";
+    public static final String RAID_LFG_ENABLED_ID = "raid-lfg-enabled";
     public static final String GUILD_RANK_STYLE_ID = "guild-rank-style";
     public static final String CONSUMABLE_HIGHLIGHTS_ENABLED_ID = "consumable-highlights-enabled";
     public static final String CONSUMABLE_HIGHLIGHT_RULES_ID = "consumable-highlight-rules";
@@ -29,9 +30,22 @@ public final class RalleSettings {
     public static final String HQ_DISTANCE_KEYBIND_ID = "hq-distance-keybind";
     public static final String QUEUE_SELF_COLOR_ID = "queue-self-color";
     public static final String QUEUE_KOF_RANK_COLORS_ID = "queue-kof-rank-colors";
+    public static final List<String> FOX_EXCLUSIVE_IDS = List.of(
+            INTERNAL_GUILD_RANKS_ID, RAID_LFG_ENABLED_ID, QUEUE_KOF_RANK_COLORS_ID);
     public static final String MATERIAL_RESOLUTION_ID = "material-resolution";
     public static final String NAMEPLATE_COLOR_ID = "nameplate-color";
+    public static final String SHOW_OWN_NAMETAG_ID = "show-own-nametag";
     private RalleSettings() {}
+
+    public static void requireFoxAccess(SettingsRegistry registry, java.util.function.BooleanSupplier allowed) {
+        for (var id : FOX_EXCLUSIVE_IDS) registry.requireAccess(id, allowed,
+                Component.translatable("ralle.settings.fox-exclusive.locked"));
+    }
+
+    public static void requireSupporterAccess(SettingsRegistry registry, java.util.function.BooleanSupplier allowed) {
+        for (var id : List.of(MATERIAL_RESOLUTION_ID, NAMEPLATE_COLOR_ID, SHOW_OWN_NAMETAG_ID))
+            registry.requireAccess(id, allowed, Component.translatable("ralle.cosmetics.supporter.locked"));
+    }
 
     public static void register(SettingsRegistry registry) {
         registry.registerCategory(new SettingsCategory(
@@ -76,14 +90,14 @@ public final class RalleSettings {
                                 choice("text-shadow", "vanilla", "none", "vanilla", "full", "wrapped-full")
                         ),
                         subcategory("chat-history",
-                                toggle("persistent-chat-enabled"),
-                                choice("persistent-chat-limit", "500", "300", "500", "1000", "1500")
+                                toggle("persistent-chat-enabled", true),
+                                choice("persistent-chat-limit", "300", "300", "500", "1000", "1500")
                         ),
                         subcategory("screenshots",
-                                toggle("chat-screenshot-enabled"),
-                                toggle("chat-screenshot-snap-to-text"),
+                                toggle("chat-screenshot-enabled", true),
+                                toggle("chat-screenshot-snap-to-text", true),
                                 toggle("chat-screenshot-smooth-expansion"),
-                                toggle("chat-selection-sounds"),
+                                toggle("chat-selection-sounds", true),
                                 choice(CHAT_SELECTION_INSTRUMENT_ID, "xylophone",
                                         "xylophone", "acoustic-guitar", "bass-guitar",
                                         "piano-recorded", "piano", "drums-recorded", "drums")
@@ -95,26 +109,26 @@ public final class RalleSettings {
                 "raid-lfg",
                 Component.translatable("ralle.settings.category.raid-lfg"),
                 Component.translatable("ralle.settings.category.raid-lfg.description"),
-                List.of(toggle("raid-lfg-enabled"), action("edit-notification-position")),
+                List.of(toggle(RAID_LFG_ENABLED_ID, true), action("edit-notification-position")),
                 List.of(
                         subcategory("notifications",
-                                toggle("new-party-notifications"),
-                                toggle("reopened-party-notifications"),
-                                toggle("party-status-notifications"),
-                                toggle("auto-pop-out-main-ui"),
-                                toggle("notification-sounds")
+                                toggle("new-party-notifications", true),
+                                toggle("reopened-party-notifications", true),
+                                toggle("party-status-notifications", true),
+                                toggle("auto-pop-out-main-ui", true),
+                                toggle("notification-sounds", true)
                         ),
                         subcategory("controls",
-                                keybind("raid-lfg-keybind"),
-                                keybind("raid-lfg-join-keybind"),
-                                keybind("raid-lfg-close-keybind"),
-                                keybind("raid-lfg-leave-disband-keybind"),
-                                keybind("raid-lfg-party-filled-keybind"),
-                                keybind("raid-lfg-ping-keybind"),
-                                keybind("raid-lfg-lock-keybind"),
-                                keybind("raid-lfg-create-keybind"),
+                                keybind("raid-lfg-keybind", "key.keyboard.f1"),
+                                keybind("raid-lfg-join-keybind", "key.keyboard.f2"),
+                                keybind("raid-lfg-close-keybind", "key.keyboard.f3"),
+                                keybind("raid-lfg-leave-disband-keybind", "key.keyboard.f4"),
+                                keybind("raid-lfg-party-filled-keybind", "key.keyboard.f5"),
+                                keybind("raid-lfg-ping-keybind", "key.keyboard.f6"),
+                                keybind("raid-lfg-lock-keybind", "key.keyboard.f7"),
+                                keybind("raid-lfg-create-keybind", "key.keyboard.f8"),
                                 toggle("raid-lfg-create-selector-wheel"),
-                                keybind("raid-lfg-kick-keybind"),
+                                keybind("raid-lfg-kick-keybind", "key.keyboard.f9"),
                                 toggle("raid-lfg-kick-selector-wheel"),
                                 keybind("automatic-raid-requeue-keybind")
                         )
@@ -147,8 +161,8 @@ public final class RalleSettings {
                 Component.translatable("ralle.settings.category.cosmetics"),
                 Component.translatable("ralle.settings.category.cosmetics.description"),
                 List.of(customPanel("nameplate-preview", "nameplate-preview"),
-                        choice(MATERIAL_RESOLUTION_ID, "recipe", "recipe", "1", "2", "0.5"),
-                        action(NAMEPLATE_COLOR_ID)),
+                        choice(MATERIAL_RESOLUTION_ID, "1", "recipe", "1", "2", "0.5"),
+                        action(NAMEPLATE_COLOR_ID), toggle(SHOW_OWN_NAMETAG_ID)),
                 List.of()
         ));
 
@@ -197,6 +211,10 @@ public final class RalleSettings {
         return new BooleanSetting(id, title(id), description(id));
     }
 
+    private static BooleanSetting toggle(String id, boolean defaultValue) {
+        return new BooleanSetting(id, title(id), description(id), defaultValue);
+    }
+
     private static ActionEntry action(String id) {
         return new ActionEntry(id, title(id), description(id));
     }
@@ -207,6 +225,10 @@ public final class RalleSettings {
 
     private static KeybindSetting keybind(String id) {
         return new KeybindSetting(id, title(id), description(id));
+    }
+
+    private static KeybindSetting keybind(String id, String defaultValue) {
+        return new KeybindSetting(id, title(id), description(id), defaultValue);
     }
 
     private static ChoiceSetting choice(String id, String defaultValue, String... choices) {

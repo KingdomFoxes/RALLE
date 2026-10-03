@@ -3,6 +3,6 @@
   "minVersion": "0.8",
   "package": "org.kingdomfoxes.ralle.cosmetics.mixin",
   "compatibilityLevel": "JAVA_21",
-  "client": ["AvatarRenderStateMixin", "AvatarNameplateMixin"],
+  "client": ["AvatarRenderStateMixin", "AvatarNameplateMixin", "NameTagMaterialMixin", "InventoryOwnNameTagMixin"],
   "injectors": {"defaultRequire": 0}
 }

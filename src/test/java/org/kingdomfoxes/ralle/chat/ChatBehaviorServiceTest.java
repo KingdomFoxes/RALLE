@@ -35,6 +35,7 @@ class ChatBehaviorServiceTest {
     void customizationIsInactiveUntilAChatBehaviorIsEnabled() {
         var settings = new SettingsRegistry(temporaryDirectory.resolve("customization.properties"));
         RalleSettings.register(settings);
+        settings.setting("persistent-chat-enabled", BooleanSetting.class).set(false);
         var behavior = new ChatBehaviorService(null, settings);
 
         assertFalse(behavior.chatCustomizationActive());
@@ -60,15 +61,17 @@ class ChatBehaviorServiceTest {
     }
 
     @Test
-    void historyLimitIsVanillaUntilPersistentChatIsEnabled() {
+    void historyDefaultsToThreeHundredAndReturnsToVanillaWhenDisabled() {
         var settings = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(settings);
         var behavior = new ChatBehaviorService(null, settings);
 
-        assertEquals(100, behavior.effectiveHistoryLimit());
+        assertEquals(300, behavior.effectiveHistoryLimit());
 
+        settings.setting("persistent-chat-enabled", BooleanSetting.class).set(false);
+        assertEquals(100, behavior.effectiveHistoryLimit());
         settings.setting("persistent-chat-enabled", BooleanSetting.class).set(true);
-        assertEquals(500, behavior.effectiveHistoryLimit());
+        assertEquals(300, behavior.effectiveHistoryLimit());
 
         for (var expected : new int[] {300, 500, 1000, 1500}) {
             settings.setting("persistent-chat-limit", ChoiceSetting.class).set(Integer.toString(expected));

@@ -61,19 +61,32 @@ class RalleOnboardingNoticeTest {
     }
 
     @Test
-    void bodyUsesExactCopyAndClickableSettingsLink() {
+    void pendingNoticeSurvivesRestartAfterTheDefaultConfigIsCreated() throws Exception {
+        var statePath = temporaryDirectory.resolve("ralle-onboarding.properties");
+        new RalleOnboardingNotice(statePath, false);
+        Files.writeString(temporaryDirectory.resolve("ralle.properties"), "raid-lfg.raid-lfg-enabled=true\n");
+        var restored = new RalleOnboardingNotice(statePath,
+                RalleOnboardingNotice.hasExistingConfig(temporaryDirectory));
+        assertEquals(0, restored.messageSent());
+        assertTrue(restored.postIfNeeded(ignored -> {}));
+        assertFalse(restored.postIfNeeded(ignored -> {}));
+    }
+
+    @Test
+    void bodyUsesRestoredCopyAndClickableCommands() {
         var body = RalleOnboardingNotice.body();
 
-        assertEquals("Thank you for installing RALLE, supporter nameplates are always on and other features are disabled by default so "
-                + "Click here or use /ralle settings to configure it", body.getString());
-
-        var span = body.getSiblings().stream()
-                .filter(component -> component.getString().equals("Click here"))
-                .findFirst()
-                .orElseThrow();
-        assertTrue(span.getStyle().isUnderlined());
-        assertEquals("/ralle settings",
-                assertInstanceOf(ClickEvent.RunCommand.class, span.getStyle().getClickEvent()).command());
+        assertEquals("Thank you for installing RALLE! Certain features have been enabled by default but please explore the settings with "
+                + "/ralle settings. Access the ally raid menu with /ralle lfg and edit hud elements with /ralle hud!\n\n"
+                + "We hope to see you in the queues ;).", body.getString());
+        for (var command : java.util.List.of("/ralle settings", "/ralle lfg", "/ralle hud")) {
+            var span = body.getSiblings().stream()
+                    .filter(component -> component.getString().equals(command)).findFirst().orElseThrow();
+            assertTrue(span.getStyle().isBold());
+            assertTrue(span.getStyle().isUnderlined());
+            assertEquals(command,
+                    assertInstanceOf(ClickEvent.RunCommand.class, span.getStyle().getClickEvent()).command());
+        }
     }
 
 }

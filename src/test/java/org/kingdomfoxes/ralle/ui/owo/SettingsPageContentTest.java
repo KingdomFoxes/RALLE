@@ -22,6 +22,7 @@ class SettingsPageContentTest {
         var screenshots = subcategory(registry, "chat", "screenshots").entries();
         var child = registry.setting("chat-selection-sounds", BooleanSetting.class);
         child.set(true);
+        registry.setting("chat-screenshot-enabled", BooleanSetting.class).set(false);
 
         assertEquals(List.of("chat-screenshot-enabled"), ids(SettingsPageContent.visibleEntries(registry, screenshots)));
         registry.setting("chat-screenshot-enabled", BooleanSetting.class).set(true);
@@ -35,6 +36,7 @@ class SettingsPageContentTest {
     void crossPageRaidDependenciesProduceOneParentMessage() {
         var registry = registry();
         var notifications = subcategory(registry, "raid-lfg", "notifications").entries();
+        registry.setting("raid-lfg-enabled", BooleanSetting.class).set(false);
 
         assertEquals(List.of(), SettingsPageContent.visibleEntries(registry, notifications));
         assertEquals(List.of("ralle.settings.option.raid-lfg-enabled"),

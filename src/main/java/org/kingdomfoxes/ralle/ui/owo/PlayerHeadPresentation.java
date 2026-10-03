@@ -37,10 +37,10 @@ public final class PlayerHeadPresentation {
                 x, y, faceSize + 2, borderColor, style, appearance);
     }
 
-    /** Notification, Kick wheel, and settings preview share a two-pixel material frame, then a one-pixel guild ring. */
+    /** Notification, Kick wheel, and preview share a white edge, two-pixel material frame, and guild ring. */
     static void draw(GuiGraphics graphics, PlayerSkin skin, int x, int y, int outerSize,
                      int borderColor, NameplateStyle style, CosmeticAppearance appearance) {
-        int materialInset = style != null && appearance != null ? 2 : 0;
+        int materialInset = style != null && appearance != null ? 3 : 0;
         if (materialInset > 0)
             LiquidMaterialPresentation.plate(graphics, style, appearance, x, y, outerSize, outerSize);
         // Cover the center of one full material quad. No scissor strips can bleed or obscure the guild ring.

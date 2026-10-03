@@ -152,18 +152,25 @@ public final class ChatTypeTabService {
         if (currentInput.isEmpty() && lastInsertedPrefix == null) return Optional.of(GUILD_PREFIX);
         if (lastInsertedPrefix == null || !currentInput.equals(lastInsertedPrefix)) return Optional.empty();
 
+        return Optional.of(nextChannel(lastInsertedPrefix));
+    }
+
+    /** Explicit label clicks cycle the destination even with a draft; the caller retains the body. */
+    public String nextChannel(String currentPrefix) {
+        if (currentPrefix == null) return GUILD_PREFIX;
+
         var prefixes = cyclePrefixes();
-        int currentIndex = prefixes.indexOf(lastInsertedPrefix);
-        if (currentIndex < 0 && DIRECT_MESSAGE_PREFIX.matcher(lastInsertedPrefix).matches()) {
-            String known = contact(lastInsertedPrefix.substring(5).strip());
+        int currentIndex = prefixes.indexOf(currentPrefix);
+        if (currentIndex < 0 && DIRECT_MESSAGE_PREFIX.matcher(currentPrefix).matches()) {
+            String known = contact(currentPrefix.substring(5).strip());
             if (known != null) currentIndex = prefixes.indexOf("/msg " + known + " ");
         }
         // An open screen may still hold a DM prefix that is no longer in this session.
-        if (currentIndex < 0 && DIRECT_MESSAGE_PREFIX.matcher(lastInsertedPrefix).matches()) {
-            return Optional.of(ALL_CHAT_PREFIX);
+        if (currentIndex < 0 && DIRECT_MESSAGE_PREFIX.matcher(currentPrefix).matches()) {
+            return ALL_CHAT_PREFIX;
         }
-        if (currentIndex < 0) return Optional.of(GUILD_PREFIX);
-        return Optional.of(prefixes.get((currentIndex + 1) % prefixes.size()));
+        if (currentIndex < 0) return GUILD_PREFIX;
+        return prefixes.get((currentIndex + 1) % prefixes.size());
     }
 
     private List<String> cyclePrefixes() {

@@ -19,10 +19,10 @@ import java.io.IOException;
 /** Shared in-screen create/edit color modal with synchronized HSV, hex, rainbow, and preview state. */
 final class ConsumableColorDialogScreen {
     private static final int ADD_DIALOG_WIDTH = 420;
-    private static final int EDIT_DIALOG_WIDTH = 310;
-    // The controls consume 130px; retain a two-pixel gutter so the preview's right edge survives row clipping.
-    private static final int EDIT_FIELDS_WIDTH = 132;
-    private static final int PICKER_SIZE = 150;
+    private static final int EDIT_DIALOG_WIDTH = 290;
+    private static final int EDIT_FIELDS_WIDTH = 134;
+    private static final int EDIT_PICKER_SIZE = 128;
+    private static final int ADD_PICKER_SIZE = 150;
     private static final int DIALOG_PADDING = 10;
 
     private ConsumableColorDialogScreen() {}
@@ -52,22 +52,22 @@ final class ConsumableColorDialogScreen {
                              HighlightStyle initial, org.kingdomfoxes.ralle.api.settings.ColorSetting queueColor) {
         var draft = new ColorStyleDraft(initial);
         boolean editing = editingIndex != null;
-        int dialogWidth = queueColor != null ? 290 : editing ? EDIT_DIALOG_WIDTH : ADD_DIALOG_WIDTH;
+        int dialogWidth = editing ? EDIT_DIALOG_WIDTH : ADD_DIALOG_WIDTH;
         int innerWidth = dialogWidth - DIALOG_PADDING * 2;
         var content = UIContainers.verticalFlow(Sizing.fixed(dialogWidth), Sizing.content());
         content.gap(6).padding(Insets.of(DIALOG_PADDING)).surface(RalleSurfaces.FRAMED_NAVY);
 
         var body = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content()).gap(8);
+        // Bottom-align short controls with the wheel, directly above the full-width Apply button.
+        if (editing) body.verticalAlignment(VerticalAlignment.BOTTOM);
         var fields = UIContainers.verticalFlow(
-                editing ? Sizing.fixed(queueColor != null ? 134 : EDIT_FIELDS_WIDTH) : Sizing.expand(100), Sizing.content()).gap(5);
+                editing ? Sizing.fixed(EDIT_FIELDS_WIDTH) : Sizing.expand(100), Sizing.content()).gap(5);
         var title = UIComponents.label(RalleTheme.ui(Component.translatable(queueColor != null ? "ralle.war.queue.color.title" : editingIndex == null
                         ? "ralle.consumables.dialog.add.title" : "ralle.consumables.dialog.color.title")))
                 .color(RalleTheme.accent());
-        if (queueColor != null) {
-            content.child(title);
-            content.child(new QueueColorPreviewComponent(draft::style));
-        }
+        if (editing) content.child(title);
         else fields.child(title);
+        if (queueColor != null) content.child(new QueueColorPreviewComponent(draft::style).margins(Insets.top(4)));
         TextBoxComponent name = editingIndex == null ? UIComponents.textBox(Sizing.fill(100)) : null;
         TextBoxComponent aliases = editingIndex == null ? UIComponents.textBox(Sizing.fill(100)) : null;
         if (name != null) {
@@ -79,7 +79,7 @@ final class ConsumableColorDialogScreen {
             fields.child(aliases);
         }
 
-        fields.child(label("ralle.consumables.field.hex"));
+        fields.child(label("ralle.consumables.field.hex").margins(Insets.left(1)));
         var hex = UIComponents.textBox(Sizing.fixed(104)).text(draft.hex());
         hex.setMaxLength(7);
         var hexRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(20)).gap(6);
@@ -96,7 +96,7 @@ final class ConsumableColorDialogScreen {
         fields.child(rainbow);
         fields.child(chroma);
 
-        var picker = new HsvWheelTrianglePicker(queueColor != null ? 128 : PICKER_SIZE, draft.rgb());
+        var picker = new HsvWheelTrianglePicker(editing ? EDIT_PICKER_SIZE : ADD_PICKER_SIZE, draft.rgb());
         var syncingHex = new boolean[1];
         picker.onChanged(rgb -> {
             draft.rgb(rgb);

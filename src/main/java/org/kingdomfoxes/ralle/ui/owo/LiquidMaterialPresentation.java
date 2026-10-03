@@ -23,6 +23,11 @@ final class LiquidMaterialPresentation {
             // Cosmetic resources must never take down the LFG workflow.
             graphics.fill(x, y, x + width, y + height, 0xff000000 | style.shadow());
         }
+        // One logical pixel, independent of the material's sampling resolution.
+        graphics.fill(x, y, x + width, y + 1, 0xffffffff);
+        graphics.fill(x, y + height - 1, x + width, y + height, 0xffffffff);
+        graphics.fill(x, y + 1, x + 1, y + height - 1, 0xffffffff);
+        graphics.fill(x + width - 1, y + 1, x + width, y + height - 1, 0xffffffff);
     }
 }
 

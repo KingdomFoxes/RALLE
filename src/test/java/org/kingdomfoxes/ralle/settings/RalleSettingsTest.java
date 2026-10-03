@@ -31,20 +31,26 @@ class RalleSettingsTest {
                 .findFirst().orElseThrow();
         assertTrue(supporter.subcategories().isEmpty());
         assertEquals(List.of("nameplate-preview", RalleSettings.MATERIAL_RESOLUTION_ID,
-                        RalleSettings.NAMEPLATE_COLOR_ID),
+                        RalleSettings.NAMEPLATE_COLOR_ID, RalleSettings.SHOW_OWN_NAMETAG_ID),
                 supporter.entries().stream().map(entry -> entry.id()).toList());
         assertTrue(registry.entry("nameplate-cosmetics").isEmpty());
+        assertFalse(registry.setting(RalleSettings.SHOW_OWN_NAMETAG_ID, BooleanSetting.class).value());
         assertTrue(registry.available(RalleSettings.MATERIAL_RESOLUTION_ID));
-        assertEquals("recipe", registry.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).value());
+        assertEquals("1", registry.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).value());
         var appearance = org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance.from(registry,
                 org.kingdomfoxes.ralle.cosmetics.NameplateStyle.CATALOG.getFirst());
         assertEquals(org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance.Treatment.PLATE, appearance.treatment());
         assertEquals(0, appearance.usernameOutlinePixels());
+        for (var style : org.kingdomfoxes.ralle.cosmetics.NameplateStyle.CATALOG) {
+            assertEquals(1d, org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance.from(registry, style).resolution());
+        }
         registry.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).set("0.5");
+        registry.setting(RalleSettings.SHOW_OWN_NAMETAG_ID, BooleanSetting.class).set(true);
         var restored = new SettingsRegistry(path);
         RalleSettings.register(restored);
         restored.seal();
         assertEquals("0.5", restored.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).value());
+        assertTrue(restored.setting(RalleSettings.SHOW_OWN_NAMETAG_ID, BooleanSetting.class).value());
         assertTrue(restored.available(RalleSettings.NAMEPLATE_COLOR_ID));
         assertFalse(Files.readString(path).contains("selected_style_id"));
         assertFalse(Files.readString(path).contains("nameplate-cosmetics"));
@@ -75,21 +81,53 @@ class RalleSettingsTest {
     }
 
     @Test
-    void everyFeatureAndKeybindDefaultsToInert() {
+    void freshInstallPersistsTheRestoredPresetAndLeavesOtherFeaturesOff() throws Exception {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);
-
-        registry.categories().stream()
-                .flatMap(category -> category.subcategories().stream())
-                .flatMap(subcategory -> subcategory.entries().stream())
+        registry.seal();
+        var enabled = List.of("chat-screenshot-enabled", "chat-selection-sounds", "raid-lfg-enabled",
+                "chat-screenshot-snap-to-text", "persistent-chat-enabled",
+                "new-party-notifications", "reopened-party-notifications", "party-status-notifications",
+                "auto-pop-out-main-ui", "notification-sounds");
+        registry.entries().stream()
                 .forEach(entry -> {
                     if (entry instanceof BooleanSetting setting) {
-                        assertFalse(setting.value(), setting.id() + " must default off");
-                    } else if (entry instanceof KeybindSetting setting) {
-                        assertEquals(RalleSettings.HQ_DISTANCE_KEYBIND_ID.equals(setting.id())
-                                ? "key.keyboard.left.control" : KeybindSetting.UNBOUND, setting.value());
+                        assertEquals(enabled.contains(setting.id()), setting.value(), setting.id());
                     }
                 });
+        var saved = new java.util.Properties();
+        try (var reader = Files.newBufferedReader(temporaryDirectory.resolve("ralle.properties"))) {
+            saved.load(reader);
+        }
+        assertEquals("true", saved.getProperty("chat.chat-screenshot-enabled"));
+        assertEquals("true", saved.getProperty("chat.chat-screenshot-snap-to-text"));
+        assertEquals("true", saved.getProperty("chat.persistent-chat-enabled"));
+        assertEquals("300", saved.getProperty("chat.persistent-chat-limit"));
+        assertEquals("true", saved.getProperty("raid-lfg.raid-lfg-enabled"));
+        assertEquals("key.keyboard.f1", saved.getProperty("raid-lfg.raid-lfg-keybind"));
+    }
+
+    @Test
+    void restoredDefaultsPreserveExistingDisabledFeaturesAndCustomBindings() throws Exception {
+        var path = temporaryDirectory.resolve("ralle.properties");
+        String existing = "chat.chat-screenshot-enabled=false\nchat.chat-selection-sounds=false\n"
+                + "chat.chat-screenshot-snap-to-text=false\nchat.persistent-chat-enabled=false\n"
+                + "chat.persistent-chat-limit=500\n"
+                + "raid-lfg.raid-lfg-enabled=false\nraid-lfg.raid-lfg-keybind=unbound\n"
+                + "raid-lfg.raid-lfg-join-keybind=key.keyboard.g\n";
+        Files.writeString(path, existing);
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+        assertFalse(registry.setting("chat-screenshot-enabled", BooleanSetting.class).value());
+        assertFalse(registry.setting("chat-selection-sounds", BooleanSetting.class).value());
+        assertFalse(registry.setting("chat-screenshot-snap-to-text", BooleanSetting.class).value());
+        assertFalse(registry.setting("persistent-chat-enabled", BooleanSetting.class).value());
+        assertEquals("500", registry.setting("persistent-chat-limit", ChoiceSetting.class).value());
+        assertFalse(registry.setting(RalleSettings.RAID_LFG_ENABLED_ID, BooleanSetting.class).value());
+        assertEquals(KeybindSetting.UNBOUND, registry.setting("raid-lfg-keybind", KeybindSetting.class).value());
+        assertEquals("key.keyboard.g", registry.setting("raid-lfg-join-keybind", KeybindSetting.class).value());
+        assertEquals(existing, Files.readString(path));
     }
 
     @Test
@@ -136,13 +174,13 @@ class RalleSettingsTest {
     }
 
     @Test
-    void chatScreenshotOptionsAreDisabledByDefault() {
+    void chatScreenshotsSnapToTextAndSoundsDefaultOnWithSmoothExpansionOff() {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);
 
-        assertFalse(registry.setting("chat-screenshot-enabled", BooleanSetting.class).value());
-        assertEquals(false, registry.setting("chat-screenshot-snap-to-text", BooleanSetting.class).value());
-        assertFalse(registry.setting("chat-selection-sounds", BooleanSetting.class).value());
+        assertTrue(registry.setting("chat-screenshot-enabled", BooleanSetting.class).value());
+        assertTrue(registry.setting("chat-screenshot-snap-to-text", BooleanSetting.class).value());
+        assertTrue(registry.setting("chat-selection-sounds", BooleanSetting.class).value());
         assertEquals(false, registry.setting("chat-screenshot-smooth-expansion", BooleanSetting.class).value());
     }
 
@@ -220,9 +258,9 @@ class RalleSettingsTest {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);
 
-        assertFalse(registry.setting("persistent-chat-enabled", BooleanSetting.class).value());
+        assertTrue(registry.setting("persistent-chat-enabled", BooleanSetting.class).value());
         var limit = registry.setting("persistent-chat-limit", ChoiceSetting.class);
-        assertEquals("500", limit.value());
+        assertEquals("300", limit.value());
         assertEquals(List.of("300", "500", "1000", "1500"), limit.choices());
         assertEquals(List.of("persistent-chat-enabled"), registry.dependencies("persistent-chat-limit"));
     }
@@ -249,11 +287,11 @@ class RalleSettingsTest {
         RalleSettings.register(invalid);
         invalid.seal();
         assertTrue(invalid.setting("persistent-chat-enabled", BooleanSetting.class).value());
-        assertEquals("500", invalid.setting("persistent-chat-limit", ChoiceSetting.class).value());
+        assertEquals("300", invalid.setting("persistent-chat-limit", ChoiceSetting.class).value());
     }
 
     @Test
-    void registersApprovedSubcategoryOrderAndUnboundKeyDefaults() {
+    void registersApprovedSubcategoryOrderAndRestoredFunctionKeyDefaults() {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);
 
@@ -299,8 +337,9 @@ class RalleSettingsTest {
                 "raid-lfg-lock-keybind",
                 "raid-lfg-create-keybind",
                 "raid-lfg-kick-keybind");
-        for (var id : keybinds) {
-            assertEquals(KeybindSetting.UNBOUND, registry.setting(id, KeybindSetting.class).value());
+        for (int index = 0; index < keybinds.size(); index++) {
+            var id = keybinds.get(index);
+            assertEquals("key.keyboard.f" + (index + 1), registry.setting(id, KeybindSetting.class).value());
             assertEquals(List.of("raid-lfg-enabled"), registry.dependencies(id));
         }
         for (var id : List.of("raid-lfg-create-selector-wheel", "raid-lfg-kick-selector-wheel")) {
@@ -374,16 +413,16 @@ class RalleSettingsTest {
     }
 
     @Test
-    void raidLfgOptionsDefaultOffAndDependOnRaidLfg() {
+    void raidLfgOptionsDefaultOnAndDependOnRaidLfg() {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);
 
-        assertFalse(registry.setting("raid-lfg-enabled", BooleanSetting.class).value());
-        assertFalse(registry.setting("new-party-notifications", BooleanSetting.class).value());
-        assertFalse(registry.setting("reopened-party-notifications", BooleanSetting.class).value());
-        assertFalse(registry.setting("party-status-notifications", BooleanSetting.class).value());
-        assertFalse(registry.setting("auto-pop-out-main-ui", BooleanSetting.class).value());
-        assertFalse(registry.setting("notification-sounds", BooleanSetting.class).value());
+        assertTrue(registry.setting("raid-lfg-enabled", BooleanSetting.class).value());
+        assertTrue(registry.setting("new-party-notifications", BooleanSetting.class).value());
+        assertTrue(registry.setting("reopened-party-notifications", BooleanSetting.class).value());
+        assertTrue(registry.setting("party-status-notifications", BooleanSetting.class).value());
+        assertTrue(registry.setting("auto-pop-out-main-ui", BooleanSetting.class).value());
+        assertTrue(registry.setting("notification-sounds", BooleanSetting.class).value());
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("new-party-notifications"));
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("reopened-party-notifications"));
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("party-status-notifications"));
@@ -392,7 +431,7 @@ class RalleSettingsTest {
     }
 
     @Test
-    void storedValuesContinueToOverrideInertDefaults() throws Exception {
+    void storedValuesContinueToOverrideDefaults() throws Exception {
         var path = temporaryDirectory.resolve("ralle.properties");
         Files.writeString(path, """
                 chat.chat-screenshot-enabled=true

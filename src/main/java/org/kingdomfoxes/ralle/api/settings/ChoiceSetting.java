@@ -26,7 +26,7 @@ public final class ChoiceSetting extends Setting<String> {
 
     @Override
     public String serialize() {
-        return value();
+        return storedValue();
     }
 
     @Override
