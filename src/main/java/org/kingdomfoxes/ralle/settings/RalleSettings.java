@@ -19,6 +19,7 @@ public final class RalleSettings {
     public static final String INTERFACE_FONT_ID = "interface-font";
     public static final String UI_THEME_ID = "ui-theme";
     public static final String INTERNAL_GUILD_RANKS_ID = "internal-guild-ranks";
+    public static final String RAID_LFG_ENABLED_ID = "raid-lfg-enabled";
     public static final String GUILD_RANK_STYLE_ID = "guild-rank-style";
     public static final String CONSUMABLE_HIGHLIGHTS_ENABLED_ID = "consumable-highlights-enabled";
     public static final String CONSUMABLE_HIGHLIGHT_RULES_ID = "consumable-highlight-rules";
@@ -29,10 +30,17 @@ public final class RalleSettings {
     public static final String HQ_DISTANCE_KEYBIND_ID = "hq-distance-keybind";
     public static final String QUEUE_SELF_COLOR_ID = "queue-self-color";
     public static final String QUEUE_KOF_RANK_COLORS_ID = "queue-kof-rank-colors";
+    public static final List<String> FOX_EXCLUSIVE_IDS = List.of(
+            INTERNAL_GUILD_RANKS_ID, RAID_LFG_ENABLED_ID, QUEUE_KOF_RANK_COLORS_ID);
     public static final String MATERIAL_RESOLUTION_ID = "material-resolution";
     public static final String NAMEPLATE_COLOR_ID = "nameplate-color";
     public static final String SHOW_OWN_NAMETAG_ID = "show-own-nametag";
     private RalleSettings() {}
+
+    public static void requireFoxAccess(SettingsRegistry registry, java.util.function.BooleanSupplier allowed) {
+        for (var id : FOX_EXCLUSIVE_IDS) registry.requireAccess(id, allowed,
+                Component.translatable("ralle.settings.fox-exclusive.locked"));
+    }
 
     public static void register(SettingsRegistry registry) {
         registry.registerCategory(new SettingsCategory(
@@ -96,7 +104,7 @@ public final class RalleSettings {
                 "raid-lfg",
                 Component.translatable("ralle.settings.category.raid-lfg"),
                 Component.translatable("ralle.settings.category.raid-lfg.description"),
-                List.of(toggle("raid-lfg-enabled"), action("edit-notification-position")),
+                List.of(toggle(RAID_LFG_ENABLED_ID), action("edit-notification-position")),
                 List.of(
                         subcategory("notifications",
                                 toggle("new-party-notifications"),

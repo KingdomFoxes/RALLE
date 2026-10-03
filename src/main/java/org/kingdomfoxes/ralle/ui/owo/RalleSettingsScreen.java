@@ -58,6 +58,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private final CosmeticStyleSelection cosmeticStyleSelection;
     private boolean savingNameplateColor;
     private boolean nameplateColorSaveFailed;
+    private boolean foxAccessAvailable;
     private FlowLayout root;
     private FlowLayout sidebarNavigation;
     private FlowLayout document;
@@ -86,6 +87,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     ) {
         this.parent = parent;
         this.settings = settings;
+        this.foxAccessAvailable = settings.available(RalleSettings.RAID_LFG_ENABLED_ID);
         this.chatLayout = chatLayout;
         this.navigation = navigation;
         this.guildRanks = guildRanks;
@@ -376,13 +378,16 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         var copy = UIContainers.verticalFlow(stacked ? Sizing.fill(100)
                 : themeChoice ? Sizing.fixed(themeCopyWidth) : Sizing.fill(67), Sizing.content());
         copy.gap(2);
-        copy.child(UIComponents.label(RalleTheme.ui(entry.title())).lineHeight(RalleTheme.BODY_LINE_HEIGHT)
-                .color(available ? RalleTheme.text() : RalleTheme.DISABLED));
+        var titleLabel = UIComponents.label(titleForDisplay(entry)).lineHeight(RalleTheme.BODY_LINE_HEIGHT)
+                .color(available ? RalleTheme.text() : RalleTheme.DISABLED);
+        if (RalleSettings.FOX_EXCLUSIVE_IDS.contains(entry.id()))
+            titleLabel.maxWidth(SettingsScreenLayout.descriptionWidth(geometry.documentWidth(), stacked));
+        copy.child(titleLabel);
         copy.child(UIComponents.label(descriptionForDisplay(entry, available)).lineHeight(RalleTheme.BODY_LINE_HEIGHT)
                 .color(available ? RalleTheme.muted() : RalleTheme.DISABLED)
                 .maxWidth(themeChoice && !stacked ? themeCopyWidth
                         : SettingsScreenLayout.descriptionWidth(geometry.documentWidth(), stacked)));
-        if (!available) {
+        if (!available && !RalleSettings.FOX_EXCLUSIVE_IDS.contains(entry.id())) {
             var reason = settings.unavailableReason(entry.id()).orElseGet(() -> {
                 var unmet = settings.unmetDependencies(entry.id()).stream()
                         .map(setting -> setting.title().getString()).toList();
@@ -396,6 +401,15 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         row.child(copy);
         row.child(control(entry, controlAvailable(entry.id())));
         return row;
+    }
+
+    static Component titleForDisplay(SettingsEntry entry) {
+        var title = entry.title().copy();
+        if (RalleSettings.FOX_EXCLUSIVE_IDS.contains(entry.id())) {
+            title.append(Component.literal(" ").append(
+                    Component.translatable("ralle.settings.fox-exclusive").withColor(RalleTheme.accentRgb())));
+        }
+        return RalleTheme.ui(title);
     }
 
     private Component descriptionForDisplay(SettingsEntry entry, boolean available) {
@@ -803,6 +817,16 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     public void tick() {
         super.tick();
+        boolean accessAvailable = settings.available(RalleSettings.RAID_LFG_ENABLED_ID);
+        if (foxAccessAvailable != accessAvailable) {
+            foxAccessAvailable = accessAvailable;
+            double progress = scroll.progress();
+            if (query.isEmpty()) rebuildCurrentPage(progress);
+            else {
+                renderSearchResults();
+                pendingScrollProgress = progress;
+            }
+        }
         var colorControl = buttonFor(RalleSettings.NAMEPLATE_COLOR_ID);
         if (colorControl != null) {
             colorControl.setMessage(nameplateColorLabel());

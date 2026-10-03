@@ -86,6 +86,9 @@ public final class RalleClient implements ClientModInitializer {
                 configDirectory.resolve("ralle-onboarding.properties"), existingInstall);
 
         RalleSettings.register(settings);
+        var foxGuildAccess = new org.kingdomfoxes.ralle.client.FoxGuildAccess(
+                new org.kingdomfoxes.ralle.client.HttpFoxGuildLookup()::lookup, System::currentTimeMillis);
+        RalleSettings.requireFoxAccess(settings, foxGuildAccess::allowed);
         var wynntilsCompatibility = WynntilsCompatibility.detect();
         if (!wynntilsCompatibility.supported()) {
             settings.markUnavailable(
@@ -244,6 +247,8 @@ public final class RalleClient implements ClientModInitializer {
         );
         var pointAndLaugh = new org.kingdomfoxes.ralle.war.PointAndLaugh();
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            foxGuildAccess.joined(client.getCurrentServer() == null ? "" : client.getCurrentServer().ip,
+                    client.getUser().getProfileId());
             cosmeticDirectory.clear();
             cosmeticStyleSelection.clear();
             pointAndLaugh.reset();
@@ -252,6 +257,7 @@ public final class RalleClient implements ClientModInitializer {
             onboarding.postIfNeeded(body -> RalleChatMessages.post(client, body));
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            foxGuildAccess.clear();
             cosmeticDirectory.clear();
             cosmeticStyleSelection.clear();
             client.execute(cosmeticTextures::close);
@@ -266,6 +272,7 @@ public final class RalleClient implements ClientModInitializer {
             QueueAttributionService.disconnect();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            foxGuildAccess.tick();
             if (cosmeticReloadPending.getAndSet(false)) cosmeticTextures.close();
             var visibleCosmeticIds = new java.util.LinkedHashSet<java.util.UUID>();
             visibleCosmeticIds.add(client.getUser().getProfileId());

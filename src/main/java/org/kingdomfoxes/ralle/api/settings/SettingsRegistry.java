@@ -25,6 +25,7 @@ public final class SettingsRegistry {
     private final Map<String, SettingsCategory> categories = new LinkedHashMap<>();
     private final Map<String, List<String>> dependencies = new LinkedHashMap<>();
     private final Map<String, Component> unavailableReasons = new LinkedHashMap<>();
+    private final Map<String, RuntimeAccess> runtimeAccess = new LinkedHashMap<>();
     private final Path storagePath;
     private boolean sealed;
 
@@ -77,6 +78,19 @@ public final class SettingsRegistry {
         unavailableReasons.put(entryId, Objects.requireNonNull(reason, "reason"));
     }
 
+    /** Locks a toggle and masks its runtime value, including loaded defaults, while access is absent. */
+    public void requireAccess(String entryId, java.util.function.BooleanSupplier allowed, Component reason) {
+        requireOpen();
+        var toggle = setting(entryId, BooleanSetting.class);
+        var access = new RuntimeAccess(Objects.requireNonNull(allowed, "allowed"),
+                Objects.requireNonNull(reason, "reason"));
+        if (runtimeAccess.putIfAbsent(entryId, access) != null)
+            throw new IllegalArgumentException("Duplicate runtime access requirement: " + entryId);
+        toggle.requireAccess(allowed);
+    }
+
+    private record RuntimeAccess(java.util.function.BooleanSupplier allowed, Component reason) {}
+
     public Collection<SettingsCategory> categories() {
         return List.copyOf(categories.values());
     }
@@ -106,7 +120,7 @@ public final class SettingsRegistry {
     }
 
     public boolean available(String entryId) {
-        return unmetDependencies(entryId).isEmpty() && !unavailableReasons.containsKey(entryId);
+        return unmetDependencies(entryId).isEmpty() && unavailableReason(entryId).isEmpty();
     }
 
     /** Dependency-hidden children are omitted; capability-unavailable entries remain visible with an explanation. */
@@ -116,6 +130,8 @@ public final class SettingsRegistry {
 
     public Optional<Component> unavailableReason(String entryId) {
         Objects.requireNonNull(entryId, "entryId");
+        var access = runtimeAccess.get(entryId);
+        if (access != null && !access.allowed().getAsBoolean()) return Optional.of(access.reason());
         return Optional.ofNullable(unavailableReasons.get(entryId));
     }
 

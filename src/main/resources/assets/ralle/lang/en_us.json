@@ -1,4 +1,6 @@
 {
+  "ralle.settings.fox-exclusive": "(Fox exclusive)",
+  "ralle.settings.fox-exclusive.locked": "Only available to Kingdom of Foxes guild members after the login guild check.",
   "ralle.settings.title": "RALLE Settings",
   "ralle.settings.search": "Search...",
   "ralle.settings.no-results": "No settings match '%s'.",

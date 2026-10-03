@@ -35,6 +35,15 @@ public abstract class Setting<T> implements SettingsEntry {
     }
 
     public final T value() {
+        return effectiveValue(value);
+    }
+
+    /** Runtime restrictions may mask a preference without overwriting the local saved value. */
+    protected T effectiveValue(T storedValue) {
+        return storedValue;
+    }
+
+    protected final T storedValue() {
         return value;
     }
 
