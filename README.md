@@ -1,4 +1,8 @@
-Hello bro,
+Kingdom Foxes' Wynncraft mod that embeds Raid LFGs In-game. Alongside many chat tweaks, Guild war improvements, Fixes to Wynntils features and much more.  
+(includes an occasional piano)
+
+## Features
+
 * Chat
    * Appearance
       * Hide Chat Scrollbar
@@ -35,3 +39,6 @@ Hello bro,
 * Supporter
    * Material Resolution
    * Nameplate Color
+   
+## More
+Hello bro this is not finished give me a SECOND 
