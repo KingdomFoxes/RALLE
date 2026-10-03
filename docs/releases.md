@@ -6,6 +6,10 @@ checks the production JAR, attaches it to that GitHub release, and uploads the
 same bytes to Modrinth. The GitHub release title and Markdown description become
 the Modrinth version name and changelog.
 
+`Build and test` also runs on pushes and pull requests, without publishing. Wait
+for this check to pass on the commit you intend to tag. Build configuration must
+be committed: local Git `skip-worktree` overrides are not present on CI runners.
+
 ## One-time account setup
 
 1. Open the [RALLE Modrinth project](https://modrinth.com/project/ralle) while
