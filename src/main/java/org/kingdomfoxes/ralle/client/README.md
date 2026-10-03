@@ -26,7 +26,9 @@ including while displaying search results.
 Boolean setting's effective `value()`, so existing feature hooks cannot act on
 saved/default-enabled values while locked. The saved preference remains local
 and survives an unrelated config save; a confirmed Fox member can use it again
-without reconfiguring. Raid LFG defaults on but stays effectively off until
+without reconfiguring. Direct changes while locked are rejected in `Setting.set()`,
+so stale UI callbacks and direct callers cannot save an unauthorized change.
+Raid LFG defaults on but stays effectively off until
 current Fox membership is confirmed; internal ranks and KoF rank colors default off.
 
 This is a local feature-access check only. It neither obtains Fox credentials
@@ -39,3 +41,9 @@ Fox's existing `live.connected` and `live.disconnected` logs identify guildless
 users too. The toggle continues to gate LFG actions, notifications, sounds,
 and party commands. Auth and snapshot viewer identities allow a null guild;
 guildless snapshots grant no LFG capabilities. Other servers make no requests.
+
+For local Fox testing, `gradlew build -PlocalBackend` produces a
+`ralle-<version>-local-backend.jar` that selects HTTP/WS on `127.0.0.1:8001`
+for the existing LFG and cosmetic gateways. The packaged marker is absent from
+ordinary builds. `-Dralle.localBackend=true` or `false` overrides the packaged
+default; the Gradle flag also configures `runClient` as before.

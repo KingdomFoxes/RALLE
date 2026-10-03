@@ -64,7 +64,6 @@ import org.kingdomfoxes.ralle.war.hqdistance.HqDistanceOverlay;
 import org.kingdomfoxes.ralle.war.hqdistance.WynntilsCompatibility;
 import org.kingdomfoxes.ralle.war.queue.QueueAttributionService;
 import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
-import org.kingdomfoxes.ralle.diagnostics.RalleDiagnostics;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
@@ -75,6 +74,11 @@ public final class RalleClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        // -PlocalBackend also marks packaged jars; an explicit JVM setting takes precedence.
+        if (System.getProperty("ralle.localBackend") == null
+                && RalleClient.class.getResource("/ralle-local-backend") != null) {
+            System.setProperty("ralle.localBackend", "true");
+        }
         FullShadowRenderingStrategy.registerCompositor();
         RalleSoundEvents.register();
 
@@ -89,6 +93,12 @@ public final class RalleClient implements ClientModInitializer {
         var foxGuildAccess = new org.kingdomfoxes.ralle.client.FoxGuildAccess(
                 new org.kingdomfoxes.ralle.client.HttpFoxGuildLookup()::lookup, System::currentTimeMillis);
         RalleSettings.requireFoxAccess(settings, foxGuildAccess::allowed);
+        var minecraft = Minecraft.getInstance();
+        var cosmeticDirectory = new NameplateDirectorySession(
+                new HttpNameplateDirectory(), () -> true,
+                () -> minecraft.getCurrentServer() == null ? "" : minecraft.getCurrentServer().ip,
+                () -> minecraft.getUser().getProfileId(), java.time.Clock.systemUTC());
+        RalleSettings.requireSupporterAccess(settings, cosmeticDirectory::settingsAllowed);
         var wynntilsCompatibility = WynntilsCompatibility.detect();
         if (!wynntilsCompatibility.supported()) {
             settings.markUnavailable(
@@ -132,11 +142,6 @@ public final class RalleClient implements ClientModInitializer {
 
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), placements);
         var navigation = new SettingsNavigationState(configDirectory.resolve("ralle-settings-ui.properties"), settings);
-        var minecraft = Minecraft.getInstance();
-        var cosmeticDirectory = new NameplateDirectorySession(
-                new HttpNameplateDirectory(), () -> true,
-                () -> minecraft.getCurrentServer() == null ? "" : minecraft.getCurrentServer().ip,
-                () -> minecraft.getUser().getProfileId(), java.time.Clock.systemUTC());
         var cosmeticStyleSelection = new CosmeticStyleSelection(
                 new HttpCosmeticSelfGateway(), new MinecraftSessionProofAdapter(minecraft),
                 cosmeticDirectory, () -> true,
@@ -147,8 +152,6 @@ public final class RalleClient implements ClientModInitializer {
                 .registerReloader(net.minecraft.resources.Identifier.fromNamespaceAndPath("ralle", "cosmetic_textures"),
                         (net.minecraft.server.packs.resources.ResourceManagerReloadListener) manager ->
                                 cosmeticReloadPending.set(true));
-        var diagnostics = new RalleDiagnostics(minecraft, FabricLoader.getInstance().getGameDir());
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> diagnostics.close());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> cosmeticTextures.close());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client ->
                 org.kingdomfoxes.ralle.platform.SharedHttpTransport.shared().close());
@@ -281,7 +284,6 @@ public final class RalleClient implements ClientModInitializer {
                     lobby.members().forEach(member -> visibleCosmeticIds.add(member.minecraftUuid())));
             cosmeticDirectory.tick(visibleCosmeticIds);
             HqDistanceOverlay.tick();
-            diagnostics.tick();
             try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_LAYOUT_TICK)) { chatLayout.tick(); }
             try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_BEHAVIOR_TICK)) { chatBehavior.tick(); }
             try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_INPUT_TICK)) { chatInput.tick(); }
@@ -339,7 +341,7 @@ public final class RalleClient implements ClientModInitializer {
                             context().lfgSounds(), lfgNotifications, lockDebouncer)));
                     return 1;
                 }));
-            dispatcher.register(ralleCommand.then(diagnostics.command()));
+            dispatcher.register(ralleCommand);
         });
     }
 

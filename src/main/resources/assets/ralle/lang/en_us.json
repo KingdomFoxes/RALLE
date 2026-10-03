@@ -285,7 +285,7 @@
   "ralle.settings.value.karla": "Karla",
   "ralle.settings.value.theme.default": "Default theme",
   "ralle.settings.value.theme.royal-dynasty": "Royal Dynasty",
-  "ralle.settings.value.theme.unnamed": "???",
+  "ralle.settings.value.theme.unnamed": "Matcha Gatcha",
   "ralle.settings.value.theme.housing-crisis": "Housing crisis",
   "ralle.settings.value.theme.gloopy-cave": "Gloopy Cave",
   "ralle.settings.value.theme.countx-sini": "Countx Sini",
@@ -344,14 +344,5 @@
   "ralle.lfg.party-queue.body": "Include your current party in this Raid LFG lobby? These players will occupy slots: %s",
   "ralle.lfg.party-queue.too-large": "Raid LFG has four slots including you. Your whole party cannot fit.",
   "ralle.lfg.party-queue.yes": "Queue with my party",
-  "ralle.lfg.party-queue.solo": "Create with just me",
-  "ralle.diag.busy": "A diagnostic recording or export is already running.",
-  "ralle.diag.started": "Recording for %s seconds (%s). Profiling adds overhead. Use /ralle diag stop to finish early.",
-  "ralle.diag.failed": "Diagnostics could not start (%s). Try /ralle diag start for section timings without JFR.",
-  "ralle.diag.idle": "No diagnostic recording is running or available to save.",
-  "ralle.diag.status": "Diagnostics: %s. Whole-client heap: %s / %s MiB (not RALLE-only memory).",
-  "ralle.diag.help": "/ralle diag start [1–300 seconds] records section timings and allocations; /ralle diag jfr [seconds] also samples JVM stacks. Default: 60 seconds. stop finishes; save retries JSON export. Local latest.json/latest.jfr are overwritten. JFR contains JVM-wide stacks; inspect before sharing.",
-  "ralle.diag.section": "%s: %s calls, %s ms total inclusive, %s KiB allocated.",
-  "ralle.diag.saved": "Diagnostics saved locally: %s%s. Use /ralle diag for the top measured sections.",
-  "ralle.diag.save-failed": "Could not save diagnostics. Check the game directory is writable, then /ralle diag save to retry JSON. JFR cannot be recovered after an export failure."
+  "ralle.lfg.party-queue.solo": "Create with just me"
 }

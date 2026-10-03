@@ -22,6 +22,45 @@ class NameplateDirectorySessionTest {
     private final AtomicReference<String> host = new AtomicReference<>("play.wynncraft.com");
     private final AtomicReference<UUID> signedIn = new AtomicReference<>();
 
+    @Test void settingsRequireFreshCurrentAccountGrantsEvenWhenAppearanceIsRetained() {
+        enabled.set(true);
+        signedIn.set(account);
+        var directory = new FakeDirectory();
+        var session = session(directory);
+        assertFalse(session.settingsAllowed());
+        session.tick(List.of(account));
+        assertFalse(session.settingsAllowed());
+        // Every supported role unlocks settings without requiring a selected style.
+        directory.reply.complete(new CosmeticLookupJson.Lookup(List.of(
+                new CosmeticIdentity(account, Set.of("supporter"), null, 1)), Duration.ofSeconds(30)));
+        assertTrue(session.settingsAllowed());
+        clock.advance(30_000);
+        assertNotNull(session.cached(account));
+        assertFalse(session.settingsAllowed());
+        session.tick(List.of(account));
+        directory.reply.completeExceptionally(new RuntimeException("offline"));
+        assertFalse(session.settingsAllowed());
+        clock.advance(2_000);
+        session.tick(List.of(account));
+        directory.reply.complete(new CosmeticLookupJson.Lookup(List.of(
+                new CosmeticIdentity(account, Set.of("contributor"), null, 2)), Duration.ofSeconds(30)));
+        assertTrue(session.settingsAllowed());
+        session.acceptSelf(new CosmeticIdentity(account, Set.of("admin"), null, 3));
+        assertTrue(session.settingsAllowed());
+        session.acceptSelf(CosmeticIdentity.neutral(account, 4));
+        assertFalse(session.settingsAllowed());
+        session.acceptSelf(new CosmeticIdentity(account, Set.of("supporter"), null, 5));
+        assertTrue(session.settingsAllowed());
+        signedIn.set(UUID.randomUUID());
+        assertFalse(session.settingsAllowed());
+        signedIn.set(account);
+        host.set("example.com");
+        assertFalse(session.settingsAllowed());
+        host.set("play.wynncraft.com");
+        session.clear();
+        assertFalse(session.settingsAllowed());
+    }
+
     @Test
     void disabledOffServerAndAccountChangesNeverExposeStaleMetadata() {
         var directory = new FakeDirectory();

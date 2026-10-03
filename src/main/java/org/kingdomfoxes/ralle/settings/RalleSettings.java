@@ -42,6 +42,11 @@ public final class RalleSettings {
                 Component.translatable("ralle.settings.fox-exclusive.locked"));
     }
 
+    public static void requireSupporterAccess(SettingsRegistry registry, java.util.function.BooleanSupplier allowed) {
+        for (var id : List.of(MATERIAL_RESOLUTION_ID, NAMEPLATE_COLOR_ID, SHOW_OWN_NAMETAG_ID))
+            registry.requireAccess(id, allowed, Component.translatable("ralle.cosmetics.supporter.locked"));
+    }
+
     public static void register(SettingsRegistry registry) {
         registry.registerCategory(new SettingsCategory(
                 "about",

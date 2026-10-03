@@ -78,15 +78,15 @@ public final class SettingsRegistry {
         unavailableReasons.put(entryId, Objects.requireNonNull(reason, "reason"));
     }
 
-    /** Locks a toggle and masks its runtime value, including loaded defaults, while access is absent. */
+    /** Locks mutations and masks loaded preferences while access is absent; actions receive UI metadata. */
     public void requireAccess(String entryId, java.util.function.BooleanSupplier allowed, Component reason) {
         requireOpen();
-        var toggle = setting(entryId, BooleanSetting.class);
+        var entry = entry(entryId).orElseThrow(() -> new IllegalArgumentException("Unknown setting: " + entryId));
         var access = new RuntimeAccess(Objects.requireNonNull(allowed, "allowed"),
                 Objects.requireNonNull(reason, "reason"));
         if (runtimeAccess.putIfAbsent(entryId, access) != null)
             throw new IllegalArgumentException("Duplicate runtime access requirement: " + entryId);
-        toggle.requireAccess(allowed);
+        if (entry instanceof Setting<?> setting) setting.requireAccess(allowed);
     }
 
     private record RuntimeAccess(java.util.function.BooleanSupplier allowed, Component reason) {}

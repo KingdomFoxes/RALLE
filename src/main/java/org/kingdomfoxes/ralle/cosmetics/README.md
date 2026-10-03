@@ -51,21 +51,21 @@ selection; pending or failed saves retain the previous effect. Fox publishes
 `selected_style_id:null` so other clients render ordinary names and heads without
 the RALLE material, white plate border, or added world-nameplate shadow.
 Supporter previews also show the cleared appearance for an eligible account.
-Cached grants still unlock the controls, allowing a color to be selected again. Older
+Fresh cached grants still unlock the controls, allowing a color to be selected again. Older
 grants-only servers remain readable but must upgrade for saving.
 
 ## Supporter settings
 
 Supporter remains navigable for every account. The enlarged roster/head previews
 always render using the cached selected style or the bundled gold sample. They
-never authenticate or grant access. Missing identity or an empty grant covers
+never authenticate or grant access. Missing identity, an empty grant, or expired grants cover
 only the Supporter content viewport (or its search-result content) with a
 60%-transparent navy pane (40% opacity) and a centered framed-navy RALLE box
 containing the gold message `These features are locked to supporters!`. The compact
 box centers each line horizontally and centers the visible text block vertically.
 Sidebar navigation, search and other settings remain usable.
 Supporter, Contributor and Admin grants unlock the controls even before a style
-is selected. Controls and dropdown actions recheck access as cached grants change;
+is selected. Controls and dropdown actions require fresh current-account grants;
 Fox still validates the current grant when saving the selected style.
 
 Material Resolution remains a local preference with labels `1 logical pixel`,
@@ -77,9 +77,18 @@ recipe value, remain compatible.
 Once enabled, it reveals the local player's normal nameplate in both F5 views
 and the survival/creative inventory character preview. First-person world
 rendering and unrelated entity previews retain their normal visibility rules.
-The control follows the existing cached-grant settings lock; rendering never
-initiates a lookup or persists anything to Fox. The saved visibility preference
-can also work outside Wynncraft, where no Fox material is resolved.
+Both this setting and Material Resolution enforce the grant lock in the settings
+layer. Without current access, Show Own Nametag resolves to off and resolution to
+`1 logical pixel`, even if the local config requests otherwise. Locked mutations
+leave the saved preference unchanged. Rendering never initiates a lookup or
+persists anything to Fox. Outside Wynncraft or after disconnect, the grant lock
+keeps these preferences inactive until a new lookup confirms access.
+
+`NameplateDirectorySession.settingsAllowed()` reuses the existing bounded lookup
+and requires fresh grants for the current account/server. Expired metadata keeps
+an accepted nameplate visible while its refresh is pending or fails, but cannot
+unlock settings or authorize a new style selection. Selection rechecks grants
+after authentication, and Fox validates current grants at write time.
 
 The visibility hook leaves Minecraft's `EntityRenderer.getNameTag` and
 `AvatarRenderer` score extraction/submission intact. In 1.21.11, player display

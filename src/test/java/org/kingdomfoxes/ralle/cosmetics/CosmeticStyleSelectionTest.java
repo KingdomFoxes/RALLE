@@ -105,6 +105,26 @@ class CosmeticStyleSelectionTest {
         assertEquals(0, gateway.challenges);
     }
 
+    @Test void grantRevokedDuringAuthenticationCannotStartAStyleMutation() {
+        UUID account = UUID.randomUUID();
+        var identity = new CosmeticIdentity(account, Set.of("supporter"), null, 1);
+        var cache = new NameplateDirectorySession(uuids -> CompletableFuture.completedFuture(
+                new CosmeticLookupJson.Lookup(List.of(identity), Duration.ofSeconds(30))),
+                () -> true, () -> "play.wynncraft.com", () -> account, Clock.systemUTC());
+        cache.tick(List.of(account));
+        var gateway = new FakeGateway(account);
+        var proof = new CompletableFuture<Void>();
+        var selection = new CosmeticStyleSelection(gateway, ignored -> proof,
+                cache, () -> true, () -> account, () -> "ExamplePlayer");
+        var request = selection.select("supporter-gold");
+        assertEquals(1, gateway.challenges);
+        cache.acceptSelf(CosmeticIdentity.neutral(account, 2));
+        proof.complete(null);
+        assertThrows(CompletionException.class, request::join);
+        assertNull(gateway.requestedStyle);
+        assertFalse(gateway.mutation.isDone());
+        assertNull(cache.cached(account).selectedStyle());
+    }
     private static final class FakeGateway implements CosmeticSelfGateway {
         final UUID account;
         int challenges;

@@ -18,7 +18,7 @@ public final class RalleThemeCatalog {
     private static final List<Theme> THEMES = List.of(
             t(DEFAULT_ID, "Default theme", null, "041330", "FFFFFF", "F2B84B"),
             t("royal-dynasty", "Royal Dynasty", "SaltyKing", "6A1B9A", "FFFFFF", "F2B84B"),
-            t("unnamed", "???", "SpaseCow", "1A4A00", "FFFFFF", "FFBABA"),
+            t("unnamed", "Matcha Gatcha", "SpaseCow", "1A4A00", "FFFFFF", "FFBABA"),
             t("housing-crisis", "Housing crisis", "SpaseCow", "5E0606", "065E32", "001702"),
             t("gloopy-cave", "Gloopy Cave", "SpaseCow", "00D636", "A100D6", "D60036"),
             t("countx-sini", "Countx Sini", "Nothesinistrtype", "6DDFFF", "FFFDAE", "851A1C"),

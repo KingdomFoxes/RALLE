@@ -44,6 +44,13 @@ public final class NameplateDirectorySession {
         return cache.get(uuid);
     }
 
+    /** Fresh current-account grants authorize settings; retained appearances never grant access. */
+    public synchronized boolean settingsAllowed() {
+        UUID account = accountId.get();
+        CosmeticIdentity identity = account == null ? null : cached(account);
+        return identity != null && !cache.needsRefresh(account) && identity.hasNameplateAccess();
+    }
+
     /** Call from a client tick with visible player UUIDs, never from a render callback. */
     public synchronized void tick(Collection<UUID> visiblePlayers) {
         if (!active()) { clear(); return; }

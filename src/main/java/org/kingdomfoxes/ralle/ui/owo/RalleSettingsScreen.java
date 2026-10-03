@@ -870,8 +870,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private boolean supporterSettingsLocked() {
-        var identity = cosmetics.cached(minecraft.getUser().getProfileId());
-        return identity == null || !identity.hasNameplateAccess();
+        return !cosmetics.settingsAllowed();
     }
 
     private boolean controlAvailable(String id) {

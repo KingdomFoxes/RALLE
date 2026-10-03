@@ -15,6 +15,30 @@ import static org.junit.jupiter.api.Assertions.*;
 class FoxExclusiveSettingsTest {
     @TempDir Path directory;
 
+    @Test void lockedDirectMutationsCannotBeSavedAndAppliedAfterMembershipChanges() throws Exception {
+        var path = directory.resolve("ralle.properties");
+        var allowed = new AtomicBoolean();
+        var settings = new SettingsRegistry(path);
+        RalleSettings.register(settings);
+        RalleSettings.requireFoxAccess(settings, allowed::get);
+        settings.seal();
+        for (var id : List.of(RalleSettings.INTERNAL_GUILD_RANKS_ID, RalleSettings.QUEUE_KOF_RANK_COLORS_ID)) {
+            var toggle = settings.setting(id, BooleanSetting.class);
+            toggle.set(true);
+            assertEquals("false", toggle.serialize());
+        }
+        allowed.set(true);
+        var lfg = settings.setting(RalleSettings.RAID_LFG_ENABLED_ID, BooleanSetting.class);
+        lfg.set(false);
+        allowed.set(false);
+        for (var id : RalleSettings.FOX_EXCLUSIVE_IDS) settings.setting(id, BooleanSetting.class).set(true);
+        settings.setting("chat-timestamps", BooleanSetting.class).set(true);
+        assertTrue(Files.readString(path).contains("raid-lfg.raid-lfg-enabled=false"));
+        allowed.set(true);
+        for (var id : RalleSettings.FOX_EXCLUSIVE_IDS)
+            assertFalse(settings.setting(id, BooleanSetting.class).value());
+    }
+
     @Test
     void savedEnabledValuesStayInactiveUntilFoxCheckAndSurviveUnrelatedSaves() throws Exception {
         var path = directory.resolve("ralle.properties");
