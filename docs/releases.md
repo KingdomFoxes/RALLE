@@ -16,12 +16,14 @@ be committed: local Git `skip-worktree` overrides are not present on CI runners.
    signed in as an owner/member with upload permission. Create/finish the project
    if needed.
 2. Open [GitHub Actions variables](https://github.com/KingdomFoxes/RALLE/settings/variables/actions).
-   The repository variable `MODRINTH_PROJECT_ID` is set to `ralle`, which the API
-   accepts as the project slug. If the slug changes, replace this value with the
-   permanent project ID from its `...` menu -> **Copy ID**.
+   The repository variable `MODRINTH_PROJECT_ID` is set to `DcSaM1LV`, the
+   maintainer-confirmed permanent project ID. Use **Copy ID** in the project's
+   `...` menu to configure another checkout. Slugs also resolve, but publishing
+   does not require a specific slug or version-derived project type, which may
+   differ while a project is a draft.
 3. In [Modrinth account settings](https://modrinth.com/settings/pats), create a
-   personal access token with **Create versions** permission. Also allow reading
-   projects/versions if access to a draft project requires it. The account must
+   personal access token with **Read projects**, **Read versions**, and
+   **Create versions** permissions. The account must
    have upload permission on RALLE. Store it directly in
    [GitHub Actions secrets](https://github.com/KingdomFoxes/RALLE/settings/secrets/actions)
    as a repository secret named `MODRINTH_TOKEN`. Do not commit the token or put
@@ -68,6 +70,14 @@ rejecting local-backend or source JARs.
 
 ## Failures and retries
 
+For an old release whose publishing tooling needs a fix, merge the tooling fix
+to `main`, open **Actions -> Publish release -> Run workflow**, select `main`,
+and enter the existing release tag (for example `1.0.0`). This uses the selected
+workflow commit's tooling but builds and verifies the original tagged source.
+It never moves tags, changes the mod version, or creates a new GitHub release.
+This recovery path still requires a successful build and a published release.
+For ordinary release events, both source and tooling come from the release tag.
+
 Correct missing secrets/variables or service errors and use **Re-run all jobs**
 on the release's workflow run. A rerun preserves an existing GitHub JAR and uses
 it as the canonical file, avoiding differences from rebuilt ZIP timestamps.
@@ -84,7 +94,8 @@ not synchronized automatically; manage those separately on each site.
 
 To fix a build/tag mismatch, publish a corrected release referencing the correct
 commit. Rerunning an old tag always builds that tag's code, not the newest branch.
-Tags predating this workflow cannot run it.
+Tags predating the automatic workflow can use manual recovery if they have a
+published GitHub release and compatible build configuration.
 
 ## Local verification
 

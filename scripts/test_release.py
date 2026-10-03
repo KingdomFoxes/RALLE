@@ -113,7 +113,7 @@ class ReleaseTest(unittest.TestCase):
 
     def test_wrong_project_never_uploads(self):
         with patch.dict("os.environ", {"MODRINTH_TOKEN": "test", "MODRINTH_PROJECT_ID": "project"}), \
-                patch.object(release, "api", return_value={"slug": "other", "project_type": "mod"}), \
+                patch.object(release, "api", return_value={"id": "other", "slug": "other", "project_type": "mod"}), \
                 patch.object(release, "gh") as gh:
             with self.assertRaises(ValueError):
                 release.publish(self.info, self.jar)
@@ -131,6 +131,32 @@ class ReleaseTest(unittest.TestCase):
             self.assertIn(b'"dependency_type": "embedded"', data)
             self.assertIn(b'"environment": "client_only"', data)
             self.assertIn(self.jar.read_bytes(), data)
+
+    def test_draft_project_uses_selected_id_without_slug_or_type_assumptions(self):
+        with patch.dict("os.environ", {"MODRINTH_TOKEN": "test", "MODRINTH_PROJECT_ID": "DcSaM1LV"}), \
+                patch.object(release, "github_asset"), patch.object(release, "api", side_effect=[
+                    {"id": "DcSaM1LV", "slug": "temporary-slug", "project_type": "project", "status": "draft"},
+                    [], {"id": "new"}]) as api:
+            release.publish(self.info, self.jar)
+            self.assertIn(b'"project_id": "DcSaM1LV"', api.call_args.args[2])
+
+    def test_manual_retry_loads_existing_release_and_keeps_version_checks(self):
+        event = {"repository": {"full_name": release.REPOSITORY}, "inputs": {"tag": "v0.1.9"}}
+        with patch.object(release, "gh", return_value=json.dumps(self.event["release"])) as gh:
+            resolved = release.release_event(event)
+            self.assertEqual("0.1.9", release.metadata(resolved, self.config)["version_number"])
+            gh.assert_called_once_with("api", "repos/KingdomFoxes/RALLE/releases/tags/v0.1.9", capture=True)
+            with self.assertRaises(ValueError):
+                release.metadata(resolved, dict(self.config, mod_version="0.2.0"))
+
+    def test_manual_retry_rejects_invalid_tag_and_other_repo_before_api_call(self):
+        with patch.object(release, "gh") as gh:
+            for event in (
+                    {"repository": {"full_name": release.REPOSITORY}, "inputs": {"tag": "../../main"}},
+                    {"repository": {"full_name": "other/RALLE"}, "inputs": {"tag": "v0.1.9"}}):
+                with self.assertRaises(ValueError):
+                    release.release_event(event)
+            gh.assert_not_called()
 
     def test_github_retry_reuses_existing_jar(self):
         original = self.jar.read_bytes()
