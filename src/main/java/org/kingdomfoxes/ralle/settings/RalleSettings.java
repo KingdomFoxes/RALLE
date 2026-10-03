@@ -85,12 +85,12 @@ public final class RalleSettings {
                                 choice("text-shadow", "vanilla", "none", "vanilla", "full", "wrapped-full")
                         ),
                         subcategory("chat-history",
-                                toggle("persistent-chat-enabled"),
-                                choice("persistent-chat-limit", "500", "300", "500", "1000", "1500")
+                                toggle("persistent-chat-enabled", true),
+                                choice("persistent-chat-limit", "300", "300", "500", "1000", "1500")
                         ),
                         subcategory("screenshots",
                                 toggle("chat-screenshot-enabled", true),
-                                toggle("chat-screenshot-snap-to-text"),
+                                toggle("chat-screenshot-snap-to-text", true),
                                 toggle("chat-screenshot-smooth-expansion"),
                                 toggle("chat-selection-sounds", true),
                                 choice(CHAT_SELECTION_INSTRUMENT_ID, "xylophone",

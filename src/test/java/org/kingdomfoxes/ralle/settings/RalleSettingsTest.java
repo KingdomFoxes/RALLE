@@ -86,6 +86,7 @@ class RalleSettingsTest {
         RalleSettings.register(registry);
         registry.seal();
         var enabled = List.of("chat-screenshot-enabled", "chat-selection-sounds", "raid-lfg-enabled",
+                "chat-screenshot-snap-to-text", "persistent-chat-enabled",
                 "new-party-notifications", "reopened-party-notifications", "party-status-notifications",
                 "auto-pop-out-main-ui", "notification-sounds");
         registry.entries().stream()
@@ -99,6 +100,9 @@ class RalleSettingsTest {
             saved.load(reader);
         }
         assertEquals("true", saved.getProperty("chat.chat-screenshot-enabled"));
+        assertEquals("true", saved.getProperty("chat.chat-screenshot-snap-to-text"));
+        assertEquals("true", saved.getProperty("chat.persistent-chat-enabled"));
+        assertEquals("300", saved.getProperty("chat.persistent-chat-limit"));
         assertEquals("true", saved.getProperty("raid-lfg.raid-lfg-enabled"));
         assertEquals("key.keyboard.f1", saved.getProperty("raid-lfg.raid-lfg-keybind"));
     }
@@ -107,6 +111,8 @@ class RalleSettingsTest {
     void restoredDefaultsPreserveExistingDisabledFeaturesAndCustomBindings() throws Exception {
         var path = temporaryDirectory.resolve("ralle.properties");
         String existing = "chat.chat-screenshot-enabled=false\nchat.chat-selection-sounds=false\n"
+                + "chat.chat-screenshot-snap-to-text=false\nchat.persistent-chat-enabled=false\n"
+                + "chat.persistent-chat-limit=500\n"
                 + "raid-lfg.raid-lfg-enabled=false\nraid-lfg.raid-lfg-keybind=unbound\n"
                 + "raid-lfg.raid-lfg-join-keybind=key.keyboard.g\n";
         Files.writeString(path, existing);
@@ -115,6 +121,9 @@ class RalleSettingsTest {
         registry.seal();
         assertFalse(registry.setting("chat-screenshot-enabled", BooleanSetting.class).value());
         assertFalse(registry.setting("chat-selection-sounds", BooleanSetting.class).value());
+        assertFalse(registry.setting("chat-screenshot-snap-to-text", BooleanSetting.class).value());
+        assertFalse(registry.setting("persistent-chat-enabled", BooleanSetting.class).value());
+        assertEquals("500", registry.setting("persistent-chat-limit", ChoiceSetting.class).value());
         assertFalse(registry.setting(RalleSettings.RAID_LFG_ENABLED_ID, BooleanSetting.class).value());
         assertEquals(KeybindSetting.UNBOUND, registry.setting("raid-lfg-keybind", KeybindSetting.class).value());
         assertEquals("key.keyboard.g", registry.setting("raid-lfg-join-keybind", KeybindSetting.class).value());
@@ -165,12 +174,12 @@ class RalleSettingsTest {
     }
 
     @Test
-    void chatScreenshotsAndSoundsDefaultOnWithOptionalSelectionTweaksOff() {
+    void chatScreenshotsSnapToTextAndSoundsDefaultOnWithSmoothExpansionOff() {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);
 
         assertTrue(registry.setting("chat-screenshot-enabled", BooleanSetting.class).value());
-        assertEquals(false, registry.setting("chat-screenshot-snap-to-text", BooleanSetting.class).value());
+        assertTrue(registry.setting("chat-screenshot-snap-to-text", BooleanSetting.class).value());
         assertTrue(registry.setting("chat-selection-sounds", BooleanSetting.class).value());
         assertEquals(false, registry.setting("chat-screenshot-smooth-expansion", BooleanSetting.class).value());
     }
@@ -249,9 +258,9 @@ class RalleSettingsTest {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("ralle.properties"));
         RalleSettings.register(registry);
 
-        assertFalse(registry.setting("persistent-chat-enabled", BooleanSetting.class).value());
+        assertTrue(registry.setting("persistent-chat-enabled", BooleanSetting.class).value());
         var limit = registry.setting("persistent-chat-limit", ChoiceSetting.class);
-        assertEquals("500", limit.value());
+        assertEquals("300", limit.value());
         assertEquals(List.of("300", "500", "1000", "1500"), limit.choices());
         assertEquals(List.of("persistent-chat-enabled"), registry.dependencies("persistent-chat-limit"));
     }
@@ -278,7 +287,7 @@ class RalleSettingsTest {
         RalleSettings.register(invalid);
         invalid.seal();
         assertTrue(invalid.setting("persistent-chat-enabled", BooleanSetting.class).value());
-        assertEquals("500", invalid.setting("persistent-chat-limit", ChoiceSetting.class).value());
+        assertEquals("300", invalid.setting("persistent-chat-limit", ChoiceSetting.class).value());
     }
 
     @Test

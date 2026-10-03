@@ -5,8 +5,9 @@ if it does not exist. Existing files and saved preferences are loaded without
 being rewritten during initialization; missing or invalid entries use their
 registered defaults. Settings continue to save locally after changes.
 
-The restored installation preset enables chat screenshots, chat selection
-sounds, Raid LFG, new/reopened party notifications, party status notifications,
+The restored installation preset enables chat screenshots with Snap to Text,
+chat selection sounds, persistent chat with a 300-message session history,
+Raid LFG, new/reopened party notifications, party status notifications,
 auto pop-out, and notification sounds. Other optional toggles remain off.
 Supporter nameplates remain always on. Raid LFG's saved default is true, but its
 effective value stays false until the current login confirms Fox membership;
