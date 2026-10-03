@@ -24,6 +24,7 @@ DEPENDENCIES = [
     {"project_id": "ccKDOlHs", "dependency_type": "embedded"},  # owo-lib
     {"project_id": "dU5Gb9Ab", "dependency_type": "optional"},  # Wynntils
 ]
+VERSION_PATTERN = r"[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?"
 
 
 def properties(path):
@@ -37,7 +38,7 @@ def metadata(event, config):
         raise ValueError("Only published RALLE releases can be uploaded.")
     tag = release["tag_name"]
     version = tag.removeprefix("v")
-    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?", version):
+    if not re.fullmatch(VERSION_PATTERN, version):
         raise ValueError("Use a version tag such as v0.1.9 or v0.1.9-alpha.1.")
     if version != config["mod_version"]:
         raise ValueError(f"Tag {tag} does not match mod_version={config['mod_version']}.")
@@ -115,8 +116,26 @@ def multipart(payload, jar):
 
 
 def gh(*args, capture=False):
-    return subprocess.run(["gh", *args], check=True, text=True,
+    return subprocess.run(["gh", *args], check=True, text=True, encoding="utf-8",
                           stdout=subprocess.PIPE if capture else None).stdout
+
+
+def release_event(event):
+    if event["repository"]["full_name"] != REPOSITORY:
+        raise ValueError("Only RALLE releases can be uploaded.")
+    if "release" in event:
+        return event
+    # Manual recovery uses the selected workflow commit's publishing tooling,
+    # while both jobs still check out and build the original release tag.
+    tag = event["inputs"]["tag"]
+    if not re.fullmatch("v?" + VERSION_PATTERN, tag):
+        raise ValueError("Select an existing version tag, such as 1.0.0.")
+    result = dict(event)
+    result["release"] = json.loads(gh("api", f"repos/{REPOSITORY}/releases/tags/{quote(tag, safe='')}",
+                                      capture=True))
+    if result["release"]["tag_name"] != tag:
+        raise ValueError("GitHub returned a different release tag.")
+    return result
 
 
 def github_asset(info, jar):
@@ -146,8 +165,10 @@ def publish(info, jar):
         raise ValueError("Set the MODRINTH_TOKEN repository secret and "
                          "MODRINTH_PROJECT_ID repository variable first. See docs/releases.md.")
     project = api("/project/" + quote(project_id, safe=""), token)
-    if project["slug"] != "ralle" or project["project_type"] != "mod":
-        raise ValueError("MODRINTH_PROJECT_ID must identify the RALLE mod (slug ralle).")
+    # The maintainer-selected ID is authoritative. Draft projects may have a
+    # temporary slug or no version-derived project type yet.
+    if project["id"] != project_id and project.get("slug") != project_id:
+        raise ValueError("Modrinth returned a different project than MODRINTH_PROJECT_ID.")
     versions = api(f"/project/{project['id']}/version", token)
     github_asset(info, jar)
     version_id = existing_version(versions, info, jar)
@@ -166,7 +187,7 @@ def publish(info, jar):
 
 
 def main():
-    event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
+    event = release_event(json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8")))
     info = metadata(event, properties(Path("gradle.properties")))
     jar = BUNDLE / info["filename"]
     phase = sys.argv[1]
