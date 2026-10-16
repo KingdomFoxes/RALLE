@@ -459,7 +459,8 @@ public final class RaidLfgService {
             if (clockMillis.getAsLong() < renewalRetryAtMillis) return;
             if (lifecycle != LifecycleState.ONLINE && bearerToken == null) return;
             long id = ++renewalSequence;
-            renewal = new RenewalAttempt(id);
+            var renewing = new RenewalAttempt(id);
+            renewal = renewing;
             gateway.status()
                     .thenCompose(status -> {
                         requireRenewal(id);
@@ -483,7 +484,7 @@ public final class RaidLfgService {
                             requireProtocol(session.protocolVersion());
                             attempt.token = session.accessToken();
                         }
-                        return gateway.connectLive(session.accessToken(), renewalListener(id));
+                        return gateway.connectLive(session.accessToken(), renewalListener(renewing));
                     })
                     .thenAccept(connection -> {
                         try (var callbackScope = stateAccess.enter()) {
@@ -502,14 +503,27 @@ public final class RaidLfgService {
         }
     }
 
-    private LfgGateway.LiveListener renewalListener(long id) {
+    private LfgGateway.LiveListener renewalListener(RenewalAttempt attempt) {
         return new LfgGateway.LiveListener() {
-            @Override public void onFrame(LfgProtocol.LiveFrame frame) { receiveRenewalFrame(id, frame); }
-            @Override public void onClosed(int statusCode, String reason) {
-                renewalFailed(id, new LfgGatewayException(statusCode,
-                        new LfgProtocol.Error("LIVE_CLOSED", "Renewal connection closed.", true, null, null)));
+            @Override public void onFrame(LfgProtocol.LiveFrame frame) {
+                try (var stateScope = stateAccess.enter()) {
+                    if (attempt.activeGeneration >= 0) applyLive(attempt.activeGeneration, frame);
+                    else receiveRenewalFrame(attempt.id, frame);
+                }
             }
-            @Override public void onFailure(Throwable failure) { renewalFailed(id, unwrap(failure)); }
+            @Override public void onClosed(int statusCode, String reason) {
+                try (var stateScope = stateAccess.enter()) {
+                    if (attempt.activeGeneration >= 0) liveClosed(attempt.activeGeneration, statusCode, reason);
+                    else renewalFailed(attempt.id, new LfgGatewayException(statusCode,
+                            new LfgProtocol.Error("LIVE_CLOSED", "Renewal connection closed.", true, null, null)));
+                }
+            }
+            @Override public void onFailure(Throwable failure) {
+                try (var stateScope = stateAccess.enter()) {
+                    if (attempt.activeGeneration >= 0) handleAsyncFailure(attempt.activeGeneration, failure, true);
+                    else renewalFailed(attempt.id, unwrap(failure));
+                }
+            }
         };
     }
 
@@ -541,7 +555,9 @@ public final class RaidLfgService {
         try (var stateScope = stateAccess.enter()) {
             if (renewal != attempt || attempt.connection == null || attempt.snapshot == null) return;
             var old = liveConnection;
-            generation++;
+            // The replacement socket keeps this listener after the temporary renewal is cleared.
+            // Promote all later frames/close/error callbacks into the normal live lifecycle.
+            attempt.activeGeneration = ++generation;
             liveConnection = attempt.connection;
             bearerToken = attempt.token;
             awaitingSnapshot = false;
@@ -557,6 +573,11 @@ public final class RaidLfgService {
             if (old != null && old != liveConnection) old.close();
             long activeGeneration = generation;
             for (var frame : attempt.bufferedFrames) applyLive(activeGeneration, frame);
+            // The socket now retains the promoted listener, so release its temporary sync data.
+            attempt.bufferedFrames.clear();
+            attempt.snapshot = null;
+            attempt.token = null;
+            attempt.connection = null;
         }
     }
 
@@ -1043,6 +1064,7 @@ public final class RaidLfgService {
 
     private static final class RenewalAttempt {
         private final long id;
+        private long activeGeneration = -1;
         private final List<LfgProtocol.LiveFrame> bufferedFrames = new ArrayList<>();
         private String token;
         private LfgGateway.LiveConnection connection;

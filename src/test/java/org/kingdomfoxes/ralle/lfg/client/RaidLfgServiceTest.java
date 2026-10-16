@@ -502,6 +502,85 @@ class RaidLfgServiceTest {
     }
 
     @Test
+    void renewedSocketsContinueDeliveringUpdatesAndCanRenewAgain() {
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var service = service(gateway, env);
+        service.tick();
+        gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshotWithLobby()));
+
+        for (int cycle = 0; cycle < 3; cycle++) {
+            var oldListener = gateway.listener;
+            oldListener.onFrame(new LfgProtocol.SessionExpiringFrame(1, Instant.ofEpochSecond(900)));
+            assertEquals(cycle + 2, gateway.listeners.size());
+            var renewed = gateway.listener;
+            renewed.onFrame(new LfgProtocol.SnapshotFrame(snapshotWithLobby()));
+            // These arrive after renewal commits, rather than in its initial snapshot/buffer.
+            renewed.onFrame(new LfgProtocol.UpsertFrame(1, 2, lockedHostedLobby()));
+            assertTrue(service.store().state().lobbies().get(hostedLobby(true).lobbyId()).locked());
+            oldListener.onFrame(new LfgProtocol.RemoveFrame(1, 3, hostedLobby(true).lobbyId()));
+            oldListener.onClosed(1006, "old connection closed");
+            assertEquals(RaidLfgService.LifecycleState.ONLINE, service.lifecycle());
+            assertFalse(service.store().state().lobbies().isEmpty());
+            renewed.onFrame(new LfgProtocol.RemoveFrame(1, 3, hostedLobby(true).lobbyId()));
+            assertTrue(service.store().state().lobbies().isEmpty());
+        }
+    }
+
+    @Test
+    void renewalBuffersEarlyFramesThenKeepsStreamingAfterConnectionFutureCompletes() {
+        var gateway = new FakeGateway();
+        var env = new MutableEnvironment();
+        env.enabled = true;
+        env.host = "wynncraft.com";
+        var service = service(gateway, env);
+        service.tick();
+        var oldListener = gateway.listener;
+        oldListener.onFrame(new LfgProtocol.SnapshotFrame(snapshotWithLobby()));
+        gateway.connectionFuture = new CompletableFuture<>();
+        oldListener.onFrame(new LfgProtocol.SessionExpiringFrame(1, Instant.ofEpochSecond(900)));
+        var replacement = gateway.listener;
+        replacement.onFrame(new LfgProtocol.SnapshotFrame(snapshotWithLobby()));
+        replacement.onFrame(new LfgProtocol.UpsertFrame(1, 2, lockedHostedLobby()));
+        assertFalse(service.store().state().lobbyList().getFirst().locked());
+        assertEquals(0, gateway.connections.getFirst().closeCalls);
+        gateway.connectionFuture.complete(gateway.connections.getLast());
+        assertTrue(service.store().state().lobbyList().getFirst().locked());
+        assertEquals(1, gateway.connections.getFirst().closeCalls);
+        replacement.onFrame(new LfgProtocol.RemoveFrame(1, 3, hostedLobby(true).lobbyId()));
+        assertTrue(service.store().state().lobbies().isEmpty());
+        oldListener.onFailure(new java.io.IOException("superseded socket"));
+        assertEquals(RaidLfgService.LifecycleState.ONLINE, service.lifecycle());
+    }
+
+    @Test
+    void renewedSocketCloseAndFailureTriggerNormalReconnect() {
+        for (boolean close : new boolean[] {true, false}) {
+            var now = new long[]{0L};
+            var gateway = new FakeGateway();
+            var env = new MutableEnvironment();
+            env.enabled = true;
+            env.host = "wynncraft.com";
+            var service = new RaidLfgService(gateway, env, ignored -> CompletableFuture.completedFuture(null),
+                    () -> now[0], () -> 0.5);
+            service.tick();
+            gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+            gateway.listener.onFrame(new LfgProtocol.SessionExpiringFrame(1, Instant.ofEpochSecond(900)));
+            gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+            if (close) gateway.listener.onClosed(1006, "connection lost");
+            else gateway.listener.onFailure(new java.io.IOException("connection lost"));
+            assertEquals(RaidLfgService.LifecycleState.RECONNECTING, service.lifecycle());
+            now[0] = 1_000;
+            service.tick();
+            assertEquals(3, gateway.challengeCalls);
+            gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot()));
+            assertEquals(RaidLfgService.LifecycleState.ONLINE, service.lifecycle());
+        }
+    }
+
+    @Test
     void expiredOldCredentialBecomesReadOnlyWithoutStartingOverlappingAuthentication() {
         var now = new long[]{0L};
         var gateway = new FakeGateway();
@@ -760,6 +839,7 @@ class RaidLfgServiceTest {
         LiveListener listener;
         LfgProtocol.Status status = new LfgProtocol.Status(true, 1);
         RuntimeException liveFailure;
+        CompletableFuture<LiveConnection> connectionFuture;
         int createCalls;
         final java.util.ArrayList<UUID> createKeys = new java.util.ArrayList<>();
         final java.util.ArrayList<LiveListener> listeners = new java.util.ArrayList<>();
@@ -808,7 +888,7 @@ class RaidLfgServiceTest {
             if (liveFailure != null) return CompletableFuture.failedFuture(liveFailure);
             var connection = new FakeConnection();
             connections.add(connection);
-            return CompletableFuture.completedFuture(connection);
+            return connectionFuture != null ? connectionFuture : CompletableFuture.completedFuture(connection);
         }
         private static <T> CompletableFuture<T> unsupported() { return CompletableFuture.failedFuture(new UnsupportedOperationException()); }
     }
