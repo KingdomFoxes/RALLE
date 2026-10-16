@@ -1,7 +1,12 @@
 package org.kingdomfoxes.ralle.cosmetics;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
+import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
+import org.kingdomfoxes.ralle.settings.RalleSettings;
 
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,6 +26,62 @@ class NameplateDirectorySessionTest {
     private final AtomicBoolean enabled = new AtomicBoolean();
     private final AtomicReference<String> host = new AtomicReference<>("play.wynncraft.com");
     private final AtomicReference<UUID> signedIn = new AtomicReference<>();
+
+    @Test void ownNametagStaysEnabledAcrossRepeatedGrantRefreshes(@TempDir Path directory) {
+        enabled.set(true);
+        signedIn.set(account);
+        var backend = new FakeDirectory();
+        var session = session(backend);
+        var settings = new SettingsRegistry(directory.resolve("ralle.properties"));
+        RalleSettings.register(settings);
+        RalleSettings.requireSupporterAccess(settings, session::settingsAllowed);
+        settings.seal();
+        var ownName = settings.setting(RalleSettings.SHOW_OWN_NAMETAG_ID, BooleanSetting.class);
+        session.tick(List.of(account));
+        backend.reply.complete(reply(account, "supporter-gold"));
+        ownName.set(true);
+        long revision = session.presentationRevision();
+
+        for (int cycle = 0; cycle < 6; cycle++) {
+            clock.advance(15_000);
+            session.tick(List.of(account));
+            assertEquals(cycle + 2, backend.calls, "Refresh grants before their expiry");
+            assertTrue(ownName.value());
+            clock.advance(1_000); // Network latency must not hide the name or reset material resolution.
+            assertTrue(ownName.value());
+            backend.reply.complete(reply(account, "supporter-gold"));
+            assertTrue(ownName.value());
+            assertEquals(revision, session.presentationRevision());
+        }
+    }
+
+    @Test void earlyGrantRefreshStillLocksOnExpiryFailureAndRevocation() {
+        enabled.set(true);
+        signedIn.set(account);
+        var backend = new FakeDirectory();
+        var session = session(backend);
+        session.tick(List.of(account, visible));
+        backend.reply.complete(new CosmeticLookupJson.Lookup(List.of(
+                new CosmeticIdentity(account, Set.of("supporter"), "supporter-gold", 1),
+                new CosmeticIdentity(visible, Set.of("supporter"), "supporter-gold", 1)), Duration.ofSeconds(6)));
+        clock.advance(3_000);
+        session.tick(List.of(account, visible));
+        assertEquals(List.of(account), backend.requested); // Other players keep their normal TTL cadence.
+        assertTrue(session.settingsAllowed());
+        backend.reply.completeExceptionally(new RuntimeException("offline"));
+        assertTrue(session.settingsAllowed());
+        clock.advance(3_000);
+        assertFalse(session.settingsAllowed());
+        assertNotNull(session.cached(account).selectedStyle());
+        session.tick(List.of(account));
+        backend.reply.complete(reply(account, "supporter-gold"));
+        assertTrue(session.settingsAllowed());
+        clock.advance(15_000);
+        session.tick(List.of(account));
+        backend.reply.complete(reply(account, null));
+        assertFalse(session.settingsAllowed());
+        assertNull(session.cached(account).selectedStyle());
+    }
 
     @Test void settingsRequireFreshCurrentAccountGrantsEvenWhenAppearanceIsRetained() {
         enabled.set(true);
@@ -215,9 +276,11 @@ class NameplateDirectorySessionTest {
 
     private static final class FakeDirectory implements NameplateDirectory {
         int calls;
+        List<UUID> requested;
         CompletableFuture<CosmeticLookupJson.Lookup> reply;
         @Override public CompletableFuture<CosmeticLookupJson.Lookup> lookup(List<UUID> uuids) {
             calls++;
+            requested = List.copyOf(uuids);
             reply = new CompletableFuture<>();
             return reply;
         }

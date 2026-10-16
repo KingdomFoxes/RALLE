@@ -12,6 +12,24 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SessionCosmeticCacheTest {
+    @Test void earlyGrantRenewalDoesNotExtendFreshnessAndHonorsShortTtls() {
+        var clock = new MutableClock();
+        var cache = new SessionCosmeticCache(clock);
+        UUID uuid = UUID.randomUUID();
+        assertTrue(cache.needsGrantRefresh(uuid));
+        cache.put(new CosmeticIdentity(uuid, Set.of("supporter"), null, 1), Duration.ofSeconds(6));
+        clock.advance(2_999);
+        assertFalse(cache.needsGrantRefresh(uuid));
+        clock.advance(1);
+        assertTrue(cache.needsGrantRefresh(uuid));
+        assertFalse(cache.needsRefresh(uuid));
+        clock.advance(3_000);
+        assertTrue(cache.needsRefresh(uuid));
+        cache.put(CosmeticIdentity.neutral(uuid, 2), Duration.ZERO);
+        assertTrue(cache.needsGrantRefresh(uuid));
+        assertTrue(cache.needsRefresh(uuid));
+    }
+
     @Test
     void ttlRequestsRefreshWhileRevocationAndSessionClearReplacePresentation() {
         var clock = new MutableClock();

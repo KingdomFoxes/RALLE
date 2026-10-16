@@ -21,7 +21,8 @@ public final class SessionCosmeticCache {
         Objects.requireNonNull(serverTtl, "serverTtl");
         long duration = Math.max(0, Math.min(MAX_AGE.toMillis(), serverTtl.toMillis()));
         entries.remove(identity.minecraftUuid());
-        entries.put(identity.minecraftUuid(), new Entry(identity, clock.millis() + duration));
+        long now = clock.millis();
+        entries.put(identity.minecraftUuid(), new Entry(identity, now + duration, now + duration / 2));
         while (entries.size() > MAX_ENTRIES) entries.remove(entries.keySet().iterator().next());
     }
 
@@ -36,8 +37,14 @@ public final class SessionCosmeticCache {
         return entry == null || clock.millis() >= entry.expiresAtMillis();
     }
 
+    /** Renew local settings grants halfway through their TTL, without extending their authority. */
+    public synchronized boolean needsGrantRefresh(UUID uuid) {
+        Entry entry = entries.get(uuid);
+        return entry == null || clock.millis() >= entry.grantRefreshAtMillis();
+    }
+
     public synchronized void clear() { entries.clear(); }
     public synchronized int size() { return entries.size(); }
 
-    private record Entry(CosmeticIdentity identity, long expiresAtMillis) {}
+    private record Entry(CosmeticIdentity identity, long expiresAtMillis, long grantRefreshAtMillis) {}
 }

@@ -85,7 +85,13 @@ persists anything to Fox. Outside Wynncraft or after disconnect, the grant lock
 keeps these preferences inactive until a new lookup confirms access.
 
 `NameplateDirectorySession.settingsAllowed()` reuses the existing bounded lookup
-and requires fresh grants for the current account/server. Expired metadata keeps
+and requires fresh grants for the current account/server. The local account is
+prioritized for renewal halfway through its accepted TTL (15 seconds for the
+default 30-second TTL), before visibility and material-resolution access expire.
+An ordinary successful refresh therefore keeps Show Own Nametag visible across
+lookup latency. This uses the same batch size, rate limit, and failure backoff;
+it does not extend grant expiry or accept stale grants as settings authority.
+Expired metadata keeps
 an accepted nameplate visible while its refresh is pending or fails, but cannot
 unlock settings or authorize a new style selection. Selection rechecks grants
 after authentication, and Fox validates current grants at write time.
@@ -135,7 +141,11 @@ Material and border submissions remain in Minecraft's normal entity collection
 (order 0). Only the decorated label moves to order 1, after that collection's
 models and custom geometry. The label retains its exact vanilla pose, attachment,
 lighting, visibility flags, and single submission; scores and undecorated labels
-retain their original path. Geometry is captured immediately before the final
+retain their original path. Decorated labels store a zero vanilla background color
+in both normal and see-through text submissions, after any Wynntils opacity hooks.
+The material replaces the dark vanilla rectangle while preserving native lettering
+shadows; scores and names without material retain their original backgrounds.
+Geometry is captured immediately before the final
 storage submission restores its pose, after attachment, camera and scale have
 been applied, including Wynntils' scale hook. No independent guessed transform
 or duplicate early plate remains. Material depth remains behind the glyphs. A prepared

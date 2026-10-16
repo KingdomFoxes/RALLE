@@ -15,7 +15,7 @@ class OwnNameTagHookCompatibilityTest {
         assertEquals(1, matchingMethods("net.minecraft.client.renderer.entity.player.AvatarRenderer", "submitNameTag", methodDescriptor));
         String storageDescriptor = "(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/phys/Vec3;ILnet/minecraft/network/chat/Component;ZIDLnet/minecraft/client/renderer/state/CameraRenderState;)V";
         assertEquals(1, matchingMethods("net.minecraft.client.renderer.feature.NameTagFeatureRenderer$Storage", "add", storageDescriptor));
-        int[] poseRestores = {0};
+        int[] poseRestores = {0}, backgroundSubmissions = {0};
         new ClassReader("net.minecraft.client.renderer.feature.NameTagFeatureRenderer$Storage").accept(new ClassVisitor(Opcodes.ASM9) {
             @Override public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
                 if (!name.equals("add") || !descriptor.equals(storageDescriptor)) return null;
@@ -23,11 +23,16 @@ class OwnNameTagHookCompatibilityTest {
                     @Override public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
                         if (owner.equals("com/mojang/blaze3d/vertex/PoseStack") && name.equals("popPose")
                                 && descriptor.equals("()V")) poseRestores[0]++;
+                        if (owner.equals("net/minecraft/client/renderer/SubmitNodeStorage$NameTagSubmit")
+                                && name.equals("<init>")
+                                && descriptor.equals("(Lorg/joml/Matrix4f;FFLnet/minecraft/network/chat/Component;IIID)V"))
+                            backgroundSubmissions[0]++;
                     }
                 };
             }
         }, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
         assertEquals(1, poseRestores[0]);
+        assertEquals(3, backgroundSubmissions[0]); // Two visible/see-through branches and the discrete branch.
     }
 
     @Test void playerVisibilityHookTargetsTheAvatarOverload() throws IOException {
