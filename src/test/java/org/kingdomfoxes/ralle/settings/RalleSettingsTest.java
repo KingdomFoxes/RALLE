@@ -19,6 +19,33 @@ class RalleSettingsTest {
     @TempDir
     Path temporaryDirectory;
 
+    @Test void classSelectorIsIndependentDisabledAndHasHiddenPersistentPreferences() {
+        var path = temporaryDirectory.resolve("classes.properties");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        RalleSettings.requireFoxAccess(registry, () -> false);
+        registry.seal();
+        var enabled = registry.setting(RalleSettings.CLASS_SELECTOR_ID, BooleanSetting.class);
+        assertFalse(enabled.value());
+        for (String id : List.of(RalleSettings.CLASS_STYLE_ID, RalleSettings.CLASS_MODIFIER_ID, RalleSettings.CLASS_SHORTCUTS_ID))
+            assertFalse(registry.visible(id));
+        enabled.set(true);
+        assertTrue(enabled.value());
+        assertTrue(registry.available(RalleSettings.CLASS_MODIFIER_ID));
+        assertTrue(registry.available(RalleSettings.CLASS_SHORTCUTS_ID));
+        assertFalse(registry.setting(RalleSettings.RAID_LFG_ENABLED_ID, BooleanSetting.class).value());
+        assertEquals("unbound", registry.setting(RalleSettings.CLASS_MODIFIER_ID, KeybindSetting.class).value());
+        registry.setting(RalleSettings.CLASS_STYLE_ID, ChoiceSetting.class).set("no-view");
+        registry.setting(RalleSettings.CLASS_MODIFIER_ID, KeybindSetting.class).set("key.keyboard.g");
+        enabled.set(false);
+        var restored = new SettingsRegistry(path);
+        RalleSettings.register(restored);
+        restored.seal();
+        assertEquals("no-view", restored.setting(RalleSettings.CLASS_STYLE_ID, ChoiceSetting.class).value());
+        assertEquals("key.keyboard.g", restored.setting(RalleSettings.CLASS_MODIFIER_ID, KeybindSetting.class).value());
+        assertFalse(restored.visible(RalleSettings.CLASS_SHORTCUTS_ID));
+    }
+
     @Test void wheelPreferencesMigrateAndHiddenStylesSurviveReload() throws Exception {
         var path = temporaryDirectory.resolve("wheels.properties");
         Files.writeString(path, "raid-lfg.raid-lfg-create-selector-wheel=true\n"
@@ -398,7 +425,9 @@ class RalleSettingsTest {
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("automatic-raid-requeue-keybind"));
         assertTrue(categories.get(3).subcategories().isEmpty());
         assertEquals(List.of("raid-lfg-create-selector-wheel", RalleSettings.CREATE_WHEEL_STYLE_ID,
-                        "raid-lfg-kick-selector-wheel", RalleSettings.KICK_WHEEL_STYLE_ID),
+                        "raid-lfg-kick-selector-wheel", RalleSettings.KICK_WHEEL_STYLE_ID,
+                        RalleSettings.CLASS_SELECTOR_ID, RalleSettings.CLASS_STYLE_ID,
+                        RalleSettings.CLASS_MODIFIER_ID, RalleSettings.CLASS_SHORTCUTS_ID),
                 categories.get(3).entries().stream().map(value -> value.id()).toList());
         assertEquals(10, categories.get(2).subcategories().get(1).entries().size());
         assertEquals(List.of("attack-timers", "territory-map", "consumables"),

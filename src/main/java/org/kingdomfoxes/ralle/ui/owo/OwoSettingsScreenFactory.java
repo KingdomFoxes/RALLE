@@ -19,6 +19,7 @@ public final class OwoSettingsScreenFactory implements SettingsScreenFactory {
     private final SettingsNavigationState navigation;
     private final GuildRankService guildRanks;
     private final ConsumableHighlightStore consumableHighlights;
+    private final org.kingdomfoxes.ralle.classes.ClassSelectorStore classShortcuts;
     private final NameplateDirectorySession cosmetics;
     private final CosmeticStyleSelection cosmeticStyleSelection;
 
@@ -29,7 +30,8 @@ public final class OwoSettingsScreenFactory implements SettingsScreenFactory {
             GuildRankService guildRanks,
             ConsumableHighlightStore consumableHighlights,
             NameplateDirectorySession cosmetics,
-            CosmeticStyleSelection cosmeticStyleSelection
+            CosmeticStyleSelection cosmeticStyleSelection,
+            org.kingdomfoxes.ralle.classes.ClassSelectorStore classShortcuts
     ) {
         this.settings = Objects.requireNonNull(settings, "settings");
         this.chatLayout = Objects.requireNonNull(chatLayout, "chatLayout");
@@ -38,12 +40,14 @@ public final class OwoSettingsScreenFactory implements SettingsScreenFactory {
         this.consumableHighlights = Objects.requireNonNull(consumableHighlights, "consumableHighlights");
         this.cosmetics = Objects.requireNonNull(cosmetics, "cosmetics");
         this.cosmeticStyleSelection = Objects.requireNonNull(cosmeticStyleSelection, "cosmeticStyleSelection");
+        this.classShortcuts = Objects.requireNonNull(classShortcuts, "classShortcuts");
     }
 
     @Override
     public Screen create(Screen parent) {
         var panels = new CustomSettingsPanelRegistry<OwoCustomSettingsPanelContext, UIComponent>();
         panels.register(new ConsumableHighlightsPanelProvider(consumableHighlights));
+        panels.register(new ClassShortcutsPanelProvider(classShortcuts, settings));
         panels.register(new NameplatePreviewPanelProvider());
         return new RalleSettingsScreen(parent, settings, chatLayout, navigation, guildRanks, panels,
                 cosmetics, cosmeticStyleSelection);

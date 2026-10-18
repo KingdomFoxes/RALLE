@@ -17,6 +17,7 @@
   "mixins": [
     "ralle.mixins.json",
     "ralle.lfg.mixins.json",
+    "ralle.classes.mixins.json",
     "ralle.consumables.mixins.json",
     "ralle.wynntils.mixins.json",
     "ralle.war.queue.mixins.json",

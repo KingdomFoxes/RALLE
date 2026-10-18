@@ -14,6 +14,10 @@ import java.util.List;
 import org.kingdomfoxes.ralle.ui.theme.RalleThemeCatalog;
 
 public final class RalleSettings {
+    public static final String CLASS_SELECTOR_ID = "class-selector-enabled";
+    public static final String CLASS_STYLE_ID = "class-selector-style";
+    public static final String CLASS_MODIFIER_ID = "class-modifier-keybind";
+    public static final String CLASS_SHORTCUTS_ID = "class-shortcuts";
     public static final String POINT_AND_LAUGH_ID = "point-and-laugh";
     public static final String CHAT_SELECTION_INSTRUMENT_ID = "chat-selection-instrument";
     public static final String INTERFACE_FONT_ID = "interface-font";
@@ -143,7 +147,11 @@ public final class RalleSettings {
                         toggle("raid-lfg-create-selector-wheel"),
                         choice(CREATE_WHEEL_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view"),
                         toggle("raid-lfg-kick-selector-wheel"),
-                        choice(KICK_WHEEL_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view")
+                        choice(KICK_WHEEL_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view"),
+                        toggle(CLASS_SELECTOR_ID),
+                        choice(CLASS_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view"),
+                        keybind(CLASS_MODIFIER_ID),
+                        customPanel(CLASS_SHORTCUTS_ID, CLASS_SHORTCUTS_ID)
                 ),
                 List.of()
         ));
@@ -212,6 +220,9 @@ public final class RalleSettings {
         registry.requireEnabled("raid-lfg-kick-selector-wheel", "raid-lfg-enabled");
         registry.requireEnabled(CREATE_WHEEL_STYLE_ID, "raid-lfg-create-selector-wheel");
         registry.requireEnabled(KICK_WHEEL_STYLE_ID, "raid-lfg-kick-selector-wheel");
+        registry.requireEnabled(CLASS_STYLE_ID, CLASS_SELECTOR_ID);
+        registry.requireEnabled(CLASS_MODIFIER_ID, CLASS_SELECTOR_ID);
+        registry.requireEnabled(CLASS_SHORTCUTS_ID, CLASS_SELECTOR_ID);
         registry.requireEnabled("automatic-raid-requeue-keybind", "raid-lfg-enabled");
     }
 

@@ -86,6 +86,8 @@ public final class RalleClient implements ClientModInitializer {
         RalleSoundEvents.register();
 
         var configDirectory = FabricLoader.getInstance().getConfigDir();
+        var classShortcuts = org.kingdomfoxes.ralle.classes.ClassSelectorStore.open(
+                configDirectory.resolve("ralle-class-shortcuts.json"));
         boolean existingInstall = RalleOnboardingNotice.hasExistingConfig(configDirectory);
         var settings = new SettingsRegistry(configDirectory.resolve("ralle.properties"));
         var placements = new HudPlacementRegistry(configDirectory.resolve("ralle-hud-layout.properties"));
@@ -135,6 +137,9 @@ public final class RalleClient implements ClientModInitializer {
                 HudPlacementRegistry.PlacementPolicy.FIXED_SIDE_ANCHORED
         ));
         settings.seal();
+        var classMenuCapture = new org.kingdomfoxes.ralle.classes.ClassMenuCapture(minecraft,
+                settings.setting(RalleSettings.CLASS_SELECTOR_ID, BooleanSetting.class),
+                configDirectory.resolve("ralle-class-menu-capture"));
         placements.seal();
         RalleTypography.bind(settings);
         org.kingdomfoxes.ralle.ui.theme.RallePalette.bind(settings);
@@ -240,7 +245,7 @@ public final class RalleClient implements ClientModInitializer {
         context = new RalleContext(
                 settings,
                 new OwoSettingsScreenFactory(settings, chatLayout, navigation, guildRanks,
-                        consumableHighlights.store(), cosmeticDirectory, cosmeticStyleSelection),
+                        consumableHighlights.store(), cosmeticDirectory, cosmeticStyleSelection, classShortcuts),
                 chatLayout,
                 chatBehavior,
                 chatTypeTabs,
@@ -255,10 +260,12 @@ public final class RalleClient implements ClientModInitializer {
                 consumableHighlights,
                 cosmeticDirectory,
                 cosmeticStyleSelection,
-                cosmeticTextures
+                cosmeticTextures,
+                classMenuCapture
         );
         var pointAndLaugh = new org.kingdomfoxes.ralle.war.PointAndLaugh();
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            classMenuCapture.reset();
             if (client.getCurrentServer() != null) updateNotice.joined();
             else updateNotice.disconnected();
             foxGuildAccess.joined(client.getCurrentServer() == null ? "" : client.getCurrentServer().ip,
@@ -271,6 +278,7 @@ public final class RalleClient implements ClientModInitializer {
             onboarding.postIfNeeded(body -> RalleChatMessages.post(client, body));
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            classMenuCapture.reset();
             updateNotice.disconnected();
             foxGuildAccess.clear();
             cosmeticDirectory.clear();
@@ -287,6 +295,7 @@ public final class RalleClient implements ClientModInitializer {
             QueueAttributionService.disconnect();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            classMenuCapture.tick();
             updateNotice.tick().ifPresent(release -> RalleChatMessages.post(client, UpdateMessages.body(release)));
             foxGuildAccess.tick();
             if (cosmeticReloadPending.getAndSet(false)) cosmeticTextures.close();

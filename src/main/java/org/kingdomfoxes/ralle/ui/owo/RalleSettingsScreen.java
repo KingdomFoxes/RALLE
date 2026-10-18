@@ -70,6 +70,12 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private String query = "";
     private SettingsNavigationState.Snapshot preSearchSnapshot;
     private KeybindSetting capturingKeybind;
+    private java.util.function.Consumer<String> customKeyCapture;
+
+    /** Compact settings modals share the screen's keyboard capture without opening a new screen. */
+    void captureOptionKey(java.util.function.Consumer<String> captured) {
+        customKeyCapture = captured;
+    }
     private ButtonComponent capturingButton;
     private double lastSavedScroll = -1;
     private SettingsScreenLayout.Geometry geometry;
@@ -636,8 +642,17 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     public boolean keyPressed(KeyEvent event) {
         if (event.key() == GLFW.GLFW_KEY_ESCAPE && RalleModalDialogs.dismissTop(root)) {
+            customKeyCapture = null;
             capturingKeybind = null;
             capturingButton = null;
+            return true;
+        }
+        if (customKeyCapture != null) {
+            var captured = customKeyCapture;
+            customKeyCapture = null;
+            var key = event.key() == GLFW.GLFW_KEY_BACKSPACE || event.key() == GLFW.GLFW_KEY_DELETE
+                    ? InputConstants.UNKNOWN : InputConstants.getKey(event);
+            captured.accept(key == InputConstants.UNKNOWN ? KeybindSetting.UNBOUND : key.getName());
             return true;
         }
         if (capturingKeybind != null) {
@@ -662,6 +677,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
+        if (customKeyCapture != null) return true;
         if (capturingKeybind != null) {
             // Raid LFG bindings are deliberately keyboard-only; keep waiting for a keyboard key.
             return true;
@@ -952,6 +968,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     public void removed() {
+        customKeyCapture = null;
         persistNavigation();
         navigation.flush();
         super.removed();
@@ -959,7 +976,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     public void onClose() {
-        if (RalleModalDialogs.dismissTop(root)) return;
+        if (RalleModalDialogs.dismissTop(root)) { customKeyCapture = null; return; }
         persistNavigation();
         minecraft.setScreen(parent);
     }

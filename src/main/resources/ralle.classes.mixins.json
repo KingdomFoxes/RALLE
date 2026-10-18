@@ -1,0 +1,8 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "org.kingdomfoxes.ralle.classes.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": ["ClassMenuSignalsMixin"],
+  "injectors": {"defaultRequire": 0}
+}

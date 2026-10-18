@@ -35,6 +35,7 @@ public record RalleContext(
         ConsumableHighlightService consumableHighlights,
         NameplateDirectorySession cosmetics,
         CosmeticStyleSelection cosmeticStyleSelection,
-        LiquidMaterialTextures cosmeticTextures
+        LiquidMaterialTextures cosmeticTextures,
+        org.kingdomfoxes.ralle.classes.ClassMenuCapture classMenuCapture
 ) {
 }
