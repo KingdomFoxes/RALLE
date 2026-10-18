@@ -227,7 +227,8 @@ public final class LfgSelectorWheelScreen extends Screen {
             }
             Component below = status != null ? status : model.hovered() >= 0 && mode == Mode.KICK
                     ? entries.get(model.hovered()).label()
-                    : Component.translatable(mode == Mode.CREATE ? "ralle.lfg.wheel.create.hint" : "ralle.lfg.wheel.kick.hint");
+                    : mode == Mode.CREATE ? null : Component.translatable("ralle.lfg.wheel.kick.hint");
+            if (below == null) return;
             int color = statusFailure ? 0xFFFF6B6B : model.hovered() >= 0 && mode == Mode.KICK
                     ? org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb()
                     : org.kingdomfoxes.ralle.ui.theme.RallePalette.secondaryText();

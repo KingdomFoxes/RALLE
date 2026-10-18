@@ -6,6 +6,9 @@ by default. Each enabled selector reveals its own Wheel Style: Circle Segments
 (default), Bars, or No View. Modifier bindings remain in Raid LFG Controls and
 stay synchronized with Minecraft's keybind options. Wheel settings retain the
 existing dependency on Enable Raid LFG and its current-account Fox access gate.
+The toggles are labeled `Lfg Create Selector` and `Party/Lfg Kick Selector`.
+The Create selector omits its idle instruction line; processing, success, and
+failure feedback still appear in its status area.
 
 The existing toggle IDs are unchanged. Their persisted keys move from
 `raid-lfg.raid-lfg-{create,kick}-selector-wheel` to
