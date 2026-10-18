@@ -19,6 +19,53 @@ class RalleSettingsTest {
     @TempDir
     Path temporaryDirectory;
 
+    @Test void wheelPreferencesMigrateAndHiddenStylesSurviveReload() throws Exception {
+        var path = temporaryDirectory.resolve("wheels.properties");
+        Files.writeString(path, "raid-lfg.raid-lfg-create-selector-wheel=true\n"
+                + "raid-lfg.raid-lfg-kick-selector-wheel=true\n");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+        for (var id : List.of("raid-lfg-create-selector-wheel", "raid-lfg-kick-selector-wheel"))
+            assertTrue(registry.setting(id, BooleanSetting.class).value());
+        var style = registry.setting(RalleSettings.CREATE_WHEEL_STYLE_ID, ChoiceSetting.class);
+        assertEquals("circle-segments", style.value());
+        assertEquals(List.of("circle-segments", "bars", "no-view"), style.choices());
+        style.set("bars");
+        registry.setting("raid-lfg-create-selector-wheel", BooleanSetting.class).set(false);
+        assertFalse(registry.visible(RalleSettings.CREATE_WHEEL_STYLE_ID));
+        assertEquals("bars", style.value());
+        var saved = Files.readString(path);
+        assertTrue(saved.contains("wheels.raid-lfg-kick-selector-wheel=true"));
+        assertFalse(saved.contains("raid-lfg.raid-lfg-kick-selector-wheel"));
+
+        var reloaded = new SettingsRegistry(path);
+        RalleSettings.register(reloaded);
+        reloaded.seal();
+        assertEquals("bars", reloaded.setting(RalleSettings.CREATE_WHEEL_STYLE_ID, ChoiceSetting.class).value());
+        assertFalse(reloaded.visible(RalleSettings.CREATE_WHEEL_STYLE_ID));
+        reloaded.setting("raid-lfg-create-selector-wheel", BooleanSetting.class).set(true);
+        assertTrue(reloaded.visible(RalleSettings.CREATE_WHEEL_STYLE_ID));
+        reloaded.setting("raid-lfg-enabled", BooleanSetting.class).set(false);
+        assertFalse(reloaded.visible(RalleSettings.CREATE_WHEEL_STYLE_ID));
+        assertFalse(reloaded.visible("raid-lfg-create-selector-wheel"));
+    }
+
+    @Test void newWheelKeysTakePrecedenceEvenWhenInvalid() throws Exception {
+        var path = temporaryDirectory.resolve("precedence.properties");
+        Files.writeString(path, "raid-lfg.raid-lfg-create-selector-wheel=true\n"
+                + "wheels.raid-lfg-create-selector-wheel=false\n"
+                + "raid-lfg.raid-lfg-kick-selector-wheel=true\n"
+                + "wheels.raid-lfg-kick-selector-wheel=invalid\n"
+                + "wheels.raid-lfg-create-wheel-style=unknown\n");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        registry.seal();
+        assertFalse(registry.setting("raid-lfg-create-selector-wheel", BooleanSetting.class).value());
+        assertFalse(registry.setting("raid-lfg-kick-selector-wheel", BooleanSetting.class).value());
+        assertEquals("circle-segments", registry.setting(RalleSettings.CREATE_WHEEL_STYLE_ID, ChoiceSetting.class).value());
+    }
+
     @Test
     void cosmeticControlsIgnoreLegacyToggleAndPersistOnlyLocalAppearance() throws Exception {
         var path = temporaryDirectory.resolve("ralle.properties");
@@ -296,7 +343,7 @@ class RalleSettingsTest {
         RalleSettings.register(registry);
 
         var categories = registry.categories().stream().toList();
-        assertEquals(List.of("about", "chat", "raid-lfg", "war", "cosmetics"), categories.stream().map(value -> value.id()).toList());
+        assertEquals(List.of("about", "chat", "raid-lfg", "wheels", "war", "cosmetics"), categories.stream().map(value -> value.id()).toList());
         assertEquals(List.of(),
                 categories.get(0).subcategories().stream().map(value -> value.id()).toList());
         assertEquals(List.of("edit-huds", RalleSettings.INTERFACE_FONT_ID, RalleSettings.UI_THEME_ID),
@@ -349,18 +396,23 @@ class RalleSettingsTest {
         assertEquals(KeybindSetting.UNBOUND,
                 registry.setting("automatic-raid-requeue-keybind", KeybindSetting.class).value());
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("automatic-raid-requeue-keybind"));
+        assertTrue(categories.get(3).subcategories().isEmpty());
+        assertEquals(List.of("raid-lfg-create-selector-wheel", RalleSettings.CREATE_WHEEL_STYLE_ID,
+                        "raid-lfg-kick-selector-wheel", RalleSettings.KICK_WHEEL_STYLE_ID),
+                categories.get(3).entries().stream().map(value -> value.id()).toList());
+        assertEquals(10, categories.get(2).subcategories().get(1).entries().size());
         assertEquals(List.of("attack-timers", "territory-map", "consumables"),
-                categories.get(3).subcategories().stream().map(value -> value.id()).toList());
+                categories.get(4).subcategories().stream().map(value -> value.id()).toList());
         assertEquals(List.of(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID,
                         RalleSettings.QUEUE_KOF_RANK_COLORS_ID, RalleSettings.QUEUE_SELF_COLOR_ID),
-                categories.get(3).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
+                categories.get(4).subcategories().getFirst().entries().stream().map(value -> value.id()).toList());
         assertFalse(registry.setting(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID, BooleanSetting.class).value());
         assertEquals(List.of(RalleSettings.HQ_DISTANCE_ENABLED_ID, RalleSettings.HQ_DISTANCE_KEYBIND_ID),
-                categories.get(3).subcategories().get(1).entries().stream().map(value -> value.id()).toList());
+                categories.get(4).subcategories().get(1).entries().stream().map(value -> value.id()).toList());
         assertFalse(registry.setting(RalleSettings.HQ_DISTANCE_ENABLED_ID, BooleanSetting.class).value());
         assertEquals(List.of(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID,
                         RalleSettings.CONSUMABLE_HIGHLIGHT_RULES_ID),
-                categories.get(3).subcategories().get(2).entries().stream().map(value -> value.id()).toList());
+                categories.get(4).subcategories().get(2).entries().stream().map(value -> value.id()).toList());
         assertFalse(registry.setting(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID, BooleanSetting.class).value());
         assertEquals(List.of(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID),
                 registry.dependencies(RalleSettings.CONSUMABLE_HIGHLIGHT_RULES_ID));

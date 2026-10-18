@@ -38,7 +38,7 @@ public final class SettingsSearch {
     }
 
     private static boolean searchable(SettingsRegistry registry, SettingsEntry entry) {
-        return !(entry instanceof CustomPanelEntry) || registry.available(entry.id());
+        return registry.visible(entry.id()) && (!(entry instanceof CustomPanelEntry) || registry.available(entry.id()));
     }
 
     private static boolean matches(String id, String title, String description, String query) {

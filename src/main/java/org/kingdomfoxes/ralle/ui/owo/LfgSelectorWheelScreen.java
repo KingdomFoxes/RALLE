@@ -4,6 +4,7 @@ import org.kingdomfoxes.ralle.diagnostics.DiagnosticProfiler;
 import org.kingdomfoxes.ralle.RalleClient;
 
 import org.kingdomfoxes.ralle.lfg.client.LfgCreationFeedback;
+import org.kingdomfoxes.ralle.lfg.client.LfgChordState;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -24,13 +25,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-/** Transparent, non-pausing Create/Kick radial selector which owns input for one modifier hold. */
+/** Transparent Create/Kick selector. Both graphical styles share actions, input and effect lifecycle. */
 public final class LfgSelectorWheelScreen extends Screen {
     public enum Mode { CREATE, KICK }
 
     private static final int DISABLED = 0xFF697487;
-    private static final int SURFACE = 0xEE0A1830;
-    private static final int OUTLINE = 0xFF586985;
     private static final LfgProtocol.RaidType[] RAIDS = LfgProtocol.RaidType.values();
 
     private final Minecraft minecraft;
@@ -38,13 +37,20 @@ public final class LfgSelectorWheelScreen extends Screen {
     private final RaidLfgService service;
     private final Mode mode;
     private final int initiatingKey;
+    private final boolean bars;
+    private final LfgChordState<Entry> keyboardChord = new LfgChordState<>();
+    private boolean keyboardSelection;
+    private boolean pointerArmed;
+    private boolean mouseReady;
+    private int lastMouseX, lastMouseY;
     private final UUID lobbyId;
     private final boolean hostedAtOpen;
     private List<Entry> entries;
     private final SelectorWheelModel model = new SelectorWheelModel();
-    private List<SelectorWheelModel.Sector> geometry = List.of();
+    private List<SelectorWheelLayout.Face> geometry = List.of();
     private double wheelScale = 1;
     private double outerRadius;
+    private double originY, scroll, maxScroll;
     private Component status;
     private boolean statusFailure;
     private boolean partyPromptOpen;
@@ -56,11 +62,12 @@ public final class LfgSelectorWheelScreen extends Screen {
     private UUID pendingKickId;
     private int kickX;
     private int kickY;
+    private float kickScale;
     private long explosionStarted = -1;
     private static final Identifier EXPLOSION = Identifier.fromNamespaceAndPath("ralle", "textures/gui/wheel/kick_explosion.png");
 
     public LfgSelectorWheelScreen(Minecraft minecraft, RaidLfgKeybinds controller,
-                                  RaidLfgService service, Mode mode, int initiatingKey) {
+                                  RaidLfgService service, Mode mode, int initiatingKey, String style) {
         super(Component.translatable(mode == Mode.CREATE
                 ? "ralle.settings.option.raid-lfg-create-selector-wheel"
                 : "ralle.settings.option.raid-lfg-kick-selector-wheel"));
@@ -69,6 +76,8 @@ public final class LfgSelectorWheelScreen extends Screen {
         this.service = service;
         this.mode = mode;
         this.initiatingKey = initiatingKey;
+        this.bars = "bars".equals(style);
+        keyboardChord.begin();
         var lobby = mode == Mode.KICK ? controller.currentLobbyForWheel() : null;
         this.lobbyId = lobby == null ? null : lobby.lobbyId();
         var hostLobby = mode == Mode.KICK ? controller.currentHostLobbyForWheel() : null;
@@ -93,17 +102,36 @@ public final class LfgSelectorWheelScreen extends Screen {
         rebuildGeometry();
         GLFW.glfwSetCursorPos(minecraft.getWindow().handle(),
                 minecraft.getWindow().getScreenWidth() / 2d, minecraft.getWindow().getScreenHeight() / 2d);
+        lastMouseX = width / 2;
+        lastMouseY = height / 2;
+        pointerArmed = false;
+        mouseReady = GLFW.glfwGetMouseButton(minecraft.getWindow().handle(), GLFW.GLFW_MOUSE_BUTTON_LEFT) != GLFW.GLFW_PRESS;
     }
 
     private void rebuildGeometry() {
         double labelWidth = entries.stream().mapToInt(entry -> font.width(RalleTypography.body(entry.label())))
                 .max().orElse(0);
+        if (bars) {
+            int side = mode == Mode.CREATE ? (int) Math.max(160, (labelWidth + 12) * 5) : 80;
+            // Round S down to a multiple of five so its 20% minimum remains pixel-aligned.
+            side = Math.max(5, Math.min(side, (int) Math.floor(width * .64)) / 5 * 5);
+            geometry = SelectorWheelLayout.bars(entries.size(), side, width);
+            wheelScale = 1;
+            double top = geometry.stream().mapToInt(SelectorWheelLayout.Face::top).min().orElse(-side / 2);
+            double bottom = geometry.stream().mapToInt(SelectorWheelLayout.Face::bottom).max().orElse(side / 2);
+            maxScroll = Math.max(0, bottom - top - Math.max(1, height - 64));
+            scroll = Math.clamp(scroll, 0, maxScroll);
+            originY = maxScroll > 0 ? 12 - top - scroll : height / 2d;
+            outerRadius = bottom;
+            return;
+        }
         outerRadius = mode == Mode.CREATE ? Math.max(76, labelWidth + 32) : 40;
         int envelope = mode == Mode.CREATE ? 18 : 7;
         wheelScale = Math.max(.01, Math.min(1, Math.min((width / 2d - 8) / (outerRadius + envelope),
                 (height / 2d - 24) / (outerRadius + envelope))));
-        geometry = mode == Mode.CREATE ? SelectorWheelModel.ring(entries.size(), 24, outerRadius, true)
-                : SelectorWheelModel.kickGeometry(entries.size());
+        geometry = SelectorWheelLayout.circles(mode == Mode.CREATE ? SelectorWheelModel.ring(entries.size(), 24, outerRadius, true)
+                : SelectorWheelModel.kickGeometry(entries.size()));
+        originY = height / 2d;
     }
 
     @Override public void tick() {
@@ -126,6 +154,7 @@ public final class LfgSelectorWheelScreen extends Screen {
                 explosionStarted = -1;
                 pendingKickId = null;
                 model.resumeSelection();
+                keyboardChord.begin();
                 status = entries.isEmpty() ? Component.translatable("ralle.lfg.wheel.no-players") : null;
             }
         } else if (model.hovered() >= 0) {
@@ -150,13 +179,17 @@ public final class LfgSelectorWheelScreen extends Screen {
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.SELECTOR_RENDER)) {
             long now = System.currentTimeMillis();
-            int hovered = model.state() == SelectorWheelModel.State.SELECTING
-                    ? hit(mouseX, mouseY) : -1;
-            if (hovered >= 0 && !enabled(entries.get(hovered))) hovered = -1;
-            if (mode == Mode.CREATE && hovered >= 0 && hovered != model.hovered()) CreateWheelSounds.hover(minecraft);
-            model.hover(hovered, now);
+            if (mouseX != lastMouseX || mouseY != lastMouseY) {
+                pointerArmed = true;
+                keyboardSelection = false;
+                lastMouseX = mouseX;
+                lastMouseY = mouseY;
+            }
+            if (!keyboardSelection && pointerArmed && model.state() == SelectorWheelModel.State.SELECTING)
+                selectHover(hit(mouseX, mouseY), now);
+            if (bars) graphics.enableScissor(0, 6, width, Math.max(7, height - 42));
             graphics.pose().pushMatrix();
-            graphics.pose().translate(width / 2f, height / 2f);
+            graphics.pose().translate(width / 2f, (float) originY);
             graphics.pose().scale((float) wheelScale, (float) wheelScale);
             for (int index = 0; index < entries.size(); index++) {
                 var entry = entries.get(index);
@@ -164,8 +197,8 @@ public final class LfgSelectorWheelScreen extends Screen {
                 double offset = model.offset(index, now);
                 boolean dissolving = creationAnimation != null && index == model.hovered();
                 if (dissolving) offset += creationAnimation.extension(now);
-                int dx = (int) Math.round(Math.cos(bounds.angle()) * offset);
-                int dy = (int) Math.round(Math.sin(bounds.angle()) * offset);
+                int dx = (int) Math.round(bounds.motionX() * offset);
+                int dy = (int) Math.round(bounds.motionY() * offset);
                 double progress = dissolving ? creationAnimation.progress(now) : 0;
                 if (dissolving && snapshots[index] != null) {
                     snapshots[index].draw(graphics, dx, dy, progress);
@@ -173,23 +206,25 @@ public final class LfgSelectorWheelScreen extends Screen {
                 }
                 // If GPU capture failed, keep the ordinary bounded renderer, then remove the segment.
                 if (dissolving && progress >= .5) continue;
-                if (mode == Mode.CREATE) {
-                    SelectorWheelRenderer.drawCreate(graphics, bounds, dx, dy, index == model.hovered());
-                }
-                else {
-                    SelectorWheelRenderer.draw(graphics, bounds, dx, dy, index == model.hovered());
-                }
+                SelectorWheelRenderer.drawFace(graphics, bounds, dx, dy, index == model.hovered());
                 int x = (int) Math.round(bounds.centerX()) + dx;
                 int y = (int) Math.round(bounds.centerY()) + dy;
-                if (mode == Mode.CREATE) drawRaid(graphics, entry, x, y, index == model.hovered());
+                if (mode == Mode.CREATE) drawRaid(graphics, entry, bounds, x, y, index == model.hovered());
                 else drawPlayer(graphics, entry, x, y, index == model.hovered());
             }
+            graphics.pose().popMatrix();
+            if (bars) graphics.disableScissor();
             if (explosionStarted >= 0) {
                 int frame = KickWheelAnimation.frame(explosionStarted, now);
-                if (frame >= 0) graphics.blit(RenderPipelines.GUI_TEXTURED, EXPLOSION,
-                        kickX - 35, kickY - 55, frame * 71f, 0, 71, 100, 71 * 17, 100);
+                if (frame >= 0) {
+                    graphics.pose().pushMatrix();
+                    graphics.pose().translate(kickX, kickY);
+                    graphics.pose().scale(kickScale, kickScale);
+                    graphics.blit(RenderPipelines.GUI_TEXTURED, EXPLOSION,
+                            -35, -55, frame * 71f, 0, 71, 100, 71 * 17, 100);
+                    graphics.pose().popMatrix();
+                }
             }
-            graphics.pose().popMatrix();
             Component below = status != null ? status : model.hovered() >= 0 && mode == Mode.KICK
                     ? entries.get(model.hovered()).label()
                     : Component.translatable(mode == Mode.CREATE ? "ralle.lfg.wheel.create.hint" : "ralle.lfg.wheel.kick.hint");
@@ -198,7 +233,7 @@ public final class LfgSelectorWheelScreen extends Screen {
                     : org.kingdomfoxes.ralle.ui.theme.RallePalette.secondaryText();
             var lines = font.split(RalleTypography.body(below), Math.max(1, width - 24));
             int statusY = Math.min(height - lines.size() * (font.lineHeight + 2) - 4,
-                    height / 2 + (int) Math.ceil((outerRadius + 12) * wheelScale));
+                    (int) Math.ceil(originY + (outerRadius + 12) * wheelScale));
             for (var line : lines) {
                 graphics.drawString(font, line, (width - font.width(line)) / 2, statusY, color, true);
                 statusY += font.lineHeight + 2;
@@ -206,13 +241,20 @@ public final class LfgSelectorWheelScreen extends Screen {
         }
     }
 
-    private void drawRaid(GuiGraphics graphics, Entry entry, int x, int y, boolean hovered) {
+    private void drawRaid(GuiGraphics graphics, Entry entry, SelectorWheelLayout.Face face, int x, int y, boolean hovered) {
         graphics.renderItem(raidItem(entry), x - 8, y - 14);
         var label = RalleTypography.body(entry.label());
-        graphics.drawString(font, label, x - font.width(label) / 2, y + 5,
-                enabled(entry) || retainsCreatePresentation() ? hovered
+        int color = enabled(entry) || retainsCreatePresentation() ? hovered
                         ? org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb()
-                        : org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText() : DISABLED, false);
+                        : org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText() : DISABLED;
+        if (!bars) graphics.drawString(font, label, x - font.width(label) / 2, y + 5, color, false);
+        else {
+            int lineY = y + 5;
+            for (var line : font.split(label, Math.max(1, face.right() - face.left() - 6))) {
+                graphics.drawString(font, line, x - font.width(line) / 2, lineY, color, false);
+                lineY += font.lineHeight + 1;
+            }
+        }
     }
 
     private void prepareSnapshot(int index) {
@@ -220,14 +262,12 @@ public final class LfgSelectorWheelScreen extends Screen {
         var bounds = geometry.get(index);
         var entry = entries.get(index);
         try {
-            snapshots[index] = CreateWheelSnapshot.capture(minecraft, (int) Math.ceil(outerRadius) + 8, graphics -> {
-                SelectorWheelRenderer.drawCreate(graphics, bounds, 0, 0, true);
+            snapshots[index] = CreateWheelSnapshot.capture(minecraft, bounds.left() - 8, bounds.top() - 8,
+                    bounds.right() + 8, bounds.bottom() + 8, graphics -> {
+                SelectorWheelRenderer.drawFace(graphics, bounds, 0, 0, true);
                 int x = (int) Math.round(bounds.centerX());
                 int y = (int) Math.round(bounds.centerY());
-                graphics.renderItem(raidItem(entry), x - 8, y - 14);
-                var label = RalleTypography.body(entry.label());
-                graphics.drawString(font, label, x - font.width(label) / 2, y + 5,
-                        org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb(), false);
+                drawRaid(graphics, entry, bounds, x, y, true);
             });
         } catch (RuntimeException | LinkageError failure) {
             snapshotFailed = true;
@@ -256,6 +296,7 @@ public final class LfgSelectorWheelScreen extends Screen {
         if (next.equals(entries)) return;
         entries = next;
         model.rosterChanged();
+        pointerArmed = false;
         rebuildGeometry();
         if (pendingKickId == null && hostedAtOpen) {
             status = entries.isEmpty() ? Component.translatable("ralle.lfg.wheel.no-players") : null;
@@ -268,6 +309,8 @@ public final class LfgSelectorWheelScreen extends Screen {
         return mode == Mode.CREATE && model.state() == SelectorWheelModel.State.SUBMITTED
                 && (!statusFailure || System.currentTimeMillis() < createFailureUntil);
     }
+
+    public boolean retainsSubmittedCreate() { return retainsCreatePresentation(); }
 
     public void suspendForPartyPrompt() { partyPromptOpen = true; }
     public void resumeFromPartyPrompt() { partyPromptOpen = false; }
@@ -289,15 +332,24 @@ public final class LfgSelectorWheelScreen extends Screen {
     }
 
     @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
-        if (event.button() != 0) return true;
+        if (event.button() != 0 || !mouseReady) return true;
+        mouseReady = false;
+        if ((int) event.x() != lastMouseX || (int) event.y() != lastMouseY) pointerArmed = true;
+        keyboardSelection = false;
         if (model.state() == SelectorWheelModel.State.SELECTING) {
             int target = hit(event.x(), event.y());
-            model.hover(target >= 0 && enabled(entries.get(target)) ? target : -1, System.currentTimeMillis());
+            selectHover(pointerArmed ? target : -1, System.currentTimeMillis());
         }
-        if (model.state() != SelectorWheelModel.State.SELECTING || model.hovered() < 0) return true;
+        submitSelection();
+        return true;
+    }
+
+    private boolean submitSelection() {
+        if (model.state() != SelectorWheelModel.State.SELECTING || model.hovered() < 0) return false;
         var entry = entries.get(model.hovered());
-        if (!enabled(entry) || !physicalKeyDown(minecraft.getWindow().handle(), initiatingKey)) return true;
-        if (!model.submit()) return true;
+        if (!enabled(entry) || !physicalKeyDown(minecraft.getWindow().handle(), initiatingKey)) return false;
+        if (!model.submit()) return false;
+        keyboardChord.finish();
         statusFailure = false;
         status = mode == Mode.CREATE ? null : Component.translatable("ralle.lfg.wheel.kicking");
         if (mode == Mode.CREATE) controller.submitWheelCreate(entry.raid(), this::feedback);
@@ -305,27 +357,90 @@ public final class LfgSelectorWheelScreen extends Screen {
             pendingKickId = entry.memberId();
             var sector = geometry.get(model.hovered());
             double offset = model.offset(model.hovered(), System.currentTimeMillis());
-            kickX = (int) Math.round(sector.centerX()) + (int) Math.round(Math.cos(sector.angle()) * offset);
-            kickY = (int) Math.round(sector.centerY()) + (int) Math.round(Math.sin(sector.angle()) * offset);
+            kickX = (int) Math.round(width / 2d + (sector.centerX() + sector.motionX() * offset) * wheelScale);
+            kickY = (int) Math.round(originY + (sector.centerY() + sector.motionY() * offset) * wheelScale);
+            kickScale = (float) wheelScale;
             controller.submitWheelKick(lobbyId, entry.memberId(), this::feedback);
         }
         return true;
     }
 
-    @Override public boolean keyPressed(KeyEvent event) {
-        if (event.key() == GLFW.GLFW_KEY_ESCAPE || controller.isOtherWheelModifier(mode, event)) {
+    private void selectHover(int index, long now) {
+        if (index >= 0 && !enabled(entries.get(index))) index = -1;
+        if (mode == Mode.CREATE && index >= 0 && index != model.hovered()) CreateWheelSounds.hover(minecraft);
+        model.hover(index, now);
+    }
+
+    /** Raw keyboard events have one owner; the screen callback cannot dispatch the same release again. */
+    public boolean handleKeyboard(KeyEvent event, int action) {
+        if (action == GLFW.GLFW_PRESS && (event.key() == GLFW.GLFW_KEY_ESCAPE
+                || controller.isOtherWheelModifier(mode, event))) {
             cancelAndClose();
+            return true;
+        }
+        if (event.key() == initiatingKey) {
+            if (action == GLFW.GLFW_RELEASE && !retainsCreatePresentation()) cancelAndClose();
+            return true;
+        }
+        int digit = RaidLfgKeybinds.topRowDigit(event.key());
+        if (digit == 0 || mode == Mode.KICK && (digit < 2 || digit > 4)) return true;
+        if (model.state() != SelectorWheelModel.State.SELECTING) return true;
+        if (action == GLFW.GLFW_PRESS && !keyboardChord.completed()) {
+            Entry selected = keyboardEntry(digit);
+            // Empty slots replace the previous selection too; releasing them must not submit the old target.
+            var press = keyboardChord.press(digit, () -> selected != null ? selected : EMPTY_KEYBOARD_SLOT);
+            keyboardSelection = true;
+            selectHover(entries.indexOf(press.selection()), System.currentTimeMillis());
+            revealSelection();
+        } else if (action == GLFW.GLFW_RELEASE) {
+            var release = keyboardChord.release(digit, physicalKeyDown(minecraft.getWindow().handle(), initiatingKey));
+            if (release.execution() != null) {
+                selectHover(entries.indexOf(release.execution()), System.currentTimeMillis());
+                if (!submitSelection()) keyboardChord.begin();
+            }
         }
         return true;
     }
 
-    @Override public boolean keyReleased(KeyEvent event) {
-        if (event.key() == initiatingKey && !retainsCreatePresentation()) cancelAndClose();
-        return true;
+    private Entry keyboardEntry(int digit) {
+        if (mode == Mode.CREATE) return digit <= entries.size() ? entries.get(digit - 1) : null;
+        var lobby = controller.currentHostLobbyForWheel();
+        if (lobby == null || !lobby.lobbyId().equals(lobbyId) || digit > lobby.members().size()) return null;
+        var id = lobby.members().get(digit - 1).minecraftUuid();
+        return entries.stream().filter(entry -> id.equals(entry.memberId())).findFirst().orElse(null);
     }
 
-    @Override public boolean mouseReleased(MouseButtonEvent event) { return true; }
-    @Override public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) { return true; }
+    private void revealSelection() {
+        if (!bars || maxScroll == 0 || model.hovered() < 0) return;
+        var face = geometry.get(model.hovered());
+        double top = originY + face.top() - SelectorWheelModel.EXTENSION;
+        double bottom = originY + face.bottom();
+        if (top < 6) scroll -= 6 - top;
+        else if (bottom > height - 42) scroll += bottom - (height - 42);
+        rebuildGeometry();
+    }
+
+    @Override public boolean keyPressed(KeyEvent event) {
+        return handleKeyboard(event, GLFW.GLFW_PRESS);
+    }
+
+    @Override public boolean keyReleased(KeyEvent event) {
+        return handleKeyboard(event, GLFW.GLFW_RELEASE);
+    }
+
+    @Override public boolean mouseReleased(MouseButtonEvent event) {
+        if (event.button() == 0) mouseReady = true;
+        return true;
+    }
+    @Override public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (bars && maxScroll > 0 && model.state() == SelectorWheelModel.State.SELECTING) {
+            scroll = Math.clamp(scroll - verticalAmount * 24, 0, maxScroll);
+            rebuildGeometry();
+            model.hover(-1, System.currentTimeMillis());
+            keyboardSelection = false;
+        }
+        return true;
+    }
 
     @Override public void onClose() { cancelAndClose(); }
 
@@ -339,7 +454,8 @@ public final class LfgSelectorWheelScreen extends Screen {
     }
 
     private int hit(double x, double y) {
-        return SelectorWheelModel.hit(geometry, (x - width / 2d) / wheelScale, (y - height / 2d) / wheelScale);
+        if (bars && (y < 6 || y >= height - 42)) return -1;
+        return SelectorWheelLayout.hit(geometry, (x - width / 2d) / wheelScale, (y - originY) / wheelScale);
     }
 
     private void cancelAndClose() {
@@ -366,6 +482,7 @@ public final class LfgSelectorWheelScreen extends Screen {
             else {
                 pendingKickId = null;
                 model.resumeSelection();
+                keyboardChord.begin();
             }
         }
     }
@@ -401,4 +518,5 @@ public final class LfgSelectorWheelScreen extends Screen {
     }
 
     private record Entry(LfgProtocol.RaidType raid, UUID memberId, Component label) {}
+    private static final Entry EMPTY_KEYBOARD_SLOT = new Entry(null, null, Component.empty());
 }

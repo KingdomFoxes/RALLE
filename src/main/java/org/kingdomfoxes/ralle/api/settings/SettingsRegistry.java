@@ -26,6 +26,7 @@ public final class SettingsRegistry {
     private final Map<String, List<String>> dependencies = new LinkedHashMap<>();
     private final Map<String, Component> unavailableReasons = new LinkedHashMap<>();
     private final Map<String, RuntimeAccess> runtimeAccess = new LinkedHashMap<>();
+    private final Map<String, String> legacyKeys = new LinkedHashMap<>();
     private final Path storagePath;
     private boolean sealed;
 
@@ -69,6 +70,14 @@ public final class SettingsRegistry {
         Objects.requireNonNull(entryId, "entryId");
         Objects.requireNonNull(requiredBooleanSettingId, "requiredBooleanSettingId");
         dependencies.computeIfAbsent(entryId, ignored -> new ArrayList<>()).add(requiredBooleanSettingId);
+    }
+
+    /** Reads a former category.setting key only when the current key is absent. Saves use the current key. */
+    public void migrateKey(String settingId, String formerKey) {
+        requireOpen();
+        setting(settingId, Setting.class);
+        if (legacyKeys.putIfAbsent(settingId, Objects.requireNonNull(formerKey)) != null)
+            throw new IllegalArgumentException("Duplicate legacy key for " + settingId);
     }
 
     /** Makes an entry visible but non-interactive when an optional runtime integration is unavailable. */
@@ -184,6 +193,8 @@ public final class SettingsRegistry {
 
         forEachSetting((category, setting) -> {
             var value = properties.getProperty(category.id() + "." + setting.id());
+            if (value == null && legacyKeys.containsKey(setting.id()))
+                value = properties.getProperty(legacyKeys.get(setting.id()));
             if (value == null) return;
             try {
                 setting.load(value);

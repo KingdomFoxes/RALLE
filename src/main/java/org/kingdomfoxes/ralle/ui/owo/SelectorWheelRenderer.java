@@ -6,12 +6,23 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Pixel-aligned annular faces shared by both modifier wheels. Runs coalesce adjacent pixels. */
+/** Shared pixel-aligned faces. Annular runs coalesce adjacent pixels; bars use bounded rectangles. */
 final class SelectorWheelRenderer {
     private static final Map<Face, List<Run>> FACES = new LinkedHashMap<>() {
         @Override protected boolean removeEldestEntry(Map.Entry<Face, List<Run>> eldest) { return size() > 32; }
     };
     private SelectorWheelRenderer() {}
+
+    static void drawFace(GuiGraphics graphics, SelectorWheelLayout.Face face, int dx, int dy, boolean selected) {
+        if (face instanceof SelectorWheelLayout.Circle circle) {
+            draw(graphics, circle.sector(), dx, dy, selected);
+            return;
+        }
+        int left = face.left() + dx, top = face.top() + dy;
+        int right = face.right() + dx, bottom = face.bottom() + dy;
+        graphics.fill(left, top, right, bottom, outlineColor(selected));
+        graphics.fill(left + 1, top + 1, right - 1, bottom - 1, fillColor(selected));
+    }
 
     static void draw(GuiGraphics graphics, SelectorWheelModel.Sector sector, int dx, int dy, boolean selected) {
         for (var run : FACES.computeIfAbsent(new Face(sector, selected,
@@ -46,9 +57,17 @@ final class SelectorWheelRenderer {
 
     static int color(SelectorWheelModel.Sector sector, double x, double y, boolean selected) {
         if (!sector.contains(x, y, 0)) return 0;
-        if (!sector.contains(x, y, 1)) return selected
+        if (!sector.contains(x, y, 1)) return outlineColor(selected);
+        return fillColor(selected);
+    }
+
+    static int outlineColor(boolean selected) {
+        return selected
                 ? org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb()
                 : org.kingdomfoxes.ralle.ui.theme.RallePalette.frameArgb();
+    }
+
+    static int fillColor(boolean selected) {
         int background = org.kingdomfoxes.ralle.ui.theme.RallePalette.background();
         int inner = background == 0x041330 ? (selected ? 0x223552 : 0x0A1830)
                 : org.kingdomfoxes.ralle.ui.theme.RallePalette.secondarySurface();

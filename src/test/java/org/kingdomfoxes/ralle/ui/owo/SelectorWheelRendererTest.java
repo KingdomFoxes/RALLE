@@ -8,6 +8,35 @@ import javax.imageio.ImageIO;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SelectorWheelRendererTest {
+    @Test void writesBarsGeometryPreviewUsingSharedFaceColors() throws Exception {
+        var preview = new BufferedImage(1020, 860, BufferedImage.TYPE_INT_ARGB);
+        var canvas = preview.createGraphics();
+        canvas.setColor(new java.awt.Color(0x101824));
+        canvas.fillRect(0, 0, preview.getWidth(), preview.getHeight());
+        int[] counts = {6, 6, 3, 2, 1, 0};
+        for (int panel = 0; panel < counts.length; panel++) {
+            int cx = panel % 3 * 340 + 170, cy = panel / 3 * 430 + 225;
+            int side = panel < 2 ? 160 : 80;
+            int viewport = panel == 1 ? 280 : 600;
+            var faces = SelectorWheelLayout.bars(counts[panel], side, viewport);
+            for (int i = 0; i < faces.size(); i++) {
+                var face = faces.get(i);
+                int dy = i == 0 ? -5 : 0;
+                canvas.setColor(new java.awt.Color(SelectorWheelRenderer.outlineColor(i == 0), true));
+                canvas.fillRect(cx + face.left(), cy + face.top() + dy, face.right() - face.left(), face.bottom() - face.top());
+                canvas.setColor(new java.awt.Color(SelectorWheelRenderer.fillColor(i == 0), true));
+                canvas.fillRect(cx + face.left() + 1, cy + face.top() + dy + 1, face.right() - face.left() - 2, face.bottom() - face.top() - 2);
+                canvas.setColor(java.awt.Color.WHITE);
+                canvas.drawString(Integer.toString(i + 1), cx + (int) face.centerX() - 3, cy + (int) face.centerY() + dy);
+            }
+            canvas.setColor(java.awt.Color.WHITE);
+            canvas.drawString(counts[panel] + " options / S=" + side + (panel == 1 ? " / wrapped" : ""), cx - 90, cy - 195);
+        }
+        canvas.dispose();
+        var output = Path.of("build", "reports", "wheel-bars-layouts.png");
+        Files.createDirectories(output.getParent());
+        ImageIO.write(preview, "png", output.toFile());
+    }
     @Test void compactKickLayoutPreviewAtTwoScales() throws Exception {
         var preview = new BufferedImage(660, 400, BufferedImage.TYPE_INT_ARGB);
         var canvas = preview.createGraphics();

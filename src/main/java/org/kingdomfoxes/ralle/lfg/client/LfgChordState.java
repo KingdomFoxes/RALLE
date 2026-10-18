@@ -2,53 +2,53 @@ package org.kingdomfoxes.ralle.lfg.client;
 
 import java.util.function.Supplier;
 
-/** Small deterministic state machine for one modifier-plus-digit keyboard chord. */
-final class LfgChordState<T> {
+/** Modifier-plus-digit selection: the latest fresh press wins and its release submits. */
+public final class LfgChordState<T> {
     private T selection;
     private int digit;
-    private boolean ambiguous;
     private boolean completed;
 
-    void begin() {
+    public void begin() {
         selection = null;
         digit = 0;
-        ambiguous = false;
         completed = false;
     }
 
-    Press<T> press(int pressedDigit, Supplier<T> selectionFactory) {
-        if (completed) return new Press<>(selection, ambiguous, false);
-        if (selection != null && digit != pressedDigit) {
-            ambiguous = true;
-            return new Press<>(selection, true, true);
-        }
-        if (selection == null) {
+    public Press<T> press(int pressedDigit, Supplier<T> selectionFactory) {
+        if (completed) return new Press<>(selection, false);
+        if (selection == null || digit != pressedDigit) {
             digit = pressedDigit;
             selection = selectionFactory.get();
         }
-        return new Press<>(selection, ambiguous, true);
+        return new Press<>(selection, true);
     }
 
-    Release<T> release(int releasedDigit, boolean modifierHeld) {
+    public Release<T> release(int releasedDigit, boolean modifierHeld) {
         if (completed || selection == null || digit != releasedDigit) {
             return new Release<>(false, null);
         }
-        T execution = !ambiguous && modifierHeld ? selection : null;
+        T execution = modifierHeld ? selection : null;
         selection = null;
         digit = 0;
-        ambiguous = false;
         completed = true;
         return new Release<>(true, execution);
     }
 
-    boolean completed() {
+    public boolean completed() {
         return completed;
     }
 
-    void reset() {
+    /** Another input source won submission. A later digit release must never dispatch a second action. */
+    public void finish() {
+        selection = null;
+        digit = 0;
+        completed = true;
+    }
+
+    public void reset() {
         begin();
     }
 
-    record Press<T>(T selection, boolean ambiguous, boolean accepted) {}
-    record Release<T>(boolean matched, T execution) {}
+    public record Press<T>(T selection, boolean accepted) {}
+    public record Release<T>(boolean matched, T execution) {}
 }

@@ -7,6 +7,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.resources.Identifier;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
+import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
+import org.kingdomfoxes.ralle.settings.RalleSettings;
 import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
@@ -56,6 +58,8 @@ public final class RaidLfgKeybinds {
     private final BooleanSetting enabled;
     private final BooleanSetting createWheelEnabled;
     private final BooleanSetting kickWheelEnabled;
+    private final ChoiceSetting createWheelStyle;
+    private final ChoiceSetting kickWheelStyle;
     private final RaidLfgService service;
     private final LfgSoundPlayer sounds;
     private final LfgNotificationManager notifications;
@@ -94,6 +98,8 @@ public final class RaidLfgKeybinds {
         this.enabled = settings.setting("raid-lfg-enabled", BooleanSetting.class);
         this.createWheelEnabled = settings.setting("raid-lfg-create-selector-wheel", BooleanSetting.class);
         this.kickWheelEnabled = settings.setting("raid-lfg-kick-selector-wheel", BooleanSetting.class);
+        this.createWheelStyle = settings.setting(RalleSettings.CREATE_WHEEL_STYLE_ID, ChoiceSetting.class);
+        this.kickWheelStyle = settings.setting(RalleSettings.KICK_WHEEL_STYLE_ID, ChoiceSetting.class);
 
         register(settings, Action.OPEN, OPEN_ID, "key.ralle.raid-lfg");
         register(settings, Action.JOIN, JOIN_ID, "key.ralle.raid-lfg-join");
@@ -126,13 +132,20 @@ public final class RaidLfgKeybinds {
         if (activeWheel != null || modifierInput.awaitingRelease()) return;
 
         if (!inputAllowed()) {
+            if (chordMode != ChordMode.NONE)
+                modifierInput.closed(physicalDown(Action.CREATE), physicalDown(Action.KICK));
             resetChord(chordMode != ChordMode.NONE);
             return;
         }
 
-        boolean createDown = createWheelEnabled.value() ? physicalDown(Action.CREATE) : down(Action.CREATE);
-        boolean kickDown = kickWheelEnabled.value() ? physicalDown(Action.KICK) : down(Action.KICK);
-        var route = modifierInput.route(createDown, kickDown, createWheelEnabled.value(), kickWheelEnabled.value());
+        boolean createDown = physicalDown(Action.CREATE);
+        boolean kickDown = physicalDown(Action.KICK);
+        if (createDown && kickDown) {
+            resetChord(true);
+            modifierInput.closed(true, true);
+            return;
+        }
+        var route = modifierInput.route(createDown, kickDown, wheelEnabled(ChordMode.CREATE), wheelEnabled(ChordMode.KICK));
         if (route == LfgModifierInput.Route.NONE) {
             if (chordMode != ChordMode.NONE) resetChord(false);
             return;
@@ -146,12 +159,15 @@ public final class RaidLfgKeybinds {
     }
 
     /**
-     * Called at the head of Minecraft's keyboard handler. Returning true consumes only top-row
-     * digits used by an already-active, valid Create/Kick chord.
+     * Called at the head of Minecraft's keyboard handler. Graphical selectors own their events;
+     * gameplay consumes only digits belonging to an active Create/Kick chord.
      */
     public boolean handleKeyboard(KeyEvent event, int glfwAction) {
         modifierInput.observe(physicalDown(Action.CREATE), physicalDown(Action.KICK));
-        if (activeWheel != null) return false;
+        if (activeWheel != null) {
+            if (minecraft.screen == activeWheel) return activeWheel.handleKeyboard(event, glfwAction);
+            return false; // The shared existing-party confirmation owns its own input.
+        }
         if (glfwAction == GLFW.GLFW_PRESS
                 && minecraft.screen == null
                 && minecraft.level != null
@@ -176,6 +192,13 @@ public final class RaidLfgKeybinds {
             return false;
         }
 
+        if (modifierInput.awaitingRelease()) return false;
+        if (physicalDown(Action.CREATE) && physicalDown(Action.KICK)) {
+            resetChord(true);
+            modifierInput.closed(true, true);
+            return false;
+        }
+
         boolean createModifier = matches(Action.CREATE, event);
         boolean kickModifier = matches(Action.KICK, event);
         if (createModifier != kickModifier) {
@@ -197,7 +220,7 @@ public final class RaidLfgKeybinds {
             }
             if (glfwAction == GLFW.GLFW_PRESS) {
                 var press = chordState.press(digit, () -> select(digit));
-                if (press.accepted() && !press.ambiguous()) {
+                if (press.accepted()) {
                     presentSelection(press.selection(), true);
                 }
                 return true;
@@ -240,8 +263,11 @@ public final class RaidLfgKeybinds {
     }
 
     private boolean wheelEnabled(ChordMode mode) {
-        return mode == ChordMode.CREATE ? createWheelEnabled.value() : kickWheelEnabled.value();
+        return graphicalWheel(mode == ChordMode.CREATE ? createWheelEnabled.value() : kickWheelEnabled.value(),
+                mode == ChordMode.CREATE ? createWheelStyle.value() : kickWheelStyle.value());
     }
+
+    static boolean graphicalWheel(boolean enabled, String style) { return enabled && !"no-view".equals(style); }
 
     private void openWheel(ChordMode mode, int key) {
         if (modifierInput.awaitingRelease() || !inputAllowed()
@@ -256,7 +282,7 @@ public final class RaidLfgKeybinds {
         actionBar.clear();
         activeWheel = new LfgSelectorWheelScreen(minecraft, this, service,
                 mode == ChordMode.CREATE ? LfgSelectorWheelScreen.Mode.CREATE : LfgSelectorWheelScreen.Mode.KICK,
-                key);
+                key, mode == ChordMode.CREATE ? createWheelStyle.value() : kickWheelStyle.value());
         minecraft.setScreen(activeWheel);
     }
 
@@ -273,7 +299,9 @@ public final class RaidLfgKeybinds {
                                    UUID lobbyId, boolean hostedAtOpen) {
         if (wheel != activeWheel || !enabled.value() || minecraft.level == null || minecraft.player == null
                 || mode == LfgSelectorWheelScreen.Mode.KICK && service.lifecycle() != RaidLfgService.LifecycleState.ONLINE
-                || !wheelEnabled(mode == LfgSelectorWheelScreen.Mode.CREATE ? ChordMode.CREATE : ChordMode.KICK)) return false;
+                || !wheelEnabled(mode == LfgSelectorWheelScreen.Mode.CREATE ? ChordMode.CREATE : ChordMode.KICK)
+                || !physicalDown(mode == LfgSelectorWheelScreen.Mode.CREATE ? Action.CREATE : Action.KICK)
+                    && !wheel.retainsSubmittedCreate()) return false;
         if (mode == LfgSelectorWheelScreen.Mode.KICK && lobbyId != null) {
             var lobby = currentLobby();
             if (lobby == null || !lobby.lobbyId().equals(lobbyId)) return false;
@@ -646,15 +674,12 @@ public final class RaidLfgKeybinds {
                 && minecraft.screen == null
                 && minecraft.level != null
                 && minecraft.player != null
-                && service.lifecycle() == RaidLfgService.LifecycleState.ONLINE;
+                && service.lifecycle() == RaidLfgService.LifecycleState.ONLINE
+                && GLFW.glfwGetWindowAttrib(minecraft.getWindow().handle(), GLFW.GLFW_FOCUSED) != GLFW.GLFW_FALSE;
     }
 
     private boolean modifierStillDown() {
-        return chordMode == ChordMode.CREATE ? down(Action.CREATE) : down(Action.KICK);
-    }
-
-    private boolean down(Action action) {
-        return !conflicted(action) && bindings.get(action).mapping.isDown();
+        return physicalDown(chordMode == ChordMode.CREATE ? Action.CREATE : Action.KICK);
     }
 
     private boolean matches(Action action, KeyEvent event) {
@@ -707,6 +732,8 @@ public final class RaidLfgKeybinds {
             KeyMapping.resetMapping();
             disbandConfirmation.clear();
             resetChord(true);
+            if (activeWheel != null) activeWheel.onClose();
+            modifierInput.closed(physicalDown(Action.CREATE), physicalDown(Action.KICK));
         }
     }
 
@@ -734,7 +761,7 @@ public final class RaidLfgKeybinds {
         }
     }
 
-    static int topRowDigit(int key) {
+    public static int topRowDigit(int key) {
         return key >= GLFW.GLFW_KEY_1 && key <= GLFW.GLFW_KEY_6
                 ? key - GLFW.GLFW_KEY_0 : 0;
     }

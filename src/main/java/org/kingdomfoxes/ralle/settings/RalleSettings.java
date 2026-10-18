@@ -18,6 +18,8 @@ public final class RalleSettings {
     public static final String CHAT_SELECTION_INSTRUMENT_ID = "chat-selection-instrument";
     public static final String INTERFACE_FONT_ID = "interface-font";
     public static final String UI_THEME_ID = "ui-theme";
+    public static final String CREATE_WHEEL_STYLE_ID = "raid-lfg-create-wheel-style";
+    public static final String KICK_WHEEL_STYLE_ID = "raid-lfg-kick-wheel-style";
     public static final String INTERNAL_GUILD_RANKS_ID = "internal-guild-ranks";
     public static final String RAID_LFG_ENABLED_ID = "raid-lfg-enabled";
     public static final String GUILD_RANK_STYLE_ID = "guild-rank-style";
@@ -127,13 +129,26 @@ public final class RalleSettings {
                                 keybind("raid-lfg-ping-keybind", "key.keyboard.f6"),
                                 keybind("raid-lfg-lock-keybind", "key.keyboard.f7"),
                                 keybind("raid-lfg-create-keybind", "key.keyboard.f8"),
-                                toggle("raid-lfg-create-selector-wheel"),
                                 keybind("raid-lfg-kick-keybind", "key.keyboard.f9"),
-                                toggle("raid-lfg-kick-selector-wheel"),
                                 keybind("automatic-raid-requeue-keybind")
                         )
                 )
         ));
+
+        registry.registerCategory(new SettingsCategory(
+                "wheels",
+                Component.translatable("ralle.settings.category.wheels"),
+                Component.translatable("ralle.settings.category.wheels.description"),
+                List.of(
+                        toggle("raid-lfg-create-selector-wheel"),
+                        choice(CREATE_WHEEL_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view"),
+                        toggle("raid-lfg-kick-selector-wheel"),
+                        choice(KICK_WHEEL_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view")
+                ),
+                List.of()
+        ));
+        registry.migrateKey("raid-lfg-create-selector-wheel", "raid-lfg.raid-lfg-create-selector-wheel");
+        registry.migrateKey("raid-lfg-kick-selector-wheel", "raid-lfg.raid-lfg-kick-selector-wheel");
 
         registry.registerCategory(new SettingsCategory(
                 "war",
@@ -195,6 +210,8 @@ public final class RalleSettings {
         registry.requireEnabled("raid-lfg-create-selector-wheel", "raid-lfg-enabled");
         registry.requireEnabled("raid-lfg-kick-keybind", "raid-lfg-enabled");
         registry.requireEnabled("raid-lfg-kick-selector-wheel", "raid-lfg-enabled");
+        registry.requireEnabled(CREATE_WHEEL_STYLE_ID, "raid-lfg-create-selector-wheel");
+        registry.requireEnabled(KICK_WHEEL_STYLE_ID, "raid-lfg-kick-selector-wheel");
         registry.requireEnabled("automatic-raid-requeue-keybind", "raid-lfg-enabled");
     }
 

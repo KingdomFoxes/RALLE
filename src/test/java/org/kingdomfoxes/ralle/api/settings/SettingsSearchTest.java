@@ -13,6 +13,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SettingsSearchTest {
     @TempDir Path directory;
 
+    @Test void wheelStylesHideInSearchUntilBothWheelAndLfgAreEnabled() {
+        var registry = new SettingsRegistry(directory.resolve("wheels.properties"));
+        org.kingdomfoxes.ralle.settings.RalleSettings.register(registry);
+        registry.seal();
+        String style = org.kingdomfoxes.ralle.settings.RalleSettings.CREATE_WHEEL_STYLE_ID;
+        assertTrue(SettingsSearch.find(registry, style).isEmpty());
+        registry.setting("raid-lfg-create-selector-wheel", BooleanSetting.class).set(true);
+        var group = SettingsSearch.find(registry, style).getFirst();
+        assertEquals("wheels", group.category().id());
+        assertTrue(group.categoryPage());
+        assertEquals(List.of(style), group.entries().stream().map(SettingsEntry::id).toList());
+        registry.setting("raid-lfg-enabled", BooleanSetting.class).set(false);
+        assertTrue(SettingsSearch.find(registry, style).isEmpty());
+    }
+
     @Test
     void searchesMetadataAndGroupsResultsInRegistryOrder() {
         var registry = new SettingsRegistry(directory.resolve("settings.properties"));
