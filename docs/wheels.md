@@ -1,6 +1,7 @@
 # Modifier wheels
 
-Wheels contains the independent Create and Kick selectors. Both remain disabled
+Wheels contains the independent Create and Kick selectors directly, without
+subcategories. Both remain disabled
 by default. Each enabled selector reveals its own Wheel Style: Circle Segments
 (default), Bars, or No View. Modifier bindings remain in Raid LFG Controls and
 stay synchronized with Minecraft's keybind options. Wheel settings retain the
@@ -19,8 +20,10 @@ and `no-view`. Disabled selectors preserve their hidden style preferences.
 All styles accept the configured keyboard modifier and existing fixed top-row
 option keys: Create 1–6 selects Dailies, NOTG, NOL, TCC, TNA, TWP; Kick 2–4
 selects the corresponding synchronized roster slot. Press selects; release of
-that digit submits only while the modifier is still held. Different simultaneous
-digits make the chord ambiguous. Key repeat never submits. A modifier rebound
+that digit submits only while the modifier is still held. Pressing a different
+option while an older key is held replaces the selection. Releasing the older
+key does nothing; releasing the latest selected key submits exactly once. Key
+repeat never submits. A modifier rebound
 to an option digit only opens its selector on that event; it cannot also select
 itself. Unbound controls and conflicts between RALLE action bindings stay inert.
 These remain keyboard bindings; this feature does not add mouse-button modifiers
@@ -31,8 +34,10 @@ left-click. Keyboard highlighting is retained while the pointer is stationary.
 Opening at the centered cursor position does not immediately select a bar.
 Mouse and keyboard share one submission guard; a successful mouse submission
 discards an armed keyboard chord so a late release cannot dispatch again.
-Create submits at most once per hold. Keyboard chords complete once per hold;
-Kick retains repeat fresh mouse clicks after failure or its accepted animation.
+Create submits at most once per hold. No View and disabled-wheel keyboard chords
+complete once per hold. Graphical Kick accepts another fresh option press/release
+or mouse click after failure or its accepted animation. Releasing an empty or
+unavailable option leaves the graphical menu usable without closing it.
 Only one Kick request may be pending. Kick targets are UUIDs captured on press,
 never a new occupant of a roster index on release.
 
@@ -47,8 +52,10 @@ still open when required.
 
 ## Bars
 
-Bars are side-by-side vertical slices of a centered square of side S. Up to five
-options divide that square equally. Above five, each bar is at least 20% of the
+Bars are side-by-side vertical slices using an original reference square of
+side S. Bar height is 55% of S (a 45% reduction); width and wrapping retain the
+original reference square. Up to five options divide its width equally.
+Above five, each bar is at least 20% of the
 original square width (S/5), with pixel rounding. Rows grow up to 64% of the
 GUI-scaled viewport width, then wrap below with each row centered. Shared borders
 are included in column widths. S is content-aware for Create and smaller for
