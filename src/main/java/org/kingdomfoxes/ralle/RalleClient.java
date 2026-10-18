@@ -140,6 +140,9 @@ public final class RalleClient implements ClientModInitializer {
         var classMenuCapture = new org.kingdomfoxes.ralle.classes.ClassMenuCapture(minecraft,
                 settings.setting(RalleSettings.CLASS_SELECTOR_ID, BooleanSetting.class),
                 configDirectory.resolve("ralle-class-menu-capture"));
+        var classMenuScanner = new org.kingdomfoxes.ralle.classes.ClassMenuScanner(minecraft,
+                settings.setting(RalleSettings.CLASS_SELECTOR_ID, BooleanSetting.class), classShortcuts,
+                configDirectory.resolve("ralle-class-menu-capture"));
         placements.seal();
         RalleTypography.bind(settings);
         org.kingdomfoxes.ralle.ui.theme.RallePalette.bind(settings);
@@ -261,11 +264,13 @@ public final class RalleClient implements ClientModInitializer {
                 cosmeticDirectory,
                 cosmeticStyleSelection,
                 cosmeticTextures,
-                classMenuCapture
+                classMenuCapture,
+                classMenuScanner
         );
         var pointAndLaugh = new org.kingdomfoxes.ralle.war.PointAndLaugh();
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             classMenuCapture.reset();
+            classMenuScanner.reset();
             if (client.getCurrentServer() != null) updateNotice.joined();
             else updateNotice.disconnected();
             foxGuildAccess.joined(client.getCurrentServer() == null ? "" : client.getCurrentServer().ip,
@@ -279,6 +284,7 @@ public final class RalleClient implements ClientModInitializer {
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             classMenuCapture.reset();
+            classMenuScanner.reset();
             updateNotice.disconnected();
             foxGuildAccess.clear();
             cosmeticDirectory.clear();
@@ -296,6 +302,7 @@ public final class RalleClient implements ClientModInitializer {
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             classMenuCapture.tick();
+            classMenuScanner.tick();
             updateNotice.tick().ifPresent(release -> RalleChatMessages.post(client, UpdateMessages.body(release)));
             foxGuildAccess.tick();
             if (cosmeticReloadPending.getAndSet(false)) cosmeticTextures.close();

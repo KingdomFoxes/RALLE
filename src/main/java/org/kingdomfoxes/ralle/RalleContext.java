@@ -36,6 +36,7 @@ public record RalleContext(
         NameplateDirectorySession cosmetics,
         CosmeticStyleSelection cosmeticStyleSelection,
         LiquidMaterialTextures cosmeticTextures,
-        org.kingdomfoxes.ralle.classes.ClassMenuCapture classMenuCapture
+        org.kingdomfoxes.ralle.classes.ClassMenuCapture classMenuCapture,
+        org.kingdomfoxes.ralle.classes.ClassMenuScanner classMenuScanner
 ) {
 }

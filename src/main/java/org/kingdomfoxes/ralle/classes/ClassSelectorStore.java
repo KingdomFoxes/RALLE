@@ -46,6 +46,7 @@ public final class ClassSelectorStore {
     }
 
     public boolean available() { return path != null; }
+    public boolean hasAccount(UUID account) { return accounts.containsKey(account); }
 
     public ClassSelectorStore(Path path) throws IOException {
         this.path = path;
@@ -101,6 +102,10 @@ public final class ClassSelectorStore {
         var current = account(account);
         replace(account, new Account(current.characters,
                 current.shortcuts.stream().filter(s -> !s.characterId().equals(id)).toList()));
+    }
+
+    public void clearShortcuts(UUID account) throws IOException {
+        replace(account, new Account(account(account).characters(), List.of()));
     }
 
     private void replace(UUID id, Account account) throws IOException {

@@ -68,6 +68,7 @@ public final class ClassMenuCapture {
         // Read the live menu independently of its presentation: Wynntils may replace the screen.
         var menu = minecraft.player.containerMenu;
         if (menu == minecraft.player.inventoryMenu) return;
+        if (!WynncraftClassMenu.matchesTitle(minecraft.screen.getTitle().getString())) return;
         var data = new JsonObject();
         data.addProperty("version", 1);
         data.addProperty("account", current.toString());

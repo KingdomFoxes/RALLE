@@ -2,8 +2,11 @@ package org.kingdomfoxes.ralle.classes;
 
 import java.util.Objects;
 
-/** A game-provided identity, never a nickname, class type or inventory position. */
+/** Game identity or explicitly marked menu observation. Only a verified game identity is switchable. */
 public record ClassCharacter(String id, String type, String nickname) {
+    public static final String OBSERVATION_PREFIX = "observed:";
+
+    public boolean hasStableIdentity() { return !id.startsWith(OBSERVATION_PREFIX); }
     public ClassCharacter {
         id = text(id, 128);
         type = text(type, 64);

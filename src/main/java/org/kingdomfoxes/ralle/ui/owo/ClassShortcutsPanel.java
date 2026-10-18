@@ -39,17 +39,24 @@ final class ClassShortcutsPanel extends FlowLayout {
         this.screen = screen;
         this.store = store;
         this.settings = settings;
-        gap(5).padding(Insets.of(5)).surface(RalleSurfaces.NAVY_ROW);
+        gap(4).padding(Insets.of(5)).surface(RalleSurfaces.NAVY_ROW);
         rows = new ExpandableParentChildListPanel(Sizing.fill(100), Sizing.content());
-        rows.gap(3).padding(Insets.of(4));
-        var scroll = new RalleScrollContainer(Sizing.fill(100), Sizing.fixed(180), rows);
-        scroll.wheelStep(24).scrollbarThiccness(3).surface(RalleSurfaces.NAVY_PANEL);
-        child(scroll);
-        child(button("ralle.classes.add", this::picker));
-        status = UIComponents.label(Component.empty()).color(RalleTheme.muted()).maxWidth(300);
-        child(status);
-        // Live server decoding stays gated until the promised capture verifies its signals.
-        child(UIComponents.label(text("ralle.classes.integration-pending")).color(RalleTheme.muted()).maxWidth(300));
+        rows.gap(2);
+        var columns = new SettingsListEditorColumns(rows);
+        columns.actions().child(button("ralle.classes.add", this::picker));
+        var reset = button("ralle.consumables.action.reset", () -> {
+            var owner = account();
+            RalleModalDialogs.confirm(screen, Component.translatable("ralle.classes.reset.title"),
+                    Component.translatable("ralle.classes.reset.message"),
+                    Component.translatable("ralle.consumables.action.reset"), true,
+                    () -> mutate(owner, () -> store.clearShortcuts(owner)));
+        });
+        reset.renderer(RalleButtonRenderers.destructive());
+        columns.actions().child(reset);
+        status = UIComponents.label(Component.empty()).lineHeight(RalleTheme.BODY_LINE_HEIGHT)
+                .color(RalleTheme.muted()).maxWidth(SettingsListEditorColumns.ACTION_WIDTH - 8);
+        columns.actions().child(status);
+        child(columns);
         rebuild();
     }
 
@@ -79,7 +86,12 @@ final class ClassShortcutsPanel extends FlowLayout {
         renderedModifier = modifier();
         var snapshot = store.account(renderedAccount);
         var content = new ArrayList<UIComponent>();
-        if (snapshot.shortcuts().isEmpty()) content.add(UIComponents.label(text("ralle.classes.empty")).color(RalleTheme.muted()).maxWidth(280));
+        if (snapshot.shortcuts().isEmpty()) {
+            var empty = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(198));
+            empty.horizontalAlignment(HorizontalAlignment.CENTER).verticalAlignment(VerticalAlignment.CENTER);
+            empty.child(UIComponents.label(text("ralle.classes.empty")).color(RalleTheme.muted()));
+            content.add(empty);
+        }
         for (var shortcut : snapshot.shortcuts()) {
             var character = snapshot.character(shortcut.characterId());
             String name = character == null ? shortcut.name().isBlank()
@@ -87,6 +99,7 @@ final class ClassShortcutsPanel extends FlowLayout {
                     : character.displayName(shortcut.name());
             var row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
             row.gap(3).padding(Insets.of(2)).verticalAlignment(VerticalAlignment.CENTER).surface(RalleSurfaces.NAVY_ROW);
+            if (character != null && !character.hasStableIdentity()) row.tooltip(text("ralle.classes.unverified"));
             row.child(UIComponents.item(fallbackIcon(character)).sizing(Sizing.fixed(18)));
             var label = UIComponents.label(RalleTheme.ui(Component.literal(name))).maxWidth(120);
             label.horizontalSizing(Sizing.expand(100));
@@ -108,7 +121,8 @@ final class ClassShortcutsPanel extends FlowLayout {
         }
         rows.replaceChildren(content);
         status.text(!store.available() ? text("ralle.classes.save-failed")
-                : snapshot.characters().isEmpty() ? text("ralle.classes.detect-next") : Component.empty());
+                : snapshot.characters().isEmpty() ? text("ralle.classes.detect-next")
+                : text("ralle.classes.detected", snapshot.characters().size()));
     }
 
     /** Native item fallback only; a verified game adapter can later supply resource-pack class sprites. */
@@ -135,8 +149,10 @@ final class ClassShortcutsPanel extends FlowLayout {
             var button = UIComponents.button(RalleTheme.ui(Component.literal(character.displayName(""))), ignored -> {
                 if (mutate(owner, () -> store.add(owner, character.id()))) overlay[0].remove();
             });
-            // Distinguish duplicate names and types without treating them as identities.
-            button.tooltip(RalleTheme.ui(Component.literal(character.type() + " · " + character.id())));
+            // Character numbers distinguish duplicate names without exposing hashes as game identities.
+            int number = WynncraftClassMenu.characterNumber(character.id());
+            button.tooltip(number < 0 ? RalleTheme.ui(Component.literal(character.type()))
+                    : text("ralle.classes.character-number", number, character.type()));
             button.sizing(Sizing.fill(100), Sizing.fixed(20));
             button.renderer(RalleButtonRenderers.neutral());
             choices.child(button);

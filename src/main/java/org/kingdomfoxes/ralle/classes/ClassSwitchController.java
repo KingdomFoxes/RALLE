@@ -34,7 +34,7 @@ public final class ClassSwitchController {
 
     public boolean begin(UUID account, String target, String current, boolean verifiedAdapter, long now) {
         if (active()) return false;
-        if (!verifiedAdapter || target.equals(current)) return false;
+        if (!verifiedAdapter || target.startsWith(ClassCharacter.OBSERVATION_PREFIX) || target.equals(current)) return false;
         this.account = java.util.Objects.requireNonNull(account);
         this.target = ClassCharacter.text(target, 128);
         started = now;

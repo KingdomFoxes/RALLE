@@ -1,0 +1,109 @@
+package org.kingdomfoxes.ralle.classes;
+
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.*;
+import java.util.regex.Pattern;
+
+/** Decoder for the character book observed in the 2026-10-19 game captures.
+ * The book has no character UUIDs: its entries are explicitly unverified observations.
+ * An observation may populate the editor, but can never authorize a switch.
+ */
+public final class WynncraftClassMenu {
+    public static final int MENU_SIZE = 54;
+    public static final String TITLE = new String(Character.toChars(0xCFFD5)) + "\uE01F";
+    private static final List<Integer> CHARACTER_SLOTS = List.of(
+            9, 10, 11, 18, 19, 20, 27, 28, 29, 36, 37, 38, 45, 46, 47);
+    private static final Set<String> TYPES = Set.of("Archer", "Hunter", "Mage", "Dark Wizard",
+            "Warrior", "Knight", "Assassin", "Ninja", "Shaman", "Skyseer");
+    private static final Pattern LEGACY = Pattern.compile("§.");
+
+    public record Result(List<ClassCharacter> characters, Map<String, Integer> slots, boolean complete) {
+        public Result { characters = List.copyOf(characters); slots = Map.copyOf(slots); }
+        public ClassScan scan(UUID account) { return new ClassScan(account, characters, complete); }
+    }
+
+    private WynncraftClassMenu() {}
+    public static boolean matchesTitle(String title) { return TITLE.equals(title); }
+    public static int characterNumber(String reference) {
+        if (!reference.startsWith(ClassCharacter.OBSERVATION_PREFIX)) return -1;
+        try {
+            int number = CHARACTER_SLOTS.indexOf(Integer.parseInt(reference.split(":", 3)[1]));
+            return number < 0 ? -1 : number + 1;
+        } catch (RuntimeException invalid) { return -1; }
+    }
+
+    /** Exact title plus independent control signatures keep housing/inventory/editor menus out. */
+    public static Optional<Result> decode(String title, List<ItemStack> items) {
+        if (!matchesTitle(title) || items.size() != MENU_SIZE
+                || !marker(items.get(7), "Cancel Deletion", 559)
+                || !marker(items.get(25), "Character Backups", 561)
+                || !marker(items.get(51), "Selector Music", 597)
+                || !marker(items.get(53), "Auto Open", 598)) return Optional.empty();
+        var characters = new ArrayList<ClassCharacter>();
+        var slots = new LinkedHashMap<String, Integer>();
+        boolean complete = true;
+        for (int slot : CHARACTER_SLOTS) {
+            var item = items.get(slot);
+            if (marker(item, "Create a Character", 562) || marker(item, "Locked Character Slot", 585)) continue;
+            var character = character(slot, item);
+            if (character == null) { complete = false; continue; }
+            characters.add(character);
+            slots.put(character.id(), slot);
+        }
+        return Optional.of(new Result(characters, slots, complete));
+    }
+
+    private static ClassCharacter character(int slot, ItemStack item) {
+        if (item == null || !item.is(Items.POTION)) return null;
+        var lore = item.get(DataComponents.LORE);
+        if (lore == null || lore.lines().size() > 32) return null;
+        var lines = lore.lines().stream().map(line -> clean(line.getString())).toList();
+        if (!lines.contains("Left-Click to Select") || !lines.contains("Right-Click to Edit")) return null;
+        var classes = lines.stream().filter(line -> line.startsWith("- Class: "))
+                .map(line -> line.substring(9)).toList();
+        if (classes.size() != 1 || !TYPES.contains(classes.getFirst())) return null;
+        // Required observed fields also prevent incomplete per-slot updates from creating entries.
+        for (String required : List.of("- Time Played: ", "- Location: ", "- Level: "))
+            if (lines.stream().filter(line -> line.startsWith(required) && line.length() > required.length()).count() != 1)
+                return null;
+        String type = classes.getFirst();
+        String name = name(item);
+        if (name.isBlank() || name.length() > 128 || lines.stream().anyMatch(line -> line.length() > 512)) return null;
+        var model = item.get(DataComponents.CUSTOM_MODEL_DATA);
+        if (model == null || model.floats().size() != 1 || !Float.isFinite(model.floats().getFirst())) return null;
+        // Include position and the complete visible evidence. Never merge by name/type alone, and
+        // never claim this hash is a stable server identity. Changed evidence requires rediscovery.
+        String evidence = slot + "\n" + model.floats().getFirst() + "\n" + name + "\n" + String.join("\n", lines);
+        String reference = ClassCharacter.OBSERVATION_PREFIX + slot + ":" + digest(evidence);
+        return new ClassCharacter(reference, type, name.equals(type) ? "" : name);
+    }
+
+    private static boolean marker(ItemStack item, String title, float modelNumber) {
+        if (item == null || !item.is(Items.POTION) || !name(item).equals(title)) return false;
+        var model = item.get(DataComponents.CUSTOM_MODEL_DATA);
+        return model != null && model.floats().size() == 1 && model.floats().getFirst() == modelNumber;
+    }
+    private static String name(ItemStack item) {
+        var name = item.get(DataComponents.CUSTOM_NAME);
+        return name == null ? "" : clean(name.getString());
+    }
+    private static String clean(String text) {
+        var plain = LEGACY.matcher(text).replaceAll("");
+        var result = new StringBuilder();
+        plain.codePoints().filter(cp -> Character.getType(cp) != Character.PRIVATE_USE
+                && Character.getType(cp) != Character.UNASSIGNED && Character.getType(cp) != Character.SURROGATE
+                && !Character.isISOControl(cp) && Character.getType(cp) != Character.FORMAT)
+                .forEach(result::appendCodePoint);
+        return result.toString().strip();
+    }
+    private static String digest(String evidence) {
+        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(evidence.getBytes(StandardCharsets.UTF_8))); }
+        catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
+    }
+}

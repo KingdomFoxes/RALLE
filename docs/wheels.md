@@ -1,7 +1,7 @@
 # Modifier wheels
 
 Class Selector is an approved independent addition under Wheels. Its local
-shortcut editor and domain controller are implemented; the live hidden-switch
+shortcut editor, game-menu discovery and domain controller are implemented; the live hidden-switch
 integration remains pending verified game data. See [Class Selector integration](class-selector.md)
 for settings, persistence, the corrected right-click sequence, capture instructions
 and the remaining runtime/visual checks.

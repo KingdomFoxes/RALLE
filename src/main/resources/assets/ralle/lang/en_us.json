@@ -368,12 +368,17 @@
   "ralle.classes.apply": "Apply",
   "ralle.classes.name": "Display Name",
   "ralle.classes.option-key": "Option Key",
-  "ralle.classes.empty": "No class shortcuts selected. Add Class to choose detected characters.",
-  "ralle.classes.detect-next": "Classes will be detected at your next character selection.",
+  "ralle.classes.empty": "No class shortcuts selected.",
+  "ralle.classes.detect-next": "Open the character book to detect your classes.",
+  "ralle.classes.detected": "%s classes detected. Switching is not ready yet.",
+  "ralle.classes.character-number": "Character %s · %s",
+  "ralle.classes.unverified": "Detected in the character book. Automatic switching is unavailable until its identity can be verified.",
+  "ralle.classes.reset.title": "RESET CLASS SHORTCUTS?",
+  "ralle.classes.reset.message": "Remove all class shortcuts? Your detected characters will remain available.",
   "ralle.classes.all-added": "All detected characters already have shortcuts.",
   "ralle.classes.missing": "Character unavailable",
   "ralle.classes.conflict": "Key conflict",
   "ralle.classes.binding-help": "Option keys work while holding the Class Modifier. Conflicting keys remain inactive. An empty display name uses the character nickname, then class type.",
   "ralle.classes.save-failed": "Could not save class shortcuts. Check the local file and try again.",
-  "ralle.classes.integration-pending": "Game discovery and switching are not available yet: the current Wynncraft menu and transition signals still need verification."
+  "ralle.classes.integration-pending": "Automatic switching is not available yet: character identities and the transition still need verification."
 }
