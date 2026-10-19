@@ -18,7 +18,7 @@ import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
-/** Standalone native adapter. No LFG/service authority, web lookup, retries or fixed stage delay. */
+/** Standalone native adapter with bounded stage clicks and no initial timed delay. */
 public final class ClassSwitcher implements ClassSwitchController.Actions, AutoCloseable {
     private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(ClassSwitcher.class);
     private final Minecraft minecraft;
@@ -29,30 +29,28 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
     private final ClassSwitchFrame frame = new ClassSwitchFrame();
     private final ClassSwitchController controller = new ClassSwitchController(this);
     private final ClassSwitchAudio audio;
-    private String target, current;
-    private java.util.UUID currentAccount;
+    private final ClassLoadTracker loads;
+    private String target;
     private int book = -1;
-    private String manuallySelected;
-    private int manualBook = -1;
-    private final ClassStageReadiness stageReadiness = new ClassStageReadiness();
     private boolean selectionScene;
-    private boolean nativeUsePending;
     private int interactionBudget;
     private ClassSwitchController.State lastStage = ClassSwitchController.State.IDLE;
     private String bookStatus = "not received";
 
-    public ClassSwitcher(Minecraft minecraft, BooleanSetting enabled, ClassMenuScanner scanner, LfgActionBarState feedback,
+    public ClassSwitcher(Minecraft minecraft, BooleanSetting enabled, ClassMenuScanner scanner, ClassSelectorStore store, LfgActionBarState feedback,
                          java.util.function.BooleanSupplier otherAutomation) {
         this.minecraft = minecraft;
         this.enabled = enabled;
         this.scanner = scanner;
         this.feedback = feedback;
         this.otherAutomation = otherAutomation;
+        loads = new ClassLoadTracker(store);
         audio = new ClassSwitchAudio(() -> minecraft.getSoundManager().refreshCategoryVolume(SoundSource.MASTER));
     }
     public boolean active() { return controller.active(); }
     public boolean isCurrent(String reference) {
-        return reference.equals(current) && minecraft.getUser().getProfileId().equals(currentAccount);
+        loads.session(minecraft.getUser().getProfileId());
+        return reference.equals(loads.current());
     }
     private boolean connected() {
         return minecraft.getConnection() != null && minecraft.getCurrentServer() != null
@@ -66,34 +64,39 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
                 || minecraft.getOverlay() != null || otherAutomation.getAsBoolean() || active() || isCurrent(reference)) return false;
         target = reference;
         book = -1;
-        stageReadiness.reset();
         bookStatus = "not received";
         lastStage = ClassSwitchController.State.CAPTURING;
         LOGGER.info("Class switch: capturing selected frame");
         feedback.clear();
-        return controller.begin(minecraft.getUser().getProfileId(), reference, current, true, now());
+        return controller.begin(minecraft.getUser().getProfileId(), reference, loads.current(), true, now());
     }
     public void tick() {
         if (!enabled.value() || !connected()) {
             controller.tick(minecraft.getUser().getProfileId(), connected(), now());
             if (active()) controller.cancel();
-            current = null; currentAccount = null; manuallySelected = null; manualBook = -1;
+            loads.reset();
             return;
         }
+        loads.session(minecraft.getUser().getProfileId());
         if (!active()) return;
         beforeTick();
         if (!active()) return;
         // Screens may be replaced by a native/Wynntils character book. Keep it ticking underneath.
         if (minecraft.screen != null && !(minecraft.screen instanceof ClassSelectorWheelScreen)
+                && controller.state() != ClassSwitchController.State.WAITING_WORLD
+                && controller.state() != ClassSwitchController.State.WAITING_TRANSITION
                 && (minecraft.player == null || minecraft.player.containerMenu == minecraft.player.inventoryMenu)) {
             controller.unexpectedMenu(); return;
         }
         blockHeldInputs();
-        if (controller.state() == ClassSwitchController.State.WAITING_STAGE && stageReadiness.ready() && usableScene()) {
-            controller.selectionStage();
-        }
         traceState();
+        menuUpdated();
+    }
+    /** Packet-tail fast path: validate and select as soon as complete live contents are applied. */
+    public void menuUpdated() {
         if (controller.state() == ClassSwitchController.State.WAITING_MENU) {
+            beforeTick();
+            if (!active()) return;
             scanner.liveMenu().ifPresent(menu -> {
                 bookStatus = (menu.result().complete() ? "complete" : "partial") + " (" + menu.result().characters().size() + " characters)";
                 if (menu.result().complete()) {
@@ -104,7 +107,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
             });
         }
     }
-    /** Runs before vanilla can consume the queued Use click, including after a delayed tick. */
+    /** Revalidate before vanilla input, including after a delayed tick. */
     public void beforeTick() {
         if (!active()) return;
         controller.tick(minecraft.getUser().getProfileId(), connected(), now());
@@ -112,13 +115,11 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
                 || GLFW.glfwGetWindowAttrib(minecraft.getWindow().handle(), GLFW.GLFW_FOCUSED) == GLFW.GLFW_FALSE)) controller.cancel();
     }
     public void beforeInput() {
-        if (!nativeUsePending) return;
+        if (!active()) return;
         beforeTick();
-        if (!active() || controller.state() != ClassSwitchController.State.WAITING_MENU
+        if (!active() || !controller.acceptingStageClicks()
                 || !selectionScene || !usableScene()) return;
-        nativeUsePending = false;
-        ClassStageInput.queueUse(minecraft.options.keyUse, minecraft.options.keyMappings);
-        LOGGER.info("Class switch: queued one Use click for vanilla input handling");
+        controller.selectionStage(now());
     }
     private boolean usableScene() {
         return minecraft.player != null && minecraft.level != null && minecraft.screen == null
@@ -142,11 +143,24 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         controller.tick(minecraft.getUser().getProfileId(), connected(), now());
         if (active() && !enabled.value()) controller.cancel();
         boolean prompt = ClassMenuCapture.selectionPrompt(text);
+        loads.session(minecraft.getUser().getProfileId());
+        if (prompt && loads.hasSelection() && !controller.acceptingStageClicks()) return;
+        if (prompt && !selectionScene) loads.selectionStage();
         if (prompt && !selectionScene) interactionBudget = 8;
         selectionScene = prompt;
-        if (controller.state() == ClassSwitchController.State.WAITING_STAGE) {
-            stageReadiness.prompt(prompt);
-        }
+    }
+
+    public void systemChat(String text) {
+        if (!enabled.value() || !connected() || !ClassLoadSignals.welcome(text)) return;
+        loads.session(minecraft.getUser().getProfileId());
+        loads.welcome();
+        selectionScene = false;
+        LOGGER.info("Class load: received Wynncraft world welcome");
+    }
+    public void compassUpdated(net.minecraft.world.item.ItemStack item) {
+        if (!enabled.value() || !connected()) return;
+        loads.session(minecraft.getUser().getProfileId());
+        loads.compass(ClassLoadSignals.compassToken(item));
     }
     /** Records only packet types, never payloads/IDs; permits comparing a manual click after Escape. */
     public void outgoing(Packet<?> packet) {
@@ -158,43 +172,53 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         }
     }
     public void opened(int containerId, String title) {
-        manuallySelected = null; manualBook = -1;
         selectionScene = false;
-        nativeUsePending = false;
         if (!active()) return;
-        blockHeldInputs(); // Auto Open may beat the queued Use click; do not send it into a book.
+        blockHeldInputs(); // Stop stage input on book-open, even before contents arrive.
+        // Wynntils may query native menus as soon as the server announces WORLD.
+        // No further automation is permitted; keep the frame while those menus finish normally.
+        if (controller.state() == ClassSwitchController.State.WAITING_WORLD && loads.awaitingWorld()) return;
         if (!WynncraftClassMenu.matchesTitle(title) || !controller.bookOpened())
             controller.unexpectedMenu();
         else {
             book = containerId;
-            stageReadiness.reset();
             LOGGER.info("Class switch: character book opened ({})", containerId);
             traceState();
         }
     }
-    public void closed(int containerId) {
-        // Servers may close inventory 0 while processing /class, before opening the book.
-        if (active() && !(containerId == 0 && book < 0)) controller.menuClosed(containerId);
-        else if (enabled.value() && containerId == manualBook) {
-            current = manuallySelected;
-            currentAccount = minecraft.getUser().getProfileId();
+    public void closed(int packetContainer, int liveContainer) {
+        if (!enabled.value() || !connected()) return;
+        loads.session(minecraft.getUser().getProfileId());
+        loads.closed(packetContainer, liveContainer);
+        if (active()) {
+            if (controller.state() == ClassSwitchController.State.WAITING_WORLD && loads.awaitingWorld()
+                    && packetContainer != book && liveContainer != book) return;
+            LOGGER.info("Class switch: server close packet {}, live container {}", packetContainer, liveContainer);
+            controller.serverClosed(packetContainer, liveContainer);
+            traceState();
         }
-        manuallySelected = null; manualBook = -1;
     }
-    /** Manual selections establish the current reference only after a matching server close. */
+    /** Record manual selection now, confirm it only after the book closes and gameplay loads. */
     public void inventoryClick(int containerId, int slot, int button, ClickType type) {
         if (active()) return;
-        manuallySelected = null; manualBook = -1;
-        if (!enabled.value() || button != 0 || type != ClickType.PICKUP) return;
+        if (!enabled.value() || !connected() || button != 0 || type != ClickType.PICKUP) return;
+        loads.session(minecraft.getUser().getProfileId());
         scanner.liveMenu().filter(menu -> menu.containerId() == containerId && menu.result().complete()).ifPresent(menu ->
                 menu.result().slots().entrySet().stream().filter(e -> e.getValue() == slot && menu.result().resolve(e.getKey()).isPresent())
-                        .findFirst().ifPresent(entry -> { manuallySelected = entry.getKey(); manualBook = containerId; }));
+                        .findFirst().ifPresent(entry -> loads.selected(entry.getKey(), containerId)));
     }
 
     /** Called after all world and UI rendering, immediately before vanilla presents its frame. */
     public void beforePresent() {
-        if (!active()) return;
+        if (!enabled.value() || !connected()) return;
         try {
+            beforeTick();
+            loads.session(minecraft.getUser().getProfileId());
+            if (loads.gameplay(worldVisible())) {
+                if (active()) controller.worldReady();
+                LOGGER.info("Class load: gameplay confirmed; current class {}", loads.current() == null ? "unknown" : "recorded");
+            }
+            if (!active()) return;
             controller.tick(minecraft.getUser().getProfileId(), connected(), now());
             if (!active()) return;
             if (!enabled.value() || minecraft.getOverlay() != null) { controller.cancel(); return; }
@@ -204,27 +228,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
                 controller.frameCaptured();
             }
             if (!active()) return;
-            if (controller.state() == ClassSwitchController.State.WAITING_STAGE) {
-                frame.sample(live, black -> {
-                    if (controller.state() == ClassSwitchController.State.WAITING_STAGE)
-                        stageReadiness.frame(black, usableScene());
-                }, controller::unavailable);
-            }
-            if (controller.state() == ClassSwitchController.State.WAITING_WORLD) {
-                frame.sample(live, black -> {
-                    controller.tick(minecraft.getUser().getProfileId(), connected(), now());
-                    if (!black && worldVisible()) controller.worldReady();
-                }, controller::unavailable);
-                return; // Wynncraft draws its own black-to-world transition; no frozen overlay.
-            }
             if (!frame.fits(live)) { controller.unavailable(); return; }
-            if (controller.waitingForBlack()) frame.sample(live, black -> {
-                controller.tick(minecraft.getUser().getProfileId(), connected(), now());
-                if (black && active() && controller.waitingForBlack()) {
-                    controller.transition(target);
-                    traceState();
-                }
-            }, controller::unavailable);
             if (active()) frame.present(live);
         } catch (RuntimeException error) {
             org.slf4j.LoggerFactory.getLogger(ClassSwitcher.class).warn("Class switch rendering failed", error);
@@ -241,7 +245,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         if (!connected()) throw new IllegalStateException("No Wynncraft connection");
         // The GPU copy retains the wheel. The live screen must no longer intercept selection.
         if (minecraft.screen instanceof ClassSelectorWheelScreen) minecraft.setScreen(null);
-        stageReadiness.reset();
+        loads.selectionStage();
         selectionScene = false; interactionBudget = 0;
         minecraft.getConnection().sendCommand("class");
         traceState();
@@ -250,15 +254,16 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         if (minecraft.player == null || minecraft.gameMode == null || minecraft.level == null
                 || minecraft.player.containerMenu != minecraft.player.inventoryMenu)
             throw new IllegalStateException("Selection stage unavailable");
-        nativeUsePending = true;
-        LOGGER.info("Class switch: selection scene visible; requesting one native Use click");
+        // Called only inside vanilla's input pass; rate limits measure actual queued clicks.
+        ClassStageInput.queueUse(minecraft.options.keyUse, minecraft.options.keyMappings);
+        LOGGER.info("Class switch: queued native Use click (100 ms retry limit until book opens)");
         traceState();
     }
     @Override public void selectCharacter(int containerId, int slot) {
         var menu = scanner.liveMenu().orElseThrow();
         if (containerId != book || menu.containerId() != containerId || menu.result().resolve(target).orElse(-1) != slot)
             throw new IllegalStateException("Character book changed before selection");
-        current = null; // An accepted click may already change the character even if later cancelled.
+        loads.selected(target, containerId);
         minecraft.gameMode.handleInventoryMouseClick(containerId, slot, 0, ClickType.PICKUP, minecraft.player);
         LOGGER.info("Class switch: selected validated character slot {} in book {}", slot, containerId);
         traceState();
@@ -271,8 +276,6 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         minecraft.mouseHandler.setIgnoreFirstMove();
     }
     @Override public void completed(String reference) {
-        current = reference;
-        currentAccount = minecraft.getUser().getProfileId();
         LOGGER.info("Class switch: gameplay restored; audio unmuted");
         clearOperation();
     }
@@ -286,18 +289,20 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
     public void reset() {
         controller.cancel();
         frame.close(); restoreAudio(); clearOperation();
-        current = null; currentAccount = null; manuallySelected = null; manualBook = -1;
+        loads.reset();
         selectionScene = false; interactionBudget = 0;
     }
     private boolean worldVisible() {
         return enabled.value() && connected() && minecraft.player != null && minecraft.level != null
                 && minecraft.screen == null && minecraft.getOverlay() == null
                 && minecraft.player.containerMenu == minecraft.player.inventoryMenu
-                && minecraft.getCameraEntity() == minecraft.player;
+                && minecraft.getCameraEntity() == minecraft.player
+                && minecraft.gameMode != null && !minecraft.gameMode.isSpectator()
+                && !minecraft.player.isHandsBusy() && !selectionScene;
     }
     private void clearOperation() {
-        frame.close(); // Also invalidate a post-black readback after cancellation or completion.
-        target = null; book = -1; nativeUsePending = false; stageReadiness.reset(); lastStage = ClassSwitchController.State.IDLE;
+        frame.close();
+        target = null; book = -1; lastStage = ClassSwitchController.State.IDLE;
     }
     private void traceState() {
         var stage = controller.state();

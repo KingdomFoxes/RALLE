@@ -232,7 +232,7 @@ public final class RalleClient implements ClientModInitializer {
         );
         var classSwitcher = new org.kingdomfoxes.ralle.classes.ClassSwitcher(minecraft,
                 settings.setting(org.kingdomfoxes.ralle.settings.RalleSettings.CLASS_SELECTOR_ID, BooleanSetting.class),
-                classMenuScanner, classActionBar, autoRaidRequeue::running);
+                classMenuScanner, classShortcuts, classActionBar, autoRaidRequeue::running);
         var classSelectorBindings = new org.kingdomfoxes.ralle.classes.ClassSelectorBindings(
                 minecraft, settings, classShortcuts, classActionBar, classSwitcher);
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> classSwitcher.close());

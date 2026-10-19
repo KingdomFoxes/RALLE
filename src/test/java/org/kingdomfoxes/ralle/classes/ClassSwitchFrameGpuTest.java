@@ -1,27 +1,23 @@
 package org.kingdomfoxes.ralle.classes;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
-
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicReference;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.lwjgl.glfw.GLFW.*;
 
 /** Opt-in real Minecraft GPU API test, isolated invisible window; RALLE_GPU_TEST=1. */
 class ClassSwitchFrameGpuTest {
-    @Test void realFrameCopyReadbackAndCancellationKeepLiveRenderingIndependent() throws Exception {
+    @Test void realFrameStaysFrozenAcrossBlackDoorAndWorldFramesUntilExplicitRelease() throws Exception {
         assumeTrue("1".equals(System.getenv("RALLE_GPU_TEST")));
-        assertTrue(glfwInit());
-        glfwDefaultWindowHints();
-        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+        assertTrue(glfwInit()); glfwDefaultWindowHints(); glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         long window = glfwCreateWindow(320, 180, "RALLE class frame test", 0, 0);
         assertNotEquals(0, window);
@@ -39,55 +35,36 @@ class ClassSwitchFrameGpuTest {
             try {
                 var encoder = RenderSystem.getDevice().createCommandEncoder();
                 encoder.clearColorTexture(live.getColorTexture(), 0xFF6090C0);
-                frame.capture(live);
-                assertTrue(frame.captured());
-                assertTrue(frame.fits(live));
-                var black = new AtomicReference<Boolean>();
-                encoder.clearColorTexture(live.getColorTexture(), 0xFF000000);
-                frame.sample(live, black::set, () -> fail("Readback failed"));
-                frame.present(live); // Readback must see the underlying black, not the frozen color.
-                flush();
-                assertEquals(Boolean.TRUE, black.get());
-                black.set(null);
-                frame.sample(live, black::set, () -> fail("Readback failed"));
-                flush();
-                assertEquals(Boolean.FALSE, black.get()); // The frozen frame was really copied back.
-
-                encoder.clearColorTexture(live.getColorTexture(), 0xFF000000);
-                black.set(null);
-                frame.sample(live, black::set, () -> fail("A cancelled readback cannot report failure"));
-                frame.close(); frame.close(); // A fence still owns the tiny sample and buffer.
-                flush();
-                assertNull(black.get());
-                assertFalse(frame.captured());
-                // A fresh operation after cancellation must still sample and release correctly.
-                frame.capture(live);
-                frame.sample(live, black::set, () -> fail("Readback after cancellation failed"));
-                flush();
-                assertEquals(Boolean.TRUE, black.get());
+                int original = pixel(live);
+                frame.capture(live); assertTrue(frame.captured()); assertTrue(frame.fits(live));
+                for (int color : new int[] {0xFF000000, 0xFF806020, 0xFF20A050}) {
+                    encoder.clearColorTexture(live.getColorTexture(), color);
+                    assertNotEquals(original, pixel(live)); // Underlying rendering keeps changing.
+                    frame.present(live);
+                    assertEquals(original, pixel(live)); // All transition scenes remain hidden.
+                }
                 var resized = new TextureTarget("Class switch test resized", 160, 90, false);
-                try { assertFalse(frame.fits(resized)); }
-                finally { resized.destroyBuffers(); }
-                frame.close(); // The native black transition is now visible; only monitor world return.
-                black.set(null);
-                encoder.clearColorTexture(live.getColorTexture(), 0xFF6090C0);
-                frame.sample(live, black::set, () -> fail("Post-black gameplay readback failed"));
-                flush();
-                assertEquals(Boolean.FALSE, black.get());
-                assertFalse(frame.captured());
+                try { assertFalse(frame.fits(resized)); } finally { resized.destroyBuffers(); }
+                frame.close(); frame.close(); assertFalse(frame.captured());
+                encoder.clearColorTexture(live.getColorTexture(), 0xFF20A050);
+                assertNotEquals(original, pixel(live));
+                frame.capture(live); int nextFrame = pixel(live);
+                encoder.clearColorTexture(live.getColorTexture(), 0xFF000000);
+                frame.present(live); assertEquals(nextFrame, pixel(live));
                 assertEquals(GL11.GL_NO_ERROR, GL11.glGetError());
-            } finally {
-                frame.close(); flush(); live.destroyBuffers();
-                RenderSystem.getDevice().close();
-            }
-        } finally {
-            GL.setCapabilities(null);
-            glfwDestroyWindow(window);
-            glfwTerminate();
-        }
+            } finally { frame.close(); live.destroyBuffers(); RenderSystem.getDevice().close(); }
+        } finally { GL.setCapabilities(null); glfwDestroyWindow(window); glfwTerminate(); }
     }
-    private static void flush() {
-        GL11.glFinish();
-        RenderSystem.executePendingTasks();
+
+    /** Test-only readback; the shipped switching code never reads pixels. */
+    private static int pixel(RenderTarget source) {
+        var result = new AtomicReference<Integer>();
+        var encoder = RenderSystem.getDevice().createCommandEncoder();
+        var buffer = RenderSystem.getDevice().createBuffer(() -> "Class frame test readback", 9, (long) source.width * source.height * 4);
+        encoder.copyTextureToBuffer(source.getColorTexture(), buffer, 0L, () -> {
+            try (buffer; var mapped = encoder.mapBuffer(buffer, true, false)) { result.set(mapped.data().getInt(0)); }
+        }, 0);
+        GL11.glFinish(); RenderSystem.executePendingTasks();
+        assertNotNull(result.get()); return result.get();
     }
 }

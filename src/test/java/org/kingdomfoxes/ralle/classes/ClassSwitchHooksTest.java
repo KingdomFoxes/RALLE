@@ -28,6 +28,9 @@ class ClassSwitchHooksTest {
                 {"handleOpenScreen", "ClientboundOpenScreenPacket"},
                 {"setActionBarText", "ClientboundSetActionBarTextPacket"},
                 {"handleContainerClose", "ClientboundContainerClosePacket"},
+                {"handleContainerContent", "ClientboundContainerSetContentPacket"},
+                {"handleContainerSetSlot", "ClientboundContainerSetSlotPacket"},
+                {"handleSetPlayerInventory", "ClientboundSetPlayerInventoryPacket"},
                 {"handleSystemChat", "ClientboundSystemChatPacket"}})
             method(packets, signature[0], "(Lnet/minecraft/network/protocol/game/" + signature[1] + ";)V");
         var keyboard = read("net/minecraft/client/KeyboardHandler");
@@ -71,8 +74,25 @@ class ClassSwitchHooksTest {
         assertEquals(0, calls(stage, "net/minecraft/client/multiplayer/MultiPlayerGameMode", "interact"));
         assertEquals(0, calls(stage, "net/minecraft/client/multiplayer/MultiPlayerGameMode", "useItemOn"));
         var beforeInput = method(runtime, "beforeInput", "()V");
-        assertEquals(1, calls(beforeInput, "org/kingdomfoxes/ralle/classes/ClassStageInput", "queueUse"));
+        assertEquals(1, calls(beforeInput, "org/kingdomfoxes/ralle/classes/ClassSwitchController", "selectionStage"));
+        assertEquals(1, calls(stage, "org/kingdomfoxes/ralle/classes/ClassStageInput", "queueUse"));
         method(read("net/minecraft/client/multiplayer/ClientCommonPacketListenerImpl"), "send", "(Lnet/minecraft/network/protocol/Packet;)V");
+    }
+    @Test void completeBookContentsAreProcessedAtPacketTailAndRuntimeDoesNotSampleBlackPixels() throws Exception {
+        var content = read("org/kingdomfoxes/ralle/classes/mixin/ClassContentSignalsMixin");
+        int hooks = 0;
+        for (var method : content.methods) for (var annotation : method.visibleAnnotations == null
+                ? List.<AnnotationNode>of() : method.visibleAnnotations) {
+            if (!annotation.desc.endsWith("/Inject;")) continue;
+            hooks++;
+            @SuppressWarnings("unchecked") var locations = (List<AnnotationNode>) value(annotation, "at");
+            assertEquals("TAIL", value(locations.getFirst(), "value"));
+            assertEquals(1, value(annotation, "require"));
+        }
+        assertEquals(3, hooks);
+        var runtime = read("org/kingdomfoxes/ralle/classes/ClassSwitcher");
+        for (var method : runtime.methods)
+            assertEquals(0, calls(method, "org/kingdomfoxes/ralle/classes/ClassSwitchFrame", "sample"));
     }
     private static long calls(MethodNode method, String owner, String name) {
         long count = 0;

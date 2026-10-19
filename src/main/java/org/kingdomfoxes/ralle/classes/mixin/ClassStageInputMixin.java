@@ -7,7 +7,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Queue the one approved click immediately before vanilla consumes Use, after normal tick updates. */
+/** Queue each bounded stage click immediately before vanilla consumes Use, after normal tick updates. */
 @Mixin(Minecraft.class)
 abstract class ClassStageInputMixin {
     @Inject(method = "handleKeybinds", at = @At("HEAD"), require = 1)

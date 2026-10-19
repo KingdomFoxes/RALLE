@@ -17,6 +17,7 @@ public final class ClassSelectorStore {
     private static final Gson JSON = new GsonBuilder().setPrettyPrinting().create();
     private final Path path;
     private Map<UUID, Account> accounts;
+    private Map<UUID, Loaded> loads = new LinkedHashMap<>();
     private long revision;
 
     public record Account(List<ClassCharacter> characters, List<ClassShortcut> shortcuts) {
@@ -32,7 +33,18 @@ public final class ClassSelectorStore {
             return characters.stream().filter(c -> c.id().equals(id)).findFirst().orElse(null);
         }
     }
-    private record FileData(int version, Map<UUID, Account> accounts) {}
+    private record Loaded(String lastReference, Map<String, String> references) {
+        private Loaded {
+            lastReference = ClassCharacter.text(lastReference, 128);
+            references = Map.copyOf(references);
+            if (references.size() > 64) throw new IllegalArgumentException("Too many loaded characters");
+            references.forEach((token, reference) -> {
+                if (!ClassLoadSignals.validToken(token)) throw new IllegalArgumentException("Invalid compass token");
+                if (!reference.isEmpty()) ClassCharacter.text(reference, 128);
+            });
+        }
+    }
+    private record FileData(int version, Map<UUID, Account> accounts, Map<UUID, Loaded> loads) {}
 
     private ClassSelectorStore() { path = null; accounts = new LinkedHashMap<>(); }
 
@@ -64,11 +76,41 @@ public final class ClassSelectorStore {
                 var shortcuts = account.shortcuts.stream().map(s -> new ClassShortcut(s.characterId(), s.name(), s.binding())).toList();
                 accounts.put(id, new Account(characters, shortcuts));
             });
+            if (data.loads != null) {
+                if (data.loads.size() > 128) throw new IllegalArgumentException("Too many accounts");
+                data.loads.forEach((id, loaded) -> loads.put(java.util.Objects.requireNonNull(id),
+                        new Loaded(loaded.lastReference, loaded.references)));
+            }
         } catch (RuntimeException failure) { throw new IOException("Invalid class selector file", failure); }
     }
 
     public Account account(UUID account) { return accounts.getOrDefault(java.util.Objects.requireNonNull(account), new Account(List.of(), List.of())); }
     public long revision() { return revision; }
+
+    /** Last confirmed load is history, never proof of the current class on a new connection. */
+    public String lastLoaded(UUID account) { return loads.containsKey(account) ? loads.get(account).lastReference : null; }
+    public String referenceForToken(UUID account, String token) {
+        if (!ClassLoadSignals.validToken(token)) return null;
+        var loaded = loads.get(account);
+        String reference = loaded == null ? null : loaded.references.get(token);
+        return reference == null || reference.isEmpty() ? null : reference;
+    }
+    public void recordLoad(UUID account, String reference, String token) throws IOException {
+        var previous = loads.get(account);
+        var references = new LinkedHashMap<String, String>();
+        if (previous != null) references.putAll(previous.references);
+        if (ClassLoadSignals.validToken(token)) {
+            // A short token is not globally unique. Conflicting retained observations disable recovery.
+            references.merge(token, reference, (old, incoming) -> old.equals(incoming) ? old : "");
+            while (references.size() > 64) references.remove(references.keySet().iterator().next());
+        }
+        var loaded = new Loaded(reference, references);
+        if (loaded.equals(previous)) return;
+        var nextLoads = new LinkedHashMap<>(loads);
+        nextLoads.put(java.util.Objects.requireNonNull(account), loaded);
+        if (nextLoads.size() > 128) throw new IllegalArgumentException("Too many accounts");
+        save(accounts, nextLoads);
+    }
 
     public void reconcile(ClassScan scan) throws IOException {
         var previous = account(scan.account());
@@ -138,12 +180,16 @@ public final class ClassSelectorStore {
     }
 
     private void replace(UUID id, Account account) throws IOException {
-        if (!available()) throw new IOException("Class selector storage is unavailable");
         if (account.equals(accounts.get(id))) return;
         var next = new LinkedHashMap<>(accounts);
         next.put(id, account);
         if (next.size() > 128) throw new IllegalArgumentException("Too many accounts");
-        String json = JSON.toJson(new FileData(1, next));
+        save(next, loads);
+    }
+
+    private void save(Map<UUID, Account> next, Map<UUID, Loaded> nextLoads) throws IOException {
+        if (!available()) throw new IOException("Class selector storage is unavailable");
+        String json = JSON.toJson(new FileData(1, next, nextLoads));
         if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 1024 * 1024)
             throw new IllegalArgumentException("Class selector file exceeds 1 MiB");
         var parent = path.toAbsolutePath().getParent();
@@ -154,6 +200,7 @@ public final class ClassSelectorStore {
             Files.move(temporary, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } finally { Files.deleteIfExists(temporary); }
         accounts = next;
+        loads = nextLoads;
         revision++;
     }
 }

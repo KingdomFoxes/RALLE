@@ -33,15 +33,19 @@ abstract class ClassMenuSignalsMixin {
 
     @Inject(method = "handleSystemChat", at = @At("HEAD"), require = 1)
     private void ralle$classOverlay(ClientboundSystemChatPacket packet, CallbackInfo ci) {
-        if (packet.overlay() && RalleClient.initialized() && RalleClient.context().classMenuCapture().requested() && Minecraft.getInstance().isSameThread()) {
-            RalleClient.context().classMenuCapture().actionBar(packet.content().getString());
-            RalleClient.context().classSwitcher().actionBar(packet.content().getString());
+        if (RalleClient.initialized() && RalleClient.context().classMenuCapture().requested() && Minecraft.getInstance().isSameThread()) {
+            if (packet.overlay()) {
+                RalleClient.context().classMenuCapture().actionBar(packet.content().getString());
+                RalleClient.context().classSwitcher().actionBar(packet.content().getString());
+            } else RalleClient.context().classSwitcher().systemChat(packet.content().getString());
         }
     }
 
     @Inject(method = "handleContainerClose", at = @At("HEAD"), require = 1)
     private void ralle$classMenuClosed(ClientboundContainerClosePacket packet, CallbackInfo ci) {
-        if (RalleClient.initialized() && Minecraft.getInstance().isSameThread())
-            RalleClient.context().classSwitcher().closed(packet.getContainerId());
+        if (RalleClient.initialized() && Minecraft.getInstance().isSameThread()) {
+            var player = Minecraft.getInstance().player;
+            RalleClient.context().classSwitcher().closed(packet.getContainerId(), player == null ? -1 : player.containerMenu.containerId);
+        }
     }
 }

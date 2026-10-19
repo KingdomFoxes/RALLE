@@ -103,13 +103,12 @@ class WynncraftClassMenuTest {
             public void failed(ClassSwitchController.Failure failure) { fail(failure.toString()); }
         });
         assertTrue(controller.begin(ACCOUNT, saved.id(), null, true, 0));
-        controller.frameCaptured(); controller.selectionStage();
+        controller.frameCaptured(); controller.selectionStage(0);
         var live = decode(fixture());
         controller.menu(7, List.of(new ClassSwitchController.Target(saved.id(), live.resolve(saved.id()).orElseThrow())), true);
-        controller.transition(saved.id());
+        controller.worldReady();
         assertTrue(controller.active());
         controller.menuClosed(7);
-        controller.transition(saved.id());
         assertEquals(ClassSwitchController.State.WAITING_WORLD, controller.state());
         controller.worldReady();
         assertEquals(List.of("capture", "class", "right", "select:7:10", "release"), calls);

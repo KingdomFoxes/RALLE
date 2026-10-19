@@ -3,6 +3,6 @@
   "minVersion": "0.8",
   "package": "org.kingdomfoxes.ralle.classes.mixin",
   "compatibilityLevel": "JAVA_21",
-  "client": ["ClassMenuSignalsMixin", "ClassSelectorKeyboardMixin", "ClassSwitchRenderMixin", "ClassSwitchMouseMixin", "ClassSelectionClickMixin", "ClassSwitchSoundMixin", "ClassStagePacketMixin", "ClassStageInputMixin"],
+  "client": ["ClassMenuSignalsMixin", "ClassContentSignalsMixin", "ClassSelectorKeyboardMixin", "ClassSwitchRenderMixin", "ClassSwitchMouseMixin", "ClassSelectionClickMixin", "ClassSwitchSoundMixin", "ClassStagePacketMixin", "ClassStageInputMixin"],
   "injectors": {"defaultRequire": 0}
 }

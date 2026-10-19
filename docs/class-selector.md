@@ -2,8 +2,8 @@
 
 The native switching adapter is implemented. It retains a GPU copy of the
 submitted frame, sends the bounded command/click sequence and observes the
-underlying black handoff while normal rendering and ticks continue. Automated
-checks replay the user's menu capture and video-derived black masks, and an
+server-confirmed world return while normal rendering and ticks continue. Automated
+checks replay the user's menu capture and the door/load sequence, and an
 opt-in test exercises the real Minecraft GPU copy/readback APIs. A full live
 Wynncraft switch, standalone and with Wynntils, still needs in-game validation;
 these checks do not establish a stable server character UUID.
@@ -94,6 +94,11 @@ destination world. This corrects the initial plan's left-click at the first stag
 The user confirms the right-click can happen sooner than in the video. Use the
 observed readiness signal rather than a fixed delay. The recording establishes
 the visual sequence, not the underlying identity or transition packets.
+The October 19 clarification and screenshot establish the intended sequence:
+`/class` once, repeat right-click until this character book opens, then select the
+requested class once. Stage retries are capped at one per 100 ms and 150 attempts
+inside the existing 15-second operation deadline; neither the command nor the
+character selection is retried.
 
 The user's subsequent local game captures contain four existing characters:
 Archer, Mage, Shaman and Warrior. The raw menu title is U+CFFD5 followed by U+E01F.
@@ -161,167 +166,160 @@ selection prompt, resets on disconnect/account changes/disable, and never uses
 the data as permission to click. Remove this temporary bridge after implementing
 and verifying the live adapter in-game. A video alone cannot establish stable IDs.
 
-## Domain controller contract
+## Switching and load confirmation
 
-`ClassDiscovery` rejects scans when disabled, from another account, or from an old
-connection/enable generation. It never triggers `/class` or a web lookup. Only a
-verified game decoder may declare a scan complete or mark the current identity.
+The current loop is: capture the selected frame, send `/class` once, submit native
+Use clicks at most every **100 ms** while the original server selection prompt is
+present and the native scene accepts input, stop on the character-book open
+packet, and select the target **once** from complete, uniquely resolved live
+contents. The entire operation still has a 15-second deadline and at most 150
+stage clicks. The first click has no artificial delay; slow ticks cannot queue
+catch-up bursts. Auto Open skips stage clicks.
 
-`ClassSwitchController` advances through capturing, waiting for stage, waiting
-for menu, waiting for transition and waiting for world return. `ClassSwitcher` implements its native
-actions. Submission requests capture but sends no command until the next complete
-rendered frame includes the selected graphical option. No View clears its local
-selection feedback before capture and adds no screen. `ClassSwitchRenderMixin`
-runs immediately before vanilla presents its main target, after all world/UI
-rendering. It copies that target to one owned GPU texture, closes the live RALLE
-wheel behind the retained image, then sends `/class` once. It never cancels or redirects the underlying render or tick loop.
+`ClassContentSignalsMixin` observes `handleContainerContent` and
+`handleContainerSetSlot` at TAIL, after vanilla has applied the items. It asks
+`ClassSwitcher.menuUpdated()` to select immediately, avoiding the previous wait
+for END_CLIENT_TICK and its preceding capture/discovery disk writes. The tick
+path remains a fallback. Both paths share the same controller state, exact live
+book validation and single target-click guard. A partial book waits; missing or
+ambiguous complete evidence still aborts. No slot/name/type fallback was added.
+
+`ClassStageInputMixin` dispatches each permitted click inside vanilla's actual
+`handleKeybinds`. The current Use binding is honored without leaving it held;
+other bindings sharing the same physical key are drained. Vanilla chooses the
+live interaction route. RALLE never invents entity IDs, interaction ranges,
+use-item packets or commands to skip server stages.
+
+The latest 12:08–12:17 attempts established that right-click and class selection
+now work, but every selection immediately ended with `UNEXPECTED_MENU` before
+the server's world welcome. This both exposed the door animation and discarded
+the operation before it recorded the current class. The earlier blackout
+readback could also miss brief initial blackouts. Both sources of visual
+inference have been removed from the runtime.
+
+### Freeze ownership and the door animation
+
+`ClassSwitchController` advances through CAPTURING, WAITING_STAGE, WAITING_MENU,
+WAITING_TRANSITION (one target click sent), and WAITING_WORLD (book closed).
+**Book-close does not release the frame or audio.** All door animation, initial
+blackout and final handoff frames remain covered by the selected GPU frame.
+There is no screen-darkness check, frame readback, synthetic fade or fixed
+animation sleep in the switching path.
 
 `ClassMenuSignalsMixin` observes original packet titles/text at HEAD with priority
-1200, on the client thread, before ordinary mods can cancel the display or replace
-a menu. The previous tail/invoke observers could miss a cancelled callback; the
-installed Wynntils 4.2.7 metadata confirms cancellable HEAD menu hooks. Only its
-hook metadata was inspected for compatibility; no external source/assets are used.
-The exact observed action-bar instruction pair is necessary but can arrive during
-the initial blackout. `ClassStageReadiness` also requires observing the underlying
-black frame followed by a nonblack, usable selection scene. Bright outgoing gameplay
-before the blackout cannot satisfy it. No screen/overlay may own input, and the
-player/camera must exist with hands no longer busy. This observes readiness rather
-than adding a timed sleep.
+1200 on the client thread, before another mod can transform or cancel display.
+At container-close it records both the packet ID and the actual live container.
+Minecraft 1.21.11's `handleContainerClose` closes the live menu regardless of the
+packet ID. A zero-ID close can therefore acknowledge the selected live book,
+including when another mod has already locally dismissed it. Initial inventory-0
+closes before selection cannot establish a load. Unrelated nonzero closes and
+unrelated pre-load open-menu packets still fail. A lingering native/replaced book
+screen after selection is allowed to finish its normal close lifecycle.
 
-Once ready, the controller requests one native Use click. `ClassStageInputMixin`
-queues it at the head of Minecraft's actual `handleKeybinds`, after rechecking the
-account/connection/deadline/focus and the still-present selection prompt.
-`ClassStageInput` uses the current Use binding,
-leaves its held state false and removes clicks queued on other mappings that share
-that binding. Vanilla consumes that single click immediately and performs its
-normal target, hand, entity/block and fallback handling. RALLE no longer constructs
-a use-item packet or chooses an interaction route. One native click may produce
-multiple normal vanilla packets; it is never a retry or another click. Start/end
-tick validation, cancellation and Auto Open discard a pending click before it can
-be consumed in an incorrect context.
+`ClassLoadSignals` recognizes the naturally received world welcome observed after
+every successful selection in the supplied logs: a standalone `Welcome to
+Wynncraft!` line accompanied by the server website line. Font glyphs and legacy
+formatting do not prevent recognition. This is a load-stage signal, not a
+character identity. Completion additionally requires a complete rendered frame
+with the camera on the local player, a non-spectator game mode, no screen or
+resource overlay, the inventory container active, no busy hands and no current
+selection prompt. A detached door camera, spectator stage, stale menu, or welcome
+alone cannot finish. These native camera/mode checks still require live
+standalone and Wynntils validation on the current server revision.
 
-The 02:01/02:02 user attempts confirmed that the earlier implementation saw the
-prompt and sent its constructed air-use packet but received no book. This revision
-therefore replaces both the premature prompt-only readiness check and that packet
-path. It still needs live verification; the observed non-response alone does not
-establish which vanilla interaction Wynncraft accepts.
+Wynntils can start passive inventory queries immediately after the welcome.
+After the selected book has closed and that fresh welcome arrives, their menus
+may open/close normally beneath the frame; RALLE submits no further menu clicks.
+The freeze waits for them to finish and for a rendered usable world. Before
+those load signals, unrelated menus still abort.
 
-The original open-screen packet must identify the expected book. If Wynncraft's
-Auto Open option already supplies it, skip the right-click and resolve that book
-directly. Partial contents wait within the existing deadline; a complete book that
-cannot uniquely resolve the saved reference aborts. A fresh native inventory
-left-click selects the validated slot once. The matching **server** container-close
-packet must arrive before any black frame can release the image. Closing inventory
-0 while `/class` starts is harmless and cannot arm this handoff.
+`ClassSwitchFrame` now owns only one GPU texture and native texture copies. It
+never replaces the live render target or pauses world/GUI/network ticks.
+`ClassSwitchAudio` keeps all output channels muted without changing saved sound
+options, audio playback or ticking. Frame, audio and input ownership end together
+on confirmed world return. Escape, timeout, disconnect, account change, focus
+loss, disable, resource reload, resize, failure and shutdown release ownership
+exactly once. Modifier release after submission does not cancel. Escape sends no
+undo command or synthetic server-menu close.
 
-Only then does `ClassSwitchFrame` downsample the actual underlying render into a
-64×36 texture and asynchronously read 9 KiB, with at most one readback in flight.
-`ClassTransitionPixels` measures the central half of the image, excluding the
-crosshair, to avoid edge HUDs. At least 99.5% of measured pixels must have all RGB
-channels at most 8. This threshold rejects the book and bright camera animation
-in the supplied recording and recognizes its actual black handoff. Initial
-`/class` blackouts are ignored by the controller. The measurement is a visual
-handoff signal, not proof of a server character UUID. The frozen frame is copied
-back over the live target until the accepted black observation releases it;
-vanilla then presents its own black-to-world frames. RALLE never draws a new
-black transition. Releasing the image advances to waiting for world return, not
-completion. It continues sampling without a frozen overlay until a nonblack live
-frame has no menu/overlay, the inventory container is active and the camera is
-back on the local player.
+### Remembering the loaded class
 
-`ClassSwitchAudio` acquires an output-mute lease at submission. A narrow
-`Channel.setVolume(float)` filter forces only the final Minecraft OpenAL channel
-gain to zero while held. Existing channels are refreshed immediately through
-`SoundManager.refreshCategoryVolume(MASTER)`; new channels and subsequent volume
-updates use the same gate. Music and other sounds keep their normal playback and
-tick state. Saved options, category gains and other applications are untouched.
-The image is released at native black while audio remains muted; world return
-completes the operation and refreshes the channels at their current normal gains.
-Every cancellation/failure/disconnect/shutdown path restores the gate exactly once.
-The audio thread reads an atomic lease count and never reads/mutates game state.
+`ClassLoadTracker` owns current-class knowledge independently of the presentation
+operation. Both a verified manual book click and an automated target click record
+a pending observation. It becomes current only after book-close, a fresh world
+welcome and the rendered gameplay checks above. Cancelling the frozen view after
+selection does not erase a later real load. A new selection stage invalidates
+outgoing current-class knowledge; disconnect/account changes discard session
+confirmation. Duplicate loads do not repeatedly write storage.
+Unconfirmed selections and load signals expire after 15 seconds; an abandoned
+click cannot be assigned to an unrelated later class load.
 
-All raw keyboard, text, mouse buttons, scrolling and camera movement are blocked
-during the operation, except Escape. Held key states and queued clicks are
-drained. The server book continues ticking and receiving packets beneath the
-frozen frame. LFG physical modifier polling cannot open another selector, and
-submission is refused while automatic raid requeue is running. There is no LFG
-eligibility or service dependency.
+`ralle-class-shortcuts.json` remains version 1 and gains an optional account-scoped
+`loads` map. Each entry stores `lastReference` and up to 64 `references` associating
+a naturally received compass token with a previously observed book selection.
+Existing files without `loads` remain valid; shortcut edits, reset and scans
+preserve this data. Writes retain the existing atomic save-before-publish policy.
+A storage failure cannot crash unrelated features or erase confirmed in-session
+knowledge. No credentials, network queries or new user commands are involved.
 
-The overall deadline is 15 seconds, checked both in ticks and before presentation.
-Account changes, disconnect, timeout, unexpected menus, ambiguous targets, action
-or GPU failures and Escape release the owned frame and provide concise feedback.
-Focus loss, feature disable, a resource-loading overlay or resizing the frozen
-frame also cancel. Modifier release after submission does not cancel. No exit sends a retry,
-undo command or synthetic menu close. Only RALLE's own selector may be dismissed;
-a real server menu remains visible after cancellation. In-flight readbacks retain
-their own tiny texture/buffer until their fence completes, and generation tokens
-ignore callbacks from cancelled operations. Client shutdown and connection reset
-release frame/audio ownership too. Bounded INFO stage logs record the prompt,
-right-click, book/container, validated slot, handoff, world return or failure phase.
-They omit account IDs, character hashes, raw chat/items and credentials.
-`ClassStagePacketMixin` additionally records at most eight outgoing interaction
-packet **types** per naturally observed selection scene, labelled automated or
-manual. This includes a manual click after Escape so a no-op and a server-unanswered
-interaction can be distinguished. It records no payloads, entity IDs, positions or
-ordinary gameplay packets and sends nothing. The scope ends on a new server
-HUD/menu or disconnect; repeated copies of the same stage prompt do not reset the
-budget.
+The naturally received compass in hotbar index 7 (inventory container slot 43)
+can carry an eight-character partial character ID in its first lore line. The
+current logs show Wynntils reading those IDs at world entry, and its public
+CharacterModel documents this received-item field. RALLE only observes incoming
+inventory packets; it never opens the compass or calls the public player API.
+The token is **not** treated as a full UUID or permission to click a class. It can
+recover current-class knowledge on a later natural load only when this account
+already recorded that exact token/selection association. A stale outgoing compass
+cannot authorize a new association; selection clears it and requires a fresh
+inventory update. A late refresh can still be saved after confirmed gameplay.
 
-A native manual selection followed by a matching server close establishes the
-known current reference; a completed automated handoff updates it too. The wheel
-renders that known reference unavailable and rejects redundant submission. The
-adapter does not guess the current character from a name when it is unknown.
+Conflicting references for a short token disable its recovery; no identity is
+guessed from class type, name, position, last-used history or another account.
+`lastReference` survives restarts as history, but is not blindly presented as
+current on reconnect. A first-time auto-join without a previously observed token
+association remains unknown until a real book selection establishes it. This
+tracking does not change the strict full-evidence requirement for target clicks
+or silently retarget a shortcut whose book evidence changed.
 
-`ClassSelectorInput` stores the reference on fresh press. The latest fresh option
-press wins; stale releases/repeats do nothing. Releasing the selected key while
-holding the modifier submits once. A fresh mouse click and keyboard releases
-share one guard. Preheld keys and cancellation cannot submit. It is connected to
-Circle Segments, Bars and No View. Closing the native/replaced server book does
-not mistake modifier release for cancellation of an accepted operation.
+### Animation-skip research
 
-## Validation remaining
+The [official character-selector announcement](https://forums.wynncraft.com/threads/2-1-1-class-select-new-raid-boss-more.319763/)
+describes the overview and right-click book flow, but does not document a door
+skip. The official [Wynntils feature list](https://modrinth.com/project/wynntils)
+lists Auto Skip Cutscenes, but that listing does not establish that the class-entry
+door accepts a skip. No supported door-skip mechanism was verified. This change
+therefore hides the server-controlled sequence while it completes; it does not
+send speculative skip commands, fake control packets or suppress server state.
 
-Automated tests replay the real captured item components (with the account UUID
-replaced by a test UUID), including nested text, font glyphs and models. They
-cover complete/partial decoding, utility/create/locked exclusion, unrelated
-screens, repeated names/types, renamed observations, malformed evidence,
-account rejection, capture recovery and exact complete live-book resolution,
-including ambiguous duplicates and moved/renamed observations.
-Additional regressions cover modifier-hold cancellation/reopening, first-load and
-two-way key synchronization, reciprocal action conflicts, unavailable options,
-native sprite model/tint preservation, sprite hydration, stale observation
-retirement and explicit retargeting without preference/order loss. Settings and
-search tests verify the three Wheels subcategories and unchanged persistence.
-Additional tests cover complete/partial reconciliation, repeated names/types,
-renames/removals, account and connection generations, restart persistence,
-failed writes/corrupt files, order, defaults, dependencies, conflicts, stale keys,
-exactly-once stage advancement and cleanup at every controller exit.
+Current-class field reference: [Wynntils CharacterModel](https://github.com/Wynntils/Wynntils/blob/main/common/src/main/java/com/wynntils/models/character/CharacterModel.java).
+Only the received-field contract was used; no external source/assets were copied.
 
-`ClassTransitionPixelsTest` replays anonymized per-pixel dark masks from the
-provided video, covering gameplay, initial blackouts, the book, animation, final
-blackout and destination world. It also checks HUD/crosshair exclusion and dark
-but nonblack gameplay. `ClassSwitchFrameGpuTest` (`RALLE_GPU_TEST=1`) uses an
-invisible isolated OpenGL window and Minecraft's actual GPU API and vanilla blit
-shaders. It verifies live/frozen independence, actual texture copy, black/color
-readback, cancellation while a readback is pending, reopening, idempotent cleanup
-size mismatch and sampling world return after releasing the image. Controller
-tests cover the capture-before-command boundary,
-exactly-once actions, matching server close, early black rejection, stale callbacks
-every stage's cancellation/deadline/disconnect/account exits, Auto Open and audio
-restoration after world return. `ClassSwitchReplayTest` combines the real book and
-video masks with the actual output-mute gate to check early blackouts, exactly one
-selection, native-black reveal and later unmute. `ClassSwitchAudioTest` verifies
-existing/new gains, cross-thread visibility, idempotence and failure cleanup.
-`ClassSwitchHooksTest` verifies the raw HEAD observer priority, native input handler and audio-channel boundary against actual mapped Minecraft
-bytecode. `ClassStageInputTest` uses real `KeyMapping` instances to verify exactly
-one consumed Use click, no held repeat, rebound Use controls and shared-binding
-isolation. `ClassStageReadinessTest` covers an early prompt during black, bright
-outgoing gameplay, replaced prompts, missing/busy scenes and reset; the combined replay uses that
-readiness gate too.
+## Verification and remaining integration work
 
-Before release, validate the complete live flow on Wynncraft: login discovery,
-earliest right-click readiness, native book/close behavior, changed and duplicate
-targets, and the visible black-to-world handoff. Include Escape at every live
-stage, delayed responses, timeout, disconnect, multiple GUI scales, both interface
-fonts, resource reloads, and standalone plus Wynntils configurations. The recording
-and isolated GPU/controller tests do not substitute for those integration checks.
+Focused checks cover exact complete live-book resolution, immediate target
+selection through the packet-tail bridge, 100 ms click spacing and bounds,
+Auto Open, zero-ID/native book closes, cleanup at every controller stage, frame
+and audio retention throughout a simulated 0.8-second door sequence, and release
+only on confirmed gameplay. Hook tests verify the actual mapped Minecraft packet
+and input boundaries and that runtime code never samples screen pixels.
+
+`ClassLoadTrackerTest` covers manual/automatic selection confirmation, late and
+stale compass evidence, reconnect/account separation, persisted load history,
+short-token collisions, damaged storage, and a real load after presentation
+cancellation. Existing menu/discovery/settings/input tests continue to cover
+partial scans, stale shortcuts, explicit reassignment and disabled behavior.
+
+`ClassSwitchFrameGpuTest` (`RALLE_GPU_TEST=1`) uses a hidden isolated OpenGL window
+and actual Minecraft GPU APIs. It verifies that changing live black, door-color
+and world-color frames cannot replace the frozen selection, and checks explicit
+release, reopening, resize detection and idempotent cleanup. Test-only pixel
+readback and the historical video-mask classifier are not shipped as runtime
+switching logic.
+
+Before release, perform complete live switches on Wynncraft, standalone and with
+Wynntils. Confirm the welcome/camera/mode boundary covers the entire door, passive
+queries finish beneath the frame, normal and Auto Open books select promptly,
+and current-class indicators persist after manual/automatic loads and reconnects.
+Exercise Escape, delayed/missing signals, timeout, disconnect, account changes,
+GUI scales, resource reloads and ambiguous targets. Automated/controller/GPU
+checks do not substitute for this server integration pass.
