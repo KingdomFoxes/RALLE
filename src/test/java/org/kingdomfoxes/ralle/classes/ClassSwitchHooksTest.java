@@ -22,6 +22,33 @@ class ClassSwitchHooksTest {
         assertEquals(1, present);
     }
 
+    @Test void earlyCommandBoundaryIsAfterPacketProcessingAndTicksButBeforeRenderingAndCapture() throws Exception {
+        var runTick = method(read("net/minecraft/client/Minecraft"), "runTick", "(Z)V");
+        int index = 0, lastPackets = -1, lastTicks = -1, render = -1, present = -1;
+        for (var instruction : runTick.instructions) {
+            if (instruction instanceof MethodInsnNode call) {
+                if (call.name.equals("processQueuedPackets") || call.name.equals("runAllTasks")) lastPackets = index;
+                if (call.owner.equals("net/minecraft/client/Minecraft") && call.name.equals("tick")) lastTicks = index;
+                if (call.owner.equals("net/minecraft/client/renderer/GameRenderer") && call.name.equals("render")) {
+                    assertEquals("(Lnet/minecraft/client/DeltaTracker;Z)V", call.desc);
+                    assertEquals(-1, render); render = index;
+                }
+                if (call.owner.equals("com/mojang/blaze3d/pipeline/RenderTarget") && call.name.equals("blitToScreen")) present = index;
+            }
+            index++;
+        }
+        assertTrue(lastPackets >= 0 && lastPackets < render);
+        assertTrue(lastTicks >= 0 && lastTicks < render);
+        assertTrue(render < present);
+        var hook = method(read("org/kingdomfoxes/ralle/classes/mixin/ClassSwitchRenderMixin"),
+                "ralle$classFrameStarting", "(ZLorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V");
+        assertEquals(1, calls(hook, "org/kingdomfoxes/ralle/classes/ClassSwitcher", "beforeRender"));
+        var inject = hook.visibleAnnotations.stream().filter(a -> a.desc.endsWith("/Inject;")).findFirst().orElseThrow();
+        @SuppressWarnings("unchecked") var locations = (List<AnnotationNode>) value(inject, "at");
+        assertEquals("Lnet/minecraft/client/renderer/GameRenderer;render(Lnet/minecraft/client/DeltaTracker;Z)V",
+                value(locations.getFirst(), "target"));
+    }
+
     @Test void packetAndInputBoundariesMatchTheSupportedMinecraftVersion() throws Exception {
         var packets = read("net/minecraft/client/multiplayer/ClientPacketListener");
         for (String[] signature : new String[][] {
@@ -89,10 +116,25 @@ class ClassSwitchHooksTest {
             assertEquals("TAIL", value(locations.getFirst(), "value"));
             assertEquals(1, value(annotation, "require"));
         }
-        assertEquals(3, hooks);
+        assertEquals(2, hooks);
         var runtime = read("org/kingdomfoxes/ralle/classes/ClassSwitcher");
         for (var method : runtime.methods)
             assertEquals(0, calls(method, "org/kingdomfoxes/ralle/classes/ClassSwitchFrame", "sample"));
+    }
+    @Test void receivedInventoryEvidenceIsObservedBeforeModsCanCancelOrReplaceItsDisplay() throws Exception {
+        var signals = read("org/kingdomfoxes/ralle/classes/mixin/ClassInventorySignalsMixin");
+        var mixin = signals.invisibleAnnotations.stream().filter(a -> a.desc.endsWith("/Mixin;")).findFirst().orElseThrow();
+        assertTrue((int) value(mixin, "priority") > 1000);
+        int hooks = 0;
+        for (var method : signals.methods) for (var annotation : method.visibleAnnotations == null
+                ? List.<AnnotationNode>of() : method.visibleAnnotations) {
+            if (!annotation.desc.endsWith("/Inject;")) continue;
+            hooks++;
+            @SuppressWarnings("unchecked") var locations = (List<AnnotationNode>) value(annotation, "at");
+            assertEquals("HEAD", value(locations.getFirst(), "value"));
+            assertEquals(1, value(annotation, "require"));
+        }
+        assertEquals(3, hooks);
     }
     private static long calls(MethodNode method, String owner, String name) {
         long count = 0;

@@ -56,7 +56,9 @@ public final class WynncraftClassMenu {
                 || !marker(items.get(7), "Cancel Deletion", 559)
                 || !marker(items.get(25), "Character Backups", 561)
                 || !marker(items.get(51), "Selector Music", 597)
-                || !marker(items.get(53), "Auto Open", 598)) return Optional.empty();
+                // Auto Open changes its model when enabled; both states identify the same book.
+                || !(marker(items.get(53), "Auto Open", 598)
+                || marker(items.get(53), "Auto Open", 599))) return Optional.empty();
         var characters = new ArrayList<ClassCharacter>();
         var slots = new LinkedHashMap<String, Integer>();
         var evidence = new LinkedHashMap<String, String>();

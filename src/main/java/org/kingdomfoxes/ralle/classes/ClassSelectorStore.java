@@ -16,9 +16,10 @@ import java.util.UUID;
 public final class ClassSelectorStore {
     private static final Gson JSON = new GsonBuilder().setPrettyPrinting().create();
     private final Path path;
-    private Map<UUID, Account> accounts;
-    private Map<UUID, Loaded> loads = new LinkedHashMap<>();
-    private long revision;
+    // Published maps are never mutated. Reads from the client/render thread never wait for disk.
+    private volatile Map<UUID, Account> accounts;
+    private volatile Map<UUID, Loaded> loads = new LinkedHashMap<>();
+    private volatile long revision;
 
     public record Account(List<ClassCharacter> characters, List<ClassShortcut> shortcuts) {
         public Account {
@@ -88,7 +89,7 @@ public final class ClassSelectorStore {
     public long revision() { return revision; }
 
     /** Last confirmed load is history, never proof of the current class on a new connection. */
-    public String lastLoaded(UUID account) { return loads.containsKey(account) ? loads.get(account).lastReference : null; }
+    public String lastLoaded(UUID account) { var loaded = loads.get(account); return loaded == null ? null : loaded.lastReference; }
     public String referenceForToken(UUID account, String token) {
         if (!ClassLoadSignals.validToken(token)) return null;
         var loaded = loads.get(account);
@@ -96,6 +97,7 @@ public final class ClassSelectorStore {
         return reference == null || reference.isEmpty() ? null : reference;
     }
     public void recordLoad(UUID account, String reference, String token) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> recordLoad(account, reference, token)); return; }
         var previous = loads.get(account);
         var references = new LinkedHashMap<String, String>();
         if (previous != null) references.putAll(previous.references);
@@ -112,11 +114,27 @@ public final class ClassSelectorStore {
         save(accounts, nextLoads);
     }
 
+    /** Snapshot the observed values now; serialization and atomic file replacement run off-thread. */
+    public java.util.concurrent.CompletableFuture<Void> recordLoadAsync(UUID account, String reference, String token) {
+        return ClassStoreWrites.submit(() -> recordLoad(account, reference, token)).whenComplete((ignored, failure) -> {
+            if (failure != null) org.slf4j.LoggerFactory.getLogger(ClassSelectorStore.class)
+                    .warn("Could not persist loaded class; current session remains available", failure);
+        });
+    }
+
+    /** Used only for shutdown and verification, never by rendering or switch completion. */
+    public void flushWrites() throws IOException { ClassStoreWrites.flush(); }
+
     /** Upgrade only references proven by complete historical item evidence, never name/slot guesses. */
     public void migrateReferences(UUID account, Map<String, String> aliases) throws IOException {
         migrateReferences(account, aliases, List.of());
     }
     public void migrateReferences(UUID account, Map<String, String> aliases, List<ClassCharacter> proofs) throws IOException {
+        if (!ClassStoreWrites.onWriter()) {
+            var copiedAliases = Map.copyOf(aliases);
+            var copiedProofs = List.copyOf(proofs);
+            ClassStoreWrites.run(() -> migrateReferences(account, copiedAliases, copiedProofs)); return;
+        }
         if (aliases.isEmpty()) return;
         var previous = account(account);
         var characters = new LinkedHashMap<String, ClassCharacter>();
@@ -162,6 +180,7 @@ public final class ClassSelectorStore {
     }
 
     public void reconcile(ClassScan scan) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> reconcile(scan)); return; }
         var previous = account(scan.account());
         var characters = new LinkedHashMap<String, ClassCharacter>();
         if (!scan.complete()) previous.characters.forEach(c -> characters.put(c.id(), c));
@@ -177,6 +196,7 @@ public final class ClassSelectorStore {
     }
 
     public void add(UUID account, String id) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> add(account, id)); return; }
         var current = account(account);
         if (current.character(id) == null) throw new IllegalArgumentException("Character is no longer detected");
         if (current.shortcuts.stream().anyMatch(s -> s.characterId().equals(id))) return;
@@ -186,6 +206,7 @@ public final class ClassSelectorStore {
     }
 
     public void edit(UUID account, ClassShortcut shortcut) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> edit(account, shortcut)); return; }
         var current = account(account);
         var shortcuts = new ArrayList<>(current.shortcuts);
         int index = -1;
@@ -197,17 +218,23 @@ public final class ClassSelectorStore {
     }
 
     public void remove(UUID account, String id) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> remove(account, id)); return; }
         var current = account(account);
         replace(account, new Account(current.characters,
                 current.shortcuts.stream().filter(s -> !s.characterId().equals(id)).toList()));
     }
 
     public void clearShortcuts(UUID account) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> clearShortcuts(account)); return; }
         replace(account, new Account(account(account).characters(), List.of()));
     }
 
     /** Hydrate only matching existing references; historical captures cannot resurrect removed entries. */
     public void updateSprites(UUID account, Map<String, ClassSprite> sprites) throws IOException {
+        if (!ClassStoreWrites.onWriter()) {
+            var copied = Map.copyOf(sprites);
+            ClassStoreWrites.run(() -> updateSprites(account, copied)); return;
+        }
         var current = account(account);
         var characters = current.characters.stream().map(c -> c.sprite() == null && sprites.containsKey(c.id())
                 ? new ClassCharacter(c.id(), c.type(), c.nickname(), sprites.get(c.id())) : c).toList();
@@ -216,6 +243,7 @@ public final class ClassSelectorStore {
 
     /** Explicit user reassignment preserves the row's order and preferences; scans never guess it. */
     public void retarget(UUID account, ClassShortcut draft, String targetId) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> retarget(account, draft, targetId)); return; }
         var current = account(account);
         if (current.character(targetId) == null) throw new IllegalArgumentException("Character is no longer detected");
         if (!draft.characterId().equals(targetId) && current.shortcuts.stream().anyMatch(s -> s.characterId().equals(targetId)))
@@ -248,8 +276,9 @@ public final class ClassSelectorStore {
             Files.writeString(temporary, json);
             Files.move(temporary, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } finally { Files.deleteIfExists(temporary); }
+        boolean changed = !accounts.equals(next);
         accounts = next;
         loads = nextLoads;
-        revision++;
+        if (changed) revision++; // A late load save must not cancel a held selector or edit its rows.
     }
 }

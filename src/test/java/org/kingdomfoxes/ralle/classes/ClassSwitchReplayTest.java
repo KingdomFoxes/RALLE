@@ -19,7 +19,9 @@ class ClassSwitchReplayTest {
         SharedConstants.tryDetectVersion(); Bootstrap.bootStrap();
         var account = UUID.fromString("00000000-0000-0000-0000-000000000001");
         WynncraftClassMenu.Result book;
-        try (var input = getClass().getResourceAsStream("/classes/wynncraft-character-book-2026-10-19.json")) {
+        String capture = autoOpen ? "wynncraft-character-book-auto-open-2026-10-19.json"
+                : "wynncraft-character-book-2026-10-19.json";
+        try (var input = getClass().getResourceAsStream("/classes/" + capture)) {
             assertNotNull(input);
             book = ClassMenuEvidence.decode(JsonParser.parseReader(new java.io.InputStreamReader(input)).getAsJsonObject(), account, JsonOps.INSTANCE).orElseThrow();
         }

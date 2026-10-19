@@ -33,6 +33,7 @@ public final class ClassSwitchController {
     private String target;
     private long started;
     private boolean captured;
+    private boolean commandSent;
     private boolean silenced;
     private int selectedContainer = -1;
     private boolean bookReceived;
@@ -53,6 +54,7 @@ public final class ClassSwitchController {
         nextStageClick = now;
         stageClicks = 0;
         bookReceived = false;
+        commandSent = false;
         state = State.CAPTURING;
         try {
             silenced = true;
@@ -63,12 +65,19 @@ public final class ClassSwitchController {
         return active();
     }
 
-    /** Called after the selected frame has actually rendered and its GPU copy is complete/ordered. */
-    public void frameCaptured() {
-        if (state != State.CAPTURING) return;
-        state = State.WAITING_STAGE;
+    /** After packet processing and ticks, before drawing this frame. Responses are applied next pass. */
+    public void frameRendering() {
+        if (state != State.CAPTURING || commandSent) return;
+        commandSent = true;
         try { actions.sendClassCommand(); }
         catch (RuntimeException failure) { fail(Failure.UNAVAILABLE); }
+    }
+
+    /** Stage interaction stays gated until the actually selected frame has been copied. */
+    public void frameCaptured() {
+        if (state != State.CAPTURING) return;
+        frameRendering(); // Safe fallback for adapters without a pre-render callback.
+        if (state == State.CAPTURING) state = State.WAITING_STAGE;
     }
 
     public boolean acceptingStageClicks() {

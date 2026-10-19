@@ -69,6 +69,30 @@ class WynncraftClassMenuTest {
         assertEquals(List.of(shortcut), store.account(ACCOUNT).shortcuts());
     }
 
+    @Test void capturedAutoOpenEnabledBookResolvesTheSameSavedCharacters() throws Exception {
+        var saved = decode(fixture());
+        var enabled = decode(fixture("wynncraft-character-book-auto-open-2026-10-19.json"));
+        assertTrue(enabled.complete());
+        assertEquals(saved.characters(), enabled.characters());
+        for (var character : saved.characters())
+            assertEquals(saved.resolve(character.id()), enabled.resolve(character.id()));
+    }
+
+    @Test void autoOpenControlStillRequiresItsObservedNameItemAndModel() throws Exception {
+        var enabled = fixture("wynncraft-character-book-auto-open-2026-10-19.json");
+        var control = slot(enabled, 53).getAsJsonObject("item");
+        var components = control.getAsJsonObject("components");
+        var models = components.getAsJsonObject("minecraft:custom_model_data").getAsJsonArray("floats");
+        models.set(0, new com.google.gson.JsonPrimitive(600));
+        assertTrue(ClassMenuEvidence.decode(enabled, ACCOUNT, JsonOps.INSTANCE).isEmpty());
+        models.set(0, new com.google.gson.JsonPrimitive(599));
+        components.add("minecraft:custom_name", text("Unrelated control"));
+        assertTrue(ClassMenuEvidence.decode(enabled, ACCOUNT, JsonOps.INSTANCE).isEmpty());
+        components.add("minecraft:custom_name", text("Auto Open"));
+        control.addProperty("id", "minecraft:stone");
+        assertTrue(ClassMenuEvidence.decode(enabled, ACCOUNT, JsonOps.INSTANCE).isEmpty());
+    }
+
     @Test void duplicateNamesTypesAndRenamedEntriesNeverTurnIntoTrustedIdentities() throws Exception {
         var source = fixture();
         slot(source, 9).add("item", slot(source, 10).get("item").deepCopy());
@@ -304,7 +328,10 @@ class WynncraftClassMenuTest {
         return ClassMenuEvidence.decode(evidence, ACCOUNT, JsonOps.INSTANCE).orElseThrow();
     }
     private static JsonObject fixture() throws Exception {
-        try (var input = WynncraftClassMenuTest.class.getResourceAsStream("/classes/wynncraft-character-book-2026-10-19.json")) {
+        return fixture("wynncraft-character-book-2026-10-19.json");
+    }
+    private static JsonObject fixture(String name) throws Exception {
+        try (var input = WynncraftClassMenuTest.class.getResourceAsStream("/classes/" + name)) {
             assertNotNull(input);
             return JsonParser.parseString(new String(input.readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject();
         }

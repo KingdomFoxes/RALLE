@@ -8,6 +8,8 @@ import java.util.UUID;
 public final class ClassLoadTracker {
     private final ClassSelectorStore store;
     private final java.util.function.LongSupplier clock;
+    @FunctionalInterface public interface Recorder { void record(UUID account, String reference, String token) throws IOException; }
+    private final Recorder recorder;
     private UUID account;
     private String current, pending, token;
     private int book = -1;
@@ -16,7 +18,13 @@ public final class ClassLoadTracker {
     private long animationEnds;
 
     public ClassLoadTracker(ClassSelectorStore store) { this(store, () -> System.nanoTime() / 1_000_000); }
-    ClassLoadTracker(ClassSelectorStore store, java.util.function.LongSupplier clock) { this.store = store; this.clock = clock; }
+    public ClassLoadTracker(ClassSelectorStore store, Recorder recorder) {
+        this(store, () -> System.nanoTime() / 1_000_000, recorder);
+    }
+    ClassLoadTracker(ClassSelectorStore store, java.util.function.LongSupplier clock) { this(store, clock, store::recordLoad); }
+    ClassLoadTracker(ClassSelectorStore store, java.util.function.LongSupplier clock, Recorder recorder) {
+        this.store = store; this.clock = clock; this.recorder = recorder;
+    }
     public void session(UUID account) {
         if (!Objects.equals(this.account, account)) { reset(); this.account = account; }
         expire();
@@ -40,6 +48,7 @@ public final class ClassLoadTracker {
     }
     public void welcome() { expire(); welcomed = true; welcomeUntil = clock.getAsLong() + ClassSwitchController.TIMEOUT_MILLIS; }
     public void compass(String token) {
+        if (pending != null && !closed) return; // The selected book can still contain outgoing inventory.
         this.token = token;
         if (current != null && pending == null && token != null) save(current);
     }
@@ -60,7 +69,7 @@ public final class ClassLoadTracker {
     }
     private void save(String reference) {
         if (saveFailed) return;
-        try { store.recordLoad(account, reference, token); }
+        try { recorder.record(account, reference, token); }
         catch (IOException | RuntimeException failure) {
             saveFailed = true;
             // Current session knowledge still works if disk storage fails.

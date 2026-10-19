@@ -110,6 +110,15 @@ Missing or unrecognized character positions make a scan partial. One captured
 update is missing the Mage position: it must not erase the previous Mage entry.
 Housing and other unrelated menus fail recognition.
 
+The 22:04 and 22:06 local captures exposed an Auto Open recognition bug: its
+disabled button uses model 598, while its enabled button uses model 599. The
+decoder originally accepted only 598, so it observed the book-open packet but
+rejected the live contents and remained in WAITING_MENU until cancellation or
+timeout. Both observed Auto Open models are now accepted with the same exact
+item/name/position checks; character identity validation remains unchanged.
+The enabled-state capture is retained as
+`wynncraft-character-book-auto-open-2026-10-19.json` with its account anonymized.
+
 **Those captured items carry no stable character IDs.** The decoder creates
 explicit `observed:<slot>:<sha256>` references from normalized identifying evidence,
 including position, model, potion tint, name and non-progress lore. They are not server identities. At
@@ -183,13 +192,25 @@ and verifying the live adapter in-game. A video alone cannot establish stable ID
 
 ## Switching and load confirmation
 
-The current loop is: capture the selected frame, send `/class` once, submit native
+The current loop is: send `/class` once just before rendering the selected frame,
+capture that frame before the next packet-processing pass, submit native
 Use clicks at most every **100 ms** while the original server selection prompt is
 present and the native scene accepts input, stop on the character-book open
 packet, and select the target **once** from complete, uniquely resolved live
 contents. The entire operation still has a 15-second deadline and at most 150
 stage clicks. The first click has no artificial delay; slow ticks cannot queue
 catch-up bursts. Auto Open skips stage clicks.
+
+`ClassSwitchRenderMixin` starts the command immediately before `GameRenderer.render`
+inside Minecraft's `runTick`, after queued packets and client ticks have finished.
+This overlaps outbound command delivery with world/GUI drawing and the GPU copy.
+The selected wheel remains visible until that copy is ordered; only then is its
+live screen dismissed and stage interaction enabled. Minecraft applies response
+packets on its next processing pass. The controller sends once even if callbacks
+repeat, and a capture failure after the command releases all presentation ownership.
+The selected frame and the 1600 ms book-close timer are unchanged. Bytecode checks
+verify the supported Minecraft ordering; no off-thread game-state mutation, packet
+suppression or speculative earlier interaction is introduced.
 
 With Wynncraft's **Auto Open** enabled in the character book, Wynncraft opens the
 book automatically when switching characters after the player has entered a
@@ -285,6 +306,18 @@ preserve this data. Writes retain the existing atomic save-before-publish policy
 A storage failure cannot crash unrelated features or erase confirmed in-session
 knowledge. No credentials, network queries or new user commands are involved.
 
+Confirmed load records and late token associations now enter a bounded serial
+background writer. They still serialize to that JSON file and use atomic replacement;
+they are not RAM-only. Current-session knowledge updates immediately, while persisted
+snapshots publish only after successful writes. Explicit shortcut edits, scans and
+evidence migrations use the same writer in submission order and retain synchronous
+error reporting, so they cannot overwrite queued load data or reintroduce a migrated
+reference. Reads never wait for storage. Load-only saves do not change the shortcut
+revision or cancel an open selector. Shutdown allows up to five seconds to drain
+pending writes; failed writes are logged and preserve the previous file. A forced
+process termination before an asynchronous write completes can lose that newest
+observation. No new saved format, setting or command is introduced.
+
 The naturally received compass in hotbar index 7 (inventory container slot 43)
 can carry an eight-character partial character ID in its first lore line. The
 current logs show Wynntils reading those IDs at world entry, and its public
@@ -295,6 +328,28 @@ recover current-class knowledge on a later natural load only when this account
 already recorded that exact token/selection association. A stale outgoing compass
 cannot authorize a new association; selection clears it and requires a fresh
 inventory update. A late refresh can still be saved after confirmed gameplay.
+
+The October 19 local file contained a last-selected reference but no token
+associations, preventing reliable recovery on login. The actual received welcome
+contains unassigned resource-font code points such as U+D0059; the old parser only
+removed private-use glyphs and rejected this welcome. It now removes unassigned
+glyphs too while retaining the exact welcome line and Wynncraft address checks.
+`ClassInventorySignalsMixin` observes original inventory packets at client-thread
+HEAD with priority 1200, before another mod can transform or cancel their display.
+It accepts hotbar index 7 through direct player-inventory packets, inventory-0 slot
+43, or a verified player-inventory slot of the currently matching live container.
+An identically numbered container-owned slot is not player evidence. Token decoding
+uses the exact eight-character lore field from that proven slot, without assuming
+the resource-pack item has vanilla's compass base item. Inventory updates before a
+selected book closes cannot associate the outgoing character's token with its target.
+
+After one verified load establishes the missing token association, a later login
+can recover the saved current character from its fresh inventory token and recognized
+welcome, and the existing selector disables that character. Existing last-used-only
+records are not silently assigned to the first token encountered; another client
+or a manual selection could have changed the actual character. The 1600 ms timer
+remains the completion rule for manual/automated book selections, independently of
+welcome parsing.
 
 Conflicting references for a short token disable its recovery; no identity is
 guessed from class type, name, position, last-used history or another account.
@@ -331,12 +386,23 @@ and input boundaries and that runtime code never samples screen pixels.
 and Auto Open paths: Auto Open sends zero stage clicks, partial contents wait,
 complete contents select without another tick, repeated callbacks cannot select
 twice, and both paths retain the frame/audio through the book-close timer.
+Each path uses its corresponding disabled/enabled captured book, including the
+different Auto Open button model. Decoder checks also reject unobserved models,
+wrong control names and wrong item types.
 
 `ClassLoadTrackerTest` covers manual/automatic selection confirmation, late and
 stale compass evidence, reconnect/account separation, persisted load history,
 short-token collisions, damaged storage, and a real load after presentation
 cancellation. Existing menu/discovery/settings/input tests continue to cover
 partial scans, stale shortcuts, explicit reassignment and disabled behavior.
+
+Additional checks replay restart recovery with the observed welcome glyphs, verify
+player-slot provenance and rejection of pre-close outgoing token evidence, and
+stall the storage worker while confirming switch completion and reads stay responsive.
+They reload the resulting file after account changes, edits and migration to check
+ordering and persistence. Pre-render command checks enforce one send, no stage
+interaction before capture, cleanup between command/capture, and the same 1600 ms
+deadline. These checks do not measure a new live switching-time improvement.
 
 `ClassSwitchFrameGpuTest` (`RALLE_GPU_TEST=1`) uses a hidden isolated OpenGL window
 and actual Minecraft GPU APIs. It verifies that changing live black, door-color

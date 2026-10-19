@@ -26,6 +26,37 @@ class ClassSwitchControllerTest {
         return List.of(new ClassSwitchController.Target("a", 10), new ClassSwitchController.Target("b", 11));
     }
 
+    @Test void preRenderCommandOverlapsDrawingButStageInputWaitsForTheCapturedFrame() {
+        var actions = new Actions(); var controller = new ClassSwitchController(actions);
+        assertTrue(controller.begin(account, "b", "a", true, 0));
+        controller.frameRendering(); controller.frameRendering();
+        assertEquals(List.of("capture", "class"), actions.calls);
+        assertEquals(ClassSwitchController.State.CAPTURING, controller.state());
+        controller.selectionStage(0);
+        assertFalse(controller.acceptingStageClicks());
+        controller.frameCaptured(); controller.frameCaptured(); controller.frameRendering();
+        assertTrue(controller.bookOpened());
+        controller.menu(7, targets(), true);
+        controller.menuClosed(7, 100);
+        controller.tick(account, true, 1699);
+        assertTrue(actions.muted);
+        controller.tick(account, true, 1700);
+        assertEquals(List.of("capture", "class", "select:7:11", "release"), actions.calls);
+    }
+
+    @Test void cancellationAndFailureBetweenEarlyCommandAndCaptureCannotResendOrHoldAudio() {
+        for (boolean fail : List.of(false, true)) {
+            var actions = new Actions(); var controller = new ClassSwitchController(actions);
+            controller.begin(account, "b", null, true, 0);
+            controller.frameRendering();
+            if (fail) controller.unavailable(); else controller.cancel();
+            controller.frameCaptured(); controller.frameRendering();
+            assertEquals(List.of("capture", "class", "release"), actions.calls);
+            assertFalse(actions.muted);
+            assertEquals(1, actions.restoreCalls);
+        }
+    }
+
     @Test void capturesBeforeCommandAndRetainsFrameAndAudioThroughTheEntireDoorAnimation() {
         var actions = new Actions();
         var controller = new ClassSwitchController(actions);
