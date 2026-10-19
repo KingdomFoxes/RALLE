@@ -1,0 +1,90 @@
+{
+  "source": "User-provided 2026-10-18 23-49-44.mp4; 10 fps, nearest 64x36; central 32x18 mask, RGB <= 8. No names, chat, images or original RGB retained.",
+  "samples": [
+    {
+      "timeSeconds": 0.0,
+      "black": false,
+      "darkMask": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "timeSeconds": 2.5,
+      "black": false,
+      "darkMask": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "timeSeconds": 2.9,
+      "black": true,
+      "darkMask": "////////////////////////////////////////////////////////////////////////////////////////////////"
+    },
+    {
+      "timeSeconds": 3.4,
+      "black": false,
+      "darkMask": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "timeSeconds": 3.6,
+      "black": true,
+      "darkMask": "////////////////////////////////////////////////////////////////////////////////////////////////"
+    },
+    {
+      "timeSeconds": 4.1,
+      "black": false,
+      "darkMask": "AASAEQAAMA8ACBA0AFjkAAAAQAAAANAPAADwEwAAoAQAAAAQAAAAJQAAAAAAABABAACAAAAA6AAAAEDAAAAA+AAAwAAAAAAA"
+    },
+    {
+      "timeSeconds": 4.5,
+      "black": false,
+      "darkMask": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAA"
+    },
+    {
+      "timeSeconds": 5.5,
+      "black": false,
+      "darkMask": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAA"
+    },
+    {
+      "timeSeconds": 6.0,
+      "black": false,
+      "darkMask": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "timeSeconds": 7.5,
+      "black": false,
+      "darkMask": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "timeSeconds": 8.2,
+      "black": false,
+      "darkMask": "AwAAAAMAAAADAAAAAwAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAgACQAAAAAAAAQAAgAEAAMQAAgAAAAAAAAABAAAA"
+    },
+    {
+      "timeSeconds": 8.3,
+      "black": true,
+      "darkMask": "////////////////////////////////////////////////////////////////////////////////////////////////"
+    },
+    {
+      "timeSeconds": 8.8,
+      "black": true,
+      "darkMask": "////////////////////////////////////////////////////////////////////////////////////////////////"
+    },
+    {
+      "timeSeconds": 9.2,
+      "black": false,
+      "darkMask": "//////////P+///x///P8d//Z/H7/9/x/9/f8f//f/H////5//+/518g/xYA4P8fAID/QAcAAMD+IQCAEQcAAB8DAAAPAAAA"
+    },
+    {
+      "timeSeconds": 9.5,
+      "black": false,
+      "darkMask": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "timeSeconds": 10.0,
+      "black": false,
+      "darkMask": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "timeSeconds": 11.0,
+      "black": false,
+      "darkMask": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAA"
+    }
+  ]
+}

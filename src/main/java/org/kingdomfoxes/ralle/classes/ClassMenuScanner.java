@@ -35,6 +35,17 @@ public final class ClassMenuScanner {
         discovery = new ClassDiscovery(store);
     }
     public boolean requested() { return enabled.value(); }
+    public record LiveMenu(int containerId, WynncraftClassMenu.Result result) { }
+
+    /** Read again immediately before an automated click; never use cached or diagnostic data. */
+    public java.util.Optional<LiveMenu> liveMenu() {
+        if (!available() || minecraft.player == null) return java.util.Optional.empty();
+        var menu = minecraft.player.containerMenu;
+        if (menu == minecraft.player.inventoryMenu || menu.containerId != openedId
+                || menu.slots.size() < WynncraftClassMenu.MENU_SIZE) return java.util.Optional.empty();
+        return WynncraftClassMenu.decode(title, menu.slots.stream().limit(WynncraftClassMenu.MENU_SIZE)
+                .map(slot -> slot.getItem()).toList()).map(result -> new LiveMenu(menu.containerId, result));
+    }
     public void opened(int containerId, String title) {
         if (!available()) return;
         openedId = containerId;
@@ -76,7 +87,10 @@ public final class ClassMenuScanner {
      * Existing saved accounts win. Captured evidence is historical and only ever merges.
      */
     private void recoverInitialCaptures(UUID current) throws IOException {
-        if (store.hasAccount(current) || !store.available() || minecraft.level == null) return;
+        if (!store.available() || minecraft.level == null) return;
+        boolean initial = !store.hasAccount(current);
+        if (!initial && store.account(current).characters().stream().allMatch(c -> c.sprite() != null)) return;
+        var sprites = new java.util.HashMap<String, ClassSprite>();
         for (int index = 0; index < 4; index++) {
             var path = captures.resolve("class-menu-" + current + "-" + index + ".json");
             if (!Files.isRegularFile(path)) continue;
@@ -93,11 +107,15 @@ public final class ClassMenuScanner {
                 if (!json.isJsonObject()) continue;
                 var result = ClassMenuEvidence.decode(json.getAsJsonObject(), current,
                         minecraft.level.registryAccess().createSerializationContext(JsonOps.INSTANCE));
-                if (result.isPresent()) discovery.observe(new ClassScan(current, result.get().characters(), false), discovery.generation());
+                if (result.isPresent()) {
+                    if (initial) discovery.observe(new ClassScan(current, result.get().characters(), false), discovery.generation());
+                    else result.get().characters().forEach(c -> { if (c.sprite() != null) sprites.put(c.id(), c.sprite()); });
+                }
             } catch (com.google.gson.JsonParseException invalid) {
                 // A diagnostic file cannot prevent live discovery or erase saved preferences.
             }
         }
+        if (!initial && !sprites.isEmpty()) store.updateSprites(current, sprites);
     }
 
     private void failed(Exception failure) {

@@ -11,8 +11,8 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 /** Decoder for the character book observed in the 2026-10-19 game captures.
- * The book has no character UUIDs: its entries are explicitly unverified observations.
- * An observation may populate the editor, but can never authorize a switch.
+ * The book has no character UUIDs. References require an exact live evidence match;
+ * identical entries in different positions are deliberately not distinguishable.
  */
 public final class WynncraftClassMenu {
     public static final int MENU_SIZE = 54;
@@ -23,9 +23,19 @@ public final class WynncraftClassMenu {
             "Warrior", "Knight", "Assassin", "Ninja", "Shaman", "Skyseer");
     private static final Pattern LEGACY = Pattern.compile("§.");
 
-    public record Result(List<ClassCharacter> characters, Map<String, Integer> slots, boolean complete) {
-        public Result { characters = List.copyOf(characters); slots = Map.copyOf(slots); }
+    public record Result(List<ClassCharacter> characters, Map<String, Integer> slots,
+                         Map<String, String> evidence, boolean complete) {
+        public Result { characters = List.copyOf(characters); slots = Map.copyOf(slots); evidence = Map.copyOf(evidence); }
         public ClassScan scan(UUID account) { return new ClassScan(account, characters, complete); }
+        /** No fallback by position, nickname or type. The entire saved observation must still match,
+         * and its position-independent evidence must occur exactly once in this complete live book. */
+        public OptionalInt resolve(String reference) {
+            String fingerprint = evidence.get(reference);
+            Integer slot = slots.get(reference);
+            if (!complete || slot == null || fingerprint == null
+                    || evidence.values().stream().filter(fingerprint::equals).count() != 1) return OptionalInt.empty();
+            return OptionalInt.of(slot);
+        }
     }
 
     private WynncraftClassMenu() {}
@@ -47,6 +57,7 @@ public final class WynncraftClassMenu {
                 || !marker(items.get(53), "Auto Open", 598)) return Optional.empty();
         var characters = new ArrayList<ClassCharacter>();
         var slots = new LinkedHashMap<String, Integer>();
+        var evidence = new LinkedHashMap<String, String>();
         boolean complete = true;
         for (int slot : CHARACTER_SLOTS) {
             var item = items.get(slot);
@@ -55,8 +66,9 @@ public final class WynncraftClassMenu {
             if (character == null) { complete = false; continue; }
             characters.add(character);
             slots.put(character.id(), slot);
+            evidence.put(character.id(), digest(evidence(item)));
         }
-        return Optional.of(new Result(characters, slots, complete));
+        return Optional.of(new Result(characters, slots, evidence, complete));
     }
 
     private static ClassCharacter character(int slot, ItemStack item) {
@@ -79,9 +91,16 @@ public final class WynncraftClassMenu {
         if (model == null || model.floats().size() != 1 || !Float.isFinite(model.floats().getFirst())) return null;
         // Include position and the complete visible evidence. Never merge by name/type alone, and
         // never claim this hash is a stable server identity. Changed evidence requires rediscovery.
-        String evidence = slot + "\n" + model.floats().getFirst() + "\n" + name + "\n" + String.join("\n", lines);
-        String reference = ClassCharacter.OBSERVATION_PREFIX + slot + ":" + digest(evidence);
-        return new ClassCharacter(reference, type, name.equals(type) ? "" : name);
+        String reference = ClassCharacter.OBSERVATION_PREFIX + slot + ":" + digest(slot + "\n" + evidence(item));
+        var potion = item.get(DataComponents.POTION_CONTENTS);
+        int tint = potion == null ? 0xFFFFFF : potion.customColor().orElse(0xFFFFFF);
+        return new ClassCharacter(reference, type, name.equals(type) ? "" : name,
+                new ClassSprite(model.floats().getFirst(), tint));
+    }
+
+    private static String evidence(ItemStack item) {
+        return item.get(DataComponents.CUSTOM_MODEL_DATA).floats().getFirst() + "\n" + name(item) + "\n"
+                + String.join("\n", item.get(DataComponents.LORE).lines().stream().map(line -> clean(line.getString())).toList());
     }
 
     private static boolean marker(ItemStack item, String title, float modelNumber) {

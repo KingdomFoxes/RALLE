@@ -143,17 +143,16 @@ public final class RalleSettings {
                 "wheels",
                 Component.translatable("ralle.settings.category.wheels"),
                 Component.translatable("ralle.settings.category.wheels.description"),
+                List.of(),
                 List.of(
-                        toggle("raid-lfg-create-selector-wheel"),
-                        choice(CREATE_WHEEL_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view"),
-                        toggle("raid-lfg-kick-selector-wheel"),
-                        choice(KICK_WHEEL_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view"),
-                        toggle(CLASS_SELECTOR_ID),
-                        choice(CLASS_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view"),
-                        keybind(CLASS_MODIFIER_ID),
-                        customPanel(CLASS_SHORTCUTS_ID, CLASS_SHORTCUTS_ID)
-                ),
-                List.of()
+                        subcategory("lfg-create-selector", toggle("raid-lfg-create-selector-wheel"),
+                                choice(CREATE_WHEEL_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view")),
+                        subcategory("party-kick-selector", toggle("raid-lfg-kick-selector-wheel"),
+                                choice(KICK_WHEEL_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view")),
+                        subcategory("class-selector", toggle(CLASS_SELECTOR_ID),
+                                choice(CLASS_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view"),
+                                keybind(CLASS_MODIFIER_ID), customPanel(CLASS_SHORTCUTS_ID, CLASS_SHORTCUTS_ID))
+                )
         ));
         registry.migrateKey("raid-lfg-create-selector-wheel", "raid-lfg.raid-lfg-create-selector-wheel");
         registry.migrateKey("raid-lfg-kick-selector-wheel", "raid-lfg.raid-lfg-kick-selector-wheel");

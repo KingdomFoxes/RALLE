@@ -17,18 +17,27 @@ public final class LfgActionBarOverlay {
 
     private final Minecraft minecraft;
     private final LfgActionBarState state;
+    private final Identifier id;
+    private final java.util.function.BooleanSupplier visible;
 
     public LfgActionBarOverlay(Minecraft minecraft, LfgActionBarState state) {
+        this(minecraft, state, Identifier.fromNamespaceAndPath(RalleClient.MOD_ID, "lfg_action_bar"), () -> true);
+    }
+
+    public LfgActionBarOverlay(Minecraft minecraft, LfgActionBarState state, Identifier id,
+                               java.util.function.BooleanSupplier visible) {
         this.minecraft = minecraft;
         this.state = state;
+        this.id = id;
+        this.visible = visible;
     }
 
     public void register() {
         HudElementRegistry.attachElementAfter(
                 VanillaHudElements.CROSSHAIR,
-                Identifier.fromNamespaceAndPath(RalleClient.MOD_ID, "lfg_action_bar"),
+                id,
                 (graphics, tickCounter) -> {
-                    if (minecraft.screen == null) render(graphics);
+                    if (minecraft.screen == null && visible.getAsBoolean()) render(graphics);
                 }
         );
     }

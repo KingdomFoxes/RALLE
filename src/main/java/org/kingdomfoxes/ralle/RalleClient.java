@@ -223,14 +223,25 @@ public final class RalleClient implements ClientModInitializer {
                 disbandConfirmation, keybindHints);
         lfgNotificationOverlay.register();
         var actionBarState = new LfgActionBarState();
-        var actionBarOverlay = new LfgActionBarOverlay(minecraft, actionBarState);
-        actionBarOverlay.register();
+        var classActionBar = new LfgActionBarState();
         var autoRaidRequeue = new AutoRaidRequeueController(
                 minecraft,
                 settings.setting(AutoRaidRequeueController.KEYBIND_ID, KeybindSetting.class),
                 new AutoRaidRequeueStore(configDirectory.resolve("ralle-auto-requeue.properties")),
                 actionBarState
         );
+        var classSwitcher = new org.kingdomfoxes.ralle.classes.ClassSwitcher(minecraft,
+                settings.setting(org.kingdomfoxes.ralle.settings.RalleSettings.CLASS_SELECTOR_ID, BooleanSetting.class),
+                classMenuScanner, classActionBar, autoRaidRequeue::running);
+        var classSelectorBindings = new org.kingdomfoxes.ralle.classes.ClassSelectorBindings(
+                minecraft, settings, classShortcuts, classActionBar, classSwitcher);
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> classSwitcher.close());
+        new LfgActionBarOverlay(minecraft, classActionBar,
+                net.minecraft.resources.Identifier.fromNamespaceAndPath(MOD_ID, "class_selector_feedback"), () -> true).register();
+        var actionBarOverlay = new LfgActionBarOverlay(minecraft, actionBarState,
+                net.minecraft.resources.Identifier.fromNamespaceAndPath(MOD_ID, "lfg_action_bar"),
+                () -> !classSelectorBindings.active() && !classActionBar.snapshot().visible());
+        actionBarOverlay.register();
         var lfgKeybinds = new RaidLfgKeybinds(
                 minecraft, settings, raidLfg, lfgSounds, lfgNotifications, hostPartyInvites, regionDetector,
                 actionBarState, disbandConfirmation, lockDebouncer, autoRaidRequeue);
@@ -265,12 +276,15 @@ public final class RalleClient implements ClientModInitializer {
                 cosmeticStyleSelection,
                 cosmeticTextures,
                 classMenuCapture,
-                classMenuScanner
+                classMenuScanner,
+                classSelectorBindings,
+                classSwitcher
         );
         var pointAndLaugh = new org.kingdomfoxes.ralle.war.PointAndLaugh();
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             classMenuCapture.reset();
             classMenuScanner.reset();
+            classSelectorBindings.reset();
             if (client.getCurrentServer() != null) updateNotice.joined();
             else updateNotice.disconnected();
             foxGuildAccess.joined(client.getCurrentServer() == null ? "" : client.getCurrentServer().ip,
@@ -285,6 +299,7 @@ public final class RalleClient implements ClientModInitializer {
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             classMenuCapture.reset();
             classMenuScanner.reset();
+            classSelectorBindings.reset();
             updateNotice.disconnected();
             foxGuildAccess.clear();
             cosmeticDirectory.clear();
@@ -300,9 +315,12 @@ public final class RalleClient implements ClientModInitializer {
             HqDistanceOverlay.clear();
             QueueAttributionService.disconnect();
         });
+        ClientTickEvents.START_CLIENT_TICK.register(client -> classSwitcher.beforeTick());
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             classMenuCapture.tick();
             classMenuScanner.tick();
+            classSwitcher.tick();
+            classSelectorBindings.tick();
             updateNotice.tick().ifPresent(release -> RalleChatMessages.post(client, UpdateMessages.body(release)));
             foxGuildAccess.tick();
             if (cosmeticReloadPending.getAndSet(false)) cosmeticTextures.close();

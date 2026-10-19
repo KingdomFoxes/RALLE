@@ -1,16 +1,18 @@
 # Modifier wheels
 
-Class Selector is an approved independent addition under Wheels. Its local
-shortcut editor, game-menu discovery and domain controller are implemented; the live hidden-switch
-integration remains pending verified game data. See [Class Selector integration](class-selector.md)
-for settings, persistence, the corrected right-click sequence, capture instructions
-and the remaining runtime/visual checks.
+Class Selector is an independent addition under Wheels with local shortcuts,
+game-menu discovery and a bounded hidden-switch runtime. See
+[Class Selector integration](class-selector.md) for persistence, strict live-book
+target resolution, the native right-click sequence, frozen-frame handoff and
+remaining live validation. Its option keys are configurable per shortcut; the
+fixed option keys described below apply to Create/Kick.
 
-Wheels contains the independent Create and Kick selectors directly, without
-subcategories. Both remain disabled
+Wheels contains three subcategories: Lfg Create Selector, Party/Lfg Kick Selector,
+and Class Selector. Each contains that selector's toggle and style; Class Selector
+also contains its modifier and shortcut editor. The Create and Kick wheels remain disabled
 by default. Each enabled selector reveals its own Wheel Style: Circle Segments
 (default), Bars, or No View. Modifier bindings remain in Raid LFG Controls and
-stay synchronized with Minecraft's keybind options. Wheel settings retain the
+stay synchronized with Minecraft's keybind options. Create/Kick wheel settings retain the
 existing dependency on Enable Raid LFG and its current-account Fox access gate.
 The toggles are labeled `Lfg Create Selector` and `Party/Lfg Kick Selector`.
 The Create selector omits its idle instruction line; processing, success, and
@@ -23,6 +25,8 @@ when the new key is absent; subsequent saves write current keys. A present but
 invalid new value uses the normal default, never the old value. Styles persist as
 `wheels.raid-lfg-{create,kick}-wheel-style`, with values `circle-segments`, `bars`,
 and `no-view`. Disabled selectors preserve their hidden style preferences.
+Moving controls into subcategories does not add subcategory IDs to persisted keys;
+all current `wheels.*` keys and legacy-key migration behavior remain unchanged.
 
 ## Input
 

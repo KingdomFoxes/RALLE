@@ -55,6 +55,7 @@ public final class RaidLfgKeybinds {
     };
 
     private final Minecraft minecraft;
+    private final SettingsRegistry settings;
     private final BooleanSetting enabled;
     private final BooleanSetting createWheelEnabled;
     private final BooleanSetting kickWheelEnabled;
@@ -86,6 +87,7 @@ public final class RaidLfgKeybinds {
                            LfgLockDebouncer lockDebouncer,
                            AutoRaidRequeueController autoRaidRequeue) {
         this.minecraft = minecraft;
+        this.settings = settings;
         this.service = service;
         this.sounds = sounds;
         this.notifications = notifications;
@@ -671,6 +673,7 @@ public final class RaidLfgKeybinds {
 
     private boolean inputAllowed() {
         return enabled.value()
+                && (!org.kingdomfoxes.ralle.RalleClient.initialized() || !org.kingdomfoxes.ralle.RalleClient.context().classSwitcher().active())
                 && minecraft.screen == null
                 && minecraft.level != null
                 && minecraft.player != null
@@ -689,6 +692,7 @@ public final class RaidLfgKeybinds {
     private boolean conflicted(Action action) {
         var value = bindings.get(action).setting.value();
         if (KeybindSetting.UNBOUND.equals(value)) return false;
+        if (org.kingdomfoxes.ralle.classes.ClassBindingConflicts.action(settings, value)) return true;
         int matches = 0;
         for (var binding : bindings.values()) {
             if (value.equals(binding.setting.value())) matches++;

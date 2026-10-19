@@ -22,7 +22,7 @@ class SettingsSearchTest {
         registry.setting("raid-lfg-create-selector-wheel", BooleanSetting.class).set(true);
         var group = SettingsSearch.find(registry, style).getFirst();
         assertEquals("wheels", group.category().id());
-        assertTrue(group.categoryPage());
+        assertEquals("lfg-create-selector", group.subcategory().id());
         assertEquals(List.of(style), group.entries().stream().map(SettingsEntry::id).toList());
         registry.setting("raid-lfg-enabled", BooleanSetting.class).set(false);
         assertTrue(SettingsSearch.find(registry, style).isEmpty());

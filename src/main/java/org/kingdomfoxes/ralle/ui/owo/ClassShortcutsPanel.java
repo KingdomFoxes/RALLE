@@ -9,8 +9,6 @@ import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.classes.*;
@@ -75,8 +73,7 @@ final class ClassShortcutsPanel extends FlowLayout {
     private String modifier() { return settings.setting(RalleSettings.CLASS_MODIFIER_ID, KeybindSetting.class).value(); }
 
     private List<String> reserved() {
-        return settings.entries().stream().filter(KeybindSetting.class::isInstance).map(KeybindSetting.class::cast)
-                .filter(s -> !s.id().equals(RalleSettings.CLASS_MODIFIER_ID)).map(KeybindSetting::value).toList();
+        return ClassBindingConflicts.reserved(settings);
     }
 
     private void rebuild() {
@@ -100,7 +97,8 @@ final class ClassShortcutsPanel extends FlowLayout {
             var row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
             row.gap(3).padding(Insets.of(2)).verticalAlignment(VerticalAlignment.CENTER).surface(RalleSurfaces.NAVY_ROW);
             if (character != null && !character.hasStableIdentity()) row.tooltip(text("ralle.classes.unverified"));
-            row.child(UIComponents.item(fallbackIcon(character)).sizing(Sizing.fixed(18)));
+            if (character == null) row.tooltip(text("ralle.classes.missing-hint"));
+            row.child(UIComponents.item(ClassPresentation.item(character)).sizing(Sizing.fixed(18)));
             var label = UIComponents.label(RalleTheme.ui(Component.literal(name))).maxWidth(120);
             label.horizontalSizing(Sizing.expand(100));
             label.color(character == null ? RalleTheme.muted() : RalleTheme.text());
@@ -121,23 +119,15 @@ final class ClassShortcutsPanel extends FlowLayout {
         }
         rows.replaceChildren(content);
         status.text(!store.available() ? text("ralle.classes.save-failed")
+                : ClassBindingConflicts.modifier(settings) ? text("ralle.classes.modifier-conflict")
                 : snapshot.characters().isEmpty() ? text("ralle.classes.detect-next")
                 : text("ralle.classes.detected", snapshot.characters().size()));
     }
 
-    /** Native item fallback only; a verified game adapter can later supply resource-pack class sprites. */
-    private static ItemStack fallbackIcon(ClassCharacter character) {
-        if (character == null) return new ItemStack(Items.PAPER);
-        String type = character.type().toLowerCase(java.util.Locale.ROOT);
-        return new ItemStack(type.contains("archer") || type.contains("hunter") ? Items.BOW
-                : type.contains("warrior") || type.contains("knight") ? Items.IRON_SHOVEL
-                : type.contains("mage") || type.contains("wizard") ? Items.STICK
-                : type.contains("assassin") || type.contains("ninja") ? Items.IRON_SWORD
-                : type.contains("shaman") || type.contains("skyseer") ? Items.TOTEM_OF_UNDYING : Items.PAPER);
-    }
-
     private void picker() {
-        var owner = account();
+        picker(account(), null, () -> {});
+    }
+    private void picker(UUID owner, ClassShortcut replacement, Runnable replaced) {
         var snapshot = store.account(owner);
         var content = modal("ralle.classes.add");
         var choices = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content()).gap(4);
@@ -147,7 +137,10 @@ final class ClassShortcutsPanel extends FlowLayout {
             if (snapshot.shortcuts().stream().anyMatch(s -> s.characterId().equals(character.id()))) continue;
             count++;
             var button = UIComponents.button(RalleTheme.ui(Component.literal(character.displayName(""))), ignored -> {
-                if (mutate(owner, () -> store.add(owner, character.id()))) overlay[0].remove();
+                if (mutate(owner, () -> {
+                    if (replacement == null) store.add(owner, character.id());
+                    else store.retarget(owner, replacement, character.id());
+                })) { overlay[0].remove(); replaced.run(); }
             });
             // Character numbers distinguish duplicate names without exposing hashes as game identities.
             int number = WynncraftClassMenu.characterNumber(character.id());
@@ -155,7 +148,12 @@ final class ClassShortcutsPanel extends FlowLayout {
                     : text("ralle.classes.character-number", number, character.type()));
             button.sizing(Sizing.fill(100), Sizing.fixed(20));
             button.renderer(RalleButtonRenderers.neutral());
-            choices.child(button);
+            var row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content()).gap(4);
+            row.verticalAlignment(VerticalAlignment.CENTER);
+            row.child(UIComponents.item(ClassPresentation.item(character)).sizing(Sizing.fixed(18)));
+            button.horizontalSizing(Sizing.expand(100));
+            row.child(button);
+            choices.child(row);
         }
         if (count == 0) choices.child(UIComponents.label(text(snapshot.characters().isEmpty()
                 ? "ralle.classes.detect-next" : "ralle.classes.all-added")).color(RalleTheme.muted()).maxWidth(266));
@@ -197,6 +195,9 @@ final class ClassShortcutsPanel extends FlowLayout {
         var error = UIComponents.label(Component.empty()).color(Color.ofRgb(0xFF6B6B)).maxWidth(266);
         content.child(error);
         @SuppressWarnings("rawtypes") var overlay = new OverlayContainer[1];
+        if (store.account(owner).character(shortcut.characterId()) == null)
+            content.child(button("ralle.classes.retarget", () -> picker(owner,
+                    new ClassShortcut(shortcut.characterId(), name.getValue(), draftBinding[0]), () -> overlay[0].remove())));
         content.child(button("ralle.classes.apply", () -> {
             try {
                 requireAccount(owner);

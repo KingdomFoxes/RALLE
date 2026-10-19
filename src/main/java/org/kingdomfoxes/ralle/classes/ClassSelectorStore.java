@@ -60,7 +60,7 @@ public final class ClassSelectorStore {
             data.accounts.forEach((id, account) -> {
                 java.util.Objects.requireNonNull(id);
                 // Reconstruct nested records to validate even when the serializer bypasses constructors.
-                var characters = account.characters.stream().map(c -> new ClassCharacter(c.id(), c.type(), c.nickname())).toList();
+                var characters = account.characters.stream().map(c -> new ClassCharacter(c.id(), c.type(), c.nickname(), c.sprite())).toList();
                 var shortcuts = account.shortcuts.stream().map(s -> new ClassShortcut(s.characterId(), s.name(), s.binding())).toList();
                 accounts.put(id, new Account(characters, shortcuts));
             });
@@ -74,7 +74,14 @@ public final class ClassSelectorStore {
         var previous = account(scan.account());
         var characters = new LinkedHashMap<String, ClassCharacter>();
         if (!scan.complete()) previous.characters.forEach(c -> characters.put(c.id(), c));
-        scan.characters().forEach(c -> characters.put(c.id(), c));
+        // A partial scan may refresh a position's evidence without proving continuity of identity.
+        // Retire its old catalog entry rather than accumulating duplicates or redirecting a shortcut.
+        for (var incoming : scan.characters()) {
+            int position = WynncraftClassMenu.characterNumber(incoming.id());
+            if (position >= 0) characters.values().removeIf(old ->
+                    WynncraftClassMenu.characterNumber(old.id()) == position && !old.id().equals(incoming.id()));
+            characters.put(incoming.id(), incoming);
+        }
         replace(scan.account(), new Account(List.copyOf(characters.values()), previous.shortcuts));
     }
 
@@ -106,6 +113,28 @@ public final class ClassSelectorStore {
 
     public void clearShortcuts(UUID account) throws IOException {
         replace(account, new Account(account(account).characters(), List.of()));
+    }
+
+    /** Hydrate only matching existing references; historical captures cannot resurrect removed entries. */
+    public void updateSprites(UUID account, Map<String, ClassSprite> sprites) throws IOException {
+        var current = account(account);
+        var characters = current.characters.stream().map(c -> c.sprite() == null && sprites.containsKey(c.id())
+                ? new ClassCharacter(c.id(), c.type(), c.nickname(), sprites.get(c.id())) : c).toList();
+        replace(account, new Account(characters, current.shortcuts));
+    }
+
+    /** Explicit user reassignment preserves the row's order and preferences; scans never guess it. */
+    public void retarget(UUID account, ClassShortcut draft, String targetId) throws IOException {
+        var current = account(account);
+        if (current.character(targetId) == null) throw new IllegalArgumentException("Character is no longer detected");
+        if (!draft.characterId().equals(targetId) && current.shortcuts.stream().anyMatch(s -> s.characterId().equals(targetId)))
+            throw new IllegalArgumentException("Character already has a shortcut");
+        var shortcuts = new ArrayList<>(current.shortcuts);
+        int index = -1;
+        for (int i = 0; i < shortcuts.size(); i++) if (shortcuts.get(i).characterId().equals(draft.characterId())) index = i;
+        if (index < 0) throw new IllegalArgumentException("Shortcut no longer exists");
+        shortcuts.set(index, new ClassShortcut(targetId, draft.name(), draft.binding()));
+        replace(account, new Account(current.characters, shortcuts));
     }
 
     private void replace(UUID id, Account account) throws IOException {

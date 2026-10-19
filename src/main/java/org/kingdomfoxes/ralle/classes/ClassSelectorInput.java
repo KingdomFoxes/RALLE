@@ -34,7 +34,7 @@ public final class ClassSelectorInput {
         held.remove(key);
         if (finished || !key.equals(armedKey)) return null;
         String result = modifierHeld ? selected : null;
-        finished = true;
+        finished = !modifierHeld || selected != null;
         selected = null;
         armedKey = null;
         return result;

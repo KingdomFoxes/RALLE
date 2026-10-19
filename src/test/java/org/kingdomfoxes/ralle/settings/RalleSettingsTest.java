@@ -423,12 +423,16 @@ class RalleSettingsTest {
         assertEquals(KeybindSetting.UNBOUND,
                 registry.setting("automatic-raid-requeue-keybind", KeybindSetting.class).value());
         assertEquals(List.of("raid-lfg-enabled"), registry.dependencies("automatic-raid-requeue-keybind"));
-        assertTrue(categories.get(3).subcategories().isEmpty());
-        assertEquals(List.of("raid-lfg-create-selector-wheel", RalleSettings.CREATE_WHEEL_STYLE_ID,
-                        "raid-lfg-kick-selector-wheel", RalleSettings.KICK_WHEEL_STYLE_ID,
-                        RalleSettings.CLASS_SELECTOR_ID, RalleSettings.CLASS_STYLE_ID,
+        assertTrue(categories.get(3).entries().isEmpty());
+        assertEquals(List.of("lfg-create-selector", "party-kick-selector", "class-selector"),
+                categories.get(3).subcategories().stream().map(value -> value.id()).toList());
+        assertEquals(List.of("raid-lfg-create-selector-wheel", RalleSettings.CREATE_WHEEL_STYLE_ID),
+                categories.get(3).subcategories().get(0).entries().stream().map(value -> value.id()).toList());
+        assertEquals(List.of("raid-lfg-kick-selector-wheel", RalleSettings.KICK_WHEEL_STYLE_ID),
+                categories.get(3).subcategories().get(1).entries().stream().map(value -> value.id()).toList());
+        assertEquals(List.of(RalleSettings.CLASS_SELECTOR_ID, RalleSettings.CLASS_STYLE_ID,
                         RalleSettings.CLASS_MODIFIER_ID, RalleSettings.CLASS_SHORTCUTS_ID),
-                categories.get(3).entries().stream().map(value -> value.id()).toList());
+                categories.get(3).subcategories().get(2).entries().stream().map(value -> value.id()).toList());
         assertEquals(10, categories.get(2).subcategories().get(1).entries().size());
         assertEquals(List.of("attack-timers", "territory-map", "consumables"),
                 categories.get(4).subcategories().stream().map(value -> value.id()).toList());

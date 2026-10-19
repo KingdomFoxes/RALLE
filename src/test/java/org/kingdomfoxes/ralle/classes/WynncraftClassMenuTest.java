@@ -34,6 +34,8 @@ class WynncraftClassMenuTest {
         assertTrue(result.characters().stream().allMatch(c -> c.nickname().isEmpty()));
         assertTrue(result.characters().stream().noneMatch(ClassCharacter::hasStableIdentity));
         assertEquals(4, result.characters().stream().map(ClassCharacter::id).distinct().count());
+        assertEquals(List.of(575F, 580F, 582F, 584F), result.characters().stream().map(c -> c.sprite().model()).toList());
+        for (var character : result.characters()) assertEquals(result.slots().get(character.id()).intValue(), result.resolve(character.id()).orElseThrow());
     }
 
     @Test void incompleteCaptureCannotEraseMageOrItsCustomShortcut() throws Exception {
@@ -51,6 +53,7 @@ class WynncraftClassMenuTest {
         }
         var partial = decode(fixture);
         assertFalse(partial.complete());
+        assertTrue(partial.resolve(mage.id()).isEmpty());
         assertEquals(3, partial.characters().size());
         store.reconcile(partial.scan(ACCOUNT));
         assertEquals(4, store.account(ACCOUNT).characters().size());
@@ -72,23 +75,50 @@ class WynncraftClassMenuTest {
         var twoMages = decode(source);
         assertEquals(2, twoMages.characters().stream().filter(c -> c.type().equals("Mage")).count());
         assertNotEquals(twoMages.characters().get(0).id(), twoMages.characters().get(1).id());
+        assertTrue(twoMages.resolve(twoMages.characters().get(0).id()).isEmpty());
+        assertTrue(twoMages.resolve(twoMages.characters().get(1).id()).isEmpty());
+        assertTrue(twoMages.resolve(twoMages.characters().get(2).id()).isPresent());
         String original = twoMages.characters().get(1).id();
         var renamed = new JsonObject();
         renamed.addProperty("text", "Renamed Mage");
         slot(source, 10).getAsJsonObject("item").getAsJsonObject("components").add("minecraft:custom_name", renamed);
-        var changed = decode(source).characters().get(1);
+        var renamedBook = decode(source);
+        var changed = renamedBook.characters().get(1);
         assertEquals("Renamed Mage", changed.nickname());
         assertNotEquals(original, changed.id());
         assertFalse(changed.hasStableIdentity());
+        assertTrue(renamedBook.resolve(original).isEmpty());
+        assertEquals(10, renamedBook.resolve(changed.id()).orElseThrow());
+    }
+
+    @Test void capturedObservationCanSwitchOnlyThroughAnExactCompleteUniqueLiveBook() throws Exception {
+        var saved = decode(fixture()).characters().get(1);
+        var calls = new ArrayList<String>();
         var controller = new ClassSwitchController(new ClassSwitchController.Actions() {
-            public void captureFrame() { fail("An observation cannot begin automation"); }
-            public void sendClassCommand() { fail(); }
-            public void rightClickSelectionStage() { fail(); }
-            public void selectCharacter(int containerId, int slot) { fail(); }
-            public void releaseFrame() { fail(); }
-            public void failed(ClassSwitchController.Failure failure) { fail(); }
+            public void captureFrame() { calls.add("capture"); }
+            public void sendClassCommand() { calls.add("class"); }
+            public void rightClickSelectionStage() { calls.add("right"); }
+            public void selectCharacter(int containerId, int slot) { calls.add("select:" + containerId + ":" + slot); }
+            public void releaseFrame() { calls.add("release"); }
+            public void failed(ClassSwitchController.Failure failure) { fail(failure.toString()); }
         });
-        assertFalse(controller.begin(ACCOUNT, changed.id(), null, true, 0));
+        assertTrue(controller.begin(ACCOUNT, saved.id(), null, true, 0));
+        controller.frameCaptured(); controller.selectionStage();
+        var live = decode(fixture());
+        controller.menu(7, List.of(new ClassSwitchController.Target(saved.id(), live.resolve(saved.id()).orElseThrow())), true);
+        controller.transition(saved.id());
+        assertTrue(controller.active());
+        controller.menuClosed(7);
+        controller.transition(saved.id());
+        assertEquals(ClassSwitchController.State.WAITING_WORLD, controller.state());
+        controller.worldReady();
+        assertEquals(List.of("capture", "class", "right", "select:7:10", "release"), calls);
+
+        var moved = fixture();
+        var from = slot(moved, 10);
+        var to = slot(moved, 19);
+        from.addProperty("slot", 19); to.addProperty("slot", 10);
+        assertTrue(decode(moved).resolve(saved.id()).isEmpty()); // Never follow a similar entry to a new position.
     }
 
     @Test void unrelatedMenusWrongAccountsCorruptSlotsAndChangedToolbarNeverReconcile() throws Exception {
@@ -118,6 +148,60 @@ class WynncraftClassMenuTest {
         var decoded = decode(fixture);
         assertFalse(decoded.complete());
         assertEquals(List.of("Archer", "Shaman", "Warrior"), decoded.characters().stream().map(ClassCharacter::type).toList());
+    }
+
+    @Test void aPartialRefreshRetiresOldEvidenceWithoutDuplicatingOrRedirectingShortcuts() throws Exception {
+        var fixture = fixture();
+        var original = decode(fixture);
+        var store = new ClassSelectorStore(directory.resolve("classes.json"));
+        store.reconcile(original.scan(ACCOUNT));
+        var oldMage = original.characters().get(1);
+        store.add(ACCOUNT, oldMage.id());
+        var renamed = new JsonObject(); renamed.addProperty("text", "Changed Mage");
+        slot(fixture, 10).getAsJsonObject("item").getAsJsonObject("components").add("minecraft:custom_name", renamed);
+        var incoming = decode(fixture).characters().get(1);
+        store.reconcile(new ClassScan(ACCOUNT, List.of(incoming), false));
+        assertEquals(4, store.account(ACCOUNT).characters().size());
+        assertNull(store.account(ACCOUNT).character(oldMage.id()));
+        assertEquals(oldMage.id(), store.account(ACCOUNT).shortcuts().getFirst().characterId());
+        assertNotNull(store.account(ACCOUNT).character(incoming.id()));
+    }
+
+    @Test void oldFilesCanHydrateSpritesWithoutChangingNamesBindingsOrResurrectingEntries() throws Exception {
+        var decoded = decode(fixture());
+        var store = new ClassSelectorStore(directory.resolve("classes.json"));
+        var first = decoded.characters().getFirst();
+        store.reconcile(new ClassScan(ACCOUNT, List.of(new ClassCharacter(first.id(), first.type(), first.nickname())), true));
+        store.add(ACCOUNT, first.id());
+        store.edit(ACCOUNT, new ClassShortcut(first.id(), "Local override", "key.keyboard.g"));
+        var sprites = new HashMap<String, ClassSprite>();
+        decoded.characters().forEach(c -> sprites.put(c.id(), c.sprite()));
+        store.updateSprites(ACCOUNT, sprites);
+        var loaded = new ClassSelectorStore(directory.resolve("classes.json")).account(ACCOUNT);
+        assertEquals(1, loaded.characters().size());
+        assertEquals(first.sprite(), loaded.characters().getFirst().sprite());
+        assertEquals(new ClassShortcut(first.id(), "Local override", "key.keyboard.g"), loaded.shortcuts().getFirst());
+    }
+
+    @Test void onlyExplicitRetargetingTransfersPreferencesToChangedEvidence() throws Exception {
+        var fixture = fixture();
+        var original = decode(fixture);
+        var store = new ClassSelectorStore(directory.resolve("classes.json"));
+        store.reconcile(original.scan(ACCOUNT));
+        var archer = original.characters().get(0);
+        var mage = original.characters().get(1);
+        store.add(ACCOUNT, archer.id()); store.add(ACCOUNT, mage.id());
+        var old = new ClassShortcut(mage.id(), "My mage", "key.keyboard.g");
+        store.edit(ACCOUNT, old);
+        var renamed = new JsonObject(); renamed.addProperty("text", "Fresh Mage");
+        slot(fixture, 10).getAsJsonObject("item").getAsJsonObject("components").add("minecraft:custom_name", renamed);
+        var fresh = decode(fixture).characters().get(1);
+        store.reconcile(new ClassScan(ACCOUNT, List.of(fresh), false));
+        assertEquals(mage.id(), store.account(ACCOUNT).shortcuts().get(1).characterId());
+        assertThrows(IllegalArgumentException.class, () -> store.retarget(ACCOUNT, old, archer.id()));
+        store.retarget(ACCOUNT, old, fresh.id());
+        assertEquals(List.of(archer.id(), fresh.id()), store.account(ACCOUNT).shortcuts().stream().map(ClassShortcut::characterId).toList());
+        assertEquals(new ClassShortcut(fresh.id(), old.name(), old.binding()), store.account(ACCOUNT).shortcuts().get(1));
     }
 
     @Test void captureRecoveryCanSeedTheEditorAndResetClearsOnlyShortcuts() throws Exception {

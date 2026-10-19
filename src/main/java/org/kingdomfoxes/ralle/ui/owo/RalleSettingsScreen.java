@@ -960,6 +960,11 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             return RalleTheme.ui(Component.translatable("ralle.settings.keybind.unbound"));
         }
         try {
+            if (RalleSettings.CLASS_MODIFIER_ID.equals(setting.id())
+                    && org.kingdomfoxes.ralle.classes.ClassBindingConflicts.modifier(settings))
+                return RalleTheme.ui(InputConstants.getKey(setting.value()).getDisplayName().copy()
+                        .append(" · ").append(Component.translatable("ralle.classes.conflict"))
+                        .withStyle(net.minecraft.ChatFormatting.RED));
             return RalleTheme.ui(InputConstants.getKey(setting.value()).getDisplayName());
         } catch (IllegalArgumentException ignored) {
             return RalleTheme.ui(Component.translatable("ralle.settings.keybind.unbound"));
