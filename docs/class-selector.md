@@ -2,7 +2,7 @@
 
 The native switching adapter is implemented. It retains a GPU copy of the
 submitted frame, sends the bounded command/click sequence and observes the
-server-confirmed world return while normal rendering and ticks continue. Automated
+1600 ms post-book-close timer while normal rendering and ticks continue. Automated
 checks replay the user's menu capture and the door/load sequence, and an
 opt-in test exercises the real Minecraft GPU copy/readback APIs. A full live
 Wynncraft switch, standalone and with Wynntils, still needs in-game validation;
@@ -111,8 +111,8 @@ update is missing the Mage position: it must not erase the previous Mage entry.
 Housing and other unrelated menus fail recognition.
 
 **Those captured items carry no stable character IDs.** The decoder creates
-explicit `observed:<slot>:<sha256>` references from the full visible evidence,
-including position, model, name and lore. They are not server identities. At
+explicit `observed:<slot>:<sha256>` references from normalized identifying evidence,
+including position, model, potion tint, name and non-progress lore. They are not server identities. At
 submission, the native adapter requires the same reference in a complete,
 recognized **live** book. It also hashes that entry's evidence without position
 and requires it to occur exactly once: two otherwise identical entries in
@@ -121,13 +121,28 @@ live menu again immediately before the click. Historical captures, names, types
 and slot numbers alone never authorize selection, and there is no nearest-match
 or position fallback.
 
-Changed evidence produces a new reference. This includes changes to nickname,
-location, level or time played, so a previously played character can require
-explicit reassignment in the editor. Preferences remain saved in their original
-row; the system never silently transfers them to a potentially different
-character. This conservative limitation remains until the game supplies a
-verified stable identity source. The decoder removes legacy formatting and
-resource-font glyphs from displayed names/lore while preserving ordinary text.
+Play time, location, level/XP and the recognized Content Progress bar/count are
+progress, not identity. Their values are normalized before hashing, so playing X,
+switching to Y, and returning to X preserves X's shortcut. Required fields must
+still be present. Nickname, class type, model/tint, position, gamemode and other
+non-progress lore remain part of the identifying evidence. Renames, moves and
+other identifying changes still require explicit reassignment. Two entries with
+identical identifying evidence cannot be disambiguated by their differing levels
+or play times. The decoder removes formatting and resource-font glyphs as before.
+
+The decoder also computes the old full-item hash as a migration proof. Existing
+references are upgraded only when a retained account-matching item capture or a
+received live book proves that exact old hash. Migration preserves row order,
+local names, keys, character sprites, last-load records and compass associations.
+If a progress update already replaced the catalog's old hash, migration restores
+the proven normalized descriptor only while that position remains occupied by a
+saved entry with the same name, type and sprite. A missing/deleted entry is never
+restored, and this catalog repair cannot bypass complete live-book validation.
+Capture recovery examines at most four bounded files on session initialization,
+even when sprites are already present. It does not resurrect removed shortcuts.
+No slot/name-only migration is allowed; legacy references without proof still
+offer the explicit reassignment action. All four shortcuts in the reported local
+configuration have matching retained captures and can migrate on the next load.
 
 Partial refreshes retire the old catalog observation at an updated position,
 preventing duplicate entries without redirecting its shortcut. A stale shortcut's
@@ -203,8 +218,11 @@ inference have been removed from the runtime.
 WAITING_TRANSITION (one target click sent), and WAITING_WORLD (book closed).
 **Book-close does not release the frame or audio.** All door animation, initial
 blackout and final handoff frames remain covered by the selected GPU frame.
-There is no screen-darkness check, frame readback, synthetic fade or fixed
-animation sleep in the switching path.
+The first accepted book-close starts a monotonic **1600 ms** animation timer.
+At its deadline, the next tick or render callback releases frame, audio and input
+together. Duplicate closes, later menus, missing welcome messages, camera state
+and spectator state do not delay or restart that timer. No screen-darkness check,
+frame readback, synthetic fade or blocking sleep participates in switching.
 
 `ClassMenuSignalsMixin` observes original packet titles/text at HEAD with priority
 1200 on the client thread, before another mod can transform or cancel display.
@@ -216,28 +234,24 @@ closes before selection cannot establish a load. Unrelated nonzero closes and
 unrelated pre-load open-menu packets still fail. A lingering native/replaced book
 screen after selection is allowed to finish its normal close lifecycle.
 
-`ClassLoadSignals` recognizes the naturally received world welcome observed after
-every successful selection in the supplied logs: a standalone `Welcome to
-Wynncraft!` line accompanied by the server website line. Font glyphs and legacy
-formatting do not prevent recognition. This is a load-stage signal, not a
-character identity. Completion additionally requires a complete rendered frame
-with the camera on the local player, a non-spectator game mode, no screen or
-resource overlay, the inventory container active, no busy hands and no current
-selection prompt. A detached door camera, spectator stage, stale menu, or welcome
-alone cannot finish. These native camera/mode checks still require live
-standalone and Wynntils validation on the current server revision.
+The 12:41–13:01 attempts reached WAITING_WORLD but never observed the expected
+welcome signal, leaving the image frozen until Escape. Per the user's correction,
+an observed selected-book close plus the 1.6-second timer now completes the switch
+without requiring welcome, camera, game-mode or other world-entry heuristics.
+`ClassLoadSignals` welcome/compass recovery remains an optional observation path
+for known naturally auto-joined classes; it cannot hold the switching freeze.
 
 Wynntils can start passive inventory queries immediately after the welcome.
-After the selected book has closed and that fresh welcome arrives, their menus
+After the selected book has closed, their menus
 may open/close normally beneath the frame; RALLE submits no further menu clicks.
-The freeze waits for them to finish and for a rendered usable world. Before
-those load signals, unrelated menus still abort.
+The timer does not wait for those queries to finish. Before the selected book's
+close, unrelated menus still abort.
 
 `ClassSwitchFrame` now owns only one GPU texture and native texture copies. It
 never replaces the live render target or pauses world/GUI/network ticks.
 `ClassSwitchAudio` keeps all output channels muted without changing saved sound
 options, audio playback or ticking. Frame, audio and input ownership end together
-on confirmed world return. Escape, timeout, disconnect, account change, focus
+1600 ms after the selected book closes. Escape, timeout, disconnect, account change, focus
 loss, disable, resource reload, resize, failure and shutdown release ownership
 exactly once. Modifier release after submission does not cancel. Escape sends no
 undo command or synthetic server-menu close.
@@ -246,8 +260,8 @@ undo command or synthetic server-menu close.
 
 `ClassLoadTracker` owns current-class knowledge independently of the presentation
 operation. Both a verified manual book click and an automated target click record
-a pending observation. It becomes current only after book-close, a fresh world
-welcome and the rendered gameplay checks above. Cancelling the frozen view after
+a pending observation. It becomes current after book-close and the same 1600 ms
+door timer, without waiting for a welcome or camera signal. Cancelling the frozen view after
 selection does not erase a later real load. A new selection stage invalidates
 outgoing current-class knowledge; disconnect/account changes discard session
 confirmation. Duplicate loads do not repeatedly write storage.
@@ -278,8 +292,8 @@ guessed from class type, name, position, last-used history or another account.
 `lastReference` survives restarts as history, but is not blindly presented as
 current on reconnect. A first-time auto-join without a previously observed token
 association remains unknown until a real book selection establishes it. This
-tracking does not change the strict full-evidence requirement for target clicks
-or silently retarget a shortcut whose book evidence changed.
+tracking does not bypass normalized identifying-evidence checks for target clicks
+or silently retarget a shortcut whose identifying evidence changed.
 
 ### Animation-skip research
 
@@ -299,8 +313,10 @@ Only the received-field contract was used; no external source/assets were copied
 Focused checks cover exact complete live-book resolution, immediate target
 selection through the packet-tail bridge, 100 ms click spacing and bounds,
 Auto Open, zero-ID/native book closes, cleanup at every controller stage, frame
-and audio retention throughout a simulated 0.8-second door sequence, and release
-only on confirmed gameplay. Hook tests verify the actual mapped Minecraft packet
+and audio retention throughout a simulated 1.6-second door sequence, and release
+at the 1600 ms book-close deadline even without world-entry signals. Tests replay
+X-to-Y-to-X with changed progress and verify evidence-proven legacy migration.
+Hook tests verify the actual mapped Minecraft packet
 and input boundaries and that runtime code never samples screen pixels.
 
 `ClassLoadTrackerTest` covers manual/automatic selection confirmation, late and
@@ -317,7 +333,7 @@ readback and the historical video-mask classifier are not shipped as runtime
 switching logic.
 
 Before release, perform complete live switches on Wynncraft, standalone and with
-Wynntils. Confirm the welcome/camera/mode boundary covers the entire door, passive
+Wynntils. Confirm the 1600 ms book-close timer covers the door, passive
 queries finish beneath the frame, normal and Auto Open books select promptly,
 and current-class indicators persist after manual/automatic loads and reconnects.
 Exercise Escape, delayed/missing signals, timeout, disconnect, account changes,

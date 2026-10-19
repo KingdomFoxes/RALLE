@@ -13,6 +13,7 @@ public final class ClassLoadTracker {
     private int book = -1;
     private boolean closed, welcomed, saveFailed;
     private long selectionUntil, welcomeUntil;
+    private long animationEnds;
 
     public ClassLoadTracker(ClassSelectorStore store) { this(store, () -> System.nanoTime() / 1_000_000); }
     ClassLoadTracker(ClassSelectorStore store, java.util.function.LongSupplier clock) { this.store = store; this.clock = clock; }
@@ -32,7 +33,10 @@ public final class ClassLoadTracker {
     public void closed(int packetContainer, int liveContainer) {
         expire();
         if (pending != null && (packetContainer == book || liveContainer == book
-                || packetContainer == 0 && liveContainer == 0)) closed = true;
+                || packetContainer == 0 && liveContainer == 0) && !closed) {
+            closed = true;
+            animationEnds = clock.getAsLong() + ClassSwitchController.ANIMATION_MILLIS;
+        }
     }
     public void welcome() { expire(); welcomed = true; welcomeUntil = clock.getAsLong() + ClassSwitchController.TIMEOUT_MILLIS; }
     public void compass(String token) {
@@ -41,9 +45,12 @@ public final class ClassLoadTracker {
     }
     public boolean awaitingWorld() { expire(); return welcomed && (pending == null || closed); }
 
-    /** Called after a complete frame with local-player camera, no menu and normal gameplay mode. */
+    /** Selected books use the approved 1600 ms door timer. Token-only recovery still needs live evidence. */
     public boolean gameplay(boolean usable) {
-        if (!usable || !awaitingWorld() || account == null) return false;
+        expire();
+        boolean finishedAnimation = pending != null && closed && clock.getAsLong() >= animationEnds;
+        if (account == null || !finishedAnimation && (!usable || !awaitingWorld())) return false;
+        if (pending != null && !finishedAnimation) return false;
         if (pending == null && token == null) return false; // Wait for a late natural compass refresh.
         String reference = pending != null ? pending : store.referenceForToken(account, token);
         current = reference;

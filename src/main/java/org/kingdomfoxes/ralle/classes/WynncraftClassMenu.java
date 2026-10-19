@@ -11,7 +11,7 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 /** Decoder for the character book observed in the 2026-10-19 game captures.
- * The book has no character UUIDs. References require an exact live evidence match;
+ * The book has no character UUIDs. References require an exact normalized live evidence match;
  * identical entries in different positions are deliberately not distinguishable.
  */
 public final class WynncraftClassMenu {
@@ -24,12 +24,14 @@ public final class WynncraftClassMenu {
     private static final Pattern LEGACY = Pattern.compile("§.");
 
     public record Result(List<ClassCharacter> characters, Map<String, Integer> slots,
-                         Map<String, String> evidence, boolean complete) {
-        public Result { characters = List.copyOf(characters); slots = Map.copyOf(slots); evidence = Map.copyOf(evidence); }
+                         Map<String, String> evidence, boolean complete, Map<String, String> legacyReferences) {
+        public Result { characters = List.copyOf(characters); slots = Map.copyOf(slots); evidence = Map.copyOf(evidence); legacyReferences = Map.copyOf(legacyReferences); }
         public ClassScan scan(UUID account) { return new ClassScan(account, characters, complete); }
-        /** No fallback by position, nickname or type. The entire saved observation must still match,
+        public String canonicalReference(String reference) { return legacyReferences.getOrDefault(reference, reference); }
+        /** No fallback by position, nickname or type. Normalized identifying evidence must match,
          * and its position-independent evidence must occur exactly once in this complete live book. */
         public OptionalInt resolve(String reference) {
+            reference = canonicalReference(reference);
             String fingerprint = evidence.get(reference);
             Integer slot = slots.get(reference);
             if (!complete || slot == null || fingerprint == null
@@ -58,6 +60,7 @@ public final class WynncraftClassMenu {
         var characters = new ArrayList<ClassCharacter>();
         var slots = new LinkedHashMap<String, Integer>();
         var evidence = new LinkedHashMap<String, String>();
+        var legacyReferences = new LinkedHashMap<String, String>();
         boolean complete = true;
         for (int slot : CHARACTER_SLOTS) {
             var item = items.get(slot);
@@ -67,8 +70,9 @@ public final class WynncraftClassMenu {
             characters.add(character);
             slots.put(character.id(), slot);
             evidence.put(character.id(), digest(evidence(item)));
+            legacyReferences.put(ClassCharacter.OBSERVATION_PREFIX + slot + ":" + digest(slot + "\n" + rawEvidence(item)), character.id());
         }
-        return Optional.of(new Result(characters, slots, evidence, complete));
+        return Optional.of(new Result(characters, slots, evidence, complete, legacyReferences));
     }
 
     private static ClassCharacter character(int slot, ItemStack item) {
@@ -89,8 +93,8 @@ public final class WynncraftClassMenu {
         if (name.isBlank() || name.length() > 128 || lines.stream().anyMatch(line -> line.length() > 512)) return null;
         var model = item.get(DataComponents.CUSTOM_MODEL_DATA);
         if (model == null || model.floats().size() != 1 || !Float.isFinite(model.floats().getFirst())) return null;
-        // Include position and the complete visible evidence. Never merge by name/type alone, and
-        // never claim this hash is a stable server identity. Changed evidence requires rediscovery.
+        // Progress changes naturally when playing. Keep all identifying evidence and position,
+        // but do not mistake play time, location, level or content progress for character identity.
         String reference = ClassCharacter.OBSERVATION_PREFIX + slot + ":" + digest(slot + "\n" + evidence(item));
         var potion = item.get(DataComponents.POTION_CONTENTS);
         int tint = potion == null ? 0xFFFFFF : potion.customColor().orElse(0xFFFFFF);
@@ -99,6 +103,24 @@ public final class WynncraftClassMenu {
     }
 
     private static String evidence(ItemStack item) {
+        var lines = new ArrayList<>(item.get(DataComponents.LORE).lines().stream().map(line -> clean(line.getString())).toList());
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            for (String field : List.of("- Time Played: ", "- Location: ", "- Level: "))
+                if (line.startsWith(field)) lines.set(i, field + "<progress>");
+            if (line.equals("Content Progress") && i + 2 < lines.size()
+                    && lines.get(i + 1).matches("\\[[|0-9.% ]+\\]") && lines.get(i + 2).matches("[0-9]+ of [0-9]+")) {
+                lines.set(i + 1, "<content progress>");
+                lines.set(i + 2, "<content count>");
+            }
+        }
+        var potion = item.get(DataComponents.POTION_CONTENTS);
+        int tint = potion == null ? 0xFFFFFF : potion.customColor().orElse(0xFFFFFF);
+        return item.get(DataComponents.CUSTOM_MODEL_DATA).floats().getFirst() + "\n" + tint + "\n" + name(item) + "\n" + String.join("\n", lines);
+    }
+
+    /** Historical full-item hash, used only to prove migration of an existing old reference. */
+    private static String rawEvidence(ItemStack item) {
         return item.get(DataComponents.CUSTOM_MODEL_DATA).floats().getFirst() + "\n" + name(item) + "\n"
                 + String.join("\n", item.get(DataComponents.LORE).lines().stream().map(line -> clean(line.getString())).toList());
     }

@@ -8,6 +8,7 @@ public final class ClassSwitchController {
     public static final long TIMEOUT_MILLIS = 15_000;
     public static final long STAGE_CLICK_INTERVAL_MILLIS = 100;
     public static final int MAX_STAGE_CLICKS = 150;
+    public static final long ANIMATION_MILLIS = 1600;
     public enum State { IDLE, CAPTURING, WAITING_STAGE, WAITING_MENU, WAITING_TRANSITION, WAITING_WORLD }
     public enum Failure { CANCELLED, TIMEOUT, DISCONNECTED, UNEXPECTED_MENU, AMBIGUOUS_TARGET, ACCOUNT_CHANGED, UNAVAILABLE }
 
@@ -37,6 +38,7 @@ public final class ClassSwitchController {
     private boolean bookReceived;
     private long nextStageClick;
     private int stageClicks;
+    private long animationEnds;
 
     public ClassSwitchController(Actions actions) { this.actions = java.util.Objects.requireNonNull(actions); }
     public State state() { return state; }
@@ -110,24 +112,25 @@ public final class ClassSwitchController {
 
     /** Vanilla closes its live menu regardless of the packet ID. A zero-ID close after
      * selection may also follow another mod locally dismissing that same book. */
-    public void serverClosed(int packetContainer, int liveContainer) {
+    public void serverClosed(int packetContainer, int liveContainer, long now) {
         int closed = selectedContainer >= 0 && (liveContainer == selectedContainer
                 || packetContainer == 0 && liveContainer == 0) ? selectedContainer : packetContainer;
-        menuClosed(closed);
+        menuClosed(closed, now);
     }
-    public void menuClosed(int containerId) {
+    public void menuClosed(int containerId, long now) {
         if (!active()) return;
         if (containerId == 0 && selectedContainer < 0) return;
-        if (state == State.WAITING_WORLD && (containerId == selectedContainer || containerId == 0)) return;
+        if (state == State.WAITING_WORLD) return; // Later closes cannot restart the animation timer.
         if (state != State.WAITING_TRANSITION || containerId != selectedContainer) {
             fail(Failure.UNEXPECTED_MENU);
             return;
         }
         state = State.WAITING_WORLD;
+        animationEnds = now + ANIMATION_MILLIS;
     }
 
-    /** Fresh server load evidence and a rendered controllable world complete the switch together. */
-    public void worldReady() {
+    /** The user-approved door duration bounds frame, audio and input ownership. */
+    private void worldReady() {
         if (state != State.WAITING_WORLD) return;
         String completed = target;
         finish();
@@ -139,6 +142,7 @@ public final class ClassSwitchController {
         if (!connected) fail(Failure.DISCONNECTED);
         else if (!this.account.equals(account)) fail(Failure.ACCOUNT_CHANGED);
         else if (now - started >= TIMEOUT_MILLIS) fail(Failure.TIMEOUT);
+        else if (state == State.WAITING_WORLD && now >= animationEnds) worldReady();
     }
     public void unexpectedMenu() { if (active()) fail(Failure.UNEXPECTED_MENU); }
     public void cancel() { if (active()) fail(Failure.CANCELLED); }

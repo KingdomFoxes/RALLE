@@ -112,6 +112,55 @@ public final class ClassSelectorStore {
         save(accounts, nextLoads);
     }
 
+    /** Upgrade only references proven by complete historical item evidence, never name/slot guesses. */
+    public void migrateReferences(UUID account, Map<String, String> aliases) throws IOException {
+        migrateReferences(account, aliases, List.of());
+    }
+    public void migrateReferences(UUID account, Map<String, String> aliases, List<ClassCharacter> proofs) throws IOException {
+        if (aliases.isEmpty()) return;
+        var previous = account(account);
+        var characters = new LinkedHashMap<String, ClassCharacter>();
+        for (var character : previous.characters) {
+            String id = aliases.getOrDefault(character.id(), character.id());
+            characters.putIfAbsent(id, new ClassCharacter(id, character.type(), character.nickname(), character.sprite()));
+        }
+        var shortcuts = new ArrayList<ClassShortcut>();
+        for (var shortcut : previous.shortcuts) {
+            String id = aliases.getOrDefault(shortcut.characterId(), shortcut.characterId());
+            if (shortcuts.stream().anyMatch(existing -> existing.characterId().equals(id))) return; // Conflicting rows stay untouched.
+            shortcuts.add(new ClassShortcut(id, shortcut.name(), shortcut.binding()));
+            // A progress refresh may have retired the old catalog hash already. Restore its
+            // proven normalized descriptor only when that position is still occupied with the
+            // same saved name/type/sprite. Never resurrect a missing/deleted catalog entry.
+            // This does not authorize a click: exact complete live-book evidence still must match.
+            if (!id.equals(shortcut.characterId()) && !characters.containsKey(id)) {
+                var proof = proofs.stream().filter(character -> character.id().equals(id)).findFirst().orElse(null);
+                if (proof != null) {
+                    var known = characters.values().stream().filter(character ->
+                            WynncraftClassMenu.characterNumber(character.id()) == WynncraftClassMenu.characterNumber(proof.id())
+                                    && character.type().equals(proof.type()) && character.nickname().equals(proof.nickname())
+                                    && java.util.Objects.equals(character.sprite(), proof.sprite())).findFirst().orElse(null);
+                    if (known != null) {
+                        characters.remove(known.id());
+                        characters.put(id, proof);
+                    }
+                }
+            }
+        }
+        var updated = new Account(List.copyOf(characters.values()), shortcuts);
+        var nextLoads = new LinkedHashMap<>(loads);
+        var loaded = loads.get(account);
+        if (loaded != null) {
+            var references = new LinkedHashMap<String, String>();
+            loaded.references.forEach((token, reference) -> references.put(token, aliases.getOrDefault(reference, reference)));
+            nextLoads.put(account, new Loaded(aliases.getOrDefault(loaded.lastReference, loaded.lastReference), references));
+        }
+        if (updated.equals(previous) && nextLoads.equals(loads)) return;
+        var nextAccounts = new LinkedHashMap<>(accounts);
+        nextAccounts.put(account, updated);
+        save(nextAccounts, nextLoads);
+    }
+
     public void reconcile(ClassScan scan) throws IOException {
         var previous = account(scan.account());
         var characters = new LinkedHashMap<String, ClassCharacter>();

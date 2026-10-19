@@ -77,6 +77,7 @@ public final class ClassMenuScanner {
             if (decoded.isEmpty()) return;
             var result = decoded.get();
             if (menu == lastMenu && result.equals(lastResult)) return;
+            store.migrateReferences(current, result.legacyReferences(), result.characters());
             discovery.observe(result.scan(current), discovery.generation());
             lastMenu = menu;
             lastResult = result;
@@ -89,8 +90,9 @@ public final class ClassMenuScanner {
     private void recoverInitialCaptures(UUID current) throws IOException {
         if (!store.available() || minecraft.level == null) return;
         boolean initial = !store.hasAccount(current);
-        if (!initial && store.account(current).characters().stream().allMatch(c -> c.sprite() != null)) return;
         var sprites = new java.util.HashMap<String, ClassSprite>();
+        var aliases = new java.util.HashMap<String, String>();
+        var proofs = new java.util.LinkedHashMap<String, ClassCharacter>();
         for (int index = 0; index < 4; index++) {
             var path = captures.resolve("class-menu-" + current + "-" + index + ".json");
             if (!Files.isRegularFile(path)) continue;
@@ -108,6 +110,8 @@ public final class ClassMenuScanner {
                 var result = ClassMenuEvidence.decode(json.getAsJsonObject(), current,
                         minecraft.level.registryAccess().createSerializationContext(JsonOps.INSTANCE));
                 if (result.isPresent()) {
+                    aliases.putAll(result.get().legacyReferences());
+                    result.get().characters().forEach(character -> proofs.put(character.id(), character));
                     if (initial) discovery.observe(new ClassScan(current, result.get().characters(), false), discovery.generation());
                     else result.get().characters().forEach(c -> { if (c.sprite() != null) sprites.put(c.id(), c.sprite()); });
                 }
@@ -115,6 +119,7 @@ public final class ClassMenuScanner {
                 // A diagnostic file cannot prevent live discovery or erase saved preferences.
             }
         }
+        store.migrateReferences(current, aliases, java.util.List.copyOf(proofs.values()));
         if (!initial && !sprites.isEmpty()) store.updateSprites(current, sprites);
     }
 

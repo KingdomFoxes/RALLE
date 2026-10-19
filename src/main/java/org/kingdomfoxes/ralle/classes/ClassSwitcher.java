@@ -177,7 +177,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         blockHeldInputs(); // Stop stage input on book-open, even before contents arrive.
         // Wynntils may query native menus as soon as the server announces WORLD.
         // No further automation is permitted; keep the frame while those menus finish normally.
-        if (controller.state() == ClassSwitchController.State.WAITING_WORLD && loads.awaitingWorld()) return;
+        if (controller.state() == ClassSwitchController.State.WAITING_WORLD) return;
         if (!WynncraftClassMenu.matchesTitle(title) || !controller.bookOpened())
             controller.unexpectedMenu();
         else {
@@ -191,10 +191,9 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         loads.session(minecraft.getUser().getProfileId());
         loads.closed(packetContainer, liveContainer);
         if (active()) {
-            if (controller.state() == ClassSwitchController.State.WAITING_WORLD && loads.awaitingWorld()
-                    && packetContainer != book && liveContainer != book) return;
+            if (controller.state() == ClassSwitchController.State.WAITING_WORLD) return;
             LOGGER.info("Class switch: server close packet {}, live container {}", packetContainer, liveContainer);
-            controller.serverClosed(packetContainer, liveContainer);
+            controller.serverClosed(packetContainer, liveContainer, now());
             traceState();
         }
     }
@@ -215,7 +214,6 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
             beforeTick();
             loads.session(minecraft.getUser().getProfileId());
             if (loads.gameplay(worldVisible())) {
-                if (active()) controller.worldReady();
                 LOGGER.info("Class load: gameplay confirmed; current class {}", loads.current() == null ? "unknown" : "recorded");
             }
             if (!active()) return;
@@ -263,7 +261,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         var menu = scanner.liveMenu().orElseThrow();
         if (containerId != book || menu.containerId() != containerId || menu.result().resolve(target).orElse(-1) != slot)
             throw new IllegalStateException("Character book changed before selection");
-        loads.selected(target, containerId);
+        loads.selected(menu.result().canonicalReference(target), containerId);
         minecraft.gameMode.handleInventoryMouseClick(containerId, slot, 0, ClickType.PICKUP, minecraft.player);
         LOGGER.info("Class switch: selected validated character slot {} in book {}", slot, containerId);
         traceState();
@@ -276,7 +274,8 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         minecraft.mouseHandler.setIgnoreFirstMove();
     }
     @Override public void completed(String reference) {
-        LOGGER.info("Class switch: gameplay restored; audio unmuted");
+        loads.gameplay(false);
+        LOGGER.info("Class switch: 1600 ms door timer finished; frame and audio released");
         clearOperation();
     }
     @Override public void failed(ClassSwitchController.Failure failure) {

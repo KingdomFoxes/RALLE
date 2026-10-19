@@ -23,7 +23,8 @@ class ClassSwitchReplayTest {
         String target = book.characters().get(1).id();
         var store = new ClassSelectorStore(directory.resolve("classes.json"));
         store.reconcile(book.scan(account));
-        var loads = new ClassLoadTracker(store); loads.session(account);
+        var now = new java.util.concurrent.atomic.AtomicLong(250);
+        var loads = new ClassLoadTracker(store, now::get); loads.session(account);
         var effects = new ArrayList<String>();
         var audio = new ClassSwitchAudio(() -> {});
         var controller = new ClassSwitchController(new ClassSwitchController.Actions() {
@@ -41,17 +42,18 @@ class ClassSwitchReplayTest {
             controller.selectionStage(100); controller.selectionStage(200);
             assertTrue(controller.bookOpened());
             controller.menu(7, List.of(new ClassSwitchController.Target(target, book.resolve(target).orElseThrow())), true);
-            loads.closed(0, 7); controller.menuClosed(7); // Native close ID 0 still closes live book 7.
-            for (int milliseconds = 250; milliseconds < 1050; milliseconds += 50) {
+            loads.closed(0, 7); controller.menuClosed(7, 250); // Native close ID 0 still closes live book 7.
+            for (int milliseconds = 250; milliseconds < 1850; milliseconds += 50) {
+                now.set(milliseconds);
                 controller.tick(account, true, milliseconds);
                 assertFalse(loads.gameplay(false)); // Includes dark frames, bright door frames and detached camera.
                 assertFalse(effects.contains("release"));
                 assertEquals(0f, ClassSwitchAudio.outputVolume(.7f));
             }
-            loads.welcome();
-            assertFalse(loads.gameplay(false)); // Welcome alone cannot reveal a detached camera or menu.
+            now.set(1850);
+            assertTrue(loads.gameplay(false)); // No welcome/camera signal can hold the frame beyond 1600 ms.
+            controller.tick(account, true, 1850);
             loads.compass("abc12345");
-            assertTrue(loads.gameplay(true)); controller.worldReady();
             assertEquals(target, loads.current()); assertEquals(target, store.lastLoaded(account));
             assertEquals(.7f, ClassSwitchAudio.outputVolume(.7f));
             assertEquals(List.of("capture", "/class", "right-click", "right-click", "select:7:10", "release"), effects);

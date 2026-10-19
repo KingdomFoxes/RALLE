@@ -16,18 +16,19 @@ import static org.junit.jupiter.api.Assertions.*;
 class ClassLoadTrackerTest {
     @TempDir Path directory;
     private final UUID account = UUID.randomUUID();
+    private final java.util.concurrent.atomic.AtomicLong now = new java.util.concurrent.atomic.AtomicLong();
 
-    @Test void manualSelectionsAreSavedOnlyAfterCloseWelcomeAndRenderedGameplay() throws Exception {
+    @Test void manualSelectionsAreSavedAfterBookCloseAndDoorTimer() throws Exception {
         var path = directory.resolve("classes.json");
         var store = new ClassSelectorStore(path);
-        var tracker = new ClassLoadTracker(store); tracker.session(account);
+        var tracker = new ClassLoadTracker(store, now::get); tracker.session(account);
         tracker.compass("old12345");
         tracker.selected("mage", 7); // Discards stale inventory evidence from the outgoing class.
         assertFalse(tracker.gameplay(true));
         tracker.welcome(); assertFalse(tracker.gameplay(true));
         tracker.closed(0, 7); assertFalse(tracker.gameplay(false));
         assertNull(store.lastLoaded(account));
-        assertTrue(tracker.gameplay(true));
+        now.set(Math.max(now.get(), 1600)); assertTrue(tracker.gameplay(true));
         assertEquals("mage", tracker.current());
         assertEquals("mage", new ClassSelectorStore(path).lastLoaded(account));
         assertNull(store.referenceForToken(account, "old12345"));
@@ -38,13 +39,13 @@ class ClassLoadTrackerTest {
     @Test void reconnectDoesNotBlindlyReuseLastClassButCanRecoverAnObservedCompassAssociation() throws Exception {
         var path = directory.resolve("classes.json"); var store = new ClassSelectorStore(path);
         store.recordLoad(account, "mage", "abc12345");
-        var tracker = new ClassLoadTracker(new ClassSelectorStore(path)); tracker.session(account);
+        var tracker = new ClassLoadTracker(new ClassSelectorStore(path), now::get); tracker.session(account);
         assertNull(tracker.current());
         tracker.welcome(); assertFalse(tracker.gameplay(true)); // Wait for natural inventory data.
-        tracker.compass("abc12345"); assertTrue(tracker.gameplay(true));
+        tracker.compass("abc12345"); now.set(Math.max(now.get(), 1600)); assertTrue(tracker.gameplay(true));
         assertEquals("mage", tracker.current());
         tracker.session(UUID.randomUUID()); tracker.compass("abc12345"); tracker.welcome();
-        assertTrue(tracker.gameplay(true)); assertNull(tracker.current());
+        now.set(Math.max(now.get(), 1600)); assertTrue(tracker.gameplay(true)); assertNull(tracker.current());
         tracker.reset(); assertNull(tracker.current()); assertFalse(tracker.gameplay(true));
     }
 
@@ -62,21 +63,21 @@ class ClassLoadTrackerTest {
     }
 
     @Test void presentationCancellationDoesNotEraseASelectionThatLaterActuallyLoads() throws Exception {
-        var tracker = new ClassLoadTracker(new ClassSelectorStore(directory.resolve("classes.json")));
+        var tracker = new ClassLoadTracker(new ClassSelectorStore(directory.resolve("classes.json")), now::get);
         tracker.session(account); tracker.selected("mage", 7);
         // Escape cancels frame/input/audio ownership, not this independent natural-load observer.
         tracker.closed(7, 0); tracker.welcome();
-        assertTrue(tracker.gameplay(true)); assertEquals("mage", tracker.current());
+        now.set(Math.max(now.get(), 1600)); assertTrue(tracker.gameplay(true)); assertEquals("mage", tracker.current());
         tracker.selectionStage(); assertNull(tracker.current());
         tracker.welcome(); tracker.compass("unknown1");
-        assertTrue(tracker.gameplay(true)); assertNull(tracker.current());
+        now.set(Math.max(now.get(), 1600)); assertTrue(tracker.gameplay(true)); assertNull(tracker.current());
     }
 
     @Test void damagedStorageCannotCrashOrEraseKnowledgeOfTheCurrentSession() throws Exception {
         var path = directory.resolve("broken.json"); Files.writeString(path, "{broken");
-        var tracker = new ClassLoadTracker(ClassSelectorStore.open(path));
+        var tracker = new ClassLoadTracker(ClassSelectorStore.open(path), now::get);
         tracker.session(account); tracker.selected("mage", 7); tracker.closed(7, 7); tracker.welcome();
-        assertTrue(tracker.gameplay(true)); assertEquals("mage", tracker.current());
+        now.set(Math.max(now.get(), 1600)); assertTrue(tracker.gameplay(true)); assertEquals("mage", tracker.current());
         assertEquals("{broken", Files.readString(path));
     }
 
@@ -87,7 +88,16 @@ class ClassLoadTrackerTest {
         now.set(15_000);
         assertFalse(tracker.hasSelection());
         tracker.compass("unknown1"); tracker.welcome();
-        assertTrue(tracker.gameplay(true)); assertNull(tracker.current());
+        now.set(Math.max(now.get(), 1600)); assertTrue(tracker.gameplay(true)); assertNull(tracker.current());
+    }
+
+    @Test void confirmedBookSelectionBecomesCurrentAfter1600MillisWithoutAnyWelcome() throws Exception {
+        var tracker = new ClassLoadTracker(new ClassSelectorStore(directory.resolve("classes.json")), now::get);
+        tracker.session(account); tracker.selected("mage", 7); tracker.closed(7, 7);
+        now.set(1599); assertFalse(tracker.gameplay(false));
+        tracker.closed(0, 0); // A duplicate close must not restart the door timer.
+        now.set(1600); assertTrue(tracker.gameplay(false));
+        assertEquals("mage", tracker.current());
     }
 
     @Test void loadSignalsRequireTheReceivedWelcomeShapeAndStrictCompassEvidence() {

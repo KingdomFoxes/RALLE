@@ -106,11 +106,11 @@ class WynncraftClassMenuTest {
         controller.frameCaptured(); controller.selectionStage(0);
         var live = decode(fixture());
         controller.menu(7, List.of(new ClassSwitchController.Target(saved.id(), live.resolve(saved.id()).orElseThrow())), true);
-        controller.worldReady();
+        controller.tick(ACCOUNT, true, 1600);
         assertTrue(controller.active());
-        controller.menuClosed(7);
+        controller.menuClosed(7, 0);
         assertEquals(ClassSwitchController.State.WAITING_WORLD, controller.state());
-        controller.worldReady();
+        controller.tick(ACCOUNT, true, 1600);
         assertEquals(List.of("capture", "class", "right", "select:7:10", "release"), calls);
 
         var moved = fixture();
@@ -219,6 +219,85 @@ class WynncraftClassMenuTest {
         assertTrue(restored.hasAccount(ACCOUNT));
         assertEquals(result.characters(), restored.account(ACCOUNT).characters());
         assertTrue(restored.account(ACCOUNT).shortcuts().isEmpty());
+    }
+
+    @Test void playingXThenYDoesNotInvalidateXWhenItsProgressChanges() throws Exception {
+        var source = fixture();
+        var original = decode(source);
+        var x = original.characters().get(0);
+        var y = original.characters().get(1);
+        var path = directory.resolve("classes.json");
+        var store = new ClassSelectorStore(path);
+        store.reconcile(original.scan(ACCOUNT)); store.add(ACCOUNT, x.id()); store.add(ACCOUNT, y.id());
+        store.edit(ACCOUNT, new ClassShortcut(x.id(), "My archer", "key.keyboard.g"));
+        var lore = slot(source, 9).getAsJsonObject("item").getAsJsonObject("components").getAsJsonArray("minecraft:lore");
+        lore.set(2, text("- Time Played: 999.99 hours"));
+        lore.set(3, text("- Location: Detlas"));
+        lore.set(4, text("- Level: 121 (89.34%)"));
+        lore.set(7, text("[||||||||99%||||||||]"));
+        lore.set(8, text("1299 of 1400"));
+        var afterPlayingX = decode(source);
+        store.reconcile(afterPlayingX.scan(ACCOUNT));
+        store.recordLoad(ACCOUNT, x.id(), "archer01"); store.recordLoad(ACCOUNT, y.id(), "mage0001");
+        var restored = new ClassSelectorStore(path);
+        assertEquals(original.characters(), restored.account(ACCOUNT).characters());
+        assertEquals(new ClassShortcut(x.id(), "My archer", "key.keyboard.g"), restored.account(ACCOUNT).shortcuts().getFirst());
+        assertEquals(9, afterPlayingX.resolve(x.id()).orElseThrow());
+        assertEquals(10, afterPlayingX.resolve(y.id()).orElseThrow());
+        assertEquals(x.id(), restored.referenceForToken(ACCOUNT, "archer01"));
+    }
+
+    @Test void legacyMigrationUsesTheOldFullHashAndPreservesShortcutOrderBindingsAndLoadData() throws Exception {
+        var decoded = decode(fixture());
+        var current = decoded.characters().getFirst();
+        String legacy = decoded.legacyReferences().entrySet().stream().filter(entry -> entry.getValue().equals(current.id()))
+                .findFirst().orElseThrow().getKey();
+        var store = new ClassSelectorStore(directory.resolve("classes.json"));
+        store.reconcile(new ClassScan(ACCOUNT, List.of(new ClassCharacter(legacy, current.type(), current.nickname(), current.sprite())), true));
+        store.add(ACCOUNT, legacy); store.edit(ACCOUNT, new ClassShortcut(legacy, "Custom", "key.keyboard.g"));
+        store.recordLoad(ACCOUNT, legacy, "archer01");
+        store.migrateReferences(ACCOUNT, decoded.legacyReferences());
+        assertEquals(new ClassShortcut(current.id(), "Custom", "key.keyboard.g"), store.account(ACCOUNT).shortcuts().getFirst());
+        assertEquals(current, store.account(ACCOUNT).characters().getFirst());
+        assertEquals(current.id(), store.lastLoaded(ACCOUNT));
+        assertEquals(current.id(), store.referenceForToken(ACCOUNT, "archer01"));
+        assertEquals(9, decoded.resolve(legacy).orElseThrow());
+    }
+
+    @Test void progressNormalizationStillRejectsRenamesIconChangesAndAmbiguousDuplicates() throws Exception {
+        var source = fixture();
+        String old = decode(source).characters().getFirst().id();
+        slot(source, 9).getAsJsonObject("item").getAsJsonObject("components").getAsJsonObject("minecraft:custom_model_data")
+                .getAsJsonArray("floats").set(0, new com.google.gson.JsonPrimitive(580));
+        assertTrue(decode(source).resolve(old).isEmpty());
+        source = fixture();
+        slot(source, 19).add("item", slot(source, 9).get("item").deepCopy());
+        var lore = slot(source, 19).getAsJsonObject("item").getAsJsonObject("components").getAsJsonArray("minecraft:lore");
+        lore.set(2, text("- Time Played: 1 hour"));
+        assertTrue(decode(source).resolve(old).isEmpty()); // Different progress cannot disambiguate identity.
+    }
+
+    @Test void migrationRepairsAlreadyRetiredProgressHashesWithoutResurrectingDeletedCharacters() throws Exception {
+        var decoded = decode(fixture());
+        var archer = decoded.characters().getFirst();
+        String legacy = decoded.legacyReferences().entrySet().stream().filter(entry -> entry.getValue().equals(archer.id()))
+                .findFirst().orElseThrow().getKey();
+        var store = new ClassSelectorStore(directory.resolve("classes.json"));
+        store.reconcile(new ClassScan(ACCOUNT, List.of(new ClassCharacter(legacy, archer.type(), archer.nickname(), archer.sprite())), true));
+        store.add(ACCOUNT, legacy);
+        store.reconcile(new ClassScan(ACCOUNT, List.of(new ClassCharacter("observed:9:" + "a".repeat(64),
+                archer.type(), archer.nickname(), archer.sprite())), true));
+        store.migrateReferences(ACCOUNT, decoded.legacyReferences(), decoded.characters());
+        assertEquals(archer, store.account(ACCOUNT).characters().getFirst());
+        assertEquals(archer.id(), store.account(ACCOUNT).shortcuts().getFirst().characterId());
+
+        store.reconcile(new ClassScan(ACCOUNT, List.of(), true));
+        store.migrateReferences(ACCOUNT, decoded.legacyReferences(), decoded.characters());
+        assertTrue(store.account(ACCOUNT).characters().isEmpty());
+    }
+
+    private static JsonObject text(String value) {
+        var text = new JsonObject(); text.addProperty("text", value); return text;
     }
 
     private static WynncraftClassMenu.Result decode(JsonObject evidence) {
