@@ -4,15 +4,18 @@ import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import java.nio.file.Path;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ClassSwitchReplayTest {
     @TempDir Path directory;
-    @Test void realBookDoorAnimationAndWorldLoadKeepFrameUntilTheActualLoadedClassIsRecorded() throws Exception {
+    @ParameterizedTest(name = "real character book with Auto Open = {0}")
+    @ValueSource(booleans = {false, true})
+    void realBookDoorAnimationAndWorldLoadKeepFrameUntilTheActualLoadedClassIsRecorded(boolean autoOpen) throws Exception {
         SharedConstants.tryDetectVersion(); Bootstrap.bootStrap();
         var account = UUID.fromString("00000000-0000-0000-0000-000000000001");
         WynncraftClassMenu.Result book;
@@ -39,9 +42,19 @@ class ClassSwitchReplayTest {
         });
         try {
             controller.begin(account, target, null, true, 0); controller.frameCaptured();
-            controller.selectionStage(100); controller.selectionStage(200);
+            if (!autoOpen) {
+                controller.selectionStage(100); controller.selectionStage(200);
+            }
             assertTrue(controller.bookOpened());
-            controller.menu(7, List.of(new ClassSwitchController.Target(target, book.resolve(target).orElseThrow())), true);
+            assertFalse(controller.acceptingStageClicks());
+            var targets = List.of(new ClassSwitchController.Target(target, book.resolve(target).orElseThrow()));
+            controller.menu(7, targets, false);
+            controller.selectionStage(250); // A partial Auto Open book must never trigger fallback clicks.
+            assertEquals(ClassSwitchController.State.WAITING_MENU, controller.state());
+            assertTrue(effects.stream().noneMatch(effect -> effect.startsWith("select:")));
+            controller.menu(7, targets, true); // Select immediately, without another controller tick.
+            assertEquals(ClassSwitchController.State.WAITING_TRANSITION, controller.state());
+            controller.menu(7, targets, true); // Later contents/tick callbacks cannot repeat the click.
             loads.closed(0, 7); controller.menuClosed(7, 250); // Native close ID 0 still closes live book 7.
             for (int milliseconds = 250; milliseconds < 1850; milliseconds += 50) {
                 now.set(milliseconds);
@@ -56,7 +69,9 @@ class ClassSwitchReplayTest {
             loads.compass("abc12345");
             assertEquals(target, loads.current()); assertEquals(target, store.lastLoaded(account));
             assertEquals(.7f, ClassSwitchAudio.outputVolume(.7f));
-            assertEquals(List.of("capture", "/class", "right-click", "right-click", "select:7:10", "release"), effects);
+            assertEquals(autoOpen
+                    ? List.of("capture", "/class", "select:7:10", "release")
+                    : List.of("capture", "/class", "right-click", "right-click", "select:7:10", "release"), effects);
             assertEquals(target, new ClassSelectorStore(directory.resolve("classes.json")).lastLoaded(account));
         } finally { audio.close(); }
     }

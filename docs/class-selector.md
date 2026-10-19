@@ -191,6 +191,15 @@ contents. The entire operation still has a 15-second deadline and at most 150
 stage clicks. The first click has no artificial delay; slow ticks cannot queue
 catch-up bursts. Auto Open skips stage clicks.
 
+With Wynncraft's **Auto Open** enabled in the character book, Wynncraft opens the
+book automatically when switching characters after the player has entered a
+world at least once (as described by its in-game tooltip). RALLE accepts that
+book directly without requiring a selection prompt or a prior right-click. It
+does not toggle Wynncraft's option. Once the book opens, even partial contents
+stop all stage retries; complete validated contents trigger one target click.
+When Auto Open does not supply a book, the existing recognized-prompt clicks
+remain the fallback.
+
 `ClassContentSignalsMixin` observes `handleContainerContent` and
 `handleContainerSetSlot` at TAIL, after vanilla has applied the items. It asks
 `ClassSwitcher.menuUpdated()` to select immediately, avoiding the previous wait
@@ -318,6 +327,10 @@ at the 1600 ms book-close deadline even without world-entry signals. Tests repla
 X-to-Y-to-X with changed progress and verify evidence-proven legacy migration.
 Hook tests verify the actual mapped Minecraft packet
 and input boundaries and that runtime code never samples screen pixels.
+`ClassSwitchReplayTest` runs the captured character book through both manual-open
+and Auto Open paths: Auto Open sends zero stage clicks, partial contents wait,
+complete contents select without another tick, repeated callbacks cannot select
+twice, and both paths retain the frame/audio through the book-close timer.
 
 `ClassLoadTrackerTest` covers manual/automatic selection confirmation, late and
 stale compass evidence, reconnect/account separation, persisted load history,
