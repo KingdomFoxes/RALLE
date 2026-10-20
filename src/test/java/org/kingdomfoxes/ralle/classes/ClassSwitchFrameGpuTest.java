@@ -58,39 +58,42 @@ class ClassSwitchFrameGpuTest {
     }
 
     private void verifyIceShader(RenderTarget live, ClassSwitchFrame frame) throws Exception {
-        try (var stream = getClass().getResourceAsStream("/assets/ralle/textures/gui/class_ice.png");
-             var map = new net.minecraft.client.renderer.texture.DynamicTexture(() -> "Ice test arrival",
-                     com.mojang.blaze3d.platform.NativeImage.read(java.util.Objects.requireNonNull(stream)));
-             var ice = new ClassIceRenderer()) {
-            int original = pixel(frame.texture());
-            var encoder = RenderSystem.getDevice().createCommandEncoder();
-            encoder.clearColorTexture(live.getColorTexture(), 0xFF000000);
-            int black = pixel(live);
-            for (int scale : new int[] {1, 2, 4}) for (int pixels : new int[] {1, 2}) {
-                ice.draw(frame.texture(), live, map.getTextureView(), 0, pixels, live.width / scale, live.height / scale);
-                assertEquals(original, pixel(live));
-                ice.draw(frame.texture(), live, map.getTextureView(), .2, pixels, live.width / scale, live.height / scale);
-                int[] partial = pixels(live);
-                assertTrue(java.util.Arrays.stream(partial).anyMatch(p -> p == original));
-                assertTrue(java.util.Arrays.stream(partial).anyMatch(p -> p == black));
-                assertTrue(java.util.Arrays.stream(partial).anyMatch(p -> p == -1), "White contour must survive the shader");
-                int cellsX = Math.ceilDiv(live.width / scale, pixels), cellsY = Math.ceilDiv(live.height / scale, pixels);
-                for (int y = 0; y < live.height; y++) for (int x = 0; x < live.width; x++) {
-                    int cx = (int) ((x + .5) * cellsX / live.width), cy = (int) ((y + .5) * cellsY / live.height);
-                    int firstX = (int) Math.ceil(cx * (double) live.width / cellsX - .5);
-                    int firstY = (int) Math.ceil(cy * (double) live.height / cellsY - .5);
-                    assertEquals(partial[firstY * live.width + firstX], partial[y * live.width + x]);
+        for (int style = 1; style <= 4; style++) {
+            String suffix = style == 1 ? "" : "_style" + style;
+            try (var stream = getClass().getResourceAsStream("/assets/ralle/textures/gui/class_ice" + suffix + ".png");
+                 var map = new net.minecraft.client.renderer.texture.DynamicTexture(() -> "Ice test arrival",
+                         com.mojang.blaze3d.platform.NativeImage.read(java.util.Objects.requireNonNull(stream)));
+                 var ice = new ClassIceRenderer()) {
+                int original = pixel(frame.texture());
+                var encoder = RenderSystem.getDevice().createCommandEncoder();
+                encoder.clearColorTexture(live.getColorTexture(), 0xFF000000);
+                int black = pixel(live);
+                for (int scale : new int[] {1, 2, 4}) for (int pixels : new int[] {1, 2}) {
+                    ice.draw(frame.texture(), live, map.getTextureView(), 0, pixels, live.width / scale, live.height / scale);
+                    assertEquals(original, pixel(live));
+                    ice.draw(frame.texture(), live, map.getTextureView(), .2, pixels, live.width / scale, live.height / scale);
+                    int[] partial = pixels(live);
+                    assertTrue(java.util.Arrays.stream(partial).anyMatch(p -> p == original));
+                    assertTrue(java.util.Arrays.stream(partial).anyMatch(p -> p == black));
+                    assertTrue(java.util.Arrays.stream(partial).anyMatch(p -> p == -1), "White contour must survive the shader");
+                    int cellsX = Math.ceilDiv(live.width / scale, pixels), cellsY = Math.ceilDiv(live.height / scale, pixels);
+                    for (int y = 0; y < live.height; y++) for (int x = 0; x < live.width; x++) {
+                        int cx = (int) ((x + .5) * cellsX / live.width), cy = (int) ((y + .5) * cellsY / live.height);
+                        int firstX = (int) Math.ceil(cx * (double) live.width / cellsX - .5);
+                        int firstY = (int) Math.ceil(cy * (double) live.height / cellsY - .5);
+                        assertEquals(partial[firstY * live.width + firstX], partial[y * live.width + x]);
+                    }
+                    if (style != 3) assertConnectedToEdge(partial, live.width, live.height, black);
+                    if (style == 1) savePreview(partial, live.width, live.height, pixels, scale);
+                    ice.draw(frame.texture(), live, map.getTextureView(), 1, pixels, live.width / scale, live.height / scale);
+                    assertTrue(java.util.Arrays.stream(pixels(live)).allMatch(p -> p == black), "Full opaque coverage");
                 }
-                assertConnectedToEdge(partial, live.width, live.height, black);
-                savePreview(partial, live.width, live.height, pixels, scale);
-                ice.draw(frame.texture(), live, map.getTextureView(), 1, pixels, live.width / scale, live.height / scale);
-                assertTrue(java.util.Arrays.stream(pixels(live)).allMatch(p -> p == black), "Full opaque coverage");
+                // A repeated operation uses a fresh background; no retained shader/frame state bleeds through.
+                encoder.clearColorTexture(live.getColorTexture(), 0xFF3060D0);
+                frame.capture(live); int next = pixel(live);
+                ice.draw(frame.texture(), live, map.getTextureView(), 0, 1, live.width, live.height);
+                assertEquals(next, pixel(live));
             }
-            // A repeated operation uses a fresh background; no retained shader/frame state bleeds through.
-            encoder.clearColorTexture(live.getColorTexture(), 0xFF3060D0);
-            frame.capture(live); int next = pixel(live);
-            ice.draw(frame.texture(), live, map.getTextureView(), 0, 1, live.width, live.height);
-            assertEquals(next, pixel(live));
         }
     }
 

@@ -395,6 +395,15 @@ public final class RalleClient implements ClientModInitializer {
                         Minecraft.getInstance().schedule(() -> context().classSwitcher().previewIce(2));
                         return 1;
                     })));
+            var styles = literal("animteststyle");
+            for (int style = 1; style <= 4; style++) {
+                int selectedStyle = style;
+                styles.then(literal(Integer.toString(style)).executes(command -> {
+                    Minecraft.getInstance().schedule(() -> context().classSwitcher().previewIceStyle(selectedStyle));
+                    return 1;
+                }));
+            }
+            ralleCommand.then(styles);
             dispatcher.register(ralleCommand);
         });
     }

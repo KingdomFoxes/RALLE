@@ -37,6 +37,14 @@ public final class ClassMenuScanner {
     public boolean requested() { return enabled.value(); }
     public record LiveMenu(int containerId, WynncraftClassMenu.Result result) { }
 
+    /** Packet-proven book ownership, including a book whose contents never finished arriving. */
+    public boolean ownsLiveBook(int containerId) {
+        return available() && minecraft.player != null && containerId == openedId
+                && WynncraftClassMenu.matchesTitle(title)
+                && minecraft.player.containerMenu != minecraft.player.inventoryMenu
+                && minecraft.player.containerMenu.containerId == containerId;
+    }
+
     /** Read again immediately before an automated click; never use cached or diagnostic data. */
     public java.util.Optional<LiveMenu> liveMenu() {
         if (!available() || minecraft.player == null) return java.util.Optional.empty();

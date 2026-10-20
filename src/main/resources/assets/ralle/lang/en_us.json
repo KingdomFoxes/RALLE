@@ -391,7 +391,7 @@
   "ralle.classes.modifier-conflict": "Class Modifier conflicts with another RALLE action. Choose a different key.",
   "ralle.classes.wheel.empty": "No class shortcuts selected. Add them in RALLE Settings → Wheels → Class Selector.",
   "ralle.classes.wheel.hold": "Class Selector: press a configured option key.",
-  "ralle.classes.ice-preview": "Ice preview: %s logical pixel(s)",
+  "ralle.classes.ice-preview": "Ice preview: %s logical pixel(s), style %s",
   "ralle.classes.ice-preview-hint": "Escape to dismiss",
   "ralle.classes.wheel.hint": "Choose a class with a fresh click or a configured option key.",
   "ralle.classes.wheel.current": "Current",
@@ -403,6 +403,8 @@
   "ralle.classes.switch.account-changed": "Class switching stopped: account changed.",
   "ralle.classes.switch.unavailable": "Class switching is unavailable in the current game state.",
   "ralle.classes.switch.current": "You are already using this character.",
+  "ralle.classes.switch.retry-command": "Command failed. Retrying (%s/%s)",
+  "ralle.classes.switch.retry-book": "Character book stalled. Retrying (%s/%s)",
   "ralle.classes.retarget": "Choose detected class…",
   "ralle.classes.wheel.no-bound-options": "No usable option keys. Check your class shortcuts and key conflicts in settings.",
   "ralle.classes.missing-hint": "This character entry changed or disappeared. Use Edit → Choose detected class to select it again."

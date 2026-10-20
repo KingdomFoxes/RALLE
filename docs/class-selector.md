@@ -98,8 +98,9 @@ the visual sequence, not the underlying identity or transition packets.
 The October 19 clarification and screenshot establish the intended sequence:
 `/class` once, repeat right-click until this character book opens, then select the
 requested class once. Stage retries are capped at one per 100 ms and 150 attempts
-inside the existing 15-second operation deadline; neither the command nor the
-character selection is retried.
+inside the existing 15-second operation deadline. The October 20 rapid-switch
+clarification additionally approves bounded command retries and close/reopen
+recovery of stalled character books, as detailed below.
 
 The user's subsequent local game captures contain four existing characters:
 Archer, Mage, Shaman and Warrior. The raw menu title is U+CFFD5 followed by U+E01F.
@@ -193,22 +194,77 @@ and verifying the live adapter in-game. A video alone cannot establish stable ID
 
 ## Switching and load confirmation
 
-The current loop is: send `/class` once just before rendering the selected frame,
+The current loop is: send the initial `/class` just before rendering the selected frame,
 capture that frame before the next packet-processing pass, submit native
 Use clicks at most every **100 ms** while the original server selection prompt is
 present and the native scene accepts input, stop on the character-book open
-packet, and select the target **once** from complete, uniquely resolved live
+packet, and select the target **once per book** from complete, uniquely resolved live
 contents. The entire operation still has a 15-second deadline and at most 150
 stage clicks. The first click has no artificial delay; slow ticks cannot queue
 catch-up bursts. Auto Open skips stage clicks.
+
+Rapid-switch recovery is local to that same operation and never extends its
+15-second deadline, captures a replacement frame, or restarts the ice/audio gate:
+
+During recovery, replace the modifier's existing status text with red, wrapping
+`Command failed. Retrying (1/2)` or `Character book stalled. Retrying (1/2)`.
+Count retries actually started, excluding the initial attempt; the denominator
+comes from that recovery path's budget. Keep the message through that attempt,
+update it for the next retry, and restore the ordinary status when the selected
+book's close is accepted. A new operation starts without old retry feedback.
+The wheel's captured image stays fixed; its status uses a separate transparent
+GPU snapshot rebuilt only when the message changes. No View uses the shared
+Action Bar presentation above the frozen background. No new setting or sound is
+introduced.
+
+- If the command produces no selection-stage/book signal, retry at least 750 ms
+  after the previous attempt, with three command attempts total. The native adapter
+  must still see usable gameplay: player camera, normal inventory, no screen,
+  overlay, spectator mode, busy hands, or pending observed selection. Local send
+  failures consume the same attempt budget. Stage/book evidence permanently stops
+  command retries for this operation; there is no command retry during a menu or
+  after a character click.
+- If an announced character book remains incomplete/unrecognized for 600 ms, or
+  remains live for 800 ms after its validated target click, close only the
+  packet-proven, matching live character book through vanilla `closeContainer`.
+  Clear the unacknowledged load observation first. Await a fresh recognized stage
+  prompt and reopen through the same native right-click path; Auto Open is also
+  accepted. There are at most two book recoveries (three books total).
+- A book closed by the server before selection can return to the stage immediately.
+  A reopened book must supply complete, unique identifying evidence again; stale,
+  missing, changed or ambiguous targets still fail closed. Each book receives at
+  most one target click. An accepted selected-book close starts the normal 1600 ms
+  release timer and prevents every retry.
+- Retain up to sixteen retired book IDs across consecutive operations so closes
+  identifying those old books cannot fail a new operation or confirm its load. A fresh book-open packet
+  can reuse an old ID. Escape, disconnect, account change, timeout, focus loss and
+  resource loading retain their normal cleanup behavior. Retry counters reset for
+  each new operation; click spacing and the total click cap do not reset on recovery.
+
+The October 20 local log contains a rapid switch at 20:24:07 that stayed in
+WAITING_STAGE until Escape at 20:24:11, and an earlier WAITING_STAGE timeout.
+It establishes the missing-stage stall, not a particular server rejection text
+or a confirmed mod exception. Recovery therefore uses bounded silence and live
+game state rather than guessing unobserved error messages. Successful fast paths
+retain immediate command submission and packet-tail target selection. Repeated
+live Wynncraft switches with and without Wynntils remain necessary to validate
+the chosen recovery windows against actual server delays.
+
+Controller and captured-book replay tests cover capped silent/local-send retries,
+the first-stage stop, partial/ignored-click book recovery, immediate reopening
+after a premature close, stale contents and retired close packets, container-ID
+reuse, account/connection cancellation, unchanged global deadlines and cleanup.
+Back-to-back replay operations verify that closing a failed attempt cannot record
+it as a loaded character; only the newly validated, acknowledged book is persisted.
 
 `ClassSwitchRenderMixin` starts the command immediately before `GameRenderer.render`
 inside Minecraft's `runTick`, after queued packets and client ticks have finished.
 This overlaps outbound command delivery with world/GUI drawing and the GPU copy.
 The selected wheel remains visible until that copy is ordered; only then is its
 live screen dismissed and stage interaction enabled. Minecraft applies response
-packets on its next processing pass. The controller sends once even if callbacks
-repeat, and a capture failure after the command releases all presentation ownership.
+packets on its next processing pass. Repeated render callbacks cannot duplicate
+the initial send; only the bounded recovery path can retry. A capture failure
+after the command releases all presentation ownership.
 The selected frame and the 1600 ms book-close timer are unchanged. Bytecode checks
 verify the supported Minecraft ordering; no off-thread game-state mutation, packet
 suppression or speculative earlier interaction is introduced.
@@ -302,23 +358,43 @@ without adding a wheel or menu blur. Underlying rendering and ticks continue.
 
 `class_ice.png` is an original, seeded 16-bit arrival field (high byte in red,
 low byte in green), generated by `java scripts/GenerateClassIce.java`. Edge-rooted
-stems grow angled side branches and finer offshoots before a second connected
-arrival wave thickens them and fills the gaps. Playback uses a logical-resolution
+stems grow angled side branches and finer offshoots. Every stem and offshoot
+continues to the viewport boundary rather than stopping at a preset length.
+There is no dilation or secondary fill wave: existing branches retain their
+width, and increasing density comes from new advancing branches crossing them.
+Only the terminal full-coverage frame closes any remaining inter-branch gaps.
+The finite viewport and existing release deadline bound the effect; it does not
+loop or restart from the roots. Playback uses a logical-resolution
 GPU target, a nearest composite and a 16-byte uniform update. Minimum arrival
 over each logical cell's footprint preserves thin connected stems at coarser
 resolutions. There is no per-frame CPU map generation, texture upload or readback.
 
 `ClassIceTimeline` starts at accepted submission. Until book-close it grows slowly
 and approaches a bounded 16% reveal threshold. The first accepted selected-book
-close anchors a continuous exponential-in finish from the current threshold.
+close anchors an exponential-in finish from the current threshold, matching the
+incoming growth velocity as well as position. The former fixed exponent was
+mathematically exponential but dropped speed at book-close before accelerating;
+the new exponent is solved once at that boundary to remove that slowdown.
 The image reaches full opaque coverage after 1500 ms, leaving the last 100 ms of
 the existing 1600 ms interval for presenting the complete effect. Duplicate closes
 do not restart it. Release timing, failure handling, audio and input ownership
 remain controlled by the existing controller. A stalled render loop can skip that
 final presentation window; the switch deadline is never extended to compensate.
 
-`/ralle animtest 1` and `/ralle animtest 2` replay the same map and timeline at one
-and two logical pixels respectively. They show a local sample wheel through the
+`/ralle animteststyle {1,2,3,4}` selects and immediately plays a local preview:
+
+1. The original branches around the screen edges.
+2. Branches rooted only at the four window corners.
+3. One randomly positioned interior seed, followed by staggered additional seeds,
+   each spreading as a diamond (Manhattan distance), without branches.
+4. Two main branches rooted at the top-left and bottom-right corners.
+
+All maps use a fixed random seed for repeatable comparisons and are baked by the
+same generator; variants use `class_ice_style2.png` through `class_ice_style4.png`.
+Style selection is preview-only and lasts for this client session. Real switches
+retain style 1. `/ralle animtest 1` and `/ralle animtest 2` replay the selected style
+at one and two logical pixels respectively; style previews reuse the last preview
+pixel size (initially one). They show a local sample wheel through the
 same capture/blur/composite path, simulate book arrival at 800 ms and dismiss at
 2400 ms. They require no enabled Class Selector, server access or class switch,
 send no commands/clicks and do not mute audio. Escape dismisses immediately.
@@ -447,7 +523,7 @@ Additional checks replay restart recovery with the observed welcome glyphs, veri
 player-slot provenance and rejection of pre-close outgoing token evidence, and
 stall the storage worker while confirming switch completion and reads stay responsive.
 They reload the resulting file after account changes, edits and migration to check
-ordering and persistence. Pre-render command checks enforce one send, no stage
+ordering and persistence. Pre-render command checks enforce one initial send, no stage
 interaction before capture, cleanup between command/capture, and the same 1600 ms
 deadline. These checks do not measure a new live switching-time improvement.
 

@@ -4,6 +4,16 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ClassIceTimelineTest {
+    @Test void bookClosePreservesIncomingSpeedWithoutALaunchPause() {
+        for (long delay : new long[] {100, 800, 7000, 13000}) {
+            var timeline = new ClassIceTimeline();
+            timeline.start(0);
+            double before = timeline.progress(delay) - timeline.progress(delay - 1);
+            timeline.bookClosed(delay);
+            double after = timeline.progress(delay + 1) - timeline.progress(delay);
+            assertEquals(before, after, before * .01);
+        }
+    }
     @Test void slowOrFastBookArrivalIsContinuousBoundedAndFinishesBeforeRelease() {
         for (long delay : new long[] {0, 100, 800, 7000, 13000}) {
             var timeline = new ClassIceTimeline();

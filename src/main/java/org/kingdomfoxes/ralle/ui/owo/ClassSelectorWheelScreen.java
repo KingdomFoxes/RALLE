@@ -98,11 +98,19 @@ public final class ClassSelectorWheelScreen extends Screen {
         return new ClassWheelSnapshot(minecraft, graphics -> {
             renderMenuBackground(graphics);
             graphics.nextStratum();
-            render(graphics, lastX, lastY, 0);
+            render(graphics, lastX, lastY, 0, false);
         });
     }
 
+    /** Only the status changes during recovery; retain the submitted wheel's GPU image. */
+    public ClassWheelSnapshot captureStatus(Component message) {
+        return new ClassWheelSnapshot(minecraft, graphics -> renderStatus(graphics, message));
+    }
+
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        render(graphics, mouseX, mouseY, partialTick, true);
+    }
+    private void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick, boolean withStatus) {
         if (frozenTime < 0 && (mouseX != lastX || mouseY != lastY)) {
             pointerArmed = true; keyboardSelection = false; lastX = mouseX; lastY = mouseY;
         }
@@ -140,14 +148,17 @@ public final class ClassSelectorWheelScreen extends Screen {
         }
         graphics.pose().popMatrix();
         if (bars) graphics.disableScissor();
-        Component below = status != null ? status : entries.isEmpty() ? Component.translatable("ralle.classes.wheel.empty")
+        if (withStatus) renderStatus(graphics, null);
+    }
+    private void renderStatus(GuiGraphics graphics, Component message) {
+        Component below = message != null ? message : status != null ? status : entries.isEmpty() ? Component.translatable("ralle.classes.wheel.empty")
                 : model.hovered() >= 0 ? Component.literal(entries.get(model.hovered()).name())
                 : Component.translatable("ralle.classes.wheel.hint");
         var lines = font.split(RalleTypography.body(below), Math.max(1, width - 24));
         int y = entries.isEmpty() ? height / 2 : Math.min(height - lines.size() * (font.lineHeight + 2) - 4,
                 (int) (originY + (radius + 12) * scale));
         for (var line : lines) {
-            graphics.drawString(font, line, (width - font.width(line)) / 2, y, failure ? 0xFFFF6B6B : RalleTheme.accentArgb(), true);
+            graphics.drawString(font, line, (width - font.width(line)) / 2, y, message != null || failure ? 0xFFFF6B6B : RalleTheme.accentArgb(), true);
             y += font.lineHeight + 2;
         }
     }

@@ -130,11 +130,11 @@ class WynncraftClassMenuTest {
         controller.frameCaptured(); controller.selectionStage(0);
         var live = decode(fixture());
         controller.menu(7, List.of(new ClassSwitchController.Target(saved.id(), live.resolve(saved.id()).orElseThrow())), true);
-        controller.tick(ACCOUNT, true, 1600);
+        controller.tick(ACCOUNT, true, 799);
         assertTrue(controller.active());
-        controller.menuClosed(7, 0);
+        controller.menuClosed(7, 800);
         assertEquals(ClassSwitchController.State.WAITING_WORLD, controller.state());
-        controller.tick(ACCOUNT, true, 1600);
+        controller.tick(ACCOUNT, true, 2400);
         assertEquals(List.of("capture", "class", "right", "select:7:10", "release"), calls);
 
         var moved = fixture();

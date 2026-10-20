@@ -5,6 +5,7 @@ import com.mojang.serialization.JsonOps;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import java.nio.file.Path;
@@ -13,6 +14,70 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ClassSwitchReplayTest {
     @TempDir Path directory;
+
+    @Test void rapidRecoveredSwitchesRecordOnlyAcknowledgedSelectionsFromFreshCapturedBooks() throws Exception {
+        SharedConstants.tryDetectVersion(); Bootstrap.bootStrap();
+        var account = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        WynncraftClassMenu.Result book;
+        try (var input = getClass().getResourceAsStream("/classes/wynncraft-character-book-2026-10-19.json")) {
+            book = ClassMenuEvidence.decode(JsonParser.parseReader(new java.io.InputStreamReader(input))
+                    .getAsJsonObject(), account, JsonOps.INSTANCE).orElseThrow();
+        }
+        var store = new ClassSelectorStore(directory.resolve("recovered.json"));
+        store.reconcile(book.scan(account));
+        var clock = new java.util.concurrent.atomic.AtomicLong();
+        var loads = new ClassLoadTracker(store, clock::get); loads.session(account);
+        var effects = new ArrayList<String>();
+        var target = new java.util.concurrent.atomic.AtomicReference<String>();
+        var controller = new ClassSwitchController(new ClassSwitchController.Actions() {
+            public void captureFrame() { effects.add("capture"); }
+            public void releaseFrame() { effects.add("release"); }
+            public void sendClassCommand() { effects.add("class"); loads.selectionStage(); }
+            public boolean canRetryClassCommand() { return true; }
+            public void rightClickSelectionStage() { effects.add("right-click"); }
+            public void selectCharacter(int container, int slot) {
+                assertEquals(book.resolve(target.get()).orElseThrow(), slot);
+                loads.selected(target.get(), container);
+            }
+            public boolean closeCharacterBook(int container) {
+                loads.selectionStage(); // The native adapter does this before vanilla closeContainer.
+                loads.closed(container, container);
+                effects.add("close:" + container);
+                return true;
+            }
+            public void failed(ClassSwitchController.Failure failure) { fail(failure.toString()); }
+        });
+        for (int operation = 0; operation < 2; operation++) {
+            long start = operation * 4000L;
+            clock.set(start); target.set(book.characters().get(operation).id());
+            assertTrue(controller.begin(account, target.get(), loads.current(), true, start));
+            controller.frameCaptured();
+            clock.set(start + 750); controller.tick(account, true, clock.get()); // Lost initial command.
+            int partial = 10 + operation * 3, ignored = partial + 1, accepted = partial + 2;
+            controller.bookOpened(partial, start + 800);
+            clock.set(start + 1400); controller.tick(account, true, clock.get());
+            assertFalse(loads.hasSelection());
+            controller.bookOpened(ignored, start + 1450);
+            var targets = List.of(new ClassSwitchController.Target(target.get(), book.resolve(target.get()).orElseThrow()));
+            controller.menu(ignored, targets, true);
+            clock.set(start + 2250); controller.tick(account, true, clock.get()); // Ignored target click.
+            assertFalse(loads.hasSelection());
+            assertFalse(loads.gameplay(false));
+            controller.bookOpened(accepted, start + 2300); controller.menu(accepted, targets, true);
+            assertTrue(controller.retiredBook(ignored)); // Adapter filters the old close before loads.closed.
+            controller.serverClosed(ignored, accepted, start + 2310);
+            clock.set(start + 2350); loads.closed(accepted, accepted);
+            controller.serverClosed(accepted, accepted, clock.get());
+            clock.set(start + 3949); assertFalse(loads.gameplay(false));
+            clock.set(start + 3950); assertTrue(loads.gameplay(false));
+            controller.tick(account, true, clock.get());
+            assertEquals(target.get(), loads.current());
+            assertEquals(target.get(), new ClassSelectorStore(directory.resolve("recovered.json")).lastLoaded(account));
+        }
+        assertEquals(2, Collections.frequency(effects, "capture"));
+        assertEquals(2, Collections.frequency(effects, "release"));
+        assertEquals(4, Collections.frequency(effects, "class"));
+    }
     @ParameterizedTest(name = "real character book with Auto Open = {0}")
     @ValueSource(booleans = {false, true})
     void realBookDoorAnimationAndWorldLoadKeepFrameUntilTheActualLoadedClassIsRecorded(boolean autoOpen) throws Exception {

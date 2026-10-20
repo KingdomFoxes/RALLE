@@ -33,9 +33,17 @@ public final class ClassIceRenderer implements AutoCloseable {
     private TextureTarget reveal;
 
     public static void warm(Minecraft minecraft) { minecraft.getTextureManager().getTexture(MAP); }
+    private static Identifier map(int style) {
+        if (style < 1 || style > 4) throw new IllegalArgumentException("Expected style 1 through 4");
+        return style == 1 ? MAP : Identifier.fromNamespaceAndPath("ralle", "textures/gui/class_ice_style" + style + ".png");
+    }
+    public static void warm(Minecraft minecraft, int style) { minecraft.getTextureManager().getTexture(map(style)); }
 
     public void draw(RenderTarget background, RenderTarget destination, double progress, int pixelSize, int guiWidth, int guiHeight) {
-        draw(background, destination, Minecraft.getInstance().getTextureManager().getTexture(MAP).getTextureView(), progress, pixelSize, guiWidth, guiHeight);
+        draw(background, destination, progress, pixelSize, guiWidth, guiHeight, 1);
+    }
+    public void draw(RenderTarget background, RenderTarget destination, double progress, int pixelSize, int guiWidth, int guiHeight, int style) {
+        draw(background, destination, Minecraft.getInstance().getTextureManager().getTexture(map(style)).getTextureView(), progress, pixelSize, guiWidth, guiHeight);
     }
 
     void draw(RenderTarget background, RenderTarget destination, GpuTextureView arrival,

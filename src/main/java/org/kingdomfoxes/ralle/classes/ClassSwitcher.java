@@ -32,9 +32,13 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
     private final ClassIceRenderer ice = new ClassIceRenderer();
     private final ClassIceTimeline iceTimeline = new ClassIceTimeline();
     private ClassWheelSnapshot foreground;
+    private ClassWheelSnapshot modifierStatus;
+    private ClassSelectorWheelScreen frozenWheel;
+    private ClassSwitchController.Retry shownRetry;
     private boolean wheelCapture;
     private ClassIcePreviewScreen preview;
     private long previewStarted;
+    private int previewStyle = 1, previewPixels = 1;
     private int pixelSize = 1, capturedScale;
     private final ClassSwitchController controller = new ClassSwitchController(this);
     private final ClassSwitchAudio audio;
@@ -154,6 +158,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         controller.tick(minecraft.getUser().getProfileId(), connected(), now());
         if (active() && !enabled.value()) controller.cancel();
         boolean prompt = ClassMenuCapture.selectionPrompt(text);
+        if (prompt) controller.observedSelectionStage();
         loads.session(minecraft.getUser().getProfileId());
         if (prompt && loads.hasSelection() && !controller.acceptingStageClicks()) return;
         if (prompt && !selectionScene) loads.selectionStage();
@@ -204,7 +209,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         // Wynntils may query native menus as soon as the server announces WORLD.
         // No further automation is permitted; keep the frame while those menus finish normally.
         if (controller.state() == ClassSwitchController.State.WAITING_WORLD) return;
-        if (!WynncraftClassMenu.matchesTitle(title) || !controller.bookOpened())
+        if (!WynncraftClassMenu.matchesTitle(title) || !controller.bookOpened(containerId, now()))
             controller.unexpectedMenu();
         else {
             book = containerId;
@@ -215,6 +220,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
     }
     public void closed(int packetContainer, int liveContainer) {
         if (!enabled.value() || !connected()) return;
+        if (active() && controller.retiredBook(packetContainer)) return;
         loads.session(minecraft.getUser().getProfileId());
         loads.closed(packetContainer, liveContainer);
         if (active()) {
@@ -277,6 +283,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
                         controller.unavailable(); return;
                     }
                     foreground = wheel.captureForeground();
+                    frozenWheel = wheel;
                 } else frame.capture(live);
                 controller.frameCaptured();
                 if (active() && minecraft.screen instanceof ClassSelectorWheelScreen) minecraft.setScreen(null);
@@ -311,23 +318,56 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
     private void composite(com.mojang.blaze3d.pipeline.RenderTarget live) {
         if (preview != null && now() >= previewStarted + 800) iceTimeline.bookClosed(previewStarted + 800);
         ice.draw(frame.texture(), live, iceTimeline.progress(now()), pixelSize,
-                minecraft.getWindow().getGuiScaledWidth(), minecraft.getWindow().getGuiScaledHeight());
+                minecraft.getWindow().getGuiScaledWidth(), minecraft.getWindow().getGuiScaledHeight(),
+                preview == null ? 1 : previewStyle);
         if (foreground != null) {
             minecraft.gameRenderer.processBlurEffect();
             foreground.present(live);
         }
+        if (preview == null) {
+            updateModifierStatus();
+            if (modifierStatus != null) modifierStatus.present(live);
+        }
+    }
+    private void updateModifierStatus() {
+        var retry = controller.retry();
+        if (java.util.Objects.equals(retry, shownRetry) && (modifierStatus != null || frozenWheel == null)) return;
+        Component message = retry == null ? null : Component.translatable(
+                retry.kind() == ClassSwitchController.RetryKind.COMMAND
+                        ? "ralle.classes.switch.retry-command" : "ralle.classes.switch.retry-book", retry.number(), retry.total());
+        ClassWheelSnapshot replacement = null;
+        if (frozenWheel != null) replacement = frozenWheel.captureStatus(message);
+        else if (message != null) {
+            var status = new LfgActionBarState();
+            status.hold(message.getString(), LfgActionBarState.Tone.DANGER);
+            replacement = new ClassWheelSnapshot(minecraft, graphics ->
+                    org.kingdomfoxes.ralle.ui.owo.LfgActionBarOverlay.render(minecraft, graphics, status.snapshot()));
+        }
+        var old = modifierStatus;
+        modifierStatus = replacement;
+        shownRetry = retry;
+        if (old != null) old.close();
     }
     public void previewIce(int pixels) {
+        previewIce(pixels, previewStyle);
+    }
+    public void previewIceStyle(int style) {
+        previewIce(previewPixels, style);
+    }
+    private void previewIce(int pixels, int style) {
         if (active()) return;
         if (pixels != 1 && pixels != 2) throw new IllegalArgumentException("Expected one or two logical pixels");
+        if (style < 1 || style > 4) throw new IllegalArgumentException("Expected style 1 through 4");
         stopPreview();
-        warmIce();
+        ClassIceRenderer.warm(minecraft, style);
+        previewStyle = style;
+        previewPixels = pixels;
         pixelSize = pixels;
         capturedScale = minecraft.getWindow().getGuiScale();
         previewStarted = now();
         iceTimeline.start(previewStarted);
         // Both previews replay the same 800 ms book arrival and 1600 ms finishing interval.
-        preview = new ClassIcePreviewScreen(this, pixels);
+        preview = new ClassIcePreviewScreen(this, pixels, style);
         minecraft.setScreen(preview);
     }
     public void stopPreview() {
@@ -342,7 +382,13 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         frame.close();
         try { ice.close(); }
         finally {
-            if (foreground != null) { var old = foreground; foreground = null; old.close(); }
+            try {
+                if (modifierStatus != null) { var old = modifierStatus; modifierStatus = null; old.close(); }
+            } finally {
+                frozenWheel = null;
+                shownRetry = null;
+                if (foreground != null) { var old = foreground; foreground = null; old.close(); }
+            }
         }
     }
     @Override public void muteAudio() { audio.mute(); }
@@ -356,7 +402,23 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         loads.selectionStage();
         selectionScene = false; interactionBudget = 0;
         minecraft.getConnection().sendCommand("class");
+        LOGGER.info("Class switch: sent /class (bounded command recovery enabled)");
         traceState();
+    }
+    @Override public boolean canRetryClassCommand() {
+        return worldVisible() && !loads.hasSelection();
+    }
+    @Override public boolean closeCharacterBook(int containerId) {
+        if (containerId != book || !scanner.ownsLiveBook(containerId)) return false;
+        // Discard the unacknowledged selection before our own close can be observed.
+        loads.selectionStage();
+        selectionScene = false;
+        book = -1;
+        bookStatus = "recovering stalled book; waiting for fresh selection prompt";
+        blockHeldInputs();
+        minecraft.player.closeContainer();
+        LOGGER.info("Class switch: closed stalled character book {}; awaiting verified stage to reopen", containerId);
+        return true;
     }
     @Override public void rightClickSelectionStage() {
         if (minecraft.player == null || minecraft.gameMode == null || minecraft.level == null

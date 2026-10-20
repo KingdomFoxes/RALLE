@@ -9,8 +9,8 @@ import org.kingdomfoxes.ralle.classes.ClassSwitcher;
 /** Local compositor preview: no server command, class selection or audio ownership. */
 public final class ClassIcePreviewScreen extends Screen {
     private final ClassSwitcher switcher;
-    public ClassIcePreviewScreen(ClassSwitcher switcher, int pixels) {
-        super(Component.translatable("ralle.classes.ice-preview", pixels));
+    public ClassIcePreviewScreen(ClassSwitcher switcher, int pixels, int style) {
+        super(Component.translatable("ralle.classes.ice-preview", pixels, style));
         this.switcher = switcher;
     }
     @Override public boolean isPauseScreen() { return false; }
