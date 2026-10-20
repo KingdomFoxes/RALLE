@@ -285,8 +285,7 @@ public final class RalleClient implements ClientModInitializer {
             classMenuCapture.reset();
             classMenuScanner.reset();
             classSelectorBindings.reset();
-            if (client.getCurrentServer() != null) updateNotice.joined();
-            else updateNotice.disconnected();
+            updateNotice.joined();
             foxGuildAccess.joined(client.getCurrentServer() == null ? "" : client.getCurrentServer().ip,
                     client.getUser().getProfileId());
             cosmeticDirectory.clear();

@@ -1,12 +1,14 @@
 # Modrinth login update notice
 
-Every multiplayer login (Wynncraft and other servers) checks for a published
+Every world join (singleplayer, Wynncraft and other multiplayer servers) checks for a published
 RALLE version newer than the installed Fabric metadata version and compatible
-with the running Minecraft version and Fabric. Singleplayer does not check.
+with the running Minecraft version and Fabric.
 The highest semantic version wins regardless of API ordering; listed release,
 beta and alpha versions are eligible when newer. Equal versions, build-metadata
 changes, older versions, incompatible listings and non-semantic development
 versions do not produce notices.
+Fabric compares numeric version components with missing components treated as zero:
+`1.1` is newer than `1.0.0` and equal to `1.1.0`.
 
 `ModrinthUpdateLookup` uses the public Modrinth v2
 [`GET /project/ralle/version`](https://docs.modrinth.com/api/operations/getprojectversions/)
@@ -17,9 +19,9 @@ Network reads and JSON parsing run away from the client thread. Invalid, private
 unpublished, missing, rate-limited and unavailable responses stay quiet.
 
 `UpdateNotice` consumes results on the client thread and delivers at most one
-notice per login. Checks, including failed checks, are limited to once per minute;
+notice per world join. Checks, including failed checks, are limited to once per minute;
 rapid reconnects reuse public metadata or the existing in-flight request. No
-notice is posted after disconnect. There are no automatic retries during a login,
+notice is posted after disconnect. There are no automatic retries during a world session,
 saved data, credentials, settings, commands, update downloads or Fox requests.
 
 `UpdateMessages` passes the localized body through `RalleChatMessages`:
@@ -30,6 +32,6 @@ ID under the fixed RALLE project URL; API-supplied links are never opened. Versi
 names have control/formatting characters removed and are capped at 120 codepoints.
 The prefix and link follow the player's selected RALLE theme.
 
-Before release, verify login, message wrapping and the version link in-game on
-Wynncraft and another multiplayer server, with and without Wynntils. Also verify
+Before release, verify world join, message wrapping and the version link in-game in
+singleplayer, on Wynncraft and another multiplayer server, with and without Wynntils. Also verify
 disconnect during a check and quiet behavior while offline or up to date.

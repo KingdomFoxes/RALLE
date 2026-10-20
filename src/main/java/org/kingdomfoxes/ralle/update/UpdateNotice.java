@@ -25,7 +25,7 @@ public final class UpdateNotice {
     public void joined() { awaitingNotice = true; }
     public void disconnected() { awaitingNotice = false; }
 
-    /** Returns a result once per multiplayer login, never while disconnected or on a worker thread. */
+    /** Returns a result once per world join, never while disconnected or on a worker thread. */
     public Optional<ModrinthRelease> tick() {
         if (!awaitingNotice) return Optional.empty();
         if (pending != null) {
