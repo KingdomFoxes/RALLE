@@ -240,6 +240,13 @@ introduced.
   can reuse an old ID. Escape, disconnect, account change, timeout, focus loss and
   resource loading retain their normal cleanup behavior. Retry counters reset for
   each new operation; click spacing and the total click cap do not reset on recovery.
+- Before this operation receives/selects a character book, ignore server close
+  packets while only the player's inventory (container 0) is live. The October 20
+  21:32:42 and 21:39:08 logs show Wynntils world-entry query closes (15 and 9)
+  arriving during the next switch's WAITING_STAGE, after those query menus were
+  already dismissed locally. They are not character-book closes and must neither
+  fail the switch nor acknowledge a selection. Unrelated closes with a live menu
+  or after target selection retain the existing validation and failure behavior.
 
 The October 20 local log contains a rapid switch at 20:24:07 that stayed in
 WAITING_STAGE until Escape at 20:24:11, and an earlier WAITING_STAGE timeout.

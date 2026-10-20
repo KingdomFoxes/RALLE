@@ -172,6 +172,10 @@ public final class ClassSwitchController {
      * selection may also follow another mod locally dismissing that same book. */
     public void serverClosed(int packetContainer, int liveContainer, long now) {
         if (retiredBooks.contains(packetContainer)) return;
+        // Wynntils can finish a previous world-entry query after the next /class. Its
+        // server close names a non-book container already dismissed locally. With only
+        // inventory live and no book received/selected, it cannot close this operation.
+        if (liveContainer == 0 && !bookReceived && selectedContainer < 0) return;
         if (state == State.WAITING_MENU && bookReceived && liveContainer == openedContainer) {
             menuClosed(openedContainer, now);
             return;

@@ -339,6 +339,43 @@ class ClassSwitchControllerTest {
         assertEquals(3, Collections.frequency(actions.calls, "class"));
     }
 
+    @Test void rapidNextSwitchIgnoresLocallyDismissedWorldQueryClosesBeforeItsOwnBookArrives() {
+        var actions = new Actions(); var controller = new ClassSwitchController(actions);
+        controller.begin(account, "b", "a", true, 0); controller.frameCaptured();
+        controller.bookOpened(6, 10); controller.menu(6, targets(), true);
+        controller.serverClosed(6, 6, 20); controller.tick(account, true, 1620);
+        assertTrue(controller.begin(account, "a", "b", true, 1621));
+        // Actual October 20 log: close 9/live 0 after selecting book 6 on the last switch.
+        // This is a query container, so retaining only previous character-book IDs is insufficient.
+        controller.serverClosed(9, 0, 1622);
+        assertEquals(ClassSwitchController.State.CAPTURING, controller.state());
+        controller.frameCaptured(); controller.serverClosed(9, 0, 1623);
+        assertEquals(ClassSwitchController.State.WAITING_STAGE, controller.state());
+        controller.selectionStage(1624); controller.serverClosed(15, 0, 1625);
+        assertEquals(ClassSwitchController.State.WAITING_MENU, controller.state());
+        assertTrue(actions.muted); assertNull(actions.failure); assertNull(controller.retry());
+        assertTrue(controller.bookOpened(9, 1630)); // Fresh book may reuse the query's ID.
+        controller.menu(9, targets(), true); controller.serverClosed(9, 9, 1640);
+        controller.tick(account, true, 3239); assertTrue(controller.active());
+        controller.tick(account, true, 3240); assertFalse(controller.active());
+        assertEquals("a", actions.completed); assertEquals(2, actions.restoreCalls);
+        assertEquals(2, Collections.frequency(actions.calls, "class"));
+        assertEquals(1, Collections.frequency(actions.calls, "select:9:10"));
+    }
+
+    @Test void unrelatedClosesWithALiveMenuOrAfterSelectingStillFailClosed() {
+        for (boolean selected : new boolean[] {false, true}) {
+            var actions = new Actions(); var controller = new ClassSwitchController(actions);
+            controller.begin(account, "b", null, true, 0); controller.frameCaptured();
+            if (selected) {
+                controller.bookOpened(7, 10); controller.menu(7, targets(), true);
+            }
+            controller.serverClosed(9, selected ? 0 : 9, 20);
+            assertEquals(ClassSwitchController.Failure.UNEXPECTED_MENU, actions.failure);
+            assertNull(actions.completed); assertFalse(actions.muted);
+        }
+    }
+
     @Test void prematurelyClosedPartialBookRecoversWithoutClosingAnotherMenu() {
         var actions = new Actions(); var controller = new ClassSwitchController(actions);
         controller.begin(account, "b", null, true, 0); controller.frameCaptured();
