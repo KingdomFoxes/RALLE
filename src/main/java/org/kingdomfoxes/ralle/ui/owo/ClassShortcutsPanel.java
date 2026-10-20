@@ -8,11 +8,13 @@ import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
 import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
 import org.kingdomfoxes.ralle.classes.*;
 import org.kingdomfoxes.ralle.settings.RalleSettings;
+import org.lwjgl.glfw.GLFW;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -25,12 +27,16 @@ final class ClassShortcutsPanel extends FlowLayout {
     private final ClassSelectorStore store;
     private final SettingsRegistry settings;
     private final ExpandableParentChildListPanel rows;
+    private final RalleScrollContainer scroll;
     private final io.wispforest.owo.ui.component.LabelComponent status;
     private UUID renderedAccount;
     private long renderedRevision = -1;
     private boolean refreshPending;
     private List<String> renderedReserved = List.of();
     private String renderedModifier = "";
+    private ShortcutRow dragged;
+    private int dragSource;
+    private final List<UIComponent> displayedRows = new ArrayList<>();
 
     ClassShortcutsPanel(RalleSettingsScreen screen, ClassSelectorStore store, SettingsRegistry settings) {
         super(Sizing.fill(100), Sizing.content(), Algorithm.VERTICAL);
@@ -41,6 +47,7 @@ final class ClassShortcutsPanel extends FlowLayout {
         rows = new ExpandableParentChildListPanel(Sizing.fill(100), Sizing.content());
         rows.gap(2);
         var columns = new SettingsListEditorColumns(rows);
+        scroll = columns.scroll();
         columns.actions().child(button("ralle.classes.add", this::picker));
         var reset = button("ralle.consumables.action.reset", () -> {
             var owner = account();
@@ -62,6 +69,21 @@ final class ClassShortcutsPanel extends FlowLayout {
     private static Component text(String key, Object... args) { return RalleTheme.ui(Component.translatable(key, args)); }
 
     @Override public void draw(OwoUIGraphics graphics, int mouseX, int mouseY, float partialTicks, float delta) {
+        if (dragged != null) {
+            var client = Minecraft.getInstance();
+            if (!client.isWindowActive() || !account().equals(renderedAccount) || renderedRevision != store.revision()) {
+                cancelDrag();
+            } else if (GLFW.glfwGetMouseButton(client.getWindow().handle(), 0) != GLFW.GLFW_PRESS) {
+                drop(mouseX, mouseY);
+            } else {
+                if (mouseX >= scroll.x() && mouseX < scroll.x() + scroll.width()) {
+                    if (mouseY < scroll.y() + 14) scroll.scrollToOffsetImmediately(scroll.offset() - delta * 4.5);
+                    else if (mouseY > scroll.y() + scroll.height() - 14)
+                        scroll.scrollToOffsetImmediately(scroll.offset() + delta * 4.5);
+                }
+                previewDrop(mouseY);
+            }
+        }
         if (!refreshPending && (!account().equals(renderedAccount) || renderedRevision != store.revision()
                 || !reserved().equals(renderedReserved) || !modifier().equals(renderedModifier))) {
             refreshPending = true;
@@ -77,6 +99,7 @@ final class ClassShortcutsPanel extends FlowLayout {
     }
 
     private void rebuild() {
+        dragged = null;
         renderedAccount = account();
         renderedRevision = store.revision();
         renderedReserved = reserved();
@@ -94,9 +117,8 @@ final class ClassShortcutsPanel extends FlowLayout {
             String name = character == null ? shortcut.name().isBlank()
                     ? Component.translatable("ralle.classes.missing").getString() : shortcut.name()
                     : character.displayName(shortcut.name());
-            var row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+            var row = new ShortcutRow(shortcut.characterId());
             row.gap(3).padding(Insets.of(2)).verticalAlignment(VerticalAlignment.CENTER).surface(RalleSurfaces.NAVY_ROW);
-            if (character != null && !character.hasStableIdentity()) row.tooltip(text("ralle.classes.unverified"));
             if (character == null) row.tooltip(text("ralle.classes.missing-hint"));
             row.child(UIComponents.item(ClassPresentation.item(character)).sizing(Sizing.fixed(18)));
             var label = UIComponents.label(RalleTheme.ui(Component.literal(name))).maxWidth(120);
@@ -118,10 +140,73 @@ final class ClassShortcutsPanel extends FlowLayout {
             content.add(row);
         }
         rows.replaceChildren(content);
+        displayedRows.clear();
+        displayedRows.addAll(content);
         status.text(!store.available() ? text("ralle.classes.save-failed")
                 : ClassBindingConflicts.modifier(settings) ? text("ralle.classes.modifier-conflict")
                 : snapshot.characters().isEmpty() ? text("ralle.classes.detect-next")
-                : text("ralle.classes.detected", snapshot.characters().size()));
+                : Component.empty());
+    }
+
+    private void previewDrop(double mouseY) {
+        if (dragged == null) return;
+        int destination = 0;
+        for (var row : displayedRows)
+            if (row != dragged && mouseY > row.y() + row.height() / 2d) destination++;
+        if (destination == displayedRows.indexOf(dragged)) return;
+        displayedRows.remove(dragged);
+        displayedRows.add(destination, dragged);
+        rows.replaceChildren(displayedRows);
+    }
+
+    private void drop(double mouseX, double mouseY) {
+        if (dragged == null) return;
+        if (!Minecraft.getInstance().isWindowActive() || !account().equals(renderedAccount) || renderedRevision != store.revision()
+                || !scroll.isInBoundingBox(mouseX, mouseY)) { cancelDrag(); return; }
+        previewDrop(mouseY);
+        var id = dragged.characterId;
+        int destination = displayedRows.indexOf(dragged);
+        dragged = null;
+        if (destination != dragSource) {
+            if (!mutate(renderedAccount, () -> store.move(renderedAccount, id, destination))) {
+                rebuild();
+                status.text(text("ralle.classes.save-failed"));
+            }
+        } else rebuild();
+    }
+
+    private void cancelDrag() { dragged = null; rebuild(); }
+
+    /** Keep the row's measured bounds and focus while rendering only its drop placeholder. */
+    private final class ShortcutRow extends FlowLayout {
+        private final String characterId;
+        ShortcutRow(String characterId) {
+            super(Sizing.fill(100), Sizing.content(), Algorithm.HORIZONTAL);
+            this.characterId = characterId;
+        }
+        @Override public void draw(OwoUIGraphics graphics, int mouseX, int mouseY, float partialTicks, float delta) {
+            if (dragged == this) graphics.fill(x, y, x + width, y + height, 0xBFFFFFFF);
+            else super.draw(graphics, mouseX, mouseY, partialTicks, delta);
+        }
+        @Override public boolean onMouseDown(MouseButtonEvent click, boolean doubled) {
+            if (super.onMouseDown(click, doubled)) return true; // Edit/remove retain their normal clicks.
+            if (click.button() != 0) return false;
+            dragged = this;
+            dragSource = displayedRows.indexOf(this);
+            focusHandler().focus(this, FocusSource.MOUSE_CLICK);
+            return true;
+        }
+        @Override public boolean onMouseDrag(MouseButtonEvent click, double deltaX, double deltaY) {
+            if (click.button() != 0 || dragged != this) return false;
+            previewDrop(y + click.y());
+            return true;
+        }
+        @Override public boolean onMouseUp(MouseButtonEvent click) {
+            if (click.button() != 0 || dragged != this) return false;
+            drop(x + click.x(), y + click.y());
+            return true;
+        }
+        @Override public boolean canFocus(FocusSource source) { return source == FocusSource.MOUSE_CLICK; }
     }
 
     private void picker() {
@@ -142,10 +227,6 @@ final class ClassShortcutsPanel extends FlowLayout {
                     else store.retarget(owner, replacement, character.id());
                 })) { overlay[0].remove(); replaced.run(); }
             });
-            // Character numbers distinguish duplicate names without exposing hashes as game identities.
-            int number = WynncraftClassMenu.characterNumber(character.id());
-            button.tooltip(number < 0 ? RalleTheme.ui(Component.literal(character.type()))
-                    : text("ralle.classes.character-number", number, character.type()));
             button.sizing(Sizing.fill(100), Sizing.fixed(20));
             button.renderer(RalleButtonRenderers.neutral());
             var row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content()).gap(4);
@@ -162,7 +243,7 @@ final class ClassShortcutsPanel extends FlowLayout {
     }
 
     private void edit(UUID owner, ClassShortcut shortcut) {
-        var content = modal("ralle.classes.edit");
+        var content = modal("ralle.classes.edit.title");
         content.child(UIComponents.label(text("ralle.classes.name")).color(RalleTheme.muted()));
         var name = UIComponents.textBox(Sizing.fill(100));
         name.setMaxLength(64);
@@ -170,28 +251,29 @@ final class ClassShortcutsPanel extends FlowLayout {
         content.child(name);
         content.child(UIComponents.label(text("ralle.classes.option-key")).color(RalleTheme.muted()));
         String[] draftBinding = {shortcut.binding()};
-        var bindingRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content()).gap(4);
+        // Horizontal binding + optional X share the exact width of Apply.
+        var bindingControls = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(20)).gap(4);
         var binding = UIComponents.button(bindingLabel(draftBinding[0]), ignored -> {});
         var clear = RalleIconButtons.destructiveX(text("ralle.settings.keybind.reset"), ignored -> {
             draftBinding[0] = ClassShortcut.UNBOUND;
             binding.setMessage(bindingLabel(draftBinding[0]));
-            if (bindingRow.children().getFirst() instanceof ButtonComponent control) control.active = false;
+            bindingControls.removeChild(ignored);
         });
-        clear.active = !ClassShortcut.UNBOUND.equals(draftBinding[0]);
-        clear.visibleWhen(() -> !ClassShortcut.UNBOUND.equals(draftBinding[0]));
         binding.onPress(ignored -> {
             binding.setMessage(text("ralle.settings.keybind.press-key"));
             screen.captureOptionKey(value -> {
                 draftBinding[0] = value;
                 binding.setMessage(bindingLabel(value));
-                clear.active = !ClassShortcut.UNBOUND.equals(value);
+                boolean bound = !ClassShortcut.UNBOUND.equals(value);
+                if (bound && !bindingControls.children().contains(clear)) bindingControls.child(clear);
+                else if (!bound && bindingControls.children().contains(clear)) bindingControls.removeChild(clear);
             });
         });
         binding.sizing(Sizing.expand(100), Sizing.fixed(20));
         binding.renderer(RalleButtonRenderers.neutral());
-        bindingRow.child(clear).child(binding);
-        content.child(bindingRow);
-        content.child(UIComponents.label(text("ralle.classes.binding-help")).color(RalleTheme.muted()).maxWidth(266));
+        bindingControls.child(binding);
+        if (!ClassShortcut.UNBOUND.equals(draftBinding[0])) bindingControls.child(clear);
+        content.child(bindingControls);
         var error = UIComponents.label(Component.empty()).color(Color.ofRgb(0xFF6B6B)).maxWidth(266);
         content.child(error);
         @SuppressWarnings("rawtypes") var overlay = new OverlayContainer[1];

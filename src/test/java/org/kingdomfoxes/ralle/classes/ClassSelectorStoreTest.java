@@ -47,6 +47,39 @@ class ClassSelectorStoreTest {
         assertTrue(store.account(UUID.randomUUID()).characters().isEmpty());
     }
 
+    @Test void dragOrderPersistsWithoutChangingPreferencesOrOtherAccounts() throws Exception {
+        var path = directory.resolve("classes.json");
+        var store = new ClassSelectorStore(path);
+        var third = new ClassCharacter("server-id-c", "Archer", "");
+        store.reconcile(new ClassScan(account, List.of(mage, other, third), true));
+        for (var character : List.of(mage, other, third)) store.add(account, character.id());
+        store.edit(account, new ClassShortcut(mage.id(), "Local mage", "key.keyboard.g"));
+        var separate = UUID.randomUUID();
+        store.reconcile(new ClassScan(separate, List.of(mage), true));
+        store.add(separate, mage.id());
+        var untouched = store.account(separate);
+        var preferences = store.account(account).shortcuts().getFirst();
+        store.move(account, mage.id(), 2);
+        assertEquals(List.of(other.id(), third.id(), mage.id()), store.account(account).shortcuts().stream()
+                .map(ClassShortcut::characterId).toList());
+        assertEquals(preferences, store.account(account).shortcuts().getLast());
+        store.move(account, mage.id(), 0);
+        assertEquals(List.of(mage.id(), other.id(), third.id()), store.account(account).shortcuts().stream()
+                .map(ClassShortcut::characterId).toList());
+        assertEquals(List.of(mage, other, third), store.account(account).characters());
+        assertEquals(untouched, store.account(separate));
+        long revision = store.revision();
+        String saved = Files.readString(path);
+        store.move(account, mage.id(), 0);
+        assertEquals(revision, store.revision());
+        assertEquals(saved, Files.readString(path));
+        assertThrows(IllegalArgumentException.class, () -> store.move(account, "missing", 0));
+        assertThrows(IllegalArgumentException.class, () -> store.move(account, mage.id(), -1));
+        assertThrows(IllegalArgumentException.class, () -> store.move(account, mage.id(), 3));
+        assertEquals(saved, Files.readString(path));
+        assertEquals(store.account(account), new ClassSelectorStore(path).account(account));
+    }
+
     @Test void failedSaveDoesNotPublishAndCorruptFilesArePreserved() throws Exception {
         var parent = directory.resolve("blocked");
         Files.writeString(parent, "file blocks a directory");

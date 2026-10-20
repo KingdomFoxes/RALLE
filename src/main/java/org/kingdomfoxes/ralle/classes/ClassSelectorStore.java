@@ -224,6 +224,21 @@ public final class ClassSelectorStore {
                 current.shortcuts.stream().filter(s -> !s.characterId().equals(id)).toList()));
     }
 
+    /** Explicit drag/drop changes shortcut order without changing characters or shortcut preferences. */
+    public void move(UUID account, String id, int destination) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> move(account, id, destination)); return; }
+        var current = account(account);
+        var shortcuts = new ArrayList<>(current.shortcuts);
+        if (destination < 0 || destination >= shortcuts.size()) throw new IllegalArgumentException("Invalid shortcut position");
+        int source = -1;
+        for (int i = 0; i < shortcuts.size(); i++)
+            if (shortcuts.get(i).characterId().equals(id)) source = i;
+        if (source < 0) throw new IllegalArgumentException("Shortcut no longer exists");
+        if (source == destination) return;
+        shortcuts.add(destination, shortcuts.remove(source));
+        replace(account, new Account(current.characters, shortcuts));
+    }
+
     public void clearShortcuts(UUID account) throws IOException {
         if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> clearShortcuts(account)); return; }
         replace(account, new Account(account(account).characters(), List.of()));

@@ -37,10 +37,18 @@ The class and consumable editors use `SettingsListEditorColumns`: the same
 220-pixel-high scrolling list, 104-pixel right action column, framed navy surfaces,
 spacing and scroll behavior. Class actions are Add Class and confirmed Reset,
 without import/export. Reset removes shortcuts, retaining detected characters.
-Empty-state copy is centered in the list; detection feedback stays in the action
-column rather than a footer. The compact edit modal offers a local name and option
-key with a clear X. The picker uses character numbers to distinguish repeated
-names/types, without presenting internal hashes as game identities.
+Empty-state copy is centered in the list; detection instructions and failure/conflict
+feedback stay in the action column, without a detected-class count. Hold left mouse
+on a shortcut's item, name or binding to reorder it. Its content disappears while
+held; a same-size white rectangle with 25% transparency marks the pending position.
+The list scrolls near its top/bottom edges. Releasing inside the list persists a
+changed order, shared by the selector; releasing outside, losing focus, or changing
+account/data cancels the preview. Edit/remove controls keep their normal clicks.
+The compact EDIT modal offers a local name and option key without explanatory
+footer copy. The key button fills Apply's width while unbound; setting a key adds
+the clear X on its right and reduces the key button to fit. ADD CLASS choices retain
+button hover feedback without character tooltips. Observed shortcuts omit the
+live-character-book tooltip; missing-character warnings remain available.
 Received class sprites persist as an optional `sprite` with potion model number
 and tint in each character record. This is backward-compatible with version 1
 files lacking that field. `ClassPresentation` reconstructs the received potion
