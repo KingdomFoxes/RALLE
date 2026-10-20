@@ -12,6 +12,23 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Validate required mixin boundaries against the real mapped Minecraft bytecode without launch/auth. */
 class ClassSwitchHooksTest {
+    @Test void backgroundCaptureRunsBetweenHudAndNativeMenuBlur() throws Exception {
+        var draw = method(read("net/minecraft/client/gui/render/GuiRenderer"), "draw", "(Lcom/mojang/blaze3d/buffers/GpuBufferSlice;)V");
+        int ranges = 0, blurs = 0;
+        for (var instruction : draw.instructions) if (instruction instanceof MethodInsnNode call) {
+            if (call.name.equals("executeDrawRange")) ranges++;
+            if (call.name.equals("processBlurEffect")) { assertEquals(1, ranges); blurs++; }
+        }
+        assertEquals(2, ranges); assertEquals(1, blurs);
+        var hook = method(read("org/kingdomfoxes/ralle/classes/mixin/ClassIceCaptureMixin"), "ralle$background",
+                "(Lcom/mojang/blaze3d/buffers/GpuBufferSlice;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V");
+        var inject = hook.visibleAnnotations.stream().filter(a -> a.desc.endsWith("/Inject;")).findFirst().orElseThrow();
+        @SuppressWarnings("unchecked") var locations = (List<AnnotationNode>) value(inject, "at");
+        assertEquals("Lnet/minecraft/client/renderer/GameRenderer;processBlurEffect()V", value(locations.getFirst(), "target"));
+        assertEquals(1, value(inject, "require"));
+        assertEquals(1, calls(hook, "org/kingdomfoxes/ralle/ui/render/GuiCaptureTargetOverride", "current"));
+        assertEquals(1, calls(hook, "org/kingdomfoxes/ralle/classes/ClassSwitcher", "captureBackground"));
+    }
     @Test void presentationHookIsAfterTheFullRender() throws Exception {
         var minecraft = read("net/minecraft/client/Minecraft");
         var runTick = method(minecraft, "runTick", "(Z)V");

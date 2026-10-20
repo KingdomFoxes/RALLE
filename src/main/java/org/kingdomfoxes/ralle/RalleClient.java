@@ -388,6 +388,14 @@ public final class RalleClient implements ClientModInitializer {
                             context().lfgSounds(), lfgNotifications, lockDebouncer)));
                     return 1;
                 }));
+            ralleCommand.then(literal("animtest")
+                    .then(literal("1").executes(command -> {
+                        Minecraft.getInstance().schedule(() -> context().classSwitcher().previewIce(1));
+                        return 1;
+                    })).then(literal("2").executes(command -> {
+                        Minecraft.getInstance().schedule(() -> context().classSwitcher().previewIce(2));
+                        return 1;
+                    })));
             dispatcher.register(ralleCommand);
         });
     }

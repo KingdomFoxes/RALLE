@@ -26,6 +26,7 @@ public final class ClassSelectorWheelScreen extends Screen {
     private boolean pointerArmed, keyboardSelection, mouseReady;
     private Component status;
     private boolean failure;
+    private long frozenTime = -1;
 
     public ClassSelectorWheelScreen(ClassSelectorBindings controller, String style) {
         super(Component.translatable("ralle.settings.option.class-selector-enabled"));
@@ -85,13 +86,27 @@ public final class ClassSelectorWheelScreen extends Screen {
         status = null;
         model.hover(index, System.currentTimeMillis());
         model.submit();
+        frozenTime = System.currentTimeMillis();
+    }
+
+    @Override protected void renderBlurredBackground(GuiGraphics graphics) {
+        // Keep a stable HUD/background boundary even when the native blur option is zero.
+        graphics.blurBeforeThisStratum();
+    }
+
+    public ClassWheelSnapshot captureForeground() {
+        return new ClassWheelSnapshot(minecraft, graphics -> {
+            renderMenuBackground(graphics);
+            graphics.nextStratum();
+            render(graphics, lastX, lastY, 0);
+        });
     }
 
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        if (mouseX != lastX || mouseY != lastY) {
+        if (frozenTime < 0 && (mouseX != lastX || mouseY != lastY)) {
             pointerArmed = true; keyboardSelection = false; lastX = mouseX; lastY = mouseY;
         }
-        if (pointerArmed && !keyboardSelection && !controller.completed()) {
+        if (frozenTime < 0 && pointerArmed && !keyboardSelection && !controller.completed()) {
             int hovered = hit(mouseX, mouseY);
             model.hover(hovered >= 0 && !controller.unavailable(entries.get(hovered)) ? hovered : -1, System.currentTimeMillis());
         }
@@ -102,7 +117,7 @@ public final class ClassSelectorWheelScreen extends Screen {
         for (int index = 0; index < entries.size(); index++) {
             var entry = entries.get(index);
             var face = geometry.get(index);
-            double extension = model.offset(index, System.currentTimeMillis());
+            double extension = model.offset(index, frozenTime >= 0 ? frozenTime : System.currentTimeMillis());
             int dx = (int) Math.round(face.motionX() * extension), dy = (int) Math.round(face.motionY() * extension);
             SelectorWheelRenderer.drawFace(graphics, face, dx, dy, model.hovered() == index);
             int x = (int) Math.round(face.centerX()) + dx, y = (int) Math.round(face.centerY()) + dy;

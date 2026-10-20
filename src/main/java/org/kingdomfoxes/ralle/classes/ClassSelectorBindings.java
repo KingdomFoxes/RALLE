@@ -118,6 +118,7 @@ public final class ClassSelectorBindings {
                 || !reserved().equals(reserved);
     }
     private void begin() {
+        switcher.warmIce();
         account = minecraft.getUser().getProfileId();
         var snapshot = store.account(account);
         entries = snapshot.shortcuts().stream().map(s -> new Entry(s, snapshot.character(s.characterId()))).toList();

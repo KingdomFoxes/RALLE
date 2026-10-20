@@ -13,6 +13,8 @@ import net.minecraft.world.inventory.ClickType;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.client.WynncraftHost;
 import org.kingdomfoxes.ralle.ui.owo.ClassSelectorWheelScreen;
+import org.kingdomfoxes.ralle.ui.owo.ClassWheelSnapshot;
+import org.kingdomfoxes.ralle.ui.owo.ClassIcePreviewScreen;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionBarState;
 import org.lwjgl.glfw.GLFW;
 
@@ -27,6 +29,13 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
     private final LfgActionBarState feedback;
     private final java.util.function.BooleanSupplier otherAutomation;
     private final ClassSwitchFrame frame = new ClassSwitchFrame();
+    private final ClassIceRenderer ice = new ClassIceRenderer();
+    private final ClassIceTimeline iceTimeline = new ClassIceTimeline();
+    private ClassWheelSnapshot foreground;
+    private boolean wheelCapture;
+    private ClassIcePreviewScreen preview;
+    private long previewStarted;
+    private int pixelSize = 1, capturedScale;
     private final ClassSwitchController controller = new ClassSwitchController(this);
     private final ClassSwitchAudio audio;
     private final ClassLoadTracker loads;
@@ -212,6 +221,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
             if (controller.state() == ClassSwitchController.State.WAITING_WORLD) return;
             LOGGER.info("Class switch: server close packet {}, live container {}", packetContainer, liveContainer);
             controller.serverClosed(packetContainer, liveContainer, now());
+            if (controller.state() == ClassSwitchController.State.WAITING_WORLD) iceTimeline.bookClosed(now());
             traceState();
         }
     }
@@ -227,6 +237,11 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
 
     /** Overlap the outbound command with rendering; keep the selected wheel visible for capture. */
     public void beforeRender() {
+        if (preview != null) {
+            if (minecraft.screen != preview || minecraft.getOverlay() != null || !minecraft.isWindowActive()
+                    || now() - previewStarted >= 800 + ClassSwitchController.ANIMATION_MILLIS) stopPreview();
+            return;
+        }
         if (!active() || !enabled.value() || !connected() || minecraft.getWindow().isMinimized()) return;
         beforeTick();
         controller.frameRendering();
@@ -234,6 +249,16 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
 
     /** Called after all world and UI rendering, immediately before vanilla presents its frame. */
     public void beforePresent() {
+        if (preview != null) {
+            try {
+                var live = minecraft.getMainRenderTarget();
+                if (!frame.captured()) return;
+                if (!frame.fits(live) || capturedScale != minecraft.getWindow().getGuiScale()) { stopPreview(); return; }
+                if (foreground == null) foreground = preview.captureForeground();
+                composite(live);
+            } catch (RuntimeException error) { LOGGER.warn("Ice preview failed", error); stopPreview(); }
+            return;
+        }
         if (!enabled.value() || !connected()) return;
         try {
             beforeTick();
@@ -247,20 +272,79 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
             if (!enabled.value() || minecraft.getOverlay() != null) { controller.cancel(); return; }
             var live = minecraft.getMainRenderTarget();
             if (controller.state() == ClassSwitchController.State.CAPTURING) {
-                frame.capture(live);
+                if (wheelCapture) {
+                    if (!frame.captured() || !(minecraft.screen instanceof ClassSelectorWheelScreen wheel)) {
+                        controller.unavailable(); return;
+                    }
+                    foreground = wheel.captureForeground();
+                } else frame.capture(live);
                 controller.frameCaptured();
                 if (active() && minecraft.screen instanceof ClassSelectorWheelScreen) minecraft.setScreen(null);
                 traceState();
             }
             if (!active()) return;
-            if (!frame.fits(live)) { controller.unavailable(); return; }
-            if (active()) frame.present(live);
+            if (!frame.fits(live) || capturedScale != minecraft.getWindow().getGuiScale()) { controller.unavailable(); return; }
+            if (active()) composite(live);
         } catch (RuntimeException error) {
             org.slf4j.LoggerFactory.getLogger(ClassSwitcher.class).warn("Class switch rendering failed", error);
             controller.unavailable();
         }
     }
-    @Override public void captureFrame() { blockHeldInputs(); }
+    @Override public void captureFrame() {
+        blockHeldInputs();
+        iceTimeline.start(now());
+        wheelCapture = minecraft.screen instanceof ClassSelectorWheelScreen;
+        pixelSize = 1;
+        capturedScale = minecraft.getWindow().getGuiScale();
+    }
+
+    /** Native GUI boundary: HUD has rendered; menu blur and foreground have not. */
+    public void captureBackground() {
+        if (frame.captured()) return;
+        if (preview != null || controller.state() == ClassSwitchController.State.CAPTURING && wheelCapture) {
+            try { frame.capture(minecraft.getMainRenderTarget()); }
+            catch (RuntimeException failure) {
+                if (preview != null) stopPreview(); else controller.unavailable();
+            }
+        }
+    }
+    private void composite(com.mojang.blaze3d.pipeline.RenderTarget live) {
+        if (preview != null && now() >= previewStarted + 800) iceTimeline.bookClosed(previewStarted + 800);
+        ice.draw(frame.texture(), live, iceTimeline.progress(now()), pixelSize,
+                minecraft.getWindow().getGuiScaledWidth(), minecraft.getWindow().getGuiScaledHeight());
+        if (foreground != null) {
+            minecraft.gameRenderer.processBlurEffect();
+            foreground.present(live);
+        }
+    }
+    public void previewIce(int pixels) {
+        if (active()) return;
+        if (pixels != 1 && pixels != 2) throw new IllegalArgumentException("Expected one or two logical pixels");
+        stopPreview();
+        warmIce();
+        pixelSize = pixels;
+        capturedScale = minecraft.getWindow().getGuiScale();
+        previewStarted = now();
+        iceTimeline.start(previewStarted);
+        // Both previews replay the same 800 ms book arrival and 1600 ms finishing interval.
+        preview = new ClassIcePreviewScreen(this, pixels);
+        minecraft.setScreen(preview);
+    }
+    public void stopPreview() {
+        var old = preview;
+        preview = null;
+        if (old == null) return;
+        closeComposition();
+        if (minecraft.screen == old) minecraft.setScreen(null);
+    }
+    public void warmIce() { ClassIceRenderer.warm(minecraft); }
+    private void closeComposition() {
+        frame.close();
+        try { ice.close(); }
+        finally {
+            if (foreground != null) { var old = foreground; foreground = null; old.close(); }
+        }
+    }
     @Override public void muteAudio() { audio.mute(); }
     @Override public void restoreAudio() {
         try { audio.close(); }
@@ -293,7 +377,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         traceState();
     }
     @Override public void releaseFrame() {
-        frame.close();
+        closeComposition();
         // Close only our selector. Escape/failure exposes any real server screen as it stands.
         if (minecraft.screen instanceof ClassSelectorWheelScreen) minecraft.setScreen(null);
         blockHeldInputs();
@@ -312,6 +396,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
                 ? LfgActionBarState.Tone.MUTED : LfgActionBarState.Tone.DANGER, 3500);
     }
     public void reset() {
+        stopPreview();
         controller.cancel();
         frame.close(); restoreAudio(); clearOperation();
         loads.reset();
@@ -326,7 +411,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
                 && !minecraft.player.isHandsBusy() && !selectionScene;
     }
     private void clearOperation() {
-        frame.close();
+        closeComposition();
         target = null; book = -1; lastStage = ClassSwitchController.State.IDLE;
     }
     private void traceState() {

@@ -17,6 +17,7 @@ public final class ClassSwitchFrame implements AutoCloseable {
     public boolean captured() { return frozen != null; }
     public boolean fits(RenderTarget target) { return frozen != null && frozen.width == target.width && frozen.height == target.height; }
     public void present(RenderTarget target) { copy(frozen, target); }
+    public RenderTarget texture() { return java.util.Objects.requireNonNull(frozen); }
 
     private static void copy(RenderTarget source, RenderTarget destination) {
         RenderSystem.getDevice().createCommandEncoder().copyTextureToTexture(
