@@ -148,7 +148,7 @@ public final class ClassSelectorWheelScreen extends Screen {
             int x = (int) Math.round(face.centerX()) + dx, y = (int) Math.round(face.centerY()) + dy;
             graphics.renderItem(items.get(index), x - 8, y - 22);
             int color = controller.unavailable(entry) ? 0xFF7E899B : index == model.hovered() ? RalleTheme.accentArgb()
-                    : org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText();
+                    : org.kingdomfoxes.ralle.ui.theme.RallePalette.modifierText();
             var label = labels.get(index);
             var lines = label.lines();
             int lineY = y - 3;
@@ -157,10 +157,10 @@ public final class ClassSelectorWheelScreen extends Screen {
                 graphics.drawString(font, text, x - font.width(text) / 2, lineY, color, false);
                 lineY += font.lineHeight + 1;
             }
-            var binding = controller.current(entry) ? RalleTypography.body(Component.translatable("ralle.classes.wheel.current"))
-                    : label.binding();
-            if (controller.current(entry) && label.conflict()) binding = binding.copy().append(" !");
-            graphics.drawString(font, binding, x - font.width(binding) / 2, y + 21, label.conflict() ? 0xFFFF6B6B : color, false);
+            if (!controller.current(entry)) {
+                var binding = label.binding();
+                graphics.drawString(font, binding, x - font.width(binding) / 2, y + 21, label.conflict() ? 0xFFFF6B6B : color, false);
+            }
         }
         graphics.pose().popMatrix();
         if (bars) graphics.disableScissor();
@@ -168,8 +168,8 @@ public final class ClassSelectorWheelScreen extends Screen {
     }
     private void renderStatus(GuiGraphics graphics, Component message) {
         Component below = message != null ? message : status != null ? status : entries.isEmpty() ? Component.translatable("ralle.classes.wheel.empty")
-                : model.hovered() >= 0 ? Component.literal(entries.get(model.hovered()).name())
-                : Component.translatable("ralle.classes.wheel.hint");
+                : null;
+        if (below == null) return;
         var lines = font.split(RalleTypography.body(below), Math.max(1, width - 24));
         int y = entries.isEmpty() ? height / 2 : Math.min(height - lines.size() * (font.lineHeight + 2) - 4,
                 (int) (originY + (radius + 12) * scale));

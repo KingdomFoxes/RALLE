@@ -1,9 +1,17 @@
 package org.kingdomfoxes.ralle.ui.theme;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
+import org.kingdomfoxes.ralle.api.settings.SettingsRegistry;
+import org.kingdomfoxes.ralle.settings.RalleSettings;
+
+import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RalleThemeCatalogTest {
+    @TempDir Path directory;
+
     @Test void catalogHasStableUniqueIdsAndExactSubmittedPaletteValues() {
         assertEquals(28, RalleThemeCatalog.themes().size());
         assertEquals(28, RalleThemeCatalog.ids().stream().distinct().count());
@@ -44,5 +52,29 @@ class RalleThemeCatalogTest {
         assertEquals(0xFFFFFFFF, RallePalette.surfaceText());
         assertEquals(0xFFFFFFFF, RallePalette.primaryText());
         assertEquals(0xFFA9B0BE, RallePalette.secondaryText());
+    }
+
+    @Test void onlyIsothopicalbobModifierMenusUseBlackTextWithoutChangingOtherPaletteRoles() {
+        var settings = new SettingsRegistry(directory.resolve("settings.properties"));
+        RalleSettings.register(settings);
+        settings.seal();
+        var choice = settings.setting(RalleSettings.UI_THEME_ID, ChoiceSetting.class);
+        RallePalette.bind(settings);
+        try {
+            for (var theme : RalleThemeCatalog.themes()) {
+                choice.set(theme.id());
+                int expected = "isothopicalbob".equals(theme.id()) ? 0xFF000000 : 0xFFFFFFFF;
+                assertEquals(expected, RallePalette.modifierText(), theme.id());
+                assertEquals(0xFFFFFFFF, RallePalette.primaryText(), theme.id());
+                assertEquals(0xFFFFFFFF, RallePalette.surfaceText(), theme.id());
+                assertEquals(theme.background(), RallePalette.background());
+                assertEquals(theme.outline(), RallePalette.outline());
+                assertEquals(theme.accent(), RallePalette.accent());
+                assertEquals("default".equals(theme.id()) ? 0xFFA9B0BE : 0xFFD8DEE6,
+                        RallePalette.secondaryText());
+            }
+        } finally {
+            choice.set(RalleThemeCatalog.DEFAULT_ID);
+        }
     }
 }

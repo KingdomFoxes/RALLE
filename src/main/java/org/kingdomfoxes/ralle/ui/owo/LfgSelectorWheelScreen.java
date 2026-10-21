@@ -250,7 +250,7 @@ public final class LfgSelectorWheelScreen extends Screen {
         var label = RalleTypography.body(entry.label());
         int color = enabled(entry) || retainsCreatePresentation() ? hovered
                         ? org.kingdomfoxes.ralle.ui.theme.RallePalette.accentArgb()
-                        : org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText() : DISABLED;
+                        : org.kingdomfoxes.ralle.ui.theme.RallePalette.modifierText() : DISABLED;
         if (!bars) graphics.drawString(font, label, x - font.width(label) / 2, y + 5, color, false);
         else {
             int lineY = y + 5;

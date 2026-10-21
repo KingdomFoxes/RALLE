@@ -47,7 +47,8 @@ The list scrolls near its top/bottom edges. Releasing inside the list persists a
 changed order, shared by the selector; releasing outside, losing focus, or changing
 account/data cancels the preview. Edit/remove controls keep their normal clicks.
 The compact EDIT modal offers a local name and option key without explanatory
-footer copy. The key button fills Apply's width while unbound; setting a key adds
+footer copy. Saved name overrides are visible immediately on opening, with the
+initial caret/scroll at the start of the text. The key button fills Apply's width while unbound; setting a key adds
 the clear X on its right and reduces the key button to fit. ADD CLASS choices retain
 button hover feedback without character tooltips. Observed shortcuts omit the
 live-character-book tooltip; missing-character warnings remain available.
@@ -79,7 +80,10 @@ option count and name length. Names affect width only. They wrap/scroll using th
 and viewport and reveal keyboard-selected rows, including their bottom outline
 and full upward-motion envelope. Entering an available option by pointer or
 keyboard plays the shared Vault step cue once per selection change. Class
-switching does not play the LFG creation success cues.
+switching does not play the LFG creation success cues. The current class remains
+gray and unavailable; its bottom tag/binding line is omitted in both graphical styles.
+Omit the idle click/option-key instruction and hovered class-name line beneath
+the graphical selector. Retain names inside options, empty-list guidance and operation feedback.
 Deliberate pointer movement takes over from keyboard
 selection; a stationary pointer does not. A left button held before opening is
 inert until released and pressed again. The screen is non-pausing, supplies

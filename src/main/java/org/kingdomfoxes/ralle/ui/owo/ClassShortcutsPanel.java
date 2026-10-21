@@ -292,7 +292,8 @@ final class ClassShortcutsPanel extends FlowLayout {
         content.child(UIComponents.label(text("ralle.classes.name")).color(RalleTheme.muted()));
         var name = UIComponents.textBox(Sizing.fill(100));
         name.setMaxLength(64);
-        name.setValue(shortcut.name());
+        // owo resets the initial horizontal scroll/caret before the field is laid out.
+        name.text(shortcut.name());
         content.child(name);
         content.child(UIComponents.label(text("ralle.classes.option-key")).color(RalleTheme.muted()));
         String[] draftBinding = {shortcut.binding()};
