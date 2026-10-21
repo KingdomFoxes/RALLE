@@ -7,6 +7,17 @@ target resolution, the native right-click sequence, frozen-frame handoff and
 remaining live validation. Its option keys are configurable per shortcut; the
 fixed option keys described below apply to Create/Kick.
 
+Circle faces are rasterized once per screen layout into tightly cropped dynamic
+textures containing both normal and selected colors. Playback submits one
+nearest-filtered image per segment, with the same pixel geometry, transparency,
+hit regions and independent motion. The screen retains every visible face
+(including all 64 supported class shortcuts), avoiding the old 32-entry cache
+thrashing and hundreds of row rectangles per segment per frame. Layout rebuilds,
+palette changes and screen removal release the owned textures. Native items and
+text still render normally; class name wrapping and option-conflict labels are
+prepared with the layout instead of recomputed for each frame. Bars retain their
+two inexpensive rectangles per face.
+
 Wheels contains three subcategories: Lfg Create Selector, Party/Lfg Kick Selector,
 and Class Selector. Each contains that selector's toggle and style; Class Selector
 also contains its modifier and shortcut editor. The Create and Kick wheels remain disabled
@@ -69,8 +80,9 @@ Bars are side-by-side vertical slices using an original reference square of
 side S. Bar height is 55% of S (a 45% reduction); width and wrapping retain the
 original reference square. Up to five options divide its width equally.
 Above five, each bar is at least 20% of the
-original square width (S/5), with pixel rounding. Rows grow up to 64% of the
-GUI-scaled viewport width, then wrap below with each row centered. Shared borders
+original square width (S/5), with pixel rounding. Rows contain at most five
+options, wrapping below with each row centered and an eight-pixel gap. Fifteen
+options form three rows of five. Rows stay within 64% of the GUI-scaled viewport width. Shared borders
 are included in column widths. S is content-aware for Create and smaller for
 Kick, clamped to the width cap and aligned to logical pixels. Kick roster changes
 recompute the layout without retaining a stale hovered target.

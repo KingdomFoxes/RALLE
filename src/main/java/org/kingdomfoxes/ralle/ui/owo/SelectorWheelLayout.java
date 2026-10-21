@@ -94,7 +94,7 @@ final class SelectorWheelLayout {
         int columns = Math.min(count, 5);
         // Use integer edges without ever rounding the minimum down below 20% of S.
         int barWidth = (int) Math.ceil(side / (double) columns);
-        int perRow = Math.max(1, cap / barWidth);
+        int perRow = Math.max(1, Math.min(5, cap / barWidth));
         int rows = (count + perRow - 1) / perRow;
         int totalHeight = rows * barHeight + (rows - 1) * 8;
         var result = new ArrayList<Face>();

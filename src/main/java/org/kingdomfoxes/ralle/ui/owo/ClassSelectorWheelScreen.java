@@ -7,6 +7,7 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.util.FormattedCharSequence;
 import org.kingdomfoxes.ralle.classes.ClassSelectorBindings;
 import org.kingdomfoxes.ralle.classes.ClassShortcut;
 import org.kingdomfoxes.ralle.sound.SelectorWheelSounds;
@@ -19,9 +20,12 @@ public final class ClassSelectorWheelScreen extends Screen {
     private final ClassSelectorBindings controller;
     private final boolean bars;
     private final SelectorWheelModel model = new SelectorWheelModel();
+    private final SelectorWheelRenderer faces = new SelectorWheelRenderer();
     private final List<ClassSelectorBindings.Entry> entries;
     private final List<ItemStack> items;
     private List<SelectorWheelLayout.Face> geometry = List.of();
+    private List<Label> labels = List.of();
+    private record Label(List<FormattedCharSequence> lines, Component binding, boolean conflict) {}
     private final SelectorWheelViewport viewport = new SelectorWheelViewport();
     private double scale = 1, originY, radius;
     private int lastX, lastY;
@@ -64,6 +68,18 @@ public final class ClassSelectorWheelScreen extends Screen {
             scale = Math.max(.01, Math.min(1, Math.min((width / 2d - 8) / (radius + 7), (height / 2d - 30) / (radius + 7))));
             originY = height / 2d;
         }
+        faces.prepare(geometry);
+        var preparedLabels = new java.util.ArrayList<Label>(entries.size());
+        for (int index = 0; index < entries.size(); index++) {
+            var entry = entries.get(index);
+            var lines = font.split(RalleTypography.body(Component.literal(entry.name())),
+                    Math.max(1, SelectorWheelLayout.labelWidth(geometry.get(index))));
+            var binding = keyLabel(entry.shortcut().binding());
+            boolean conflict = controller.optionConflict(entry);
+            if (conflict) binding = binding.copy().append(" !");
+            preparedLabels.add(new Label(lines, binding, conflict));
+        }
+        labels = List.copyOf(preparedLabels);
     }
     public void keyboardSelection(int index) {
         keyboardSelection = true;
@@ -128,13 +144,13 @@ public final class ClassSelectorWheelScreen extends Screen {
             var face = geometry.get(index);
             double extension = model.offset(index, frozenTime >= 0 ? frozenTime : System.currentTimeMillis());
             int dx = (int) Math.round(face.motionX() * extension), dy = (int) Math.round(face.motionY() * extension);
-            SelectorWheelRenderer.drawFace(graphics, face, dx, dy, model.hovered() == index);
+            faces.drawFace(graphics, face, dx, dy, model.hovered() == index);
             int x = (int) Math.round(face.centerX()) + dx, y = (int) Math.round(face.centerY()) + dy;
             graphics.renderItem(items.get(index), x - 8, y - 22);
             int color = controller.unavailable(entry) ? 0xFF7E899B : index == model.hovered() ? RalleTheme.accentArgb()
                     : org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText();
-            int lineWidth = SelectorWheelLayout.labelWidth(face);
-            var lines = font.split(RalleTypography.body(Component.literal(entry.name())), Math.max(1, lineWidth));
+            var label = labels.get(index);
+            var lines = label.lines();
             int lineY = y - 3;
             for (int line = 0; line < Math.min(2, lines.size()); line++) {
                 var text = lines.get(line);
@@ -142,10 +158,9 @@ public final class ClassSelectorWheelScreen extends Screen {
                 lineY += font.lineHeight + 1;
             }
             var binding = controller.current(entry) ? RalleTypography.body(Component.translatable("ralle.classes.wheel.current"))
-                    : keyLabel(entry.shortcut().binding());
-            boolean conflict = controller.optionConflict(entry);
-            if (conflict) binding = binding.copy().append(" !");
-            graphics.drawString(font, binding, x - font.width(binding) / 2, y + 21, conflict ? 0xFFFF6B6B : color, false);
+                    : label.binding();
+            if (controller.current(entry) && label.conflict()) binding = binding.copy().append(" !");
+            graphics.drawString(font, binding, x - font.width(binding) / 2, y + 21, label.conflict() ? 0xFFFF6B6B : color, false);
         }
         graphics.pose().popMatrix();
         if (bars) graphics.disableScissor();
@@ -194,7 +209,7 @@ public final class ClassSelectorWheelScreen extends Screen {
     @Override public boolean keyPressed(KeyEvent event) { return controller.handleKeyboard(event, GLFW.GLFW_PRESS); }
     @Override public boolean keyReleased(KeyEvent event) { return controller.handleKeyboard(event, GLFW.GLFW_RELEASE); }
     @Override public void onClose() { controller.close(); }
-    @Override public void removed() { controller.screenRemoved(this); super.removed(); }
+    @Override public void removed() { faces.close(); controller.screenRemoved(this); super.removed(); }
     @Override public Component getNarrationMessage() {
         var narration = title.copy();
         for (var entry : entries) {

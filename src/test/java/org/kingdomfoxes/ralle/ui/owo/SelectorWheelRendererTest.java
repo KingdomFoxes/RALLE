@@ -8,6 +8,33 @@ import javax.imageio.ImageIO;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SelectorWheelRendererTest {
+    @Test void croppedImagesMatchOriginalPixelsForEveryRingAndBothHoverStates() {
+        var random = new java.util.Random(0xFACE);
+        for (int count : new int[] {1, 7, 8, 15, 32, 64}) {
+            long imagePixels = 0;
+            for (var sector : SelectorWheelModel.classGeometry(count)) {
+                var raster = SelectorWheelRenderer.rasterize(sector);
+                imagePixels += (long) raster.width() * raster.height();
+                for (int y = 0; y < raster.height(); y++) for (int x = 0; x < raster.width(); x++) {
+                    for (boolean selected : new boolean[] {false, true})
+                        assertEquals(SelectorWheelRenderer.color(sector, raster.left() + x + .5,
+                                raster.top() + y + .5, selected), raster.colorAt(x, y, selected));
+                }
+                // Independently sample outside the crop to detect any clipped arc/border pixels.
+                int extent = (int) Math.ceil(sector.outer());
+                for (int sample = 0; sample < 4096; sample++) {
+                    int x = random.nextInt(-extent, extent), y = random.nextInt(-extent, extent);
+                    if (x >= raster.left() && x < raster.left() + raster.width()
+                            && y >= raster.top() && y < raster.top() + raster.height()) continue;
+                    assertEquals(0, SelectorWheelRenderer.color(sector, x + .5, y + .5, false));
+                }
+            }
+            // Both states fit comfortably in a bounded screen-owned cache even at the 64-class limit.
+            assertTrue(imagePixels * 2 * Integer.BYTES < 48L * 1024 * 1024,
+                    "Texture budget exceeded for " + count + " options");
+        }
+    }
+
     @Test void writesClassHalfCircleAndConcentricRingPreview() throws Exception {
         int panelSize = 500;
         var preview = new BufferedImage(panelSize * 3, panelSize * 2, BufferedImage.TYPE_INT_ARGB);
@@ -23,10 +50,10 @@ class SelectorWheelRendererTest {
                 var sector = sectors.get(i);
                 int dx = i == 0 ? (int) Math.round(Math.cos(sector.angle()) * 5) : 0;
                 int dy = i == 0 ? (int) Math.round(Math.sin(sector.angle()) * 5) : 0;
-                int extent = (int) sector.outer();
-                for (int y = -extent; y < extent; y++) for (int x = -extent; x < extent; x++) {
-                    int color = SelectorWheelRenderer.color(sector, x + .5, y + .5, i == 0);
-                    if (color != 0) preview.setRGB(cx + x + dx, cy + y + dy, color);
+                var raster = SelectorWheelRenderer.rasterize(sector);
+                for (int y = 0; y < raster.height(); y++) for (int x = 0; x < raster.width(); x++) {
+                    int color = raster.colorAt(x, y, i == 0);
+                    if (color != 0) preview.setRGB(cx + raster.left() + x + dx, cy + raster.top() + y + dy, color);
                 }
                 int x = cx + (int) Math.round(sector.centerX()) + dx;
                 int y = cy + (int) Math.round(sector.centerY()) + dy;

@@ -43,21 +43,18 @@ class SelectorWheelLayoutTest {
         }
     }
 
-    @Test void sixOptionsGrowBeforeWrappingAtTheScreenCap() {
-        var wide = SelectorWheelLayout.bars(6, 200, 500); // cap 320; 6 * 40 fits
-        assertEquals(240, wide.getLast().right() - wide.getFirst().left());
-        assertEquals(wide.getFirst().top(), wide.getLast().top());
-        for (var face : wide) assertEquals(40, face.right() - face.left());
-
-        var narrow = SelectorWheelLayout.bars(6, 200, 375); // cap exactly 240
-        assertEquals(narrow.getFirst().top(), narrow.getLast().top());
-        var wrapped = SelectorWheelLayout.bars(6, 200, 374); // cap 239
-        assertEquals(40, wrapped.getLast().right() - wrapped.getLast().left());
-        assertEquals(110, wrapped.getLast().bottom() - wrapped.getLast().top());
-        assertEquals(8, wrapped.getLast().top() - wrapped.getFirst().bottom());
-        assertTrue(wrapped.getLast().top() > wrapped.getFirst().bottom());
-        assertEquals(-20, wrapped.getLast().left());
-        assertEquals(20, wrapped.getLast().right());
+    @Test void sixthOptionStartsACenteredSecondRowEvenOnWideScreens() {
+        for (int viewportWidth : new int[] {374, 375, 500, 1000}) {
+            var faces = SelectorWheelLayout.bars(6, 200, viewportWidth);
+            for (var face : faces) {
+                assertEquals(40, face.right() - face.left());
+                assertEquals(110, face.bottom() - face.top());
+            }
+            assertEquals(faces.getFirst().top(), faces.get(4).top());
+            assertEquals(8, faces.getLast().top() - faces.getFirst().bottom());
+            assertEquals(-20, faces.getLast().left());
+            assertEquals(20, faces.getLast().right());
+        }
     }
 
     @Test void kickBarsRetainTheirWidthsWithTheReducedHeight() {

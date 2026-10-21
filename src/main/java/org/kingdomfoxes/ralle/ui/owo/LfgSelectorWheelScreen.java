@@ -48,6 +48,7 @@ public final class LfgSelectorWheelScreen extends Screen {
     private final boolean hostedAtOpen;
     private List<Entry> entries;
     private final SelectorWheelModel model = new SelectorWheelModel();
+    private final SelectorWheelRenderer faces = new SelectorWheelRenderer();
     private List<SelectorWheelLayout.Face> geometry = List.of();
     private double wheelScale = 1;
     private double outerRadius;
@@ -123,6 +124,7 @@ public final class LfgSelectorWheelScreen extends Screen {
             double bottom = geometry.stream().mapToInt(SelectorWheelLayout.Face::bottom).max().orElse(side / 2);
             originY = viewport.originY();
             outerRadius = bottom;
+            faces.prepare(geometry);
             return;
         }
         outerRadius = mode == Mode.CREATE ? Math.max(76, labelWidth + 32) : 40;
@@ -132,6 +134,7 @@ public final class LfgSelectorWheelScreen extends Screen {
         geometry = SelectorWheelLayout.circles(mode == Mode.CREATE ? SelectorWheelModel.ring(entries.size(), 24, outerRadius, true)
                 : SelectorWheelModel.kickGeometry(entries.size()));
         originY = height / 2d;
+        faces.prepare(geometry);
     }
 
     @Override public void tick() {
@@ -206,7 +209,7 @@ public final class LfgSelectorWheelScreen extends Screen {
                 }
                 // If GPU capture failed, keep the ordinary bounded renderer, then remove the segment.
                 if (dissolving && progress >= .5) continue;
-                SelectorWheelRenderer.drawFace(graphics, bounds, dx, dy, index == model.hovered());
+                faces.drawFace(graphics, bounds, dx, dy, index == model.hovered());
                 int x = (int) Math.round(bounds.centerX()) + dx;
                 int y = (int) Math.round(bounds.centerY()) + dy;
                 if (mode == Mode.CREATE) drawRaid(graphics, entry, bounds, x, y, index == model.hovered());
@@ -265,7 +268,7 @@ public final class LfgSelectorWheelScreen extends Screen {
         try {
             snapshots[index] = CreateWheelSnapshot.capture(minecraft, bounds.left() - 8, bounds.top() - 8,
                     bounds.right() + 8, bounds.bottom() + 8, graphics -> {
-                SelectorWheelRenderer.drawFace(graphics, bounds, 0, 0, true);
+                faces.drawFace(graphics, bounds, 0, 0, true);
                 int x = (int) Math.round(bounds.centerX());
                 int y = (int) Math.round(bounds.centerY());
                 drawRaid(graphics, entry, bounds, x, y, true);
@@ -442,6 +445,7 @@ public final class LfgSelectorWheelScreen extends Screen {
 
     @Override public void removed() {
         clearSnapshots();
+        faces.close();
         if (exitCue.wheelRemoved(partyPromptOpen)) controller.playSuccessfulWheelCreateExit();
         if (!partyPromptOpen) {
             controller.wheelClosed(this);

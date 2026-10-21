@@ -12,6 +12,11 @@ class SelectorWheelViewportTest {
         var viewport = new SelectorWheelViewport();
         viewport.layout(faces, 501);
         assertEquals(15, faces.size());
+        assertEquals(3, faces.stream().map(SelectorWheelLayout.Face::top).distinct().count());
+        for (int row = 0; row < 3; row++) {
+            assertEquals(faces.get(row * 5).top(), faces.get(row * 5 + 4).top());
+            assertEquals(-faces.get(row * 5).left(), faces.get(row * 5 + 4).right());
+        }
         assertFalse(viewport.scrollable());
         for (var face : faces) {
             assertEquals(88, face.bottom() - face.top());
