@@ -4,6 +4,45 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SelectorWheelModelTest {
+    @Test void hoverCueTransitionsDoNotRepeatWhileStationaryOrAfterSubmission() {
+        var model = new SelectorWheelModel();
+        model.open(0);
+        assertTrue(model.hover(0, 0));
+        assertFalse(model.hover(0, 120));
+        assertTrue(model.hover(-1, 130));
+        assertFalse(model.hover(-1, 140));
+        assertTrue(model.hover(0, 150));
+        assertTrue(model.hover(1, 160));
+        assertTrue(model.submit());
+        assertFalse(model.hover(0, 170));
+        assertEquals(1, model.hovered());
+    }
+
+    @Test void singleOptionIsAnUpperHalfCircleWithNoSelectableLowerHalf() {
+        var sectors = SelectorWheelModel.ring(1, 26, 90, true);
+        assertEquals(Math.PI / 2, sectors.getFirst().halfAngle());
+        assertEquals(0, SelectorWheelModel.hit(sectors, 0, -58));
+        assertEquals(-1, SelectorWheelModel.hit(sectors, 0, 58));
+        assertEquals(-1, SelectorWheelModel.hit(sectors, 0, 0));
+    }
+
+    @Test void classOptionsStartAnOuterRingAfterEverySevenWithoutEnlargingExistingFaces() {
+        var seven = SelectorWheelModel.classGeometry(7);
+        assertEquals(SelectorWheelModel.ring(7, 26, 90, true), seven);
+        for (int count = 8; count <= 28; count++) {
+            var sectors = SelectorWheelModel.classGeometry(count);
+            assertEquals(seven, sectors.subList(0, 7));
+            for (int i = 0; i < count; i++) {
+                var sector = sectors.get(i);
+                assertEquals(26 + i / 7 * 72, sector.inner());
+                assertEquals(64, sector.outer() - sector.inner());
+                assertEquals(i, SelectorWheelModel.hit(sectors, sector.centerX(), sector.centerY()));
+            }
+            if (count % 7 == 1) assertEquals(Math.PI / 2, sectors.getLast().halfAngle());
+        }
+        assertTrue(SelectorWheelModel.classGeometry(0).isEmpty());
+    }
+
     @Test void compactKickVariantsKeepTheThreeMemberSegmentSizeAndEmptyCenter() {
         var original = SelectorWheelModel.ring(3, 14, 40, true);
         assertEquals(original, SelectorWheelModel.kickGeometry(3));

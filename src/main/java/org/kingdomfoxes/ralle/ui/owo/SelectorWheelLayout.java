@@ -5,6 +5,8 @@ import java.util.List;
 
 /** Geometry and stable animation envelopes; option order never represents a persistent player identity. */
 final class SelectorWheelLayout {
+    // Original compact reference square (160) at 55% height. Class names affect width only.
+    static final int CLASS_BAR_HEIGHT = 88;
     private SelectorWheelLayout() {}
 
     interface Face {
@@ -49,13 +51,38 @@ final class SelectorWheelLayout {
         return sectors.stream().<Face>map(Circle::new).toList();
     }
 
+    /** The five-option reference size is independent of total options and wrapped-row count. */
+    static int referenceSide(int labelWidth, int viewportWidth) {
+        return Math.max(5, Math.min(Math.max(160, (labelWidth + 12) * 5),
+                (int) Math.floor(viewportWidth * .64)) / 5 * 5);
+    }
+
+    static int labelWidth(Face face) {
+        if (face instanceof Circle circle) {
+            var sector = circle.sector();
+            return Math.max(24, (int) (2 * Math.hypot(face.centerX(), face.centerY())
+                    * Math.sin(Math.min(Math.PI / 2, sector.halfAngle()))) - 8);
+        }
+        return Math.max(1, face.right() - face.left() - 6);
+    }
+
+    static List<Face> classBars(List<Integer> labelWidths, int viewportWidth) {
+        int widest = labelWidths.stream().mapToInt(Integer::intValue).max().orElse(0);
+        int side = referenceSide(Math.min(100, widest), viewportWidth);
+        return bars(labelWidths.size(), side, viewportWidth, CLASS_BAR_HEIGHT);
+    }
+
     /** S is the original square side: height is 55% of S, width stays at least S/5, with shared borders. */
     static List<Face> bars(int count, int side, int viewportWidth) {
+        return bars(count, side, viewportWidth,
+                Math.max(1, (int) Math.round(Math.min(side, Math.floor(viewportWidth * .64)) * .55)));
+    }
+
+    private static List<Face> bars(int count, int side, int viewportWidth, int barHeight) {
         if (count < 0 || side < 1 || viewportWidth < 1) throw new IllegalArgumentException("Invalid bar layout");
         if (count == 0) return List.of();
         int cap = Math.max(1, (int) Math.floor(viewportWidth * .64));
         side = Math.min(side, cap);
-        int barHeight = Math.max(1, (int) Math.round(side * .55));
         if (count <= 5) {
             var result = new ArrayList<Face>();
             int left = -side / 2;

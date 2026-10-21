@@ -8,16 +8,55 @@ import javax.imageio.ImageIO;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SelectorWheelRendererTest {
+    @Test void writesClassHalfCircleAndConcentricRingPreview() throws Exception {
+        int panelSize = 500;
+        var preview = new BufferedImage(panelSize * 3, panelSize * 2, BufferedImage.TYPE_INT_ARGB);
+        var canvas = preview.createGraphics();
+        canvas.setColor(new java.awt.Color(0x101824));
+        canvas.fillRect(0, 0, preview.getWidth(), preview.getHeight());
+        int[] counts = {1, 5, 7, 8, 14, 15};
+        for (int panel = 0; panel < counts.length; panel++) {
+            int cx = panel % 3 * panelSize + panelSize / 2;
+            int cy = panel / 3 * panelSize + panelSize / 2;
+            var sectors = SelectorWheelModel.classGeometry(counts[panel]);
+            for (int i = 0; i < sectors.size(); i++) {
+                var sector = sectors.get(i);
+                int dx = i == 0 ? (int) Math.round(Math.cos(sector.angle()) * 5) : 0;
+                int dy = i == 0 ? (int) Math.round(Math.sin(sector.angle()) * 5) : 0;
+                int extent = (int) sector.outer();
+                for (int y = -extent; y < extent; y++) for (int x = -extent; x < extent; x++) {
+                    int color = SelectorWheelRenderer.color(sector, x + .5, y + .5, i == 0);
+                    if (color != 0) preview.setRGB(cx + x + dx, cy + y + dy, color);
+                }
+                int x = cx + (int) Math.round(sector.centerX()) + dx;
+                int y = cy + (int) Math.round(sector.centerY()) + dy;
+                canvas.setColor(new java.awt.Color(0xBC915F));
+                canvas.fillRect(x - 8, y - 22, 16, 16);
+                canvas.setColor(java.awt.Color.WHITE);
+                canvas.drawString("Class " + (i + 1), x - 18, y + 4);
+                canvas.drawString("[K]", x - 8, y + 27);
+            }
+            canvas.setColor(java.awt.Color.WHITE);
+            canvas.drawLine(cx - 3, cy, cx + 3, cy);
+            canvas.drawLine(cx, cy - 3, cx, cy + 3);
+            canvas.drawString(counts[panel] + " class options", cx - 45, cy - 235);
+        }
+        canvas.dispose();
+        var output = Path.of("build", "reports", "wheel-class-rings.png");
+        Files.createDirectories(output.getParent());
+        ImageIO.write(preview, "png", output.toFile());
+    }
+
     @Test void writesBarsGeometryPreviewUsingSharedFaceColors() throws Exception {
         var preview = new BufferedImage(1020, 860, BufferedImage.TYPE_INT_ARGB);
         var canvas = preview.createGraphics();
         canvas.setColor(new java.awt.Color(0x101824));
         canvas.fillRect(0, 0, preview.getWidth(), preview.getHeight());
-        int[] counts = {6, 6, 3, 2, 1, 0};
+        int[] counts = {5, 6, 12, 18, 1, 0};
         for (int panel = 0; panel < counts.length; panel++) {
             int cx = panel % 3 * 340 + 170, cy = panel / 3 * 430 + 225;
-            int side = panel < 2 ? 160 : 80;
-            int viewport = panel == 1 ? 280 : 600;
+            int side = panel < 4 ? 160 : 80;
+            int viewport = panel >= 1 && panel <= 3 ? 280 : 600;
             var faces = SelectorWheelLayout.bars(counts[panel], side, viewport);
             for (int i = 0; i < faces.size(); i++) {
                 var face = faces.get(i);

@@ -17,6 +17,7 @@ import org.kingdomfoxes.ralle.lfg.client.RaidLfgKeybinds;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 import org.kingdomfoxes.ralle.sound.CreateWheelSounds;
+import org.kingdomfoxes.ralle.sound.SelectorWheelSounds;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
@@ -50,7 +51,8 @@ public final class LfgSelectorWheelScreen extends Screen {
     private List<SelectorWheelLayout.Face> geometry = List.of();
     private double wheelScale = 1;
     private double outerRadius;
-    private double originY, scroll, maxScroll;
+    private final SelectorWheelViewport viewport = new SelectorWheelViewport();
+    private double originY;
     private Component status;
     private boolean statusFailure;
     private boolean partyPromptOpen;
@@ -112,16 +114,14 @@ public final class LfgSelectorWheelScreen extends Screen {
         double labelWidth = entries.stream().mapToInt(entry -> font.width(RalleTypography.body(entry.label())))
                 .max().orElse(0);
         if (bars) {
-            int side = mode == Mode.CREATE ? (int) Math.max(160, (labelWidth + 12) * 5) : 80;
+            int side = mode == Mode.CREATE ? SelectorWheelLayout.referenceSide((int) labelWidth, width) : 80;
             // Round S down to a multiple of five so its 20% minimum remains pixel-aligned.
             side = Math.max(5, Math.min(side, (int) Math.floor(width * .64)) / 5 * 5);
             geometry = SelectorWheelLayout.bars(entries.size(), side, width);
             wheelScale = 1;
-            double top = geometry.stream().mapToInt(SelectorWheelLayout.Face::top).min().orElse(-side / 2);
+            viewport.layout(geometry, height);
             double bottom = geometry.stream().mapToInt(SelectorWheelLayout.Face::bottom).max().orElse(side / 2);
-            maxScroll = Math.max(0, bottom - top - Math.max(1, height - 64));
-            scroll = Math.clamp(scroll, 0, maxScroll);
-            originY = maxScroll > 0 ? 12 - top - scroll : height / 2d;
+            originY = viewport.originY();
             outerRadius = bottom;
             return;
         }
@@ -187,7 +187,7 @@ public final class LfgSelectorWheelScreen extends Screen {
             }
             if (!keyboardSelection && pointerArmed && model.state() == SelectorWheelModel.State.SELECTING)
                 selectHover(hit(mouseX, mouseY), now);
-            if (bars) graphics.enableScissor(0, 6, width, Math.max(7, height - 42));
+            if (bars) graphics.enableScissor(0, SelectorWheelViewport.TOP, width, viewport.bottom());
             graphics.pose().pushMatrix();
             graphics.pose().translate(width / 2f, (float) originY);
             graphics.pose().scale((float) wheelScale, (float) wheelScale);
@@ -368,8 +368,7 @@ public final class LfgSelectorWheelScreen extends Screen {
 
     private void selectHover(int index, long now) {
         if (index >= 0 && !enabled(entries.get(index))) index = -1;
-        if (mode == Mode.CREATE && index >= 0 && index != model.hovered()) CreateWheelSounds.hover(minecraft);
-        model.hover(index, now);
+        if (model.hover(index, now) && mode == Mode.CREATE && index >= 0) SelectorWheelSounds.hover(minecraft);
     }
 
     /** Raw keyboard events have one owner; the screen callback cannot dispatch the same release again. */
@@ -412,13 +411,9 @@ public final class LfgSelectorWheelScreen extends Screen {
     }
 
     private void revealSelection() {
-        if (!bars || maxScroll == 0 || model.hovered() < 0) return;
-        var face = geometry.get(model.hovered());
-        double top = originY + face.top() - SelectorWheelModel.EXTENSION;
-        double bottom = originY + face.bottom();
-        if (top < 6) scroll -= 6 - top;
-        else if (bottom > height - 42) scroll += bottom - (height - 42);
-        rebuildGeometry();
+        if (!bars || model.hovered() < 0) return;
+        viewport.reveal(geometry.get(model.hovered()), geometry);
+        originY = viewport.originY();
     }
 
     @Override public boolean keyPressed(KeyEvent event) {
@@ -434,9 +429,9 @@ public final class LfgSelectorWheelScreen extends Screen {
         return true;
     }
     @Override public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (bars && maxScroll > 0 && model.state() == SelectorWheelModel.State.SELECTING) {
-            scroll = Math.clamp(scroll - verticalAmount * 24, 0, maxScroll);
-            rebuildGeometry();
+        if (bars && viewport.scrollable() && model.state() == SelectorWheelModel.State.SELECTING) {
+            viewport.scroll(-verticalAmount * 24, geometry);
+            originY = viewport.originY();
             model.hover(-1, System.currentTimeMillis());
             keyboardSelection = false;
         }
@@ -455,7 +450,7 @@ public final class LfgSelectorWheelScreen extends Screen {
     }
 
     private int hit(double x, double y) {
-        if (bars && (y < 6 || y >= height - 42)) return -1;
+        if (bars && !viewport.contains(y)) return -1;
         return SelectorWheelLayout.hit(geometry, (x - width / 2d) / wheelScale, (y - originY) / wheelScale);
     }
 

@@ -4,6 +4,30 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SelectorWheelLayoutTest {
+    @Test void classBarHeightIsTheOriginalCompactHeightRegardlessOfCountOrAnyNameLength() {
+        for (int count = 1; count <= 28; count++) {
+            for (int labelWidth : new int[] {0, 24, 42, 80, 100, 300}) {
+                var widths = java.util.Collections.nCopies(count, labelWidth);
+                for (int viewportWidth : new int[] {375, 633, 1000}) {
+                    var faces = SelectorWheelLayout.classBars(widths, viewportWidth);
+                    for (var face : faces) assertEquals(88, face.bottom() - face.top());
+                }
+            }
+        }
+    }
+
+    @Test void additionalClassBarsKeepTheFiveOptionFaceSizeAcrossMultipleRows() {
+        int side = SelectorWheelLayout.referenceSide(80, 600);
+        var five = SelectorWheelLayout.bars(5, side, 600).getFirst();
+        for (int count = 6; count <= 28; count++) {
+            var faces = SelectorWheelLayout.bars(count, side, 600);
+            for (var face : faces) {
+                assertEquals(five.right() - five.left(), face.right() - face.left());
+                assertEquals(five.bottom() - five.top(), face.bottom() - face.top());
+            }
+        }
+    }
+
     @Test void initialWidthDividesEquallyAndHeightIsReducedByFortyFivePercent() {
         assertTrue(SelectorWheelLayout.bars(0, 120, 500).isEmpty());
         for (int count = 1; count <= 5; count++) {

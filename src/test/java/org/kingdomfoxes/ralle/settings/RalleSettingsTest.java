@@ -568,7 +568,7 @@ class RalleSettingsTest {
         registry.seal();
         var theme = registry.setting(RalleSettings.UI_THEME_ID, ChoiceSetting.class);
         assertEquals("default", theme.value());
-        assertEquals(25, theme.choices().size());
+        assertEquals(org.kingdomfoxes.ralle.ui.theme.RalleThemeCatalog.ids(), theme.choices());
         theme.set("hot-chocolate");
         assertTrue(Files.readString(path).contains("about.ui-theme=hot-chocolate"));
 

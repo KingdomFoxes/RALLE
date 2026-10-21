@@ -12,10 +12,6 @@ import java.nio.ByteOrder;
 public final class CreateWheelSounds {
     private CreateWheelSounds() {}
 
-    public static void hover(Minecraft minecraft) {
-        minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.VAULT_STEP, 1f, .55f));
-    }
-
     /** Measure the actual randomly selected attack sample, including resource-pack replacements. */
     public static long created(Minecraft minecraft) {
         var cue = SimpleSoundInstance.forUI(SoundEvents.CONDUIT_ATTACK_TARGET, 1f, .8f);

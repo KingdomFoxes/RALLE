@@ -78,7 +78,10 @@ recompute the layout without retaining a stale hovered target.
 Selection moves a complete bar and its content upward by five logical pixels
 over the existing 120 ms cubic ease-out. Hit regions include that movement and
 do not follow animation. Short viewports scroll the bar area instead of scaling
-away its minimum width; keyboard selection reveals its row. Status remains below
+away its minimum width; keyboard selection reveals its row. Create, Kick and
+Class use the same viewport calculations, including the upward-motion envelope
+and complete bottom outline for every wrapped row. Class bars use a fixed compact
+88-logical-pixel height regardless of option count or name length. Status remains below
 the visible bar area. Resolution and GUI-scale changes recompute geometry.
 
 Both graphical styles retain Create's confirmation, failure feedback, cached

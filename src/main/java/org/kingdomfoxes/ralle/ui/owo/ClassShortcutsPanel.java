@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.DraggableContainer;
 import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
@@ -117,9 +118,8 @@ final class ClassShortcutsPanel extends FlowLayout {
             String name = character == null ? shortcut.name().isBlank()
                     ? Component.translatable("ralle.classes.missing").getString() : shortcut.name()
                     : character.displayName(shortcut.name());
-            var row = new ShortcutRow(shortcut.characterId());
+            var row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
             row.gap(3).padding(Insets.of(2)).verticalAlignment(VerticalAlignment.CENTER).surface(RalleSurfaces.NAVY_ROW);
-            if (character == null) row.tooltip(text("ralle.classes.missing-hint"));
             row.child(UIComponents.item(ClassPresentation.item(character)).sizing(Sizing.fixed(18)));
             var label = UIComponents.label(RalleTheme.ui(Component.literal(name))).maxWidth(120);
             label.horizontalSizing(Sizing.expand(100));
@@ -137,7 +137,9 @@ final class ClassShortcutsPanel extends FlowLayout {
             row.child(edit);
             row.child(RalleIconButtons.destructiveX(text("ralle.classes.remove", name), ignored -> mutate(owner,
                     () -> store.remove(owner, shortcut.characterId()))));
-            content.add(row);
+            var draggableRow = new ShortcutRow(shortcut.characterId(), row);
+            if (character == null) draggableRow.tooltip(text("ralle.classes.missing-hint"));
+            content.add(draggableRow);
         }
         rows.replaceChildren(content);
         displayedRows.clear();
@@ -152,10 +154,11 @@ final class ClassShortcutsPanel extends FlowLayout {
         if (dragged == null) return;
         int destination = 0;
         for (var row : displayedRows)
-            if (row != dragged && mouseY > row.y() + row.height() / 2d) destination++;
+            if (row != dragged && mouseY > row.baseY() + row.height() / 2d) destination++;
         if (destination == displayedRows.indexOf(dragged)) return;
         displayedRows.remove(dragged);
         displayedRows.add(destination, dragged);
+        dragged.resetOffset();
         rows.replaceChildren(displayedRows);
     }
 
@@ -177,19 +180,33 @@ final class ClassShortcutsPanel extends FlowLayout {
 
     private void cancelDrag() { dragged = null; rebuild(); }
 
-    /** Keep the row's measured bounds and focus while rendering only its drop placeholder. */
-    private final class ShortcutRow extends FlowLayout {
+    /** owo owns drag motion and focus; this adapter turns its drop into an ordered local shortcut. */
+    private final class ShortcutRow extends DraggableContainer<FlowLayout> {
         private final String characterId;
-        ShortcutRow(String characterId) {
-            super(Sizing.fill(100), Sizing.content(), Algorithm.HORIZONTAL);
+        ShortcutRow(String characterId, FlowLayout content) {
+            super(Sizing.fill(100), Sizing.content(), content);
             this.characterId = characterId;
+            foreheadSize(0);
+        }
+        private void resetOffset() {
+            xOffset = 0;
+            yOffset = 0;
+            updateX(baseX);
+            updateY(baseY);
+        }
+        @Override public UIComponent childAt(int mouseX, int mouseY) {
+            if (!isInBoundingBox(mouseX, mouseY)) return null;
+            var target = super.childAt(mouseX, mouseY);
+            // Leave native button dispatch/focus intact; the remainder of the row is the drag handle.
+            return target instanceof ButtonComponent ? target : this;
         }
         @Override public void draw(OwoUIGraphics graphics, int mouseX, int mouseY, float partialTicks, float delta) {
-            if (dragged == this) graphics.fill(x, y, x + width, y + height, 0xBFFFFFFF);
+            if (dragged == this) graphics.fill(baseX, baseY, baseX + width, baseY + height, 0xBFFFFFFF);
             else super.draw(graphics, mouseX, mouseY, partialTicks, delta);
         }
         @Override public boolean onMouseDown(MouseButtonEvent click, boolean doubled) {
-            if (super.onMouseDown(click, doubled)) return true; // Edit/remove retain their normal clicks.
+            if (childAt((int) (x + click.x()), (int) (y + click.y())) instanceof ButtonComponent)
+                return super.onMouseDown(click, doubled);
             if (click.button() != 0) return false;
             dragged = this;
             dragSource = displayedRows.indexOf(this);
@@ -198,7 +215,11 @@ final class ClassShortcutsPanel extends FlowLayout {
         }
         @Override public boolean onMouseDrag(MouseButtonEvent click, double deltaX, double deltaY) {
             if (click.button() != 0 || dragged != this) return false;
-            previewDrop(y + click.y());
+            double mouseY = y + click.y();
+            super.onMouseDrag(click, deltaX, deltaY);
+            previewDrop(mouseY);
+            // This is an ordered list: constrain owo's moving container back to its current list slot.
+            resetOffset();
             return true;
         }
         @Override public boolean onMouseUp(MouseButtonEvent click) {
@@ -206,7 +227,12 @@ final class ClassShortcutsPanel extends FlowLayout {
             drop(x + click.x(), y + click.y());
             return true;
         }
-        @Override public boolean canFocus(FocusSource source) { return source == FocusSource.MOUSE_CLICK; }
+        @Override public void onFocusLost() {
+            super.onFocusLost();
+            if (dragged == this) Minecraft.getInstance().schedule(() -> {
+                if (dragged == this) cancelDrag();
+            });
+        }
     }
 
     private void picker() {
@@ -214,7 +240,7 @@ final class ClassShortcutsPanel extends FlowLayout {
     }
     private void picker(UUID owner, ClassShortcut replacement, Runnable replaced) {
         var snapshot = store.account(owner);
-        var content = modal("ralle.classes.add");
+        var content = modal("ralle.classes.add.title");
         var choices = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content()).gap(4);
         @SuppressWarnings("rawtypes") var overlay = new OverlayContainer[1];
         int count = 0;

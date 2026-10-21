@@ -9,6 +9,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import org.kingdomfoxes.ralle.classes.ClassSelectorBindings;
 import org.kingdomfoxes.ralle.classes.ClassShortcut;
+import org.kingdomfoxes.ralle.sound.SelectorWheelSounds;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
@@ -21,7 +22,8 @@ public final class ClassSelectorWheelScreen extends Screen {
     private final List<ClassSelectorBindings.Entry> entries;
     private final List<ItemStack> items;
     private List<SelectorWheelLayout.Face> geometry = List.of();
-    private double scale = 1, originY, radius, scroll, maxScroll;
+    private final SelectorWheelViewport viewport = new SelectorWheelViewport();
+    private double scale = 1, originY, radius;
     private int lastX, lastY;
     private boolean pointerArmed, keyboardSelection, mouseReady;
     private Component status;
@@ -48,34 +50,33 @@ public final class ClassSelectorWheelScreen extends Screen {
     }
     private void rebuild() {
         if (bars) {
-            int labelWidth = entries.stream().mapToInt(e -> font.width(RalleTypography.body(Component.literal(e.name())))).max().orElse(0);
-            int side = Math.max(5, Math.min(Math.max(160, (Math.min(100, labelWidth) + 12) * 5), (int) (width * .64)) / 5 * 5);
-            geometry = SelectorWheelLayout.bars(entries.size(), side, width);
+            var labelWidths = entries.stream().map(e -> font.width(RalleTypography.body(Component.literal(e.name())))).toList();
+            geometry = SelectorWheelLayout.classBars(labelWidths, width);
             scale = 1;
-            double top = geometry.stream().mapToInt(SelectorWheelLayout.Face::top).min().orElse(0);
+            viewport.layout(geometry, height);
             double bottom = geometry.stream().mapToInt(SelectorWheelLayout.Face::bottom).max().orElse(0);
-            maxScroll = Math.max(0, bottom - top - Math.max(1, height - 64));
-            scroll = Math.clamp(scroll, 0, maxScroll);
-            originY = maxScroll > 0 ? 12 - top - scroll : height / 2d;
+            originY = viewport.originY();
             radius = bottom;
         } else {
-            radius = Math.max(90, entries.size() * 42 / (2 * Math.PI) + 36);
-            geometry = SelectorWheelLayout.circles(SelectorWheelModel.ring(entries.size(), radius - 64, radius, true));
+            var sectors = SelectorWheelModel.classGeometry(entries.size());
+            radius = sectors.stream().mapToDouble(SelectorWheelModel.Sector::outer).max().orElse(90);
+            geometry = SelectorWheelLayout.circles(sectors);
             scale = Math.max(.01, Math.min(1, Math.min((width / 2d - 8) / (radius + 7), (height / 2d - 30) / (radius + 7))));
             originY = height / 2d;
         }
     }
     public void keyboardSelection(int index) {
         keyboardSelection = true;
-        model.hover(index, System.currentTimeMillis());
-        if (bars && maxScroll > 0 && index >= 0) {
-            var face = geometry.get(index);
-            double top = originY + face.top() - SelectorWheelModel.EXTENSION;
-            double bottom = originY + face.bottom();
-            if (top < 6) scroll -= 6 - top;
-            else if (bottom > height - 42) scroll += bottom - (height - 42);
-            rebuild();
+        selectHover(index);
+        if (bars && index >= 0) {
+            viewport.reveal(geometry.get(index), geometry);
+            originY = viewport.originY();
         }
+    }
+    private void selectHover(int index) {
+        if (index >= 0 && controller.unavailable(entries.get(index))) index = -1;
+        if (model.hover(index, System.currentTimeMillis()) && index >= 0)
+            SelectorWheelSounds.hover(minecraft);
     }
     public void feedback(Component message, boolean failure) {
         status = message;
@@ -116,9 +117,9 @@ public final class ClassSelectorWheelScreen extends Screen {
         }
         if (frozenTime < 0 && pointerArmed && !keyboardSelection && !controller.completed()) {
             int hovered = hit(mouseX, mouseY);
-            model.hover(hovered >= 0 && !controller.unavailable(entries.get(hovered)) ? hovered : -1, System.currentTimeMillis());
+            selectHover(hovered);
         }
-        if (bars) graphics.enableScissor(0, 6, width, Math.max(7, height - 42));
+        if (bars) graphics.enableScissor(0, SelectorWheelViewport.TOP, width, viewport.bottom());
         graphics.pose().pushMatrix();
         graphics.pose().translate(width / 2f, (float) originY);
         graphics.pose().scale((float) scale, (float) scale);
@@ -132,7 +133,7 @@ public final class ClassSelectorWheelScreen extends Screen {
             graphics.renderItem(items.get(index), x - 8, y - 22);
             int color = controller.unavailable(entry) ? 0xFF7E899B : index == model.hovered() ? RalleTheme.accentArgb()
                     : org.kingdomfoxes.ralle.ui.theme.RallePalette.primaryText();
-            int lineWidth = bars ? face.right() - face.left() - 6 : Math.max(24, (int) ((radius - 32) * 2 * Math.PI / Math.max(1, entries.size())) - 8);
+            int lineWidth = SelectorWheelLayout.labelWidth(face);
             var lines = font.split(RalleTypography.body(Component.literal(entry.name())), Math.max(1, lineWidth));
             int lineY = y - 3;
             for (int line = 0; line < Math.min(2, lines.size()); line++) {
@@ -168,7 +169,7 @@ public final class ClassSelectorWheelScreen extends Screen {
         catch (IllegalArgumentException ignored) { return Component.empty(); }
     }
     private int hit(double x, double y) {
-        if (bars && (y < 6 || y >= height - 42)) return -1;
+        if (bars && !viewport.contains(y)) return -1;
         return SelectorWheelLayout.hit(geometry, (x - width / 2d) / scale, (y - originY) / scale);
     }
     @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
@@ -177,15 +178,16 @@ public final class ClassSelectorWheelScreen extends Screen {
             boolean ready = mouseReady;
             mouseReady = false;
             int index = hit(event.x(), event.y());
-            if (ready && index >= 0) { model.hover(index, System.currentTimeMillis()); controller.click(index, true); }
+            if (ready && index >= 0) { selectHover(index); controller.click(index, true); }
         }
         return true;
     }
     @Override public boolean mouseReleased(MouseButtonEvent event) { if (event.button() == 0) mouseReady = true; return true; }
     @Override public boolean mouseScrolled(double x, double y, double horizontal, double vertical) {
-        if (bars && maxScroll > 0 && !controller.completed()) {
-            scroll = Math.clamp(scroll - vertical * 24, 0, maxScroll);
-            rebuild(); model.hover(-1, System.currentTimeMillis()); keyboardSelection = false;
+        if (bars && viewport.scrollable() && !controller.completed()) {
+            viewport.scroll(-vertical * 24, geometry);
+            originY = viewport.originY();
+            model.hover(-1, System.currentTimeMillis()); keyboardSelection = false;
         }
         return true;
     }

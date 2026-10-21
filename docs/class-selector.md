@@ -35,11 +35,12 @@ editor fails closed, without disabling chat or LFG.
 
 The class and consumable editors use `SettingsListEditorColumns`: the same
 220-pixel-high scrolling list, 104-pixel right action column, framed navy surfaces,
-spacing and scroll behavior. Class actions are Add Class and confirmed Reset,
+spacing and scroll behavior. Class actions are Add class and confirmed Reset,
 without import/export. Reset removes shortcuts, retaining detected characters.
 Empty-state copy is centered in the list; detection instructions and failure/conflict
 feedback stay in the action column, without a detected-class count. Hold left mouse
-on a shortcut's item, name or binding to reorder it. Its content disappears while
+on a shortcut's item, name or binding to reorder it through owo-lib's
+`DraggableContainer`, constrained to ordered list slots. Its content disappears while
 held; a same-size white rectangle with 25% transparency marks the pending position.
 The list scrolls near its top/bottom edges. Releasing inside the list persists a
 changed order, shared by the selector; releasing outside, losing focus, or changing
@@ -68,8 +69,17 @@ callbacks, with tick recovery sharing the same submission guard. While enabled
 on Wynncraft, holding the registered modifier opens `ClassSelectorWheelScreen`
 for Circle Segments/Bars. It uses the shared selector faces, stable hit geometry,
 120 ms reversible five-pixel motion, configured fonts, received class items and
-shortcuts in saved order. Bars wrap/scroll using the shared layout and reveal
-keyboard-selected rows. Deliberate pointer movement takes over from keyboard
+shortcuts in saved order. Class circles keep the existing 90-pixel outer radius
+and 64-pixel depth for the first ring, with at most seven options per ring.
+Additional rings retain that depth with an eight-pixel gap. A lone option on
+any ring occupies its upper half only. Class bars have a fixed compact height of
+88 logical pixels (55% of the original 160-pixel reference square), for every
+option count and name length. Names affect width only. They wrap/scroll using the shared layout
+and viewport and reveal keyboard-selected rows, including their bottom outline
+and full upward-motion envelope. Entering an available option by pointer or
+keyboard plays the shared Vault step cue once per selection change. Class
+switching does not play the LFG creation success cues.
+Deliberate pointer movement takes over from keyboard
 selection; a stationary pointer does not. A left button held before opening is
 inert until released and pressed again. The screen is non-pausing, supplies
 narration and suppresses gameplay keys while it owns input.
