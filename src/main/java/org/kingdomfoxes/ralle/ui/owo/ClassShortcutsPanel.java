@@ -91,6 +91,10 @@ final class ClassShortcutsPanel extends FlowLayout {
             Minecraft.getInstance().schedule(() -> { refreshPending = false; rebuild(); });
         }
         super.draw(graphics, mouseX, mouseY, partialTicks, delta);
+        if (dragged != null) {
+            var held = dragged;
+            screen.drawDragPreview(overlay -> held.drawHeld(overlay, mouseX, mouseY, partialTicks, delta));
+        }
     }
 
     private String modifier() { return settings.setting(RalleSettings.CLASS_MODIFIER_ID, KeybindSetting.class).value(); }
@@ -180,9 +184,10 @@ final class ClassShortcutsPanel extends FlowLayout {
 
     private void cancelDrag() { dragged = null; rebuild(); }
 
-    /** owo owns drag motion and focus; this adapter turns its drop into an ordered local shortcut. */
+    /** owo owns drag input/focus; a cursor preview floats above the pending ordered list slot. */
     private final class ShortcutRow extends DraggableContainer<FlowLayout> {
         private final String characterId;
+        private double grabX, grabY;
         ShortcutRow(String characterId, FlowLayout content) {
             super(Sizing.fill(100), Sizing.content(), content);
             this.characterId = characterId;
@@ -204,10 +209,24 @@ final class ClassShortcutsPanel extends FlowLayout {
             if (dragged == this) graphics.fill(baseX, baseY, baseX + width, baseY + height, 0xBFFFFFFF);
             else super.draw(graphics, mouseX, mouseY, partialTicks, delta);
         }
+        private void drawHeld(OwoUIGraphics graphics, int mouseX, int mouseY, float partialTicks, float delta) {
+            int slotX = baseX, slotY = baseY;
+            try {
+                // owo's >16px item renderer uses component bounds rather than the pose matrix.
+                // Move every child for this draw so the native class item follows the held row too.
+                moveTo((int) Math.round(mouseX - grabX), (int) Math.round(mouseY - grabY));
+                // Render the actual row without hover feedback on its inactive buttons.
+                super.draw(graphics, Integer.MIN_VALUE, Integer.MIN_VALUE, partialTicks, delta);
+            } finally {
+                moveTo(slotX, slotY);
+            }
+        }
         @Override public boolean onMouseDown(MouseButtonEvent click, boolean doubled) {
             if (childAt((int) (x + click.x()), (int) (y + click.y())) instanceof ButtonComponent)
                 return super.onMouseDown(click, doubled);
             if (click.button() != 0) return false;
+            grabX = click.x();
+            grabY = click.y();
             dragged = this;
             dragSource = displayedRows.indexOf(this);
             focusHandler().focus(this, FocusSource.MOUSE_CLICK);

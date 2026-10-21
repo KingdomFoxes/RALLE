@@ -12,11 +12,13 @@ import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.HorizontalAlignment;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.OwoUIAdapter;
+import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.UIComponent;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -71,6 +73,26 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private SettingsNavigationState.Snapshot preSearchSnapshot;
     private KeybindSetting capturingKeybind;
     private java.util.function.Consumer<String> customKeyCapture;
+    private java.util.function.Consumer<OwoUIGraphics> dragPreview;
+
+    /** Draw a held settings row above the complete screen, outside nested list scissors. */
+    void drawDragPreview(java.util.function.Consumer<OwoUIGraphics> preview) {
+        dragPreview = preview;
+    }
+
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // Only a panel rendered this frame may contribute a preview.
+        dragPreview = null;
+        super.render(graphics, mouseX, mouseY, partialTick);
+        var preview = dragPreview;
+        dragPreview = null;
+        if (preview != null) {
+            graphics.nextStratum();
+            preview.accept(OwoUIGraphics.of(graphics));
+            graphics.nextStratum();
+        }
+    }
 
     /** Compact settings modals share the screen's keyboard capture without opening a new screen. */
     void captureOptionKey(java.util.function.Consumer<String> captured) {

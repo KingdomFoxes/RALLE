@@ -40,8 +40,9 @@ without import/export. Reset removes shortcuts, retaining detected characters.
 Empty-state copy is centered in the list; detection instructions and failure/conflict
 feedback stay in the action column, without a detected-class count. Hold left mouse
 on a shortcut's item, name or binding to reorder it through owo-lib's
-`DraggableContainer`, constrained to ordered list slots. Its content disappears while
-held; a same-size white rectangle with 25% transparency marks the pending position.
+`DraggableContainer`, constrained to ordered list slots. The actual held row follows
+the cursor at its original grab point, rendered above the settings screen without
+list clipping; a same-size white rectangle with 25% transparency marks the pending position.
 The list scrolls near its top/bottom edges. Releasing inside the list persists a
 changed order, shared by the selector; releasing outside, losing focus, or changing
 account/data cancels the preview. Edit/remove controls keep their normal clicks.
