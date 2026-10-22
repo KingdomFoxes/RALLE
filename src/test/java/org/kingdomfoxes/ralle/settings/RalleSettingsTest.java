@@ -19,6 +19,25 @@ class RalleSettingsTest {
     @TempDir
     Path temporaryDirectory;
 
+    @Test void rememberedAutoOpenAllowsTheToggleAfterRestartAndANewDisabledObservationRelocksIt() throws Exception {
+        var statePath = temporaryDirectory.resolve("auto-open-state.json");
+        var account = java.util.UUID.randomUUID();
+        var state = new org.kingdomfoxes.ralle.classes.ClassSelectorStore(statePath);
+        state.recordAutoOpen(account, true);
+        var restored = new org.kingdomfoxes.ralle.classes.ClassSelectorStore(statePath);
+        var registry = new SettingsRegistry(temporaryDirectory.resolve("remembered.properties"));
+        RalleSettings.register(registry);
+        RalleSettings.requireClassAutoOpen(registry, () -> restored.autoOpenEnabled(account));
+        registry.seal();
+        assertTrue(registry.available(RalleSettings.CLASS_SELECTOR_ID));
+        var enabled = registry.setting(RalleSettings.CLASS_SELECTOR_ID, BooleanSetting.class);
+        enabled.set(true);
+        assertTrue(enabled.value());
+        restored.recordAutoOpen(account, false);
+        assertFalse(enabled.value());
+        assertFalse(registry.available(RalleSettings.CLASS_SELECTOR_ID));
+    }
+
     @Test void classSwitcherCannotBeEnabledUntilAutoOpenIsObservedEnabled() {
         var registry = new SettingsRegistry(temporaryDirectory.resolve("auto-open.properties"));
         RalleSettings.register(registry);

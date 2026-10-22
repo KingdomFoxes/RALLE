@@ -12,6 +12,34 @@ class ClassSelectorStoreTest {
     private final ClassCharacter mage = new ClassCharacter("server-id-a", "Mage", "Same name");
     private final ClassCharacter other = new ClassCharacter("server-id-b", "Mage", "Same name");
 
+    @Test void autoOpenFlagSurvivesRestartsAndRemainsAccountScopedWithoutCreatingCharacterData() throws Exception {
+        var path = directory.resolve("auto-open.json");
+        var second = UUID.randomUUID();
+        var store = new ClassSelectorStore(path);
+        assertFalse(store.autoOpenEnabled(account));
+        store.recordAutoOpen(account, true);
+        assertFalse(store.hasAccount(account));
+        assertEquals(0, store.revision());
+        var restored = new ClassSelectorStore(path);
+        assertTrue(restored.autoOpenEnabled(account));
+        assertFalse(restored.autoOpenEnabled(second));
+        restored.recordAutoOpen(second, true);
+        restored.recordAutoOpen(account, false);
+        var reloaded = new ClassSelectorStore(path);
+        assertFalse(reloaded.autoOpenEnabled(account));
+        assertTrue(reloaded.autoOpenEnabled(second));
+        assertFalse(reloaded.hasAccount(account));
+    }
+
+    @Test void legacyClassFilesHaveUnknownAutoOpenUntilANewObservationIsSaved() throws Exception {
+        var path = directory.resolve("legacy.json");
+        Files.writeString(path, "{\"version\":1,\"accounts\":{}}");
+        var store = new ClassSelectorStore(path);
+        assertFalse(store.autoOpenEnabled(account));
+        store.recordAutoOpen(account, true);
+        assertTrue(new ClassSelectorStore(path).autoOpenEnabled(account));
+    }
+
     @Test void completeAndPartialScansPreservePreferencesAndOrderAcrossRestarts() throws Exception {
         var path = directory.resolve("classes.json");
         var store = new ClassSelectorStore(path);

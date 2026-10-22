@@ -49,18 +49,26 @@ class ClassStoreWritesTest {
         store.reconcile(new ClassScan(account, List.of(new ClassCharacter("old", "Mage", "")), true));
         store.add(account, "old");
         long revision = store.revision();
+        store.recordAutoOpenAsync(account, true).get(2, TimeUnit.SECONDS);
+        assertEquals(revision, store.revision());
         store.recordLoadAsync(account, "old", "abc12345").get(2, TimeUnit.SECONDS);
         assertEquals(revision, store.revision());
         store.recordLoadAsync(account, "old", "def12345");
         store.migrateReferences(account, Map.of("old", "new"));
         store.edit(account, new ClassShortcut("new", "Local name", "key.keyboard.g"));
         store.recordLoadAsync(account, "new", "abc12345");
+        store.recordAutoOpenAsync(account, false);
+        store.edit(account, new ClassShortcut("new", "Local name", "key.keyboard.g"));
         store.flushWrites();
         var restored = new ClassSelectorStore(path);
         assertEquals("new", restored.lastLoaded(account));
         assertEquals("new", restored.referenceForToken(account, "abc12345"));
         assertEquals("new", restored.referenceForToken(account, "def12345"));
         assertEquals("Local name", restored.account(account).shortcuts().getFirst().name());
+        assertFalse(restored.autoOpenEnabled(account));
+        store.recordAutoOpenAsync(account, true);
+        store.remove(account, "new");
+        assertTrue(new ClassSelectorStore(path).autoOpenEnabled(account));
     }
 
     @Test void asynchronousFailurePreservesDamagedFileAndDoesNotBlockLaterWrites() throws Exception {

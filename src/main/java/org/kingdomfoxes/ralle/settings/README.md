@@ -15,11 +15,14 @@ backend authentication and eligibility checks still apply.
 
 ## Locked preferences
 
-Class Switcher's toggle is locked off until the current Wynncraft session has
-observed Auto Open enabled in the character menu. Its passive prerequisite check
-runs while the feature is off and keeps only the control state in memory; it does
-not discover characters, capture diagnostics or write files. Direct mutations and
-saved enabled values cannot bypass the gate. See `docs/class-selector.md`.
+Class Switcher's toggle requires the account's last observed Auto Open flag to
+be true. The flag persists in `ralle-class-shortcuts.json` across connections and
+restarts; missing values default to off. Its passive prerequisite check runs
+while the feature is off and saves only that on/off flag. It does not discover
+characters or capture diagnostics. A newly observed disabled value locks the
+toggle again. Direct mutations and saved Class Switcher preferences cannot bypass
+the gate. The original Class Switcher description is retained; unavailable-row
+guidance explains Auto Open. See `docs/class-selector.md`.
 
 Access is enforced by `Setting.value()` and `Setting.set()`, including callers
 outside the settings screen. Fox-exclusive booleans resolve to off until the

@@ -218,19 +218,28 @@ and verifying the live adapter in-game. A video alone cannot establish stable ID
 ## Switching and load confirmation
 
 The **Class Switcher setting itself** requires Wynncraft's **Auto Open** setting
-to be enabled. Open `/class` and its character book once per connection so RALLE
-can observe the setting, even while Class Switcher is off. Unknown or disabled
+to be enabled. RALLE remembers the last observed Auto Open value for each Minecraft
+account across connections and restarts. If it has never been checked, open `/class`
+and its character book so RALLE can observe it, even while Class Switcher is off. Unknown or disabled
 keeps the toggle gray and effectively off, rejects direct attempts to enable it,
 and hides its dependent controls in both settings and search. The disabled row
 explains how to enable Auto Open. The screen refreshes when the prerequisite changes.
 Saved enabled preferences are preserved but cannot take effect until confirmed;
 a fresh install still requires explicitly turning Class Switcher on.
 
-The prerequisite observation is memory-only and resets on disconnect or account
-change, but survives turning Class Switcher off so it can be enabled again. While
-off, only the recognized menu's utility controls are checked: no character
-discovery, diagnostic capture, capture recovery, file writes, commands or clicks
-run for this check. Saved diagnostic captures cannot unlock the toggle. Manual
+The last observed value is a boolean in an optional account-scoped `autoOpen` map
+in `config/ralle-class-shortcuts.json` (format version 1). Older files without the
+map remain valid and default to unknown/off. A saved true value satisfies the toggle
+gate on the next Wynncraft connection; a newly observed false value locks it again.
+Accounts never inherit each other's flag. Turning Class Switcher off does not clear it.
+Observations update the current session immediately and use the existing bounded
+background writer and atomic file replacement. Unchanged observations do not rewrite
+the file or change shortcut revisions; edits, resets, load saves and migrations
+preserve the flag. Storage failures retain the current live observation and old file.
+
+While off, only the recognized menu's utility controls are checked and their on/off
+flag is saved. No character discovery, diagnostic capture, capture recovery,
+commands or clicks run for this check. Saved diagnostic captures cannot unlock the toggle. Manual
 class selection remains available with Auto Open off. Shortcut submission retains
 its own prerequisite check before sending `/class`, capturing a frame or muting audio.
 

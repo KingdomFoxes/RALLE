@@ -19,6 +19,7 @@ public final class ClassSelectorStore {
     // Published maps are never mutated. Reads from the client/render thread never wait for disk.
     private volatile Map<UUID, Account> accounts;
     private volatile Map<UUID, Loaded> loads = new LinkedHashMap<>();
+    private volatile Map<UUID, Boolean> autoOpen = new LinkedHashMap<>();
     private volatile long revision;
 
     public record Account(List<ClassCharacter> characters, List<ClassShortcut> shortcuts) {
@@ -45,7 +46,8 @@ public final class ClassSelectorStore {
             });
         }
     }
-    private record FileData(int version, Map<UUID, Account> accounts, Map<UUID, Loaded> loads) {}
+    private record FileData(int version, Map<UUID, Account> accounts, Map<UUID, Loaded> loads,
+                            Map<UUID, Boolean> autoOpen) {}
 
     private ClassSelectorStore() { path = null; accounts = new LinkedHashMap<>(); }
 
@@ -82,11 +84,37 @@ public final class ClassSelectorStore {
                 data.loads.forEach((id, loaded) -> loads.put(java.util.Objects.requireNonNull(id),
                         new Loaded(loaded.lastReference, loaded.references)));
             }
+            if (data.autoOpen != null) {
+                if (data.autoOpen.size() > 128) throw new IllegalArgumentException("Too many accounts");
+                data.autoOpen.forEach((id, value) -> autoOpen.put(java.util.Objects.requireNonNull(id),
+                        java.util.Objects.requireNonNull(value)));
+            }
         } catch (RuntimeException failure) { throw new IOException("Invalid class selector file", failure); }
     }
 
     public Account account(UUID account) { return accounts.getOrDefault(java.util.Objects.requireNonNull(account), new Account(List.of(), List.of())); }
     public long revision() { return revision; }
+
+    /** Last observed Wynncraft preference; absent/unknown stays off and accounts never share it. */
+    public boolean autoOpenEnabled(UUID account) { return Boolean.TRUE.equals(autoOpen.get(account)); }
+
+    public void recordAutoOpen(UUID account, boolean enabled) throws IOException {
+        java.util.Objects.requireNonNull(account);
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> recordAutoOpen(account, enabled)); return; }
+        if (java.util.Objects.equals(autoOpen.get(account), enabled)) return;
+        var next = new LinkedHashMap<>(autoOpen);
+        next.put(account, enabled);
+        if (next.size() > 128) throw new IllegalArgumentException("Too many accounts");
+        save(accounts, loads, next);
+    }
+
+    /** A newly observed control never waits for disk or changes the shortcut revision. */
+    public java.util.concurrent.CompletableFuture<Void> recordAutoOpenAsync(UUID account, boolean enabled) {
+        return ClassStoreWrites.submit(() -> recordAutoOpen(account, enabled)).whenComplete((ignored, failure) -> {
+            if (failure != null) org.slf4j.LoggerFactory.getLogger(ClassSelectorStore.class)
+                    .warn("Could not persist Auto Open preference; current session remains available", failure);
+        });
+    }
 
     /** Last confirmed load is history, never proof of the current class on a new connection. */
     public String lastLoaded(UUID account) { var loaded = loads.get(account); return loaded == null ? null : loaded.lastReference; }
@@ -280,8 +308,12 @@ public final class ClassSelectorStore {
     }
 
     private void save(Map<UUID, Account> next, Map<UUID, Loaded> nextLoads) throws IOException {
+        save(next, nextLoads, autoOpen);
+    }
+
+    private void save(Map<UUID, Account> next, Map<UUID, Loaded> nextLoads, Map<UUID, Boolean> nextAutoOpen) throws IOException {
         if (!available()) throw new IOException("Class selector storage is unavailable");
-        String json = JSON.toJson(new FileData(1, next, nextLoads));
+        String json = JSON.toJson(new FileData(1, next, nextLoads, nextAutoOpen));
         if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 1024 * 1024)
             throw new IllegalArgumentException("Class selector file exceeds 1 MiB");
         var parent = path.toAbsolutePath().getParent();
@@ -294,6 +326,7 @@ public final class ClassSelectorStore {
         boolean changed = !accounts.equals(next);
         accounts = next;
         loads = nextLoads;
+        autoOpen = nextAutoOpen;
         if (changed) revision++; // A late load save must not cancel a held selector or edit its rows.
     }
 }

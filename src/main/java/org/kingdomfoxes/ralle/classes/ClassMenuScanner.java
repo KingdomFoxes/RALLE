@@ -28,6 +28,7 @@ public final class ClassMenuScanner {
     private boolean failed;
     private boolean autoOpenEnabled;
     private UUID autoOpenAccount;
+    private Boolean lastAutoOpenObservation;
 
     public ClassMenuScanner(Minecraft minecraft, BooleanSetting enabled, ClassSelectorStore store, Path captures) {
         this.minecraft = minecraft;
@@ -38,9 +39,11 @@ public final class ClassMenuScanner {
     }
     public boolean requested() { return enabled.value(); }
     public boolean observesMenus() { return connected(); }
-    /** Current-session observation only; historical captures never satisfy this prerequisite. */
+    /** Current observation wins; otherwise reuse this account's saved Auto Open flag. */
     public boolean autoOpenEnabled() {
-        return connected() && minecraft.getUser().getProfileId().equals(autoOpenAccount) && autoOpenEnabled;
+        if (!connected()) return false;
+        UUID current = minecraft.getUser().getProfileId();
+        return current.equals(autoOpenAccount) ? autoOpenEnabled : store.autoOpenEnabled(current);
     }
     public record LiveMenu(int containerId, WynncraftClassMenu.Result result) { }
 
@@ -60,7 +63,7 @@ public final class ClassMenuScanner {
                 || menu.slots.size() < WynncraftClassMenu.MENU_SIZE) return java.util.Optional.empty();
         return WynncraftClassMenu.decode(title, menu.slots.stream().limit(WynncraftClassMenu.MENU_SIZE)
                 .map(slot -> slot.getItem()).toList()).map(result -> {
-                    if (minecraft.getUser().getProfileId().equals(autoOpenAccount)) autoOpenEnabled = result.autoOpenEnabled();
+                    autoOpenObserved(minecraft.getUser().getProfileId(), result.autoOpenEnabled());
                     return new LiveMenu(menu.containerId, result);
                 });
     }
@@ -96,7 +99,7 @@ public final class ClassMenuScanner {
             var decoded = WynncraftClassMenu.decode(currentTitle, items);
             if (decoded.isEmpty()) return;
             var result = decoded.get();
-            autoOpenEnabled = result.autoOpenEnabled();
+            autoOpenObserved(current, result.autoOpenEnabled());
             if (menu == lastMenu && result.equals(lastResult)) return;
             store.migrateReferences(current, result.legacyReferences(), result.characters());
             discovery.observe(result.scan(current), discovery.generation());
@@ -105,12 +108,13 @@ public final class ClassMenuScanner {
         } catch (IOException | RuntimeException failure) { failed(failure); }
     }
 
-    /** Passive, memory-only control check while the switcher is off. No character scan or capture. */
+    /** Passive control check while the switcher is off. Persists only its on/off flag. */
     private void observeAutoOpen() {
         UUID current = minecraft.getUser().getProfileId();
         if (!current.equals(autoOpenAccount)) {
             autoOpenAccount = current;
-            autoOpenEnabled = false;
+            autoOpenEnabled = store.autoOpenEnabled(current);
+            lastAutoOpenObservation = null;
         }
         if (minecraft.player == null) return;
         var menu = minecraft.player.containerMenu;
@@ -119,7 +123,16 @@ public final class ClassMenuScanner {
                 : minecraft.screen == null ? "" : minecraft.screen.getTitle().getString();
         if (!WynncraftClassMenu.matchesTitle(currentTitle)) return;
         WynncraftClassMenu.autoOpenState(currentTitle, menu.slots.stream().limit(WynncraftClassMenu.MENU_SIZE)
-                .map(slot -> slot.getItem()).toList()).ifPresent(value -> autoOpenEnabled = value);
+                .map(slot -> slot.getItem()).toList()).ifPresent(value -> autoOpenObserved(current, value));
+    }
+
+    private void autoOpenObserved(UUID current, boolean value) {
+        if (!current.equals(autoOpenAccount)) lastAutoOpenObservation = null;
+        autoOpenAccount = current;
+        autoOpenEnabled = value;
+        if (java.util.Objects.equals(lastAutoOpenObservation, value)) return;
+        lastAutoOpenObservation = value;
+        store.recordAutoOpenAsync(current, value);
     }
 
     /** Upgrade the earlier capture-only build without requiring another round of manual attempts.
@@ -184,6 +197,7 @@ public final class ClassMenuScanner {
         resetDiscovery();
         autoOpenAccount = null;
         autoOpenEnabled = false;
+        lastAutoOpenObservation = null;
         title = null;
         openedId = -1;
     }
