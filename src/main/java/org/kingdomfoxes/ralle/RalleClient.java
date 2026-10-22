@@ -136,12 +136,13 @@ public final class RalleClient implements ClientModInitializer {
                 LfgNotificationOverlay.CARD_HEIGHT,
                 HudPlacementRegistry.PlacementPolicy.FIXED_SIDE_ANCHORED
         ));
+        var classMenuScanner = new org.kingdomfoxes.ralle.classes.ClassMenuScanner(minecraft,
+                settings.setting(RalleSettings.CLASS_SELECTOR_ID, BooleanSetting.class), classShortcuts,
+                configDirectory.resolve("ralle-class-menu-capture"));
+        RalleSettings.requireClassAutoOpen(settings, classMenuScanner::autoOpenEnabled);
         settings.seal();
         var classMenuCapture = new org.kingdomfoxes.ralle.classes.ClassMenuCapture(minecraft,
                 settings.setting(RalleSettings.CLASS_SELECTOR_ID, BooleanSetting.class),
-                configDirectory.resolve("ralle-class-menu-capture"));
-        var classMenuScanner = new org.kingdomfoxes.ralle.classes.ClassMenuScanner(minecraft,
-                settings.setting(RalleSettings.CLASS_SELECTOR_ID, BooleanSetting.class), classShortcuts,
                 configDirectory.resolve("ralle-class-menu-capture"));
         placements.seal();
         RalleTypography.bind(settings);

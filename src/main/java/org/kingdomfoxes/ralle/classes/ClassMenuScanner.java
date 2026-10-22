@@ -27,6 +27,7 @@ public final class ClassMenuScanner {
     private WynncraftClassMenu.Result lastResult;
     private boolean failed;
     private boolean autoOpenEnabled;
+    private UUID autoOpenAccount;
 
     public ClassMenuScanner(Minecraft minecraft, BooleanSetting enabled, ClassSelectorStore store, Path captures) {
         this.minecraft = minecraft;
@@ -36,9 +37,10 @@ public final class ClassMenuScanner {
         discovery = new ClassDiscovery(store);
     }
     public boolean requested() { return enabled.value(); }
+    public boolean observesMenus() { return connected(); }
     /** Current-session observation only; historical captures never satisfy this prerequisite. */
     public boolean autoOpenEnabled() {
-        return available() && minecraft.getUser().getProfileId().equals(account) && autoOpenEnabled;
+        return connected() && minecraft.getUser().getProfileId().equals(autoOpenAccount) && autoOpenEnabled;
     }
     public record LiveMenu(int containerId, WynncraftClassMenu.Result result) { }
 
@@ -58,12 +60,12 @@ public final class ClassMenuScanner {
                 || menu.slots.size() < WynncraftClassMenu.MENU_SIZE) return java.util.Optional.empty();
         return WynncraftClassMenu.decode(title, menu.slots.stream().limit(WynncraftClassMenu.MENU_SIZE)
                 .map(slot -> slot.getItem()).toList()).map(result -> {
-                    if (minecraft.getUser().getProfileId().equals(account)) autoOpenEnabled = result.autoOpenEnabled();
+                    if (minecraft.getUser().getProfileId().equals(autoOpenAccount)) autoOpenEnabled = result.autoOpenEnabled();
                     return new LiveMenu(menu.containerId, result);
                 });
     }
     public void opened(int containerId, String title) {
-        if (!available()) return;
+        if (!connected()) return;
         openedId = containerId;
         this.title = title;
         lastMenu = null;
@@ -71,12 +73,13 @@ public final class ClassMenuScanner {
     }
 
     public void tick() {
-        if (!available()) { reset(); return; }
+        if (!connected()) { reset(); return; }
+        observeAutoOpen();
+        if (!enabled.value()) { resetDiscovery(); return; }
         if (minecraft.player == null || minecraft.level == null) return;
         UUID current = minecraft.getUser().getProfileId();
         if (!current.equals(account)) {
             account = current;
-            autoOpenEnabled = false;
             discovery.session(current, true);
             try { recoverInitialCaptures(current); }
             catch (IOException failure) { failed(failure); }
@@ -100,6 +103,23 @@ public final class ClassMenuScanner {
             lastMenu = menu;
             lastResult = result;
         } catch (IOException | RuntimeException failure) { failed(failure); }
+    }
+
+    /** Passive, memory-only control check while the switcher is off. No character scan or capture. */
+    private void observeAutoOpen() {
+        UUID current = minecraft.getUser().getProfileId();
+        if (!current.equals(autoOpenAccount)) {
+            autoOpenAccount = current;
+            autoOpenEnabled = false;
+        }
+        if (minecraft.player == null) return;
+        var menu = minecraft.player.containerMenu;
+        if (menu == minecraft.player.inventoryMenu || menu.slots.size() < WynncraftClassMenu.MENU_SIZE) return;
+        String currentTitle = menu.containerId == openedId ? title
+                : minecraft.screen == null ? "" : minecraft.screen.getTitle().getString();
+        if (!WynncraftClassMenu.matchesTitle(currentTitle)) return;
+        WynncraftClassMenu.autoOpenState(currentTitle, menu.slots.stream().limit(WynncraftClassMenu.MENU_SIZE)
+                .map(slot -> slot.getItem()).toList()).ifPresent(value -> autoOpenEnabled = value);
     }
 
     /** Upgrade the earlier capture-only build without requiring another round of manual attempts.
@@ -146,17 +166,25 @@ public final class ClassMenuScanner {
         org.slf4j.LoggerFactory.getLogger(ClassMenuScanner.class).warn("Could not update detected class entries", failure);
     }
     private boolean available() {
-        return enabled.value() && minecraft.getConnection() != null && minecraft.getCurrentServer() != null
+        return enabled.value() && connected();
+    }
+    private boolean connected() {
+        return minecraft.getConnection() != null && minecraft.getCurrentServer() != null
                 && WynncraftHost.matches(minecraft.getCurrentServer().ip);
     }
-    public void reset() {
+    private void resetDiscovery() {
+        if (account == null) return;
         account = null;
-        autoOpenEnabled = false;
-        title = null;
-        openedId = -1;
         lastMenu = null;
         lastResult = null;
         failed = false;
         discovery.disconnect();
+    }
+    public void reset() {
+        resetDiscovery();
+        autoOpenAccount = null;
+        autoOpenEnabled = false;
+        title = null;
+        openedId = -1;
     }
 }

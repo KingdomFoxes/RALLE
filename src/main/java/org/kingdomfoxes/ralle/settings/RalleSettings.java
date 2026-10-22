@@ -53,6 +53,11 @@ public final class RalleSettings {
             registry.requireAccess(id, allowed, Component.translatable("ralle.cosmetics.supporter.locked"));
     }
 
+    public static void requireClassAutoOpen(SettingsRegistry registry, java.util.function.BooleanSupplier enabled) {
+        registry.requireAccess(CLASS_SELECTOR_ID, enabled,
+                Component.translatable("ralle.classes.switch.auto-open-required"));
+    }
+
     public static void register(SettingsRegistry registry) {
         registry.registerCategory(new SettingsCategory(
                 "about",

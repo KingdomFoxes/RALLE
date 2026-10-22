@@ -15,6 +15,12 @@ backend authentication and eligibility checks still apply.
 
 ## Locked preferences
 
+Class Switcher's toggle is locked off until the current Wynncraft session has
+observed Auto Open enabled in the character menu. Its passive prerequisite check
+runs while the feature is off and keeps only the control state in memory; it does
+not discover characters, capture diagnostics or write files. Direct mutations and
+saved enabled values cannot bypass the gate. See `docs/class-selector.md`.
+
 Access is enforced by `Setting.value()` and `Setting.set()`, including callers
 outside the settings screen. Fox-exclusive booleans resolve to off until the
 current login confirms membership. Supporter local preferences reuse fresh,

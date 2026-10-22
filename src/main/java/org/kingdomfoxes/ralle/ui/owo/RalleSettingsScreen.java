@@ -61,6 +61,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private boolean savingNameplateColor;
     private boolean nameplateColorSaveFailed;
     private boolean foxAccessAvailable;
+    private boolean classAutoOpenAvailable;
     private FlowLayout root;
     private FlowLayout sidebarNavigation;
     private FlowLayout document;
@@ -116,6 +117,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         this.parent = parent;
         this.settings = settings;
         this.foxAccessAvailable = settings.available(RalleSettings.RAID_LFG_ENABLED_ID);
+        this.classAutoOpenAvailable = settings.available(RalleSettings.CLASS_SELECTOR_ID);
         this.chatLayout = chatLayout;
         this.navigation = navigation;
         this.guildRanks = guildRanks;
@@ -870,8 +872,10 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     public void tick() {
         super.tick();
         boolean accessAvailable = settings.available(RalleSettings.RAID_LFG_ENABLED_ID);
-        if (foxAccessAvailable != accessAvailable) {
+        boolean autoOpenAvailable = settings.available(RalleSettings.CLASS_SELECTOR_ID);
+        if (foxAccessAvailable != accessAvailable || classAutoOpenAvailable != autoOpenAvailable) {
             foxAccessAvailable = accessAvailable;
+            classAutoOpenAvailable = autoOpenAvailable;
             double progress = scroll.progress();
             if (query.isEmpty()) rebuildCurrentPage(progress);
             else {

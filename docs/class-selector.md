@@ -217,13 +217,22 @@ and verifying the live adapter in-game. A video alone cannot establish stable ID
 
 ## Switching and load confirmation
 
-Class Switcher requires Wynncraft's **Auto Open** setting to be enabled. Open
-`/class` and its character book once per connection while Class Switcher is enabled
-so RALLE can observe the setting. Unknown or disabled blocks shortcut submission
-before sending `/class`, capturing a frame or muting audio, with local guidance to
-open the menu and enable Auto Open. This observation is memory-only and resets on
-disconnect, account change or feature disable; saved diagnostic captures cannot
-unlock switching. Discovery and manual class selection still work with Auto Open off.
+The **Class Switcher setting itself** requires Wynncraft's **Auto Open** setting
+to be enabled. Open `/class` and its character book once per connection so RALLE
+can observe the setting, even while Class Switcher is off. Unknown or disabled
+keeps the toggle gray and effectively off, rejects direct attempts to enable it,
+and hides its dependent controls in both settings and search. The disabled row
+explains how to enable Auto Open. The screen refreshes when the prerequisite changes.
+Saved enabled preferences are preserved but cannot take effect until confirmed;
+a fresh install still requires explicitly turning Class Switcher on.
+
+The prerequisite observation is memory-only and resets on disconnect or account
+change, but survives turning Class Switcher off so it can be enabled again. While
+off, only the recognized menu's utility controls are checked: no character
+discovery, diagnostic capture, capture recovery, file writes, commands or clicks
+run for this check. Saved diagnostic captures cannot unlock the toggle. Manual
+class selection remains available with Auto Open off. Shortcut submission retains
+its own prerequisite check before sending `/class`, capturing a frame or muting audio.
 
 The initial check uses the already captured `Auto Open` control in slot 53:
 potion model 599 means enabled, 598 means disabled. The recognized live book must

@@ -19,6 +19,56 @@ class RalleSettingsTest {
     @TempDir
     Path temporaryDirectory;
 
+    @Test void classSwitcherCannotBeEnabledUntilAutoOpenIsObservedEnabled() {
+        var registry = new SettingsRegistry(temporaryDirectory.resolve("auto-open.properties"));
+        RalleSettings.register(registry);
+        var autoOpen = new java.util.concurrent.atomic.AtomicBoolean();
+        RalleSettings.requireClassAutoOpen(registry, autoOpen::get);
+        registry.seal();
+        var enabled = registry.setting(RalleSettings.CLASS_SELECTOR_ID, BooleanSetting.class);
+        assertFalse(registry.available(enabled.id()));
+        assertTrue(registry.unavailableReason(enabled.id()).isPresent());
+        enabled.set(true);
+        assertFalse(enabled.value());
+        assertEquals("false", enabled.serialize());
+        assertFalse(registry.visible(RalleSettings.CLASS_SHORTCUTS_ID));
+
+        autoOpen.set(true);
+        assertTrue(registry.available(enabled.id()));
+        assertFalse(enabled.value()); // Checking the prerequisite never opts in a fresh install.
+        enabled.set(true);
+        assertTrue(enabled.value());
+        assertTrue(registry.visible(RalleSettings.CLASS_SHORTCUTS_ID));
+        enabled.set(false);
+        assertTrue(registry.available(enabled.id())); // Turning off must not relock its own prerequisite.
+        enabled.set(true);
+        assertTrue(enabled.value());
+
+        autoOpen.set(false);
+        assertFalse(enabled.value());
+        assertFalse(registry.available(enabled.id()));
+        assertFalse(registry.visible(RalleSettings.CLASS_SHORTCUTS_ID));
+    }
+
+    @Test void savedEnabledClassSwitcherRemainsOffUntilAutoOpenIsConfirmed() throws Exception {
+        var path = temporaryDirectory.resolve("saved-class-switcher.properties");
+        Files.writeString(path, "wheels.class-selector-enabled=true\n");
+        var registry = new SettingsRegistry(path);
+        RalleSettings.register(registry);
+        var autoOpen = new java.util.concurrent.atomic.AtomicBoolean();
+        RalleSettings.requireClassAutoOpen(registry, autoOpen::get);
+        registry.seal();
+        var enabled = registry.setting(RalleSettings.CLASS_SELECTOR_ID, BooleanSetting.class);
+        assertFalse(enabled.value());
+        enabled.set(true);
+        assertFalse(enabled.value());
+        assertEquals("true", enabled.serialize());
+        autoOpen.set(true);
+        assertTrue(enabled.value());
+        autoOpen.set(false); // Disconnect, account change, or a disabled live control relocks it.
+        assertFalse(enabled.value());
+    }
+
     @Test void classSelectorIsIndependentDisabledAndHasHiddenPersistentPreferences() {
         var path = temporaryDirectory.resolve("classes.properties");
         var registry = new SettingsRegistry(path);

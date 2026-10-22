@@ -51,8 +51,8 @@ public final class WynncraftClassMenu {
         } catch (RuntimeException invalid) { return -1; }
     }
 
-    /** Exact title plus independent control signatures keep housing/inventory/editor menus out. */
-    public static Optional<Result> decode(String title, List<ItemStack> items) {
+    /** Reads only controls, allowing the prerequisite to be checked before character discovery is enabled. */
+    public static Optional<Boolean> autoOpenState(String title, List<ItemStack> items) {
         if (!matchesTitle(title) || items.size() != MENU_SIZE
                 || !marker(items.get(7), "Cancel Deletion", 559)
                 || !marker(items.get(25), "Character Backups", 561)
@@ -60,6 +60,13 @@ public final class WynncraftClassMenu {
                 // Auto Open changes its model when enabled; both states identify the same book.
                 || !(marker(items.get(53), "Auto Open", 598)
                 || marker(items.get(53), "Auto Open", 599))) return Optional.empty();
+        return Optional.of(marker(items.get(53), "Auto Open", 599));
+    }
+
+    /** Exact title plus independent control signatures keep housing/inventory/editor menus out. */
+    public static Optional<Result> decode(String title, List<ItemStack> items) {
+        var autoOpen = autoOpenState(title, items);
+        if (autoOpen.isEmpty()) return Optional.empty();
         var characters = new ArrayList<ClassCharacter>();
         var slots = new LinkedHashMap<String, Integer>();
         var evidence = new LinkedHashMap<String, String>();
@@ -76,7 +83,7 @@ public final class WynncraftClassMenu {
             legacyReferences.put(ClassCharacter.OBSERVATION_PREFIX + slot + ":" + digest(slot + "\n" + rawEvidence(item)), character.id());
         }
         return Optional.of(new Result(characters, slots, evidence, complete, legacyReferences,
-                marker(items.get(53), "Auto Open", 599)));
+                autoOpen.get()));
     }
 
     private static ClassCharacter character(int slot, ItemStack item) {

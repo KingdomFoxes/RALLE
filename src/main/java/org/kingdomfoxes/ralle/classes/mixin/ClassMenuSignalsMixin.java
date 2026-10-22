@@ -17,9 +17,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 abstract class ClassMenuSignalsMixin {
     @Inject(method = "handleOpenScreen", at = @At("HEAD"), require = 1)
     private void ralle$classMenuOpened(ClientboundOpenScreenPacket packet, CallbackInfo ci) {
-        if (RalleClient.initialized() && RalleClient.context().classMenuScanner().requested() && Minecraft.getInstance().isSameThread()) {
+        if (RalleClient.initialized() && RalleClient.context().classMenuScanner().observesMenus() && Minecraft.getInstance().isSameThread()) {
             RalleClient.context().classMenuScanner().opened(packet.getContainerId(), packet.getTitle().getString());
-            RalleClient.context().classSwitcher().opened(packet.getContainerId(), packet.getTitle().getString());
+            if (RalleClient.context().classMenuScanner().requested())
+                RalleClient.context().classSwitcher().opened(packet.getContainerId(), packet.getTitle().getString());
         }
     }
 
