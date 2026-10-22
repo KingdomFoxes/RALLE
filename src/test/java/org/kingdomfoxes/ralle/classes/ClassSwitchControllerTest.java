@@ -28,6 +28,21 @@ class ClassSwitchControllerTest {
         return List.of(new ClassSwitchController.Target("a", 10), new ClassSwitchController.Target("b", 11));
     }
 
+    @Test void disabledAutoOpenStopsTheOperationAndReleasesFrameAndAudioWithoutSelecting() {
+        var actions = new Actions(); var controller = new ClassSwitchController(actions);
+        assertTrue(controller.begin(account, "b", "a", true, 0));
+        controller.frameCaptured();
+        controller.bookOpened(7, 100);
+        controller.autoOpenRequired();
+        controller.menu(7, targets(), true);
+        controller.autoOpenRequired();
+        assertFalse(controller.active());
+        assertFalse(actions.muted);
+        assertEquals(1, actions.restoreCalls);
+        assertEquals(ClassSwitchController.Failure.AUTO_OPEN_REQUIRED, actions.failure);
+        assertEquals(List.of("capture", "class", "release"), actions.calls);
+    }
+
     @Test void preRenderCommandOverlapsDrawingButStageInputWaitsForTheCapturedFrame() {
         var actions = new Actions(); var controller = new ClassSwitchController(actions);
         assertTrue(controller.begin(account, "b", "a", true, 0));

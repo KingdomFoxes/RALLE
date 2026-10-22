@@ -15,7 +15,7 @@ public final class ClassSwitchController {
     public static final long BOOK_SELECTION_TIMEOUT_MILLIS = 800;
     public static final int MAX_BOOK_RECOVERIES = 2;
     public enum State { IDLE, CAPTURING, WAITING_STAGE, WAITING_MENU, WAITING_TRANSITION, WAITING_WORLD }
-    public enum Failure { CANCELLED, TIMEOUT, DISCONNECTED, UNEXPECTED_MENU, AMBIGUOUS_TARGET, ACCOUNT_CHANGED, UNAVAILABLE }
+    public enum Failure { CANCELLED, TIMEOUT, DISCONNECTED, UNEXPECTED_MENU, AMBIGUOUS_TARGET, ACCOUNT_CHANGED, UNAVAILABLE, AUTO_OPEN_REQUIRED }
     public enum RetryKind { COMMAND, BOOK }
     public record Retry(RetryKind kind, int number, int total) { }
 
@@ -248,6 +248,7 @@ public final class ClassSwitchController {
     public void unexpectedMenu() { if (active()) fail(Failure.UNEXPECTED_MENU); }
     public void cancel() { if (active()) fail(Failure.CANCELLED); }
     public void unavailable() { if (active()) fail(Failure.UNAVAILABLE); }
+    public void autoOpenRequired() { if (active()) fail(Failure.AUTO_OPEN_REQUIRED); }
     private void fail(Failure failure) {
         try { finish(); }
         finally { actions.failed(failure); }

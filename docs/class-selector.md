@@ -217,6 +217,22 @@ and verifying the live adapter in-game. A video alone cannot establish stable ID
 
 ## Switching and load confirmation
 
+Class Switcher requires Wynncraft's **Auto Open** setting to be enabled. Open
+`/class` and its character book once per connection while Class Switcher is enabled
+so RALLE can observe the setting. Unknown or disabled blocks shortcut submission
+before sending `/class`, capturing a frame or muting audio, with local guidance to
+open the menu and enable Auto Open. This observation is memory-only and resets on
+disconnect, account change or feature disable; saved diagnostic captures cannot
+unlock switching. Discovery and manual class selection still work with Auto Open off.
+
+The initial check uses the already captured `Auto Open` control in slot 53:
+potion model 599 means enabled, 598 means disabled. The recognized live book must
+still match its existing title and control signatures. The setting is reread from
+live contents before automatic target resolution and again immediately before the
+click; a disabled observation stops the operation and releases frame/audio/input.
+This deliberately basic check can be refined with further live menu evidence;
+RALLE never toggles the server setting itself.
+
 The current loop is: send the initial `/class` just before rendering the selected frame,
 capture that frame before the next packet-processing pass, submit native
 Use clicks at most every **100 ms** while the original server selection prompt is

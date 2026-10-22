@@ -63,6 +63,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         audio = new ClassSwitchAudio(() -> minecraft.getSoundManager().refreshCategoryVolume(SoundSource.MASTER));
     }
     public boolean active() { return controller.active(); }
+    public boolean autoOpenEnabled() { return scanner.autoOpenEnabled(); }
     public boolean isCurrent(String reference) {
         loads.session(minecraft.getUser().getProfileId());
         return reference.equals(loads.current());
@@ -76,7 +77,8 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
     public boolean begin(String reference) {
         if (!enabled.value() || !connected() || minecraft.player == null || minecraft.level == null
                 || minecraft.gameMode == null || minecraft.player.containerMenu != minecraft.player.inventoryMenu
-                || minecraft.getOverlay() != null || otherAutomation.getAsBoolean() || active() || isCurrent(reference)) return false;
+                || minecraft.getOverlay() != null || otherAutomation.getAsBoolean() || active() || isCurrent(reference)
+                || !autoOpenEnabled()) return false;
         target = reference;
         book = -1;
         bookStatus = "not received";
@@ -113,6 +115,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
             beforeTick();
             if (!active()) return;
             scanner.liveMenu().ifPresent(menu -> {
+                if (!menu.result().autoOpenEnabled()) { controller.autoOpenRequired(); return; }
                 bookStatus = (menu.result().complete() ? "complete" : "partial") + " (" + menu.result().characters().size() + " characters)";
                 if (menu.result().complete()) {
                     var slot = menu.result().resolve(target);
@@ -431,6 +434,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
     }
     @Override public void selectCharacter(int containerId, int slot) {
         var menu = scanner.liveMenu().orElseThrow();
+        if (!menu.result().autoOpenEnabled()) { controller.autoOpenRequired(); return; }
         if (containerId != book || menu.containerId() != containerId || menu.result().resolve(target).orElse(-1) != slot)
             throw new IllegalStateException("Character book changed before selection");
         loads.selected(menu.result().canonicalReference(target), containerId);

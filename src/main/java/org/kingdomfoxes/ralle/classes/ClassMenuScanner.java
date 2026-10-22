@@ -26,6 +26,7 @@ public final class ClassMenuScanner {
     private AbstractContainerMenu lastMenu;
     private WynncraftClassMenu.Result lastResult;
     private boolean failed;
+    private boolean autoOpenEnabled;
 
     public ClassMenuScanner(Minecraft minecraft, BooleanSetting enabled, ClassSelectorStore store, Path captures) {
         this.minecraft = minecraft;
@@ -35,6 +36,10 @@ public final class ClassMenuScanner {
         discovery = new ClassDiscovery(store);
     }
     public boolean requested() { return enabled.value(); }
+    /** Current-session observation only; historical captures never satisfy this prerequisite. */
+    public boolean autoOpenEnabled() {
+        return available() && minecraft.getUser().getProfileId().equals(account) && autoOpenEnabled;
+    }
     public record LiveMenu(int containerId, WynncraftClassMenu.Result result) { }
 
     /** Packet-proven book ownership, including a book whose contents never finished arriving. */
@@ -52,7 +57,10 @@ public final class ClassMenuScanner {
         if (menu == minecraft.player.inventoryMenu || menu.containerId != openedId
                 || menu.slots.size() < WynncraftClassMenu.MENU_SIZE) return java.util.Optional.empty();
         return WynncraftClassMenu.decode(title, menu.slots.stream().limit(WynncraftClassMenu.MENU_SIZE)
-                .map(slot -> slot.getItem()).toList()).map(result -> new LiveMenu(menu.containerId, result));
+                .map(slot -> slot.getItem()).toList()).map(result -> {
+                    if (minecraft.getUser().getProfileId().equals(account)) autoOpenEnabled = result.autoOpenEnabled();
+                    return new LiveMenu(menu.containerId, result);
+                });
     }
     public void opened(int containerId, String title) {
         if (!available()) return;
@@ -68,6 +76,7 @@ public final class ClassMenuScanner {
         UUID current = minecraft.getUser().getProfileId();
         if (!current.equals(account)) {
             account = current;
+            autoOpenEnabled = false;
             discovery.session(current, true);
             try { recoverInitialCaptures(current); }
             catch (IOException failure) { failed(failure); }
@@ -84,6 +93,7 @@ public final class ClassMenuScanner {
             var decoded = WynncraftClassMenu.decode(currentTitle, items);
             if (decoded.isEmpty()) return;
             var result = decoded.get();
+            autoOpenEnabled = result.autoOpenEnabled();
             if (menu == lastMenu && result.equals(lastResult)) return;
             store.migrateReferences(current, result.legacyReferences(), result.characters());
             discovery.observe(result.scan(current), discovery.generation());
@@ -141,6 +151,7 @@ public final class ClassMenuScanner {
     }
     public void reset() {
         account = null;
+        autoOpenEnabled = false;
         title = null;
         openedId = -1;
         lastMenu = null;

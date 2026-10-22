@@ -73,9 +73,21 @@ class WynncraftClassMenuTest {
         var saved = decode(fixture());
         var enabled = decode(fixture("wynncraft-character-book-auto-open-2026-10-19.json"));
         assertTrue(enabled.complete());
+        assertFalse(saved.autoOpenEnabled());
+        assertTrue(enabled.autoOpenEnabled());
         assertEquals(saved.characters(), enabled.characters());
         for (var character : saved.characters())
             assertEquals(saved.resolve(character.id()), enabled.resolve(character.id()));
+    }
+
+    @Test void disablingAutoOpenInTheLiveBookDoesNotInvalidateDetectedCharacters() throws Exception {
+        var fixture = fixture("wynncraft-character-book-auto-open-2026-10-19.json");
+        var enabled = decode(fixture);
+        slot(fixture, 53).add("item", slot(fixture(), 53).get("item").deepCopy());
+        var disabled = decode(fixture);
+        assertFalse(disabled.autoOpenEnabled());
+        assertEquals(enabled.characters(), disabled.characters());
+        assertTrue(disabled.complete());
     }
 
     @Test void autoOpenControlStillRequiresItsObservedNameItemAndModel() throws Exception {

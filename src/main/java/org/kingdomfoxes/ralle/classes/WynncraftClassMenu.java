@@ -24,7 +24,8 @@ public final class WynncraftClassMenu {
     private static final Pattern LEGACY = Pattern.compile("§.");
 
     public record Result(List<ClassCharacter> characters, Map<String, Integer> slots,
-                         Map<String, String> evidence, boolean complete, Map<String, String> legacyReferences) {
+                         Map<String, String> evidence, boolean complete, Map<String, String> legacyReferences,
+                         boolean autoOpenEnabled) {
         public Result { characters = List.copyOf(characters); slots = Map.copyOf(slots); evidence = Map.copyOf(evidence); legacyReferences = Map.copyOf(legacyReferences); }
         public ClassScan scan(UUID account) { return new ClassScan(account, characters, complete); }
         public String canonicalReference(String reference) { return legacyReferences.getOrDefault(reference, reference); }
@@ -74,7 +75,8 @@ public final class WynncraftClassMenu {
             evidence.put(character.id(), digest(evidence(item)));
             legacyReferences.put(ClassCharacter.OBSERVATION_PREFIX + slot + ":" + digest(slot + "\n" + rawEvidence(item)), character.id());
         }
-        return Optional.of(new Result(characters, slots, evidence, complete, legacyReferences));
+        return Optional.of(new Result(characters, slots, evidence, complete, legacyReferences,
+                marker(items.get(53), "Auto Open", 599)));
     }
 
     private static ClassCharacter character(int slot, ItemStack item) {

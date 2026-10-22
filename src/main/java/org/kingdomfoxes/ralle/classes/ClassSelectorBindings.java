@@ -200,6 +200,7 @@ public final class ClassSelectorBindings {
     }
     private void submit(String identity) {
         if (index(identity) < 0) return;
+        if (!switcher.autoOpenEnabled()) { show("ralle.classes.switch.auto-open-required", true); return; }
         if (screen != null) screen.submitted(index(identity));
         submitted = switcher.begin(identity);
         if (!submitted) show("ralle.classes.switch.unavailable", true);
