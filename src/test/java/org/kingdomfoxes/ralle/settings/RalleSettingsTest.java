@@ -49,7 +49,9 @@ class RalleSettingsTest {
     @Test void wheelPreferencesMigrateAndHiddenStylesSurviveReload() throws Exception {
         var path = temporaryDirectory.resolve("wheels.properties");
         Files.writeString(path, "raid-lfg.raid-lfg-create-selector-wheel=true\n"
-                + "raid-lfg.raid-lfg-kick-selector-wheel=true\n");
+                + "raid-lfg.raid-lfg-kick-selector-wheel=true\n"
+                + "raid-lfg.raid-lfg-create-keybind=key.keyboard.g\n"
+                + "raid-lfg.raid-lfg-kick-keybind=key.keyboard.h\n");
         var registry = new SettingsRegistry(path);
         RalleSettings.register(registry);
         registry.seal();
@@ -65,10 +67,16 @@ class RalleSettingsTest {
         var saved = Files.readString(path);
         assertTrue(saved.contains("wheels.raid-lfg-kick-selector-wheel=true"));
         assertFalse(saved.contains("raid-lfg.raid-lfg-kick-selector-wheel"));
+        assertTrue(saved.contains("wheels.raid-lfg-create-keybind=key.keyboard.g"));
+        assertTrue(saved.contains("wheels.raid-lfg-kick-keybind=key.keyboard.h"));
+        assertFalse(saved.contains("raid-lfg.raid-lfg-create-keybind"));
+        assertFalse(saved.contains("raid-lfg.raid-lfg-kick-keybind"));
 
         var reloaded = new SettingsRegistry(path);
         RalleSettings.register(reloaded);
         reloaded.seal();
+        assertEquals("key.keyboard.g", reloaded.setting("raid-lfg-create-keybind", KeybindSetting.class).value());
+        assertEquals("key.keyboard.h", reloaded.setting("raid-lfg-kick-keybind", KeybindSetting.class).value());
         assertEquals("bars", reloaded.setting(RalleSettings.CREATE_WHEEL_STYLE_ID, ChoiceSetting.class).value());
         assertFalse(reloaded.visible(RalleSettings.CREATE_WHEEL_STYLE_ID));
         reloaded.setting("raid-lfg-create-selector-wheel", BooleanSetting.class).set(true);
@@ -84,12 +92,18 @@ class RalleSettingsTest {
                 + "wheels.raid-lfg-create-selector-wheel=false\n"
                 + "raid-lfg.raid-lfg-kick-selector-wheel=true\n"
                 + "wheels.raid-lfg-kick-selector-wheel=invalid\n"
+                + "raid-lfg.raid-lfg-create-keybind=key.keyboard.g\n"
+                + "wheels.raid-lfg-create-keybind=key.keyboard.j\n"
+                + "raid-lfg.raid-lfg-kick-keybind=key.keyboard.h\n"
+                + "wheels.raid-lfg-kick-keybind=invalid binding\n"
                 + "wheels.raid-lfg-create-wheel-style=unknown\n");
         var registry = new SettingsRegistry(path);
         RalleSettings.register(registry);
         registry.seal();
         assertFalse(registry.setting("raid-lfg-create-selector-wheel", BooleanSetting.class).value());
         assertFalse(registry.setting("raid-lfg-kick-selector-wheel", BooleanSetting.class).value());
+        assertEquals("key.keyboard.j", registry.setting("raid-lfg-create-keybind", KeybindSetting.class).value());
+        assertEquals("key.keyboard.f9", registry.setting("raid-lfg-kick-keybind", KeybindSetting.class).value());
         assertEquals("circle-segments", registry.setting(RalleSettings.CREATE_WHEEL_STYLE_ID, ChoiceSetting.class).value());
     }
 
@@ -426,14 +440,19 @@ class RalleSettingsTest {
         assertTrue(categories.get(3).entries().isEmpty());
         assertEquals(List.of("lfg-create-selector", "party-kick-selector", "class-selector"),
                 categories.get(3).subcategories().stream().map(value -> value.id()).toList());
-        assertEquals(List.of("raid-lfg-create-selector-wheel", RalleSettings.CREATE_WHEEL_STYLE_ID),
+        assertEquals(List.of("raid-lfg-create-selector-wheel", RalleSettings.CREATE_WHEEL_STYLE_ID,
+                        "raid-lfg-create-keybind"),
                 categories.get(3).subcategories().get(0).entries().stream().map(value -> value.id()).toList());
-        assertEquals(List.of("raid-lfg-kick-selector-wheel", RalleSettings.KICK_WHEEL_STYLE_ID),
+        assertEquals(List.of("raid-lfg-kick-selector-wheel", RalleSettings.KICK_WHEEL_STYLE_ID,
+                        "raid-lfg-kick-keybind"),
                 categories.get(3).subcategories().get(1).entries().stream().map(value -> value.id()).toList());
         assertEquals(List.of(RalleSettings.CLASS_SELECTOR_ID, RalleSettings.CLASS_STYLE_ID,
                         RalleSettings.CLASS_MODIFIER_ID, RalleSettings.CLASS_SHORTCUTS_ID),
                 categories.get(3).subcategories().get(2).entries().stream().map(value -> value.id()).toList());
-        assertEquals(10, categories.get(2).subcategories().get(1).entries().size());
+        assertEquals(List.of("raid-lfg-keybind", "raid-lfg-join-keybind", "raid-lfg-close-keybind",
+                        "raid-lfg-leave-disband-keybind", "raid-lfg-party-filled-keybind", "raid-lfg-ping-keybind",
+                        "raid-lfg-lock-keybind", "automatic-raid-requeue-keybind"),
+                categories.get(2).subcategories().get(1).entries().stream().map(value -> value.id()).toList());
         assertEquals(List.of("attack-timers", "territory-map", "consumables"),
                 categories.get(4).subcategories().stream().map(value -> value.id()).toList());
         assertEquals(List.of(RalleSettings.WAR_QUEUE_ATTRIBUTION_ENABLED_ID,

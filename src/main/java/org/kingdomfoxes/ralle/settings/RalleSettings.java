@@ -132,8 +132,6 @@ public final class RalleSettings {
                                 keybind("raid-lfg-party-filled-keybind", "key.keyboard.f5"),
                                 keybind("raid-lfg-ping-keybind", "key.keyboard.f6"),
                                 keybind("raid-lfg-lock-keybind", "key.keyboard.f7"),
-                                keybind("raid-lfg-create-keybind", "key.keyboard.f8"),
-                                keybind("raid-lfg-kick-keybind", "key.keyboard.f9"),
                                 keybind("automatic-raid-requeue-keybind")
                         )
                 )
@@ -146,9 +144,11 @@ public final class RalleSettings {
                 List.of(),
                 List.of(
                         subcategory("lfg-create-selector", toggle("raid-lfg-create-selector-wheel"),
-                                choice(CREATE_WHEEL_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view")),
+                                choice(CREATE_WHEEL_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view"),
+                                keybind("raid-lfg-create-keybind", "key.keyboard.f8")),
                         subcategory("party-kick-selector", toggle("raid-lfg-kick-selector-wheel"),
-                                choice(KICK_WHEEL_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view")),
+                                choice(KICK_WHEEL_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view"),
+                                keybind("raid-lfg-kick-keybind", "key.keyboard.f9")),
                         subcategory("class-selector", toggle(CLASS_SELECTOR_ID),
                                 choice(CLASS_STYLE_ID, "circle-segments", "circle-segments", "bars", "no-view"),
                                 keybind(CLASS_MODIFIER_ID), customPanel(CLASS_SHORTCUTS_ID, CLASS_SHORTCUTS_ID))
@@ -156,6 +156,8 @@ public final class RalleSettings {
         ));
         registry.migrateKey("raid-lfg-create-selector-wheel", "raid-lfg.raid-lfg-create-selector-wheel");
         registry.migrateKey("raid-lfg-kick-selector-wheel", "raid-lfg.raid-lfg-kick-selector-wheel");
+        registry.migrateKey("raid-lfg-create-keybind", "raid-lfg.raid-lfg-create-keybind");
+        registry.migrateKey("raid-lfg-kick-keybind", "raid-lfg.raid-lfg-kick-keybind");
 
         registry.registerCategory(new SettingsCategory(
                 "war",

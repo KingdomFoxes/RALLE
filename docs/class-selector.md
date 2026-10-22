@@ -1,4 +1,4 @@
-# Class Selector integration
+# Class Switcher integration
 
 The native switching adapter is implemented. It retains the submitted background
 and wheel on the GPU, composites growing black ice beneath the menu blur,
@@ -11,7 +11,7 @@ these checks do not establish a stable server character UUID.
 
 ## Settings and local data
 
-Wheels → Class Selector has Class Selector (off), Wheel Style (Circle Segments, Bars, No View),
+Wheels → Class Switcher has Class Switcher (off), Wheel Style (Circle Segments, Bars, No View),
 Class Modifier (Unbound) and a dependency-hidden Class Shortcuts panel. None
 depends on Raid LFG, guild access, cosmetic access or the LFG service. Style and
 modifier preferences persist as `wheels.class-selector-style` and
@@ -198,7 +198,7 @@ without requiring the player to repeat them.
 
 For future compatibility diagnostics with this development build:
 
-1. Enable Class Selector in Wheels.
+1. Enable Class Switcher in Wheels.
 2. Naturally encounter character selection (login or manually run `/class`),
    right-click to open the book and briefly hover existing character entries.
 3. Share the generated `config/ralle-class-menu-capture/class-menu-<account>-*.json`.
@@ -426,7 +426,7 @@ retain style 1. `/ralle animtest 1` and `/ralle animtest 2` replay the selected 
 at one and two logical pixels respectively; style previews reuse the last preview
 pixel size (initially one). They show a local sample wheel through the
 same capture/blur/composite path, simulate book arrival at 800 ms and dismiss at
-2400 ms. They require no enabled Class Selector, server access or class switch,
+2400 ms. They require no enabled Class Switcher, server access or class switch,
 send no commands/clicks and do not mute audio. Escape dismisses immediately.
 Screen replacement, focus loss, resize, GUI-scale change, resource loading,
 disconnect and shutdown also clean up the preview.

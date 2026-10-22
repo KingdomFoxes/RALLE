@@ -1,8 +1,8 @@
 # Modifier wheels
 
-Class Selector is an independent addition under Wheels with local shortcuts,
+Class Switcher is an independent addition under Wheels with local shortcuts,
 game-menu discovery and a bounded hidden-switch runtime. See
-[Class Selector integration](class-selector.md) for persistence, strict live-book
+[Class Switcher integration](class-selector.md) for persistence, strict live-book
 target resolution, the native right-click sequence, frozen-frame handoff and
 remaining live validation. Its option keys are configurable per shortcut; the
 fixed option keys described below apply to Create/Kick.
@@ -18,14 +18,15 @@ text still render normally; class name wrapping and option-conflict labels are
 prepared with the layout instead of recomputed for each frame. Bars retain their
 two inexpensive rectangles per face.
 
-Wheels contains three subcategories: Lfg Create Selector, Party/Lfg Kick Selector,
-and Class Selector. Each contains that selector's toggle and style; Class Selector
-also contains its modifier and shortcut editor. The Create and Kick wheels remain disabled
+Wheels contains three subcategories: Party Create, Party Kick, and Class Switcher.
+Each contains its toggle, style and modifier keybind; Class Switcher also contains
+its shortcut editor. The Create and Kick wheels remain disabled
 by default. Each enabled selector reveals its own Wheel Style: Circle Segments
-(default), Bars, or No View. Modifier bindings remain in Raid LFG Controls and
-stay synchronized with Minecraft's keybind options. Create/Kick wheel settings retain the
+(default), Bars, or No View. Modifier bindings stay synchronized with Minecraft's
+keybind options. Create/Kick modifiers remain available with their graphical wheel
+toggle off, preserving keyboard-only chords. Create/Kick wheel settings retain the
 existing dependency on Enable Raid LFG and its current-account Fox access gate.
-The toggles are labeled `Lfg Create Selector` and `Party/Lfg Kick Selector`.
+The toggles are labeled `Party Create` and `Party Kick`.
 The Create selector omits its idle instruction line; processing, success, and
 failure feedback still appear in its status area.
 
@@ -36,8 +37,10 @@ when the new key is absent; subsequent saves write current keys. A present but
 invalid new value uses the normal default, never the old value. Styles persist as
 `wheels.raid-lfg-{create,kick}-wheel-style`, with values `circle-segments`, `bars`,
 and `no-view`. Disabled selectors preserve their hidden style preferences.
-Moving controls into subcategories does not add subcategory IDs to persisted keys;
-all current `wheels.*` keys and legacy-key migration behavior remain unchanged.
+Create/Kick modifier bindings migrate from `raid-lfg.raid-lfg-{create,kick}-keybind`
+to `wheels.raid-lfg-{create,kick}-keybind`, preserving saved choices with the same
+current-key precedence. Their defaults remain F8 and F9. Subcategory IDs and
+display-name changes do not alter persisted keys.
 
 ## Input
 
