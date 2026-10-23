@@ -163,7 +163,7 @@ def publish(info, jar):
     project_id = os.environ.get("MODRINTH_PROJECT_ID", "")
     if not token or not re.fullmatch(r"[A-Za-z0-9_-]+", project_id):
         raise ValueError("Set the MODRINTH_TOKEN repository secret and "
-                         "MODRINTH_PROJECT_ID repository variable first. See docs/releases.md.")
+                         "MODRINTH_PROJECT_ID repository variable first.")
     project = api("/project/" + quote(project_id, safe=""), token)
     # The maintainer-selected ID is authoritative. Draft projects may have a
     # temporary slug or no version-derived project type yet.
