@@ -3,7 +3,6 @@ package org.kingdomfoxes.ralle.chat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
-import org.kingdomfoxes.ralle.chat.screenshot.ChatScreenshotTokens;
 
 /** Shared presentation and delivery path for RALLE-authored local chat notifications. */
 public final class RalleChatMessages {

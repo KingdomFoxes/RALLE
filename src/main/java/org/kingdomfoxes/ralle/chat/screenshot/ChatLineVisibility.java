@@ -1,7 +1,6 @@
 package org.kingdomfoxes.ralle.chat.screenshot;
 
 import net.minecraft.client.gui.Font;
-import net.minecraft.network.chat.Style;
 import net.minecraft.util.FormattedCharSequence;
 
 /** Classifies frozen lines from their actual prepared glyph/effect bounds, excluding advance-only spaces. */

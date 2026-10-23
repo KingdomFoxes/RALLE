@@ -35,7 +35,6 @@ import org.kingdomfoxes.ralle.lfg.client.LfgLockDebouncer;
 import org.kingdomfoxes.ralle.lfg.client.LfgNotificationManager;
 import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.lfg.client.RaidRegionDetector;
-import org.kingdomfoxes.ralle.lfg.protocol.LfgGatewayException;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgNoteText;
 import org.kingdomfoxes.ralle.sound.LfgSoundPlayer;
@@ -700,12 +699,11 @@ public final class RaidLfgScreen extends BaseOwoScreen<FlowLayout> {
         if (style != null) {
             row.surface((graphics, component) -> {
                 var appearance = RalleClient.cosmeticAppearance(style);
-                if (appearance != null && appearance.treatment() == org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance.Treatment.PLATE)
+                if (appearance != null)
                     LiquidMaterialPresentation.plate(graphics, style, appearance,
                             component.x(), component.y(), component.width(), component.height());
             });
-            var name = new LiquidNameComponent(member.ign(), member.role() == LfgProtocol.MemberRole.HOST,
-                    style);
+            var name = new LiquidNameComponent(member.ign(), member.role() == LfgProtocol.MemberRole.HOST);
             name.tooltip(identityTooltip);
             row.child(name);
         } else {

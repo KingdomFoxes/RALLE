@@ -18,11 +18,13 @@ public final class SelectorWheelModel {
     public State state() { return state; }
     public int hovered() { return hovered; }
     public boolean ownsInput() { return state == State.SELECTING || state == State.SUBMITTED; }
-    public void hover(int option, long now) {
-        if (state != State.SELECTING || option == hovered) return;
+    /** Returns true only for a fresh selection transition, shared by hover cue dispatchers. */
+    public boolean hover(int option, long now) {
+        if (state != State.SELECTING || option == hovered) return false;
         if (hovered >= 0) motions.put(hovered, new Motion(offset(hovered, now), 0, now));
         if (option >= 0) motions.put(option, new Motion(offset(option, now), EXTENSION, now));
         hovered = option;
+        return true;
     }
     public double offset(int option, long now) {
         var motion = motions.get(option);
@@ -67,7 +69,18 @@ public final class SelectorWheelModel {
         var sectors = new ArrayList<Sector>();
         for (int i = 0; i < count; i++) {
             double angle = (firstAtTop ? -Math.PI / 2 : Math.PI) + i * Math.PI * 2 / count;
-            sectors.add(new Sector(inner, outer, angle, Math.PI / count));
+            sectors.add(new Sector(inner, outer, angle, Math.PI / Math.max(2, count)));
+        }
+        return List.copyOf(sectors);
+    }
+
+    /** Keep class faces at their original size; additional options start another ring after seven. */
+    public static List<Sector> classGeometry(int count) {
+        if (count < 0) throw new IllegalArgumentException("Invalid class count");
+        var sectors = new ArrayList<Sector>();
+        for (int start = 0, row = 0; start < count; start += 7, row++) {
+            double inner = 26 + row * 72;
+            sectors.addAll(ring(Math.min(7, count - start), inner, inner + 64, true));
         }
         return List.copyOf(sectors);
     }

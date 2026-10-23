@@ -1,0 +1,2080 @@
+{
+  "version": 1,
+  "account": "00000000-0000-0000-0000-000000000001",
+  "title": "\udaff\udfd5\ue01f",
+  "containerId": 1,
+  "slots": [
+    {
+      "slot": 7,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "Cancel Deletion",
+            "color": "red",
+            "bold": true,
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77Restore characters currently in",
+              "italic": false
+            },
+            {
+              "text": "\u00a77the waiting period prior to deletion",
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf000",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Click to Open",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              559.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16777215
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 9,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "",
+            "extra": [
+              {
+                "text": "\udb00\udc35",
+                "font": "minecraft:space"
+              },
+              {
+                "text": "Archer",
+                "color": "gold"
+              }
+            ],
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Class: ",
+                      "extra": [
+                        {
+                          "text": "Archer",
+                          "color": "white"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Time Played: ",
+                      "extra": [
+                        {
+                          "text": "842.08 hours",
+                          "color": "white"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Location: ",
+                      "extra": [
+                        {
+                          "text": "Mining Base Camp",
+                          "color": "white"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Level: ",
+                      "extra": [
+                        {
+                          "text": "120",
+                          "color": "white"
+                        },
+                        " ",
+                        {
+                          "text": "(34.58%)",
+                          "color": "dark_gray"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "",
+              "extra": [
+                {
+                  "text": "\udb00\udc1a",
+                  "font": "minecraft:space"
+                },
+                {
+                  "text": "Content Progress",
+                  "color": "gray"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "",
+              "extra": [
+                {
+                  "text": "\udb00\udc12",
+                  "font": "minecraft:space"
+                },
+                {
+                  "text": "[",
+                  "extra": [
+                    {
+                      "text": "",
+                      "extra": [
+                        {
+                          "text": "||||||||||||||||||||57%|",
+                          "color": "yellow"
+                        },
+                        "|||||||||||||||||||"
+                      ],
+                      "color": "dark_gray"
+                    },
+                    "]"
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "",
+              "extra": [
+                {
+                  "text": "\udb00\udc29",
+                  "font": "minecraft:space"
+                },
+                {
+                  "text": "748 of 1302",
+                  "color": "gray"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf000",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Left-Click to Select",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf001",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Right-Click to Edit",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              575.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 9842687
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 10,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "",
+            "extra": [
+              {
+                "text": "\udb00\udc39",
+                "font": "minecraft:space"
+              },
+              {
+                "text": "Mage",
+                "color": "gold"
+              }
+            ],
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Class: ",
+                      "extra": [
+                        {
+                          "text": "Mage",
+                          "color": "white"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Time Played: ",
+                      "extra": [
+                        {
+                          "text": "210.25 hours",
+                          "color": "white"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Location: ",
+                      "extra": [
+                        {
+                          "text": "Detlas",
+                          "color": "white"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Level: ",
+                      "extra": [
+                        {
+                          "text": "120",
+                          "color": "white"
+                        },
+                        " ",
+                        {
+                          "text": "(28.93%)",
+                          "color": "dark_gray"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "",
+              "extra": [
+                {
+                  "text": "\udb00\udc18",
+                  "font": "minecraft:space"
+                },
+                {
+                  "text": "Content Progress",
+                  "color": "gray"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "",
+              "extra": [
+                {
+                  "text": "\udb00\udc10",
+                  "font": "minecraft:space"
+                },
+                {
+                  "text": "[",
+                  "extra": [
+                    {
+                      "text": "",
+                      "extra": [
+                        {
+                          "text": "||||||||||||",
+                          "color": "yellow"
+                        },
+                        "||||||||30%||||||||||||||||||||"
+                      ],
+                      "color": "dark_gray"
+                    },
+                    "]"
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "",
+              "extra": [
+                {
+                  "text": "\udb00\udc27",
+                  "font": "minecraft:space"
+                },
+                {
+                  "text": "391 of 1302",
+                  "color": "gray"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf000",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Left-Click to Select",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf001",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Right-Click to Edit",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              580.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16723759
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 11,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "",
+            "extra": [
+              {
+                "text": "\udb00\udc2d",
+                "font": "minecraft:space"
+              },
+              {
+                "text": "Shaman",
+                "color": "gold"
+              }
+            ],
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Class: ",
+                      "extra": [
+                        {
+                          "text": "Shaman",
+                          "color": "white"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Time Played: ",
+                      "extra": [
+                        {
+                          "text": "7.33 hours",
+                          "color": "white"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Location: ",
+                      "extra": [
+                        {
+                          "text": "Cinfras",
+                          "color": "white"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Level: ",
+                      "extra": [
+                        {
+                          "text": "77",
+                          "color": "white"
+                        },
+                        " ",
+                        {
+                          "text": "(70.32%)",
+                          "color": "dark_gray"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "",
+              "extra": [
+                {
+                  "text": "\udb00\udc12",
+                  "font": "minecraft:space"
+                },
+                {
+                  "text": "Content Progress",
+                  "color": "gray"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "",
+              "extra": [
+                {
+                  "text": "\udb00\udc0d",
+                  "font": "minecraft:space"
+                },
+                {
+                  "text": "[",
+                  "extra": [
+                    {
+                      "text": "",
+                      "extra": [
+                        {
+                          "text": "||",
+                          "color": "red"
+                        },
+                        "||||||||||||||||||7%||||||||||||||||||||"
+                      ],
+                      "color": "dark_gray"
+                    },
+                    "]"
+                  ],
+                  "color": "dark_red"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "",
+              "extra": [
+                {
+                  "text": "\udb00\udc24",
+                  "font": "minecraft:space"
+                },
+                {
+                  "text": "95 of 1302",
+                  "color": "gray"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf000",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Left-Click to Select",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf001",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Right-Click to Edit",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              582.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16746799
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 18,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "",
+            "extra": [
+              {
+                "text": "\udb00\udc2c",
+                "font": "minecraft:space"
+              },
+              {
+                "text": "Warrior",
+                "color": "gold"
+              }
+            ],
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Class: ",
+                      "extra": [
+                        {
+                          "text": "Warrior",
+                          "color": "white"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Time Played: ",
+                      "extra": [
+                        {
+                          "text": "6.25 hours",
+                          "color": "white"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Location: ",
+                      "extra": [
+                        {
+                          "text": "Ragni",
+                          "color": "white"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "- ",
+                  "extra": [
+                    {
+                      "text": "Level: ",
+                      "extra": [
+                        {
+                          "text": "30",
+                          "color": "white"
+                        },
+                        " ",
+                        {
+                          "text": "(11.11%)",
+                          "color": "dark_gray"
+                        }
+                      ],
+                      "color": "gray"
+                    }
+                  ],
+                  "color": "gold"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "",
+              "extra": [
+                {
+                  "text": "\udb00\udc12",
+                  "font": "minecraft:space"
+                },
+                {
+                  "text": "Content Progress",
+                  "color": "gray"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "",
+              "extra": [
+                {
+                  "text": "\udb00\udc0d",
+                  "font": "minecraft:space"
+                },
+                {
+                  "text": "[",
+                  "extra": [
+                    {
+                      "text": "",
+                      "extra": [
+                        {
+                          "text": "",
+                          "color": "red"
+                        },
+                        "||||||||||||||||||||2%||||||||||||||||||||"
+                      ],
+                      "color": "dark_gray"
+                    },
+                    "]"
+                  ],
+                  "color": "dark_red"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "",
+              "extra": [
+                {
+                  "text": "\udb00\udc24",
+                  "font": "minecraft:space"
+                },
+                {
+                  "text": "30 of 1302",
+                  "color": "gray"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf000",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Left-Click to Select",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf001",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Right-Click to Edit",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              584.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16746799
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 19,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "Create a Character",
+            "color": "green",
+            "bold": true,
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77This character slot is available",
+              "italic": false
+            },
+            {
+              "text": "\u00a77for a character to be created",
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf000",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Click to create a Character",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              562.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16777215
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 20,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "Create a Character",
+            "color": "green",
+            "bold": true,
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77This character slot is available",
+              "italic": false
+            },
+            {
+              "text": "\u00a77for a character to be created",
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf000",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Click to create a Character",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              562.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16777215
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 25,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "Character Backups",
+            "color": "yellow",
+            "bold": true,
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77Restore up to 5 recently",
+              "italic": false
+            },
+            {
+              "text": "\u00a77deleted characters",
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a78This feature is only available",
+              "italic": false
+            },
+            {
+              "text": "\u00a78to \u00a7dHERO+\u00a78 or higher",
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              561.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16777215
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 27,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "Create a Character",
+            "color": "green",
+            "bold": true,
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77This character slot is available",
+              "italic": false
+            },
+            {
+              "text": "\u00a77for a character to be created",
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf000",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Click to create a Character",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              562.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16777215
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 28,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "Create a Character",
+            "color": "green",
+            "bold": true,
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77This character slot is available",
+              "italic": false
+            },
+            {
+              "text": "\u00a77for a character to be created",
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf000",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Click to create a Character",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              562.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16777215
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 29,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "Create a Character",
+            "color": "green",
+            "bold": true,
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77This character slot is available",
+              "italic": false
+            },
+            {
+              "text": "\u00a77for a character to be created",
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf000",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Click to create a Character",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              562.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16777215
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 36,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "Create a Character",
+            "color": "green",
+            "bold": true,
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77This character slot is available",
+              "italic": false
+            },
+            {
+              "text": "\u00a77for a character to be created",
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf000",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Click to create a Character",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              562.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16777215
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 37,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "Create a Character",
+            "color": "green",
+            "bold": true,
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77This character slot is available",
+              "italic": false
+            },
+            {
+              "text": "\u00a77for a character to be created",
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf000",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Click to create a Character",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              562.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16777215
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 38,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "Locked Character Slot",
+            "color": "dark_gray",
+            "bold": true,
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": "\u00a78This character slot is only",
+              "italic": false
+            },
+            {
+              "text": "\u00a78available to \u00a7dHERO+\u00a78 or higher",
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              585.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16777215
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 45,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "Locked Character Slot",
+            "color": "dark_gray",
+            "bold": true,
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": "\u00a78This character slot is only",
+              "italic": false
+            },
+            {
+              "text": "\u00a78available to \u00a76\u00a7b\u00a7k|\u00a76CHAMPION\u00a7b\u00a7k|\u00a7r\u00a78 or higher",
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              585.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16777215
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 46,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "Locked Character Slot",
+            "color": "dark_gray",
+            "bold": true,
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": "\u00a78This character slot is only",
+              "italic": false
+            },
+            {
+              "text": "\u00a78available to \u00a76\u00a7b\u00a7k|\u00a76CHAMPION\u00a7b\u00a7k|\u00a7r\u00a78 or higher",
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              585.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16777215
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 47,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "Locked Character Slot",
+            "color": "dark_gray",
+            "bold": true,
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": "\u00a78This character slot is only",
+              "italic": false
+            },
+            {
+              "text": "\u00a78available to \u00a76\u00a7b\u00a7k|\u00a76CHAMPION\u00a7b\u00a7k|\u00a7r\u00a78 or higher",
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              585.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16777215
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 51,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "\u00a77",
+            "extra": [
+              {
+                "text": "Selector Music",
+                "color": "green",
+                "bold": true
+              }
+            ],
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77Defines if music should be played",
+              "italic": false
+            },
+            {
+              "text": "\u00a77while in the character selector",
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a7a- Enabled",
+              "italic": false
+            },
+            {
+              "text": "\u00a78- Disabled",
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf000",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Click to Toggle",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              597.0
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16777215
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    },
+    {
+      "slot": 53,
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:custom_name": {
+            "text": "\u00a77",
+            "extra": [
+              {
+                "text": "Auto Open",
+                "color": "yellow",
+                "bold": true
+              }
+            ],
+            "italic": false
+          },
+          "minecraft:lore": [
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77Automatically opens this menu when",
+              "italic": false
+            },
+            {
+              "text": "\u00a77switching characters, as long as",
+              "italic": false
+            },
+            {
+              "text": "\u00a77you've entered a world at least once.",
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a78- Enabled",
+              "italic": false
+            },
+            {
+              "text": "\u00a7e- Disabled",
+              "italic": false
+            },
+            {
+              "text": " ",
+              "italic": false
+            },
+            {
+              "text": "\u00a77",
+              "extra": [
+                {
+                  "text": "",
+                  "extra": [
+                    {
+                      "text": "\uf000",
+                      "font": "minecraft:keybind"
+                    },
+                    {
+                      "text": " Click to Toggle",
+                      "color": "green"
+                    }
+                  ],
+                  "color": "white"
+                }
+              ],
+              "italic": false
+            }
+          ],
+          "minecraft:tooltip_display": {
+            "hidden_components": [
+              "minecraft:enchantments",
+              "minecraft:stored_enchantments",
+              "minecraft:attribute_modifiers",
+              "minecraft:unbreakable",
+              "minecraft:can_break",
+              "minecraft:can_place_on",
+              "minecraft:banner_patterns",
+              "minecraft:potion_contents",
+              "minecraft:suspicious_stew_effects",
+              "minecraft:dyed_color"
+            ]
+          },
+          "minecraft:custom_model_data": {
+            "floats": [
+              598.0
+            ],
+            "strings": [
+              "disabled"
+            ]
+          },
+          "minecraft:unbreakable": {},
+          "minecraft:potion_contents": {
+            "custom_color": 16777215
+          },
+          "!minecraft:consumable": {}
+        }
+      }
+    }
+  ]
+}

@@ -74,6 +74,58 @@ class HostPartyInviteControllerTest {
     }
 
     @Test
+    void fullPartyAfterCredentialRenewalStillOffersAndSendsInvitations() {
+        var fixture = new Fixture();
+        fixture.persistentCards.add(LOBBY_ID);
+        fixture.connect(lobby(1, 3, true));
+        fixture.now[0] = 20 * 60_000L;
+        fixture.gateway.listener.onFrame(new LfgProtocol.SessionExpiringFrame(1,
+                Instant.ofEpochMilli(fixture.now[0] + 60_000)));
+        fixture.gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot(1, lobby(1, 3, true))));
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 2, lobby(2, 4, true)));
+        assertEquals(4, fixture.service.store().state().lobbies().get(LOBBY_ID).members().size());
+        assertTrue(fixture.controller.hasCardOffer(LOBBY_ID));
+        assertTrue(fixture.controller.inviteAll(LOBBY_ID));
+        for (int i = 0; i < 3; i++) {
+            fixture.controller.tick();
+            fixture.now[0] += HostPartyInviteController.COMMAND_INTERVAL_MILLIS;
+        }
+        assertEquals(List.of("Member1", "Member2", "Member3"), fixture.commands.invites);
+    }
+
+    @Test
+    void recoveredFullSnapshotRestoresCardInvitationWithoutReplayingChatOrCommands() {
+        var fixture = new Fixture();
+        fixture.persistentCards.add(LOBBY_ID);
+        fixture.connect(lobby(1, 3, true));
+        fixture.gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot(2, lobby(2, 4, true))));
+        assertTrue(fixture.controller.hasCardOffer(LOBBY_ID));
+        assertTrue(fixture.sink.fills.isEmpty());
+        assertTrue(fixture.commands.invites.isEmpty());
+        assertTrue(fixture.controller.inviteAll(LOBBY_ID));
+    }
+
+    @Test
+    void reconnectHidesCardOfferUntilFreshSynchronizationWithoutAutoInviting() {
+        var fixture = new Fixture();
+        fixture.persistentCards.add(LOBBY_ID);
+        fixture.connect(lobby(1, 3, true));
+        fixture.gateway.listener.onFrame(new LfgProtocol.UpsertFrame(1, 2, lobby(2, 4, true)));
+        assertTrue(fixture.controller.hasCardOffer(LOBBY_ID));
+        fixture.gateway.listener.onClosed(1006, "offline");
+        fixture.controller.tick();
+        assertFalse(fixture.controller.hasCardOffer(LOBBY_ID));
+        assertFalse(fixture.controller.inviteAll(LOBBY_ID));
+        fixture.now[0] += 1_000;
+        fixture.service.tick();
+        fixture.controller.tick();
+        fixture.gateway.listener.onFrame(new LfgProtocol.SnapshotFrame(snapshot(2, lobby(2, 4, true))));
+        assertTrue(fixture.controller.hasCardOffer(LOBBY_ID));
+        assertTrue(fixture.commands.invites.isEmpty());
+        assertTrue(fixture.controller.inviteAll(LOBBY_ID));
+    }
+
+    @Test
     void boundedQueueDeduplicatesPacesAndAllowsANameAgainAfterExecution() {
         var fixture = new Fixture();
         fixture.connect(lobby(1, 4, true));

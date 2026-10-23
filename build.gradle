@@ -53,6 +53,8 @@ def modVersion = project.version
 def localBackend = project.hasProperty('localBackend')
 
 processResources {
+    // Asset authoring notes belong in the source tree, not the player's JAR.
+    exclude '**/*.md'
     inputs.property 'version', modVersion
     inputs.property 'localBackend', localBackend
     filesMatching('fabric.mod.json') {

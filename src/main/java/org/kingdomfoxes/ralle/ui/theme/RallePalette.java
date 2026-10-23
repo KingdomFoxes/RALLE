@@ -30,6 +30,8 @@ public final class RallePalette {
     // darken the submitted background, so their ordinary copy remains light.
     public static int surfaceText() { return 0xFFFFFFFF; }
     public static int primaryText() { return 0xFFFFFFFF; }
+    /** Only modifier-menu faces use the white isothopicalbob background directly. */
+    public static int modifierText() { return "isothopicalbob".equals(theme().id()) ? 0xFF000000 : primaryText(); }
     public static int secondary() { return theme().background() == 0x041330 ? 0xFFA9B0BE : 0xFFD8DEE6; }
     public static int secondaryText() { return secondary(); }
     public static int selectionFill() { return alpha(background(), 0xE6); }

@@ -6,33 +6,37 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.function.Consumer;
+import org.kingdomfoxes.ralle.settings.LocalStateSection;
 
 /** Persists and presents the one-time local installation notice. */
 public final class RalleOnboardingNotice {
     private static final Logger LOGGER = LoggerFactory.getLogger(RalleOnboardingNotice.class);
     private static final String MESSAGE_SENT_KEY = "message-sent";
     private static final List<String> LEGACY_CONFIG_FILES = List.of(
+            "ralle.json",
             "ralle.properties",
             "ralle-hud-layout.properties",
             "ralle-settings-ui.properties",
             "ralle-ranks.json"
     );
 
-    private final Path storagePath;
+    private final LocalStateSection storagePath;
     private int messageSent;
 
     public RalleOnboardingNotice(Path storagePath, boolean existingInstall) {
+        this(LocalStateSection.file(storagePath), existingInstall);
+    }
+
+    public RalleOnboardingNotice(LocalStateSection storagePath, boolean existingInstall) {
         this.storagePath = Objects.requireNonNull(storagePath, "storagePath");
         this.messageSent = load(existingInstall);
-        if (!Files.exists(storagePath)) save();
+        if (!storagePath.exists()) save();
     }
 
     public static boolean hasExistingConfig(Path configDirectory) {
@@ -79,11 +83,10 @@ public final class RalleOnboardingNotice {
     }
 
     private int load(boolean existingInstall) {
-        if (!Files.exists(storagePath)) return existingInstall ? 1 : 0;
+        if (!storagePath.exists()) return existingInstall ? 1 : 0;
 
-        var properties = new Properties();
-        try (Reader reader = Files.newBufferedReader(storagePath)) {
-            properties.load(reader);
+        try {
+            var properties = storagePath.readProperties();
             String stored = properties.getProperty(MESSAGE_SENT_KEY);
             if ("0".equals(stored)) return 0;
             if ("1".equals(stored)) return 1;
@@ -99,10 +102,7 @@ public final class RalleOnboardingNotice {
         var properties = new Properties();
         properties.setProperty(MESSAGE_SENT_KEY, Integer.toString(messageSent));
         try {
-            Files.createDirectories(storagePath.getParent());
-            try (Writer writer = Files.newBufferedWriter(storagePath)) {
-                properties.store(writer, "RALLE local onboarding state");
-            }
+            storagePath.writeProperties(properties);
         } catch (IOException exception) {
             LOGGER.error("Could not save RALLE onboarding state to {}", storagePath, exception);
         }

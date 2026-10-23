@@ -15,10 +15,12 @@ import org.kingdomfoxes.ralle.cosmetics.WorldNameplateBounds;
 import org.kingdomfoxes.ralle.cosmetics.WorldNameplateRenderer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /** Shared final submission path used by both Minecraft and Wynntils replacement tags. */
@@ -37,7 +39,7 @@ abstract class NameTagMaterialMixin {
         }
         Component tinted;
         try {
-            tinted = LiquidComponentTint.whiteWithVanillaShadow(label, Minecraft.getInstance().font);
+            tinted = LiquidComponentTint.whiteWithVanillaShadow(label);
         } catch (RuntimeException failure) {
             ralle$warn(failure);
             original.call(pose, attachment, y, label, seeThrough, light, distance, camera);
@@ -46,6 +48,17 @@ abstract class NameTagMaterialMixin {
         // Even a replacement label now follows this route, exactly once, after material geometry.
         scope.submit(tinted, () -> scope.collector().order(1)
                 .submitNameTag(pose, attachment, y, tinted, seeThrough, light, distance, camera));
+    }
+
+    @ModifyArg(method = "add", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/SubmitNodeStorage$NameTagSubmit;<init>(Lorg/joml/Matrix4f;FFLnet/minecraft/network/chat/Component;IIID)V"),
+            index = 6, require = 3)
+    private int ralle$replaceVanillaBackground(Matrix4f pose, float x, float y, Component label,
+                                              int light, int color, int background, double distance) {
+        var scope = NameplateRenderScope.current();
+        // Capture this in the deferred submissions, for both normal and see-through passes.
+        // This runs after opacity hooks (including Wynntils); a later render callback has no scope.
+        return scope != null && scope.submittingLabel() == label ? 0 : background;
     }
 
     @Inject(method = "add", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;popPose()V", shift = At.Shift.BEFORE), require = 1)

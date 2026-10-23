@@ -10,12 +10,10 @@ import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.kingdomfoxes.ralle.api.settings.KeybindSetting;
-import org.kingdomfoxes.ralle.lfg.client.RaidLfgService;
 import org.kingdomfoxes.ralle.client.WynncraftHost;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionBarState;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionGlyph;
 
-import java.util.Locale;
 
 /** Bounded, headless Wynncraft Party Finder navigation for the last locally observed raid. */
 public final class AutoRaidRequeueController {

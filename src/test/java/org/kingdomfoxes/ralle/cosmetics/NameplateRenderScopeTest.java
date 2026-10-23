@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class NameplateRenderScopeTest {
     private final NameplateStyle style = NameplateStyle.byId("supporter-gold").orElseThrow();
-    private final CosmeticAppearance appearance = new CosmeticAppearance(1, CosmeticAppearance.Treatment.PLATE, 0);
+    private final CosmeticAppearance appearance = new CosmeticAppearance(1);
 
     @Test void replacementIconAndServerSuffixUseTheCompleteFinalUsernameRow() {
         var original = Component.literal("§fPlayer");
@@ -22,7 +22,7 @@ class NameplateRenderScopeTest {
             assertFalse(scope.decorates(Component.literal("PlayerTwo")));
             assertFalse(scope.decorates(Component.literal("OtherPlayer")));
             var font = CosmeticTestFont.create();
-            var tinted = LiquidComponentTint.apply(finalLabel, font, (x, y) -> 0xffffffff);
+            var tinted = LiquidComponentTint.whiteWithVanillaShadow(finalLabel);
             var full = WorldNameplateBounds.measure(font, tinted, 0);
             var early = WorldNameplateBounds.measure(font, original, 0);
             assertTrue(full.right() - full.left() > early.right() - early.left());

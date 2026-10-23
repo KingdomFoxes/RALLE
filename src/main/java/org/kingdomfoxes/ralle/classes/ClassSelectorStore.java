@@ -1,0 +1,351 @@
+package org.kingdomfoxes.ralle.classes;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import java.io.IOException;
+import java.nio.file.Path;
+import org.kingdomfoxes.ralle.settings.LocalStateSection;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+/** Account-scoped immutable snapshots. Save first, then publish; scans never discard shortcut preferences. */
+public final class ClassSelectorStore {
+    private static final Gson JSON = new GsonBuilder().setPrettyPrinting().create();
+    private final LocalStateSection path;
+    // Published maps are never mutated. Reads from the client/render thread never wait for disk.
+    private volatile Map<UUID, Account> accounts;
+    private volatile Map<UUID, Loaded> loads = new LinkedHashMap<>();
+    private volatile Map<UUID, Boolean> autoOpen = new LinkedHashMap<>();
+    private volatile long revision;
+
+    public record Account(List<ClassCharacter> characters, List<ClassShortcut> shortcuts) {
+        public Account {
+            characters = List.copyOf(characters);
+            shortcuts = List.copyOf(shortcuts);
+            if (characters.size() > 64 || shortcuts.size() > 64) throw new IllegalArgumentException("Too many classes");
+            if (characters.stream().map(ClassCharacter::id).distinct().count() != characters.size()
+                    || shortcuts.stream().map(ClassShortcut::characterId).distinct().count() != shortcuts.size())
+                throw new IllegalArgumentException("Duplicate character identity");
+        }
+        public ClassCharacter character(String id) {
+            return characters.stream().filter(c -> c.id().equals(id)).findFirst().orElse(null);
+        }
+    }
+    private record Loaded(String lastReference, Map<String, String> references) {
+        private Loaded {
+            lastReference = ClassCharacter.text(lastReference, 128);
+            references = Map.copyOf(references);
+            if (references.size() > 64) throw new IllegalArgumentException("Too many loaded characters");
+            references.forEach((token, reference) -> {
+                if (!ClassLoadSignals.validToken(token)) throw new IllegalArgumentException("Invalid compass token");
+                if (!reference.isEmpty()) ClassCharacter.text(reference, 128);
+            });
+        }
+    }
+    private record FileData(int version, Map<UUID, Account> accounts, Map<UUID, Loaded> loads,
+                            Map<UUID, Boolean> autoOpen) {}
+
+    private ClassSelectorStore() { path = null; accounts = new LinkedHashMap<>(); }
+
+    /** A damaged local file must neither crash chat/LFG nor be overwritten by an empty snapshot. */
+    public static ClassSelectorStore open(Path path) {
+        return open(LocalStateSection.file(path));
+    }
+
+    public static ClassSelectorStore open(LocalStateSection path) {
+        try { return new ClassSelectorStore(path); }
+        catch (IOException failure) {
+            org.slf4j.LoggerFactory.getLogger(ClassSelectorStore.class).warn("Could not load class shortcuts; preserving {}", path, failure);
+            return new ClassSelectorStore();
+        }
+    }
+
+    public boolean available() { return path != null; }
+    public boolean hasAccount(UUID account) { return accounts.containsKey(account); }
+
+    public ClassSelectorStore(Path path) throws IOException {
+        this(LocalStateSection.file(path));
+    }
+
+    public ClassSelectorStore(LocalStateSection path) throws IOException {
+        this.path = path;
+        accounts = new LinkedHashMap<>();
+        if (!path.exists()) return;
+        try {
+            String text = path.read();
+            if (text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 1024 * 1024)
+                throw new IOException("Class selector file exceeds 1 MiB");
+            var data = JSON.fromJson(text, FileData.class);
+            if (data == null || (data.version != 1 && data.version != 2) || data.accounts == null || data.accounts.size() > 128)
+                throw new IllegalArgumentException("Invalid class selector file");
+            data.accounts.forEach((id, account) -> {
+                java.util.Objects.requireNonNull(id);
+                // Reconstruct nested records to validate even when the serializer bypasses constructors.
+                var characters = account.characters.stream().map(c -> new ClassCharacter(c.id(), c.type(), c.nickname(), c.sprite(), c.identity(), c.book())).toList();
+                var shortcuts = account.shortcuts.stream().map(s -> new ClassShortcut(s.characterId(), s.name(), s.binding())).toList();
+                accounts.put(id, new Account(characters, shortcuts));
+            });
+            if (data.loads != null) {
+                if (data.loads.size() > 128) throw new IllegalArgumentException("Too many accounts");
+                data.loads.forEach((id, loaded) -> loads.put(java.util.Objects.requireNonNull(id),
+                        new Loaded(loaded.lastReference, loaded.references)));
+            }
+            if (data.autoOpen != null) {
+                if (data.autoOpen.size() > 128) throw new IllegalArgumentException("Too many accounts");
+                data.autoOpen.forEach((id, value) -> autoOpen.put(java.util.Objects.requireNonNull(id),
+                        java.util.Objects.requireNonNull(value)));
+            }
+        } catch (RuntimeException failure) { throw new IOException("Invalid class selector file", failure); }
+    }
+
+    public Account account(UUID account) { return accounts.getOrDefault(java.util.Objects.requireNonNull(account), new Account(List.of(), List.of())); }
+    public long revision() { return revision; }
+
+    /** Last observed Wynncraft preference; absent/unknown stays off and accounts never share it. */
+    public boolean autoOpenEnabled(UUID account) { return Boolean.TRUE.equals(autoOpen.get(account)); }
+
+    public void recordAutoOpen(UUID account, boolean enabled) throws IOException {
+        java.util.Objects.requireNonNull(account);
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> recordAutoOpen(account, enabled)); return; }
+        if (java.util.Objects.equals(autoOpen.get(account), enabled)) return;
+        var next = new LinkedHashMap<>(autoOpen);
+        next.put(account, enabled);
+        if (next.size() > 128) throw new IllegalArgumentException("Too many accounts");
+        save(accounts, loads, next);
+    }
+
+    /** A newly observed control never waits for disk or changes the shortcut revision. */
+    public java.util.concurrent.CompletableFuture<Void> recordAutoOpenAsync(UUID account, boolean enabled) {
+        return ClassStoreWrites.submit(() -> recordAutoOpen(account, enabled)).whenComplete((ignored, failure) -> {
+            if (failure != null) org.slf4j.LoggerFactory.getLogger(ClassSelectorStore.class)
+                    .warn("Could not persist Auto Open preference; current session remains available", failure);
+        });
+    }
+
+    /** Last confirmed load is history, never proof of the current class on a new connection. */
+    public String lastLoaded(UUID account) { var loaded = loads.get(account); return loaded == null ? null : loaded.lastReference; }
+    public String referenceForToken(UUID account, String token) {
+        if (!ClassLoadSignals.validToken(token)) return null;
+        var loaded = loads.get(account);
+        String reference = loaded == null ? null : loaded.references.get(token);
+        return reference == null || reference.isEmpty() ? null : reference;
+    }
+    public void recordLoad(UUID account, String reference, String token) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> recordLoad(account, reference, token)); return; }
+        var previous = loads.get(account);
+        var references = new LinkedHashMap<String, String>();
+        if (previous != null) references.putAll(previous.references);
+        if (ClassLoadSignals.validToken(token)) {
+            // A short token is not globally unique. Conflicting retained observations disable recovery.
+            references.merge(token, reference, (old, incoming) -> old.equals(incoming) ? old : "");
+            while (references.size() > 64) references.remove(references.keySet().iterator().next());
+        }
+        var loaded = new Loaded(reference, references);
+        if (loaded.equals(previous)) return;
+        var nextLoads = new LinkedHashMap<>(loads);
+        nextLoads.put(java.util.Objects.requireNonNull(account), loaded);
+        if (nextLoads.size() > 128) throw new IllegalArgumentException("Too many accounts");
+        save(accounts, nextLoads);
+    }
+
+    /** Snapshot the observed values now; serialization and atomic file replacement run off-thread. */
+    public java.util.concurrent.CompletableFuture<Void> recordLoadAsync(UUID account, String reference, String token) {
+        return ClassStoreWrites.submit(() -> recordLoad(account, reference, token)).whenComplete((ignored, failure) -> {
+            if (failure != null) org.slf4j.LoggerFactory.getLogger(ClassSelectorStore.class)
+                    .warn("Could not persist loaded class; current session remains available", failure);
+        });
+    }
+
+    /** Used only for shutdown and verification, never by rendering or switch completion. */
+    public void flushWrites() throws IOException { ClassStoreWrites.flush(); }
+
+    /** Upgrade only references proven by complete historical item evidence, never name/slot guesses. */
+    public void migrateReferences(UUID account, Map<String, String> aliases) throws IOException {
+        migrateReferences(account, aliases, List.of());
+    }
+    public void migrateReferences(UUID account, Map<String, String> aliases, List<ClassCharacter> proofs) throws IOException {
+        if (!ClassStoreWrites.onWriter()) {
+            var copiedAliases = Map.copyOf(aliases);
+            var copiedProofs = List.copyOf(proofs);
+            ClassStoreWrites.run(() -> migrateReferences(account, copiedAliases, copiedProofs)); return;
+        }
+        if (aliases.isEmpty()) return;
+        var previous = account(account);
+        var characters = new LinkedHashMap<String, ClassCharacter>();
+        for (var character : previous.characters) {
+            String id = aliases.getOrDefault(character.id(), character.id());
+            var proof = id.equals(character.id()) ? null : proofs.stream().filter(c -> c.id().equals(id)).findFirst().orElse(null);
+            var identity = proof != null ? proof.identity() : character.identity();
+            characters.putIfAbsent(id, new ClassCharacter(id, character.type(), character.nickname(), proof != null ? proof.sprite() : character.sprite(), identity,
+                    proof != null ? proof.book() : character.book()));
+        }
+        var shortcuts = new ArrayList<ClassShortcut>();
+        for (var shortcut : previous.shortcuts) {
+            String id = aliases.getOrDefault(shortcut.characterId(), shortcut.characterId());
+            if (shortcuts.stream().anyMatch(existing -> existing.characterId().equals(id))) return; // Conflicting rows stay untouched.
+            shortcuts.add(new ClassShortcut(id, shortcut.name(), shortcut.binding()));
+            // A progress refresh may have retired the old catalog hash already. Restore its
+            // proven normalized descriptor only when that position is still occupied with the
+            // same saved name/type/sprite. Never resurrect a missing/deleted catalog entry.
+            // This does not authorize a click: exact complete live-book evidence still must match.
+            if (!id.equals(shortcut.characterId()) && !characters.containsKey(id)) {
+                var proof = proofs.stream().filter(character -> character.id().equals(id)).findFirst().orElse(null);
+                if (proof != null) {
+                    var known = characters.values().stream().filter(character ->
+                            WynncraftClassMenu.bookSlot(character) == WynncraftClassMenu.bookSlot(proof)
+                                    && character.type().equals(proof.type()) && character.nickname().equals(proof.nickname())
+                                    && java.util.Objects.equals(character.sprite(), proof.sprite())).findFirst().orElse(null);
+                    if (known != null) {
+                        characters.remove(known.id());
+                        characters.put(id, proof);
+                    }
+                }
+            }
+        }
+        var updated = new Account(List.copyOf(characters.values()), shortcuts);
+        var nextLoads = new LinkedHashMap<>(loads);
+        var loaded = loads.get(account);
+        if (loaded != null) {
+            var references = new LinkedHashMap<String, String>();
+            loaded.references.forEach((token, reference) -> references.put(token, aliases.getOrDefault(reference, reference)));
+            nextLoads.put(account, new Loaded(aliases.getOrDefault(loaded.lastReference, loaded.lastReference), references));
+        }
+        if (updated.equals(previous) && nextLoads.equals(loads)) return;
+        var nextAccounts = new LinkedHashMap<>(accounts);
+        nextAccounts.put(account, updated);
+        save(nextAccounts, nextLoads);
+    }
+
+    public void reconcile(ClassScan scan) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> reconcile(scan)); return; }
+        var previous = account(scan.account());
+        var characters = new LinkedHashMap<String, ClassCharacter>();
+        if (!scan.complete()) previous.characters.forEach(c -> characters.put(c.id(), c));
+        // Keep every unmatched old witness through partial updates. A new item at its former
+        // position may precede the packet moving that old character elsewhere in this book.
+        for (var incoming : scan.characters()) {
+            characters.put(incoming.id(), incoming);
+        }
+        replace(scan.account(), new Account(List.copyOf(characters.values()), previous.shortcuts));
+    }
+
+    public void add(UUID account, String id) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> add(account, id)); return; }
+        var current = account(account);
+        if (current.character(id) == null) throw new IllegalArgumentException("Character is no longer detected");
+        if (current.shortcuts.stream().anyMatch(s -> s.characterId().equals(id))) return;
+        var shortcuts = new ArrayList<>(current.shortcuts);
+        shortcuts.add(new ClassShortcut(id, "", ClassShortcut.UNBOUND));
+        replace(account, new Account(current.characters, shortcuts));
+    }
+
+    public void edit(UUID account, ClassShortcut shortcut) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> edit(account, shortcut)); return; }
+        var current = account(account);
+        var shortcuts = new ArrayList<>(current.shortcuts);
+        int index = -1;
+        for (int i = 0; i < shortcuts.size(); i++)
+            if (shortcuts.get(i).characterId().equals(shortcut.characterId())) index = i;
+        if (index < 0) throw new IllegalArgumentException("Shortcut no longer exists");
+        shortcuts.set(index, shortcut);
+        replace(account, new Account(current.characters, shortcuts));
+    }
+
+    public void remove(UUID account, String id) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> remove(account, id)); return; }
+        var current = account(account);
+        replace(account, new Account(current.characters,
+                current.shortcuts.stream().filter(s -> !s.characterId().equals(id)).toList()));
+    }
+
+    /** Explicit drag/drop changes shortcut order without changing characters or shortcut preferences. */
+    public void move(UUID account, String id, int destination) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> move(account, id, destination)); return; }
+        var current = account(account);
+        var shortcuts = new ArrayList<>(current.shortcuts);
+        if (destination < 0 || destination >= shortcuts.size()) throw new IllegalArgumentException("Invalid shortcut position");
+        int source = -1;
+        for (int i = 0; i < shortcuts.size(); i++)
+            if (shortcuts.get(i).characterId().equals(id)) source = i;
+        if (source < 0) throw new IllegalArgumentException("Shortcut no longer exists");
+        if (source == destination) return;
+        shortcuts.add(destination, shortcuts.remove(source));
+        replace(account, new Account(current.characters, shortcuts));
+    }
+
+    public void clearShortcuts(UUID account) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> clearShortcuts(account)); return; }
+        replace(account, new Account(account(account).characters(), List.of()));
+    }
+
+    /** Hydrate only matching existing references; historical captures cannot resurrect removed entries. */
+    public void updateSprites(UUID account, Map<String, ClassSprite> sprites) throws IOException {
+        if (!ClassStoreWrites.onWriter()) {
+            var copied = Map.copyOf(sprites);
+            ClassStoreWrites.run(() -> updateSprites(account, copied)); return;
+        }
+        var current = account(account);
+        var characters = current.characters.stream().map(c -> c.sprite() == null && sprites.containsKey(c.id())
+                ? new ClassCharacter(c.id(), c.type(), c.nickname(), sprites.get(c.id()), c.identity(), c.book()) : c).toList();
+        replace(account, new Account(characters, current.shortcuts));
+    }
+
+    /** Historical observations may fill absent witnesses, but never overwrite a newer one. */
+    public void hydrateBookObservations(UUID account, List<ClassCharacter> proofs) throws IOException {
+        if (!ClassStoreWrites.onWriter()) {
+            var copied = List.copyOf(proofs);
+            ClassStoreWrites.run(() -> hydrateBookObservations(account, copied)); return;
+        }
+        var current = account(account);
+        var characters = current.characters.stream().map(old -> {
+            if (old.book() != null) return old;
+            return proofs.stream().filter(proof -> proof.id().equals(old.id()) && proof.book() != null
+                    && old.type().equals(proof.type()) && old.nickname().equals(proof.nickname())
+                    && java.util.Objects.equals(old.sprite(), proof.sprite())).findFirst().orElse(old);
+        }).toList();
+        replace(account, new Account(characters, current.shortcuts));
+    }
+
+    /** Explicit user reassignment preserves the row's order and preferences; scans never guess it. */
+    public void retarget(UUID account, ClassShortcut draft, String targetId) throws IOException {
+        if (!ClassStoreWrites.onWriter()) { ClassStoreWrites.run(() -> retarget(account, draft, targetId)); return; }
+        var current = account(account);
+        if (current.character(targetId) == null) throw new IllegalArgumentException("Character is no longer detected");
+        if (!draft.characterId().equals(targetId) && current.shortcuts.stream().anyMatch(s -> s.characterId().equals(targetId)))
+            throw new IllegalArgumentException("Character already has a shortcut");
+        var shortcuts = new ArrayList<>(current.shortcuts);
+        int index = -1;
+        for (int i = 0; i < shortcuts.size(); i++) if (shortcuts.get(i).characterId().equals(draft.characterId())) index = i;
+        if (index < 0) throw new IllegalArgumentException("Shortcut no longer exists");
+        shortcuts.set(index, new ClassShortcut(targetId, draft.name(), draft.binding()));
+        replace(account, new Account(current.characters, shortcuts));
+    }
+
+    private void replace(UUID id, Account account) throws IOException {
+        if (account.equals(accounts.get(id))) return;
+        var next = new LinkedHashMap<>(accounts);
+        next.put(id, account);
+        if (next.size() > 128) throw new IllegalArgumentException("Too many accounts");
+        save(next, loads);
+    }
+
+    private void save(Map<UUID, Account> next, Map<UUID, Loaded> nextLoads) throws IOException {
+        save(next, nextLoads, autoOpen);
+    }
+
+    private void save(Map<UUID, Account> next, Map<UUID, Loaded> nextLoads, Map<UUID, Boolean> nextAutoOpen) throws IOException {
+        if (!available()) throw new IOException("Class selector storage is unavailable");
+        String json = JSON.toJson(new FileData(2, next, nextLoads, nextAutoOpen));
+        if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 1024 * 1024)
+            throw new IllegalArgumentException("Class selector file exceeds 1 MiB");
+        path.write(json);
+        boolean changed = !accounts.equals(next);
+        accounts = next;
+        loads = nextLoads;
+        autoOpen = nextAutoOpen;
+        if (changed) revision++; // A late load save must not cancel a held selector or edit its rows.
+    }
+}

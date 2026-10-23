@@ -1,12 +1,11 @@
 package org.kingdomfoxes.ralle.cosmetics;
 
 import org.kingdomfoxes.ralle.platform.SharedHttpTransport;
+import org.kingdomfoxes.ralle.platform.BoundedHttpBody;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
@@ -44,16 +43,10 @@ public final class HttpNameplateDirectory implements NameplateDirectory {
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
                 .build();
-        return client.get().sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
+        return BoundedHttpBody.send(client.get(), request, MAX_RESPONSE_BYTES)
                 .thenApply(response -> {
-                    try (var stream = response.body()) {
-                        if (response.statusCode() != 200) throw new IllegalArgumentException("Fox cosmetic lookup unavailable");
-                        byte[] bytes = stream.readNBytes(MAX_RESPONSE_BYTES + 1);
-                        if (bytes.length > MAX_RESPONSE_BYTES) throw new IllegalArgumentException("Fox cosmetic response too large");
-                        return CosmeticLookupJson.decode(new String(bytes, StandardCharsets.UTF_8), uuids);
-                    } catch (IOException failure) {
-                        throw new IllegalArgumentException("Fox cosmetic lookup unavailable", failure);
-                    }
+                    if (response.statusCode() != 200) throw new IllegalArgumentException("Fox cosmetic lookup unavailable");
+                    return CosmeticLookupJson.decode(response.body(), uuids);
                 });
     }
 }

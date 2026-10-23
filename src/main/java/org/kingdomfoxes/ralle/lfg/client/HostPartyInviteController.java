@@ -59,6 +59,12 @@ public final class HostPartyInviteController {
 
         discardInvalidPending();
         if (!full(current)) cardOffers.remove(change.lobbyId());
+        else if (change.origin() == RaidLfgStore.UpdateOrigin.SNAPSHOT
+                && persistentCardExists.test(current.lobbyId())) {
+            // A fill missed while offline is still actionable after authoritative synchronization.
+            // Restore the manual card action silently; snapshots never replay chat or invitations.
+            cardOffers.add(current.lobbyId());
+        }
 
         var previous = change.previous();
         boolean genuineFill = change.origin() == RaidLfgStore.UpdateOrigin.LIVE
@@ -79,7 +85,7 @@ public final class HostPartyInviteController {
 
     public synchronized void tick() {
         if (service.lifecycle() != RaidLfgService.LifecycleState.ONLINE) {
-            cancelAll();
+            cancelPending();
             return;
         }
         discardInvalidPending();
@@ -146,6 +152,7 @@ public final class HostPartyInviteController {
     }
 
     public synchronized boolean hasCardOffer(UUID lobbyId) {
+        if (service.lifecycle() != RaidLfgService.LifecycleState.ONLINE) return false;
         var lobby = service.store().state().lobbies().get(lobbyId);
         if (!cardOffers.contains(lobbyId) || !viewerHosts(lobby) || !full(lobby)) {
             cardOffers.remove(lobbyId);
@@ -236,10 +243,9 @@ public final class HostPartyInviteController {
         if (queue.isEmpty()) nextCommandAtMillis = 0;
     }
 
-    private void cancelAll() {
+    private void cancelPending() {
         queue.clear();
         pendingTargets.clear();
-        cardOffers.clear();
         nextCommandAtMillis = 0;
     }
 

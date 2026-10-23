@@ -5,7 +5,6 @@ import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.Sizing;
-import io.wispforest.owo.ui.core.UIComponent;
 import net.minecraft.network.chat.Component;
 
 /** Shared compact confirmation overlay matching the Raid LFG modal language. */

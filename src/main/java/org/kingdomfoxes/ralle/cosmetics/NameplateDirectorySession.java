@@ -63,6 +63,9 @@ public final class NameplateDirectorySession {
         }
         if (pending || clock.millis() < retryAfterMillis || visiblePlayers == null) return;
         var missing = new LinkedHashSet<UUID>();
+        // The local visibility/resolution settings need fresh grants continuously. Refresh them
+        // before expiry and ahead of crowded-world batches, while retaining the strict expiry gate.
+        if (visiblePlayers.contains(account) && cache.needsGrantRefresh(account)) missing.add(account);
         for (UUID uuid : visiblePlayers) {
             if (uuid != null && cache.needsRefresh(uuid)) missing.add(uuid);
             if (missing.size() == CosmeticLookupJson.MAX_BATCH) break;

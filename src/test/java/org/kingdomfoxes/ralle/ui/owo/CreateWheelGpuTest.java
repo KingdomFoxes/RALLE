@@ -73,31 +73,35 @@ class CreateWheelGpuTest {
             assertEquals(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
             glViewport(0, 0, 128, 128);
             var result = BufferUtils.createByteBuffer(128 * 128 * 4);
-            for (int density : new int[] {1, 2}) {
-                int logicalSize = 128 / density;
-                var captured = new java.awt.image.BufferedImage(logicalSize, logicalSize, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-                for (int y = 0; y < logicalSize; y++) for (int x = 0; x < logicalSize; x++) {
+            for (int[] size : new int[][] {{128, 128}, {64, 192}, {192, 64}}) for (int density : new int[] {1, 2}) {
+                int width = size[0], height = size[1];
+                glViewport(0, 0, width, height);
+                glActiveTexture(GL_TEXTURE2);
+                glBindTexture(GL_TEXTURE_2D, output);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (ByteBuffer) null);
+                var captured = new java.awt.image.BufferedImage(width / density, height / density, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                for (int y = 0; y < height / density; y++) for (int x = 0; x < width / density; x++) {
                     if ((x + y) % 7 != 0) captured.setRGB(x, y, 0xC0000000 | (x % 192) << 16 | (y % 192) << 8 | 80);
                 }
                 source.clear();
-                for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++) {
-                    int color = captured.getRGB(x / density, (127 - y) / density);
+                for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) {
+                    int color = captured.getRGB(x / density, (height - 1 - y) / density);
                     source.put((byte) (color >> 16)).put((byte) (color >> 8)).put((byte) color).put((byte) (color >>> 24));
                 }
                 source.flip();
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, input);
-                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 128, 128, GL_RGBA, GL_UNSIGNED_BYTE, source);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, source);
                 for (int frame : new int[] {0, 17, 31, 48, 63}) {
                     glClearColor(0, 0, 0, 0);
                     glClear(GL_COLOR_BUFFER_BIT);
                     glUniform4f(glGetUniformLocation(program, "data"), frame / 255f, density / 255f, 0, 1);
                     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-                    glReadPixels(0, 0, 128, 128, GL_RGBA, GL_UNSIGNED_BYTE, result);
+                    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, result);
                     var expected = CreateDustReference.render(captured, frame, null);
-                    for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++) {
-                        int color = expected.getRGB(x / density, (127 - y) / density);
-                        int at = (y * 128 + x) * 4;
+                    for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) {
+                        int color = expected.getRGB(x / density, (height - 1 - y) / density);
+                        int at = (y * width + x) * 4;
                         assertEquals(color >>> 24, Byte.toUnsignedInt(result.get(at + 3)), 1, "Alpha at " + x + "," + y);
                         if ((color >>> 24) > 1) for (int c = 0; c < 3; c++) {
                             assertEquals(color >> (16 - c * 8) & 255, Byte.toUnsignedInt(result.get(at + c)), 1);
@@ -110,7 +114,7 @@ class CreateWheelGpuTest {
             glBeginQuery(GL_TIME_ELAPSED, query);
             for (int i = 0; i < 100; i++) glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
             glEndQuery(GL_TIME_ELAPSED);
-            System.out.println("128px baked dust GPU draw average (warm, isolated): "
+            System.out.println("Baked dust GPU draw average (warm, isolated): "
                     + glGetQueryObjectui64(query, GL_QUERY_RESULT) / 100_000d + " microseconds");
             glDeleteQueries(query);
             assertEquals(GL_NO_ERROR, glGetError());

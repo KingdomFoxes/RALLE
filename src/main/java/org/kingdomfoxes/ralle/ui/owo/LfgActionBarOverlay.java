@@ -17,24 +17,37 @@ public final class LfgActionBarOverlay {
 
     private final Minecraft minecraft;
     private final LfgActionBarState state;
+    private final Identifier id;
+    private final java.util.function.BooleanSupplier visible;
 
     public LfgActionBarOverlay(Minecraft minecraft, LfgActionBarState state) {
+        this(minecraft, state, Identifier.fromNamespaceAndPath(RalleClient.MOD_ID, "lfg_action_bar"), () -> true);
+    }
+
+    public LfgActionBarOverlay(Minecraft minecraft, LfgActionBarState state, Identifier id,
+                               java.util.function.BooleanSupplier visible) {
         this.minecraft = minecraft;
         this.state = state;
+        this.id = id;
+        this.visible = visible;
     }
 
     public void register() {
         HudElementRegistry.attachElementAfter(
                 VanillaHudElements.CROSSHAIR,
-                Identifier.fromNamespaceAndPath(RalleClient.MOD_ID, "lfg_action_bar"),
+                id,
                 (graphics, tickCounter) -> {
-                    if (minecraft.screen == null) render(graphics);
+                    if (minecraft.screen == null && visible.getAsBoolean()) render(graphics);
                 }
         );
     }
 
     private void render(GuiGraphics graphics) {
-        var snapshot = state.snapshot();
+        render(minecraft, graphics, state.snapshot());
+    }
+
+    /** Shared with the frozen Class Selector compositor for live recovery feedback. */
+    public static void render(Minecraft minecraft, GuiGraphics graphics, LfgActionBarState.Snapshot snapshot) {
         if (!snapshot.visible()) return;
         int color = withOpacity(color(snapshot.tone()), snapshot.opacity());
         int y = graphics.guiHeight() / 2 - 34;
@@ -62,19 +75,19 @@ public final class LfgActionBarOverlay {
         int raidWidth = Math.round(minecraft.font.width(raid) * TEXT_SCALE);
         int totalWidth = prefixWidth + ITEM_SIZE + ITEM_GAP + raidWidth;
         int x = (graphics.guiWidth() - totalWidth) / 2;
-        drawScaledText(graphics, prefix, x, y, color);
+        drawScaledText(minecraft, graphics, prefix, x, y, color);
         int itemX = x + prefixWidth;
         if (snapshot.opacity() > 0.08d) {
             graphics.renderItem(new ItemStack(RaidPresentation.item(snapshot.raid())), itemX, y - 2);
         }
-        drawScaledText(graphics, raid, itemX + ITEM_SIZE + ITEM_GAP, y, color);
+        drawScaledText(minecraft, graphics, raid, itemX + ITEM_SIZE + ITEM_GAP, y, color);
     }
 
     private static Component actionText(LfgActionGlyph glyph, String text) {
         return glyph == null ? RalleTypography.body(Component.literal(text)) : glyph.label(text);
     }
 
-    private void drawScaledText(GuiGraphics graphics, Component text, int x, int y, int color) {
+    private static void drawScaledText(Minecraft minecraft, GuiGraphics graphics, Component text, int x, int y, int color) {
         graphics.pose().pushMatrix();
         graphics.pose().translate(x, y);
         graphics.pose().scale(TEXT_SCALE, TEXT_SCALE);

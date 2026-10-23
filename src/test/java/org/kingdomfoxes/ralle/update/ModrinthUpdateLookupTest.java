@@ -26,6 +26,14 @@ class ModrinthUpdateLookupTest {
     }
 
     @Test
+    void comparesShortVersionsNumericallyWithMissingComponentsAsZero() {
+        assertEquals("1.1", ModrinthUpdateLookup.newerRelease(
+                "[" + listing("1.1") + "]", "1.0.0", "1.21.11").orElseThrow().versionNumber());
+        assertTrue(ModrinthUpdateLookup.newerRelease(
+                "[" + listing("1.1.0") + "," + listing("1.0.0") + "]", "1.1", "1.21.11").isEmpty());
+    }
+
+    @Test
     void neverRecommendsOlderEqualOrBuildMetadataOnlyVersions() {
         for (var number : new String[]{"0.1.7", "0.1.8", "0.1.8+build.2", "0.1.8-beta.1"}) {
             assertTrue(ModrinthUpdateLookup.newerRelease("[" + listing(number) + "]", "0.1.8", "1.21.11").isEmpty());

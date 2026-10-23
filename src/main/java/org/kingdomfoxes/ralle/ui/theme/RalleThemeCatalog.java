@@ -40,6 +40,9 @@ public final class RalleThemeCatalog {
             t("river-styx", "River Styx", "maxkarson", "000000", "0AF539", "0AF539"),
             t("crimson-planet", "Crimson Planet", "maxkarson", "000000", "FF1100", "FF1100"),
             t("cyclic", "Cyclic", "maxkarson", "000000", "00CCFF", "00CCFF"),
+            t("isothopicalbob", "isothopicalbob", "maxkarson", "FFFFFF", "FF0054", "FF0365"),
+            t("john-hell-emergency", "John Hell Emergency", "maxkarson", "E7F90E", "E61B02", "E61B02"),
+            t("hatred", "Hatred", "maxkarson", "000000", "FFFFFF", "FFFFFF"),
             t("hot-chocolate", "Hot Chocolate", "_Hotchocolate", "5D4037", "795548", "A1887F")
     );
     private static final Map<String, Theme> BY_ID = THEMES.stream().collect(java.util.stream.Collectors.toUnmodifiableMap(Theme::id, v -> v));

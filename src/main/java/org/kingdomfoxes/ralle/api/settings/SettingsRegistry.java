@@ -5,10 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
-import java.nio.file.Files;
 import java.nio.file.Path;
+import org.kingdomfoxes.ralle.settings.LocalStateSection;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,10 +24,19 @@ public final class SettingsRegistry {
     private final Map<String, List<String>> dependencies = new LinkedHashMap<>();
     private final Map<String, Component> unavailableReasons = new LinkedHashMap<>();
     private final Map<String, RuntimeAccess> runtimeAccess = new LinkedHashMap<>();
-    private final Path storagePath;
+    private final Map<String, String> legacyKeys = new LinkedHashMap<>();
+    private final Map<String, SettingsEntry> entriesById = new LinkedHashMap<>();
+    private List<SettingsEntry> orderedEntries = List.of();
+    private List<SettingsCategory> orderedCategories = List.of();
+    private final LocalStateSection storagePath;
     private boolean sealed;
+    private java.util.concurrent.CompletableFuture<Void> pendingSave;
 
     public SettingsRegistry(Path storagePath) {
+        this(LocalStateSection.file(storagePath));
+    }
+
+    public SettingsRegistry(LocalStateSection storagePath) {
         this.storagePath = Objects.requireNonNull(storagePath, "storagePath");
     }
 
@@ -61,6 +68,11 @@ public final class SettingsRegistry {
             }
         }
         categories.put(category.id(), category);
+        category.entries().forEach(entry -> entriesById.put(entry.id(), entry));
+        category.subcategories().forEach(subcategory ->
+                subcategory.entries().forEach(entry -> entriesById.put(entry.id(), entry)));
+        orderedEntries = List.copyOf(entriesById.values());
+        orderedCategories = List.copyOf(categories.values());
     }
 
     /** Declares that an entry is available only while the referenced boolean setting is enabled. */
@@ -69,6 +81,14 @@ public final class SettingsRegistry {
         Objects.requireNonNull(entryId, "entryId");
         Objects.requireNonNull(requiredBooleanSettingId, "requiredBooleanSettingId");
         dependencies.computeIfAbsent(entryId, ignored -> new ArrayList<>()).add(requiredBooleanSettingId);
+    }
+
+    /** Reads a former category.setting key only when the current key is absent. Saves use the current key. */
+    public void migrateKey(String settingId, String formerKey) {
+        requireOpen();
+        setting(settingId, Setting.class);
+        if (legacyKeys.putIfAbsent(settingId, Objects.requireNonNull(formerKey)) != null)
+            throw new IllegalArgumentException("Duplicate legacy key for " + settingId);
     }
 
     /** Makes an entry visible but non-interactive when an optional runtime integration is unavailable. */
@@ -92,21 +112,16 @@ public final class SettingsRegistry {
     private record RuntimeAccess(java.util.function.BooleanSupplier allowed, Component reason) {}
 
     public Collection<SettingsCategory> categories() {
-        return List.copyOf(categories.values());
+        return orderedCategories;
     }
 
     public List<SettingsEntry> entries() {
-        return categories.values().stream()
-                .flatMap(category -> java.util.stream.Stream.concat(
-                        category.entries().stream(),
-                        category.subcategories().stream().flatMap(subcategory -> subcategory.entries().stream())
-                ))
-                .toList();
+        return orderedEntries;
     }
 
     public Optional<SettingsEntry> entry(String id) {
         Objects.requireNonNull(id, "id");
-        return entries().stream().filter(entry -> entry.id().equals(id)).findFirst();
+        return Optional.ofNullable(entriesById.get(id));
     }
 
     public List<String> dependencies(String entryId) {
@@ -146,18 +161,10 @@ public final class SettingsRegistry {
     public <S extends Setting<?>> S setting(String id, Class<S> type) {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(type, "type");
-        return entries().stream()
-                .filter(Setting.class::isInstance)
-                .map(entry -> (Setting<?>) entry)
-                .filter(setting -> setting.id().equals(id))
-                .findFirst()
-                .map(setting -> {
-                    if (!type.isInstance(setting)) {
-                        throw new IllegalArgumentException("Setting " + id + " is not a " + type.getSimpleName());
-                    }
-                    return type.cast(setting);
-                })
-                .orElseThrow(() -> new IllegalArgumentException("Unknown setting: " + id));
+        var entry = entriesById.get(id);
+        if (!(entry instanceof Setting<?>)) throw new IllegalArgumentException("Unknown setting: " + id);
+        if (!type.isInstance(entry)) throw new IllegalArgumentException("Setting " + id + " is not a " + type.getSimpleName());
+        return type.cast(entry);
     }
 
     public void seal() {
@@ -169,14 +176,14 @@ public final class SettingsRegistry {
                 .map(entry -> (Setting<?>) entry)
                 .forEach(setting -> setting.onChanged(ignored -> save()));
         sealed = true;
-        if (!Files.exists(storagePath)) save();
+        if (!storagePath.exists()) save();
     }
 
     private void load() {
-        if (!Files.exists(storagePath)) return;
-        var properties = new Properties();
-        try (Reader reader = Files.newBufferedReader(storagePath)) {
-            properties.load(reader);
+        if (!storagePath.exists()) return;
+        final Properties properties;
+        try {
+            properties = storagePath.readProperties();
         } catch (IOException exception) {
             LOGGER.warn("Could not read RALLE settings from {}. Defaults will be used", storagePath, exception);
             return;
@@ -184,6 +191,8 @@ public final class SettingsRegistry {
 
         forEachSetting((category, setting) -> {
             var value = properties.getProperty(category.id() + "." + setting.id());
+            if (value == null && legacyKeys.containsKey(setting.id()))
+                value = properties.getProperty(legacyKeys.get(setting.id()));
             if (value == null) return;
             try {
                 setting.load(value);
@@ -197,14 +206,12 @@ public final class SettingsRegistry {
         var properties = new Properties();
         forEachSetting((category, setting) ->
                 properties.setProperty(category.id() + "." + setting.id(), setting.serialize()));
-        try {
-            Files.createDirectories(storagePath.getParent());
-            try (Writer writer = Files.newBufferedWriter(storagePath)) {
-                properties.store(writer, "RALLE local settings");
-            }
-        } catch (IOException exception) {
-            LOGGER.error("Could not save RALLE settings to {}", storagePath, exception);
-        }
+        var save = storagePath.writePropertiesAsync(properties);
+        if (save == pendingSave) return;
+        pendingSave = save;
+        save.whenComplete((ignored, failure) -> {
+            if (failure != null) LOGGER.error("Could not save RALLE settings to {}", storagePath, failure);
+        });
     }
 
     private void forEachSetting(java.util.function.BiConsumer<SettingsCategory, Setting<?>> consumer) {

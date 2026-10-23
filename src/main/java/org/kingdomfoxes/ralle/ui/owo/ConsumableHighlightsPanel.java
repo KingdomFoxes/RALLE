@@ -25,13 +25,13 @@ import java.util.Set;
 
 /** Framed, internally scrolling ordered rule editor with a fixed right action lane. */
 final class ConsumableHighlightsPanel extends FlowLayout {
-    private static final int ACTION_LANE_WIDTH = 104;
     private static final int RULE_ROW_GAP = 2;
     private final RalleSettingsScreen screen;
     private final ConsumableHighlightStore store;
     private final ExpandableParentChildListPanel list;
-    private final FlowLayout listContent;
     private final io.wispforest.owo.ui.component.LabelComponent status;
+    private java.util.List<ConsumableHighlightRule> renderedRules;
+    private boolean refreshPending;
 
     ConsumableHighlightsPanel(RalleSettingsScreen screen, ConsumableHighlightStore store, Set<Integer> expanded) {
         super(Sizing.fill(100), Sizing.content(), Algorithm.VERTICAL);
@@ -39,27 +39,17 @@ final class ConsumableHighlightsPanel extends FlowLayout {
         this.store = store;
         gap(4).padding(Insets.of(5)).surface(RalleSurfaces.NAVY_ROW);
 
-        var columns = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(230));
-        columns.gap(6);
-        listContent = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
-        listContent.gap(2).padding(Insets.of(4));
         list = new ExpandableParentChildListPanel(Sizing.fill(100), Sizing.content(), expanded);
         list.gap(RULE_ROW_GAP);
-        listContent.child(list);
-        var listScroll = new RalleScrollContainer(Sizing.expand(100), Sizing.fixed(220), listContent);
-        listScroll.wheelStep(18).scrollbarThiccness(3).surface(RalleSurfaces.NAVY_PANEL);
-        columns.child(listScroll);
-
-        var actions = UIContainers.verticalFlow(Sizing.fixed(ACTION_LANE_WIDTH), Sizing.fixed(220));
-        actions.gap(5).padding(Insets.of(4)).surface(RalleSurfaces.NAVY_PANEL);
+        var columns = new SettingsListEditorColumns(list);
+        var actions = columns.actions();
         status = UIComponents.label(Component.empty()).lineHeight(RalleTheme.BODY_LINE_HEIGHT)
-                .color(RalleTheme.muted()).maxWidth(ACTION_LANE_WIDTH - 8);
+                .color(RalleTheme.muted()).maxWidth(SettingsListEditorColumns.ACTION_WIDTH - 8);
         actions.child(action("ralle.consumables.action.add", this::openAdd, RalleButtonRenderers.primary()));
         actions.child(action("ralle.consumables.action.import", this::startImport, RalleButtonRenderers.neutral()));
         actions.child(action("ralle.consumables.action.export", this::startExport, RalleButtonRenderers.neutral()));
         actions.child(action("ralle.consumables.action.reset", this::confirmReset, RalleButtonRenderers.destructive()));
         actions.child(status);
-        columns.child(actions);
         child(columns);
         rebuild();
     }
@@ -74,6 +64,7 @@ final class ConsumableHighlightsPanel extends FlowLayout {
     void rebuild() {
         var rows = new ArrayList<io.wispforest.owo.ui.core.UIComponent>();
         var rules = store.snapshot();
+        renderedRules = rules;
         if (rules.isEmpty()) {
             var empty = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(198));
             empty.horizontalAlignment(HorizontalAlignment.CENTER).verticalAlignment(VerticalAlignment.CENTER);
@@ -92,6 +83,18 @@ final class ConsumableHighlightsPanel extends FlowLayout {
             }
         }
         list.replaceChildren(rows);
+    }
+
+    @Override
+    public void draw(io.wispforest.owo.ui.core.OwoUIGraphics graphics, int mouseX, int mouseY,
+                     float partialTicks, float delta) {
+        // Only the visible panel watches the immutable snapshot. The long-lived store must
+        // never retain providers/screens through a new listener on every settings opening.
+        if (!refreshPending && renderedRules != store.snapshot()) {
+            refreshPending = true;
+            Minecraft.getInstance().schedule(() -> { refreshPending = false; rebuild(); });
+        }
+        super.draw(graphics, mouseX, mouseY, partialTicks, delta);
     }
 
     private FlowLayout parentRow(int index, ConsumableHighlightRule rule) {

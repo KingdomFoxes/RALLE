@@ -4,12 +4,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
+import org.kingdomfoxes.ralle.platform.AtomicFiles;
+import org.kingdomfoxes.ralle.settings.LocalStateSection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -21,11 +20,15 @@ public final class ConsumableHighlightStore {
     public static final long MAX_IMPORT_BYTES = 1024L * 1024L;
     private static final Logger LOGGER = LoggerFactory.getLogger(ConsumableHighlightStore.class);
 
-    private final Path path;
+    private final LocalStateSection path;
     private final List<Consumer<List<ConsumableHighlightRule>>> listeners = new CopyOnWriteArrayList<>();
     private volatile List<ConsumableHighlightRule> snapshot;
 
     public ConsumableHighlightStore(Path path) {
+        this(LocalStateSection.file(path));
+    }
+
+    public ConsumableHighlightStore(LocalStateSection path) {
         this.path = Objects.requireNonNull(path, "path");
         this.snapshot = loadInitial();
     }
@@ -105,17 +108,17 @@ public final class ConsumableHighlightStore {
     }
 
     private List<ConsumableHighlightRule> loadInitial() {
-        if (!Files.exists(path)) {
+        if (!path.exists()) {
             var defaults = ConsumableHighlightDefaults.rules();
             try {
-                writeAtomically(path, ConsumableHighlightJson.encode(defaults));
+                path.write(ConsumableHighlightJson.encode(defaults));
             } catch (IOException exception) {
                 LOGGER.error("Could not seed consumable highlight rules at {}", path, exception);
             }
             return defaults;
         }
         try {
-            return ConsumableHighlightJson.decode(Files.readString(path, StandardCharsets.UTF_8));
+            return ConsumableHighlightJson.decode(path.read());
         } catch (IOException | IllegalArgumentException exception) {
             LOGGER.error("Could not load consumable highlight rules from {}; defaults remain in memory", path, exception);
             return ConsumableHighlightDefaults.rules();
@@ -123,7 +126,7 @@ public final class ConsumableHighlightStore {
     }
 
     private void publishAfterSave(List<ConsumableHighlightRule> next) throws IOException {
-        writeAtomically(path, ConsumableHighlightJson.encode(next));
+        path.write(ConsumableHighlightJson.encode(next));
         snapshot = List.copyOf(next);
         for (var listener : listeners) {
             try {
@@ -135,21 +138,6 @@ public final class ConsumableHighlightStore {
     }
 
     static void writeAtomically(Path destination, String json) throws IOException {
-        Objects.requireNonNull(destination, "destination");
-        var parent = destination.toAbsolutePath().getParent();
-        if (parent == null) throw new IOException("Destination has no parent directory");
-        Files.createDirectories(parent);
-        var temporary = Files.createTempFile(parent, destination.getFileName().toString(), ".tmp");
-        boolean moved = false;
-        try {
-            Files.writeString(temporary, json, StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING);
-            try (var channel = FileChannel.open(temporary, StandardOpenOption.WRITE)) {
-                channel.force(true);
-            }
-            Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            moved = true;
-        } finally {
-            if (!moved) Files.deleteIfExists(temporary);
-        }
+        AtomicFiles.write(destination, json);
     }
 }

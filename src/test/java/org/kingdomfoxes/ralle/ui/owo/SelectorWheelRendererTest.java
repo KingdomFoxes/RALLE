@@ -8,6 +8,101 @@ import javax.imageio.ImageIO;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SelectorWheelRendererTest {
+    @Test void croppedImagesMatchOriginalPixelsForEveryRingAndBothHoverStates() {
+        var random = new java.util.Random(0xFACE);
+        for (int count : new int[] {1, 7, 8, 15, 32, 64}) {
+            long imagePixels = 0;
+            for (var sector : SelectorWheelModel.classGeometry(count)) {
+                var raster = SelectorWheelRenderer.rasterize(sector);
+                imagePixels += (long) raster.width() * raster.height();
+                for (int y = 0; y < raster.height(); y++) for (int x = 0; x < raster.width(); x++) {
+                    for (boolean selected : new boolean[] {false, true})
+                        assertEquals(SelectorWheelRenderer.color(sector, raster.left() + x + .5,
+                                raster.top() + y + .5, selected), raster.colorAt(x, y, selected));
+                }
+                // Independently sample outside the crop to detect any clipped arc/border pixels.
+                int extent = (int) Math.ceil(sector.outer());
+                for (int sample = 0; sample < 4096; sample++) {
+                    int x = random.nextInt(-extent, extent), y = random.nextInt(-extent, extent);
+                    if (x >= raster.left() && x < raster.left() + raster.width()
+                            && y >= raster.top() && y < raster.top() + raster.height()) continue;
+                    assertEquals(0, SelectorWheelRenderer.color(sector, x + .5, y + .5, false));
+                }
+            }
+            // Both states fit comfortably in a bounded screen-owned cache even at the 64-class limit.
+            assertTrue(imagePixels * 2 * Integer.BYTES < 48L * 1024 * 1024,
+                    "Texture budget exceeded for " + count + " options");
+        }
+    }
+
+    @Test void writesClassHalfCircleAndConcentricRingPreview() throws Exception {
+        int panelSize = 500;
+        var preview = new BufferedImage(panelSize * 3, panelSize * 2, BufferedImage.TYPE_INT_ARGB);
+        var canvas = preview.createGraphics();
+        canvas.setColor(new java.awt.Color(0x101824));
+        canvas.fillRect(0, 0, preview.getWidth(), preview.getHeight());
+        int[] counts = {1, 5, 7, 8, 14, 15};
+        for (int panel = 0; panel < counts.length; panel++) {
+            int cx = panel % 3 * panelSize + panelSize / 2;
+            int cy = panel / 3 * panelSize + panelSize / 2;
+            var sectors = SelectorWheelModel.classGeometry(counts[panel]);
+            for (int i = 0; i < sectors.size(); i++) {
+                var sector = sectors.get(i);
+                int dx = i == 0 ? (int) Math.round(Math.cos(sector.angle()) * 5) : 0;
+                int dy = i == 0 ? (int) Math.round(Math.sin(sector.angle()) * 5) : 0;
+                var raster = SelectorWheelRenderer.rasterize(sector);
+                for (int y = 0; y < raster.height(); y++) for (int x = 0; x < raster.width(); x++) {
+                    int color = raster.colorAt(x, y, i == 0);
+                    if (color != 0) preview.setRGB(cx + raster.left() + x + dx, cy + raster.top() + y + dy, color);
+                }
+                int x = cx + (int) Math.round(sector.centerX()) + dx;
+                int y = cy + (int) Math.round(sector.centerY()) + dy;
+                canvas.setColor(new java.awt.Color(0xBC915F));
+                canvas.fillRect(x - 8, y - 22, 16, 16);
+                canvas.setColor(java.awt.Color.WHITE);
+                canvas.drawString("Class " + (i + 1), x - 18, y + 4);
+                canvas.drawString("[K]", x - 8, y + 27);
+            }
+            canvas.setColor(java.awt.Color.WHITE);
+            canvas.drawLine(cx - 3, cy, cx + 3, cy);
+            canvas.drawLine(cx, cy - 3, cx, cy + 3);
+            canvas.drawString(counts[panel] + " class options", cx - 45, cy - 235);
+        }
+        canvas.dispose();
+        var output = Path.of("build", "reports", "wheel-class-rings.png");
+        Files.createDirectories(output.getParent());
+        ImageIO.write(preview, "png", output.toFile());
+    }
+
+    @Test void writesBarsGeometryPreviewUsingSharedFaceColors() throws Exception {
+        var preview = new BufferedImage(1020, 860, BufferedImage.TYPE_INT_ARGB);
+        var canvas = preview.createGraphics();
+        canvas.setColor(new java.awt.Color(0x101824));
+        canvas.fillRect(0, 0, preview.getWidth(), preview.getHeight());
+        int[] counts = {5, 6, 12, 18, 1, 0};
+        for (int panel = 0; panel < counts.length; panel++) {
+            int cx = panel % 3 * 340 + 170, cy = panel / 3 * 430 + 225;
+            int side = panel < 4 ? 160 : 80;
+            int viewport = panel >= 1 && panel <= 3 ? 280 : 600;
+            var faces = SelectorWheelLayout.bars(counts[panel], side, viewport);
+            for (int i = 0; i < faces.size(); i++) {
+                var face = faces.get(i);
+                int dy = i == 0 ? -5 : 0;
+                canvas.setColor(new java.awt.Color(SelectorWheelRenderer.outlineColor(i == 0), true));
+                canvas.fillRect(cx + face.left(), cy + face.top() + dy, face.right() - face.left(), face.bottom() - face.top());
+                canvas.setColor(new java.awt.Color(SelectorWheelRenderer.fillColor(i == 0), true));
+                canvas.fillRect(cx + face.left() + 1, cy + face.top() + dy + 1, face.right() - face.left() - 2, face.bottom() - face.top() - 2);
+                canvas.setColor(java.awt.Color.WHITE);
+                canvas.drawString(Integer.toString(i + 1), cx + (int) face.centerX() - 3, cy + (int) face.centerY() + dy);
+            }
+            canvas.setColor(java.awt.Color.WHITE);
+            canvas.drawString(counts[panel] + " options / S=" + side + (panel == 1 ? " / wrapped" : ""), cx - 90, cy - 195);
+        }
+        canvas.dispose();
+        var output = Path.of("build", "reports", "wheel-bars-layouts.png");
+        Files.createDirectories(output.getParent());
+        ImageIO.write(preview, "png", output.toFile());
+    }
     @Test void compactKickLayoutPreviewAtTwoScales() throws Exception {
         var preview = new BufferedImage(660, 400, BufferedImage.TYPE_INT_ARGB);
         var canvas = preview.createGraphics();

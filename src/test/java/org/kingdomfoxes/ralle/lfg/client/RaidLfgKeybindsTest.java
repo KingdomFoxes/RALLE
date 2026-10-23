@@ -7,6 +7,13 @@ import org.lwjgl.glfw.GLFW;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class RaidLfgKeybindsTest {
+    @Test void noViewAndDisabledWheelsUseTheExistingChordPath() {
+        for (var style : new String[] {"circle-segments", "bars", "no-view"})
+            assertEquals(false, RaidLfgKeybinds.graphicalWheel(false, style));
+        assertEquals(true, RaidLfgKeybinds.graphicalWheel(true, "circle-segments"));
+        assertEquals(true, RaidLfgKeybinds.graphicalWheel(true, "bars"));
+        assertEquals(false, RaidLfgKeybinds.graphicalWheel(true, "no-view"));
+    }
     @Test
     void onlyTopRowOneThroughSixResolveAsChordDigits() {
         assertEquals(1, RaidLfgKeybinds.topRowDigit(GLFW.GLFW_KEY_1));

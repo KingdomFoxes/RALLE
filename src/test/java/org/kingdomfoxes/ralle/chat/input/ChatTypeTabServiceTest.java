@@ -8,6 +8,27 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ChatTypeTabServiceTest {
     @Test
+    void longSessionsRetainOnly128RecentContactsWithoutChangingAnOpenDestination() {
+        var service = new ChatTypeTabService();
+        service.observeSentCommand("msg FirstFox hello");
+        for (int i = 0; i < 10_000; i++) service.observeIncomingSender("Contact" + i);
+        assertEquals(Optional.of("/msg FirstFox "), service.prefixForNewChat());
+        assertEquals("", service.nextChannel("/msg FirstFox "));
+        assertEquals("/msg Contact9872 ", service.nextChannel("/p "));
+        int count = 0;
+        String prefix = service.nextChannel("/p ");
+        while (!prefix.isEmpty()) { count++; prefix = service.nextChannel(prefix); }
+        assertEquals(ChatTypeTabService.MAX_DM_CONTACTS, count);
+        service.observeIncomingSender("CONTACT9872");
+        service.observeIncomingSender("NewestFox");
+        assertEquals("/msg Contact9872 ", service.nextChannel("/p "), "Retained tabs keep their first-seen order");
+        assertEquals("/msg Contact9874 ", service.nextChannel("/msg Contact9872 "));
+        assertEquals("/msg NewestFox ", service.nextChannel("/msg Contact9999 "));
+        service.resetSession();
+        assertEquals("", service.nextChannel("/p "));
+    }
+
+    @Test
     void labelClicksAdvanceThroughEveryChannelAndKeepDraftRoutingSeparate() {
         var service = new ChatTypeTabService();
         service.observeIncomingSender("FriendFox");

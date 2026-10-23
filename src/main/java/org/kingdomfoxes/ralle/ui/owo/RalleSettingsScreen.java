@@ -12,16 +12,19 @@ import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.HorizontalAlignment;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.OwoUIAdapter;
+import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.UIComponent;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.NotNull;
 import org.kingdomfoxes.ralle.api.settings.ActionEntry;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
@@ -59,6 +62,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private boolean savingNameplateColor;
     private boolean nameplateColorSaveFailed;
     private boolean foxAccessAvailable;
+    private boolean classAutoOpenAvailable;
     private FlowLayout root;
     private FlowLayout sidebarNavigation;
     private FlowLayout document;
@@ -70,6 +74,32 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private String query = "";
     private SettingsNavigationState.Snapshot preSearchSnapshot;
     private KeybindSetting capturingKeybind;
+    private java.util.function.Consumer<String> customKeyCapture;
+    private java.util.function.Consumer<OwoUIGraphics> dragPreview;
+
+    /** Draw a held settings row above the complete screen, outside nested list scissors. */
+    void drawDragPreview(java.util.function.Consumer<OwoUIGraphics> preview) {
+        dragPreview = preview;
+    }
+
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // Only a panel rendered this frame may contribute a preview.
+        dragPreview = null;
+        super.render(graphics, mouseX, mouseY, partialTick);
+        var preview = dragPreview;
+        dragPreview = null;
+        if (preview != null) {
+            graphics.nextStratum();
+            preview.accept(OwoUIGraphics.of(graphics));
+            graphics.nextStratum();
+        }
+    }
+
+    /** Compact settings modals share the screen's keyboard capture without opening a new screen. */
+    void captureOptionKey(java.util.function.Consumer<String> captured) {
+        customKeyCapture = captured;
+    }
     private ButtonComponent capturingButton;
     private double lastSavedScroll = -1;
     private SettingsScreenLayout.Geometry geometry;
@@ -88,6 +118,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         this.parent = parent;
         this.settings = settings;
         this.foxAccessAvailable = settings.available(RalleSettings.RAID_LFG_ENABLED_ID);
+        this.classAutoOpenAvailable = settings.available(RalleSettings.CLASS_SELECTOR_ID);
         this.chatLayout = chatLayout;
         this.navigation = navigation;
         this.guildRanks = guildRanks;
@@ -329,6 +360,15 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private void renderEntryPage(Component title, java.util.List<SettingsEntry> entries, double progress) {
         document.clearChildren();
         document.child(new SettingsSectionDivider(title));
+        if (activePage == SettingsNavigationState.Page.CATEGORY && "wheels".equals(selectedCategory)) {
+            int side = Math.min(192, documentTextWidth());
+            var imageRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+            imageRow.horizontalAlignment(HorizontalAlignment.CENTER);
+            imageRow.child(UIComponents.texture(
+                    Identifier.fromNamespaceAndPath("ralle", "textures/gui/wheel/settings_wheel.png"),
+                    0, 0, 64, 64, 64, 64).sizing(Sizing.fixed(side), Sizing.fixed(side)));
+            document.child(imageRow);
+        }
         var visible = SettingsPageContent.visibleEntries(settings, entries);
         if (visible.isEmpty() && !entries.isEmpty()) {
             var unmet = SettingsPageContent.unmetParentTitles(settings, entries);
@@ -636,8 +676,17 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     public boolean keyPressed(KeyEvent event) {
         if (event.key() == GLFW.GLFW_KEY_ESCAPE && RalleModalDialogs.dismissTop(root)) {
+            customKeyCapture = null;
             capturingKeybind = null;
             capturingButton = null;
+            return true;
+        }
+        if (customKeyCapture != null) {
+            var captured = customKeyCapture;
+            customKeyCapture = null;
+            var key = event.key() == GLFW.GLFW_KEY_BACKSPACE || event.key() == GLFW.GLFW_KEY_DELETE
+                    ? InputConstants.UNKNOWN : InputConstants.getKey(event);
+            captured.accept(key == InputConstants.UNKNOWN ? KeybindSetting.UNBOUND : key.getName());
             return true;
         }
         if (capturingKeybind != null) {
@@ -662,6 +711,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
+        if (customKeyCapture != null) return true;
         if (capturingKeybind != null) {
             // Raid LFG bindings are deliberately keyboard-only; keep waiting for a keyboard key.
             return true;
@@ -832,8 +882,10 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     public void tick() {
         super.tick();
         boolean accessAvailable = settings.available(RalleSettings.RAID_LFG_ENABLED_ID);
-        if (foxAccessAvailable != accessAvailable) {
+        boolean autoOpenAvailable = settings.available(RalleSettings.CLASS_SELECTOR_ID);
+        if (foxAccessAvailable != accessAvailable || classAutoOpenAvailable != autoOpenAvailable) {
             foxAccessAvailable = accessAvailable;
+            classAutoOpenAvailable = autoOpenAvailable;
             double progress = scroll.progress();
             if (query.isEmpty()) rebuildCurrentPage(progress);
             else {
@@ -944,6 +996,11 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             return RalleTheme.ui(Component.translatable("ralle.settings.keybind.unbound"));
         }
         try {
+            if (RalleSettings.CLASS_MODIFIER_ID.equals(setting.id())
+                    && org.kingdomfoxes.ralle.classes.ClassBindingConflicts.modifier(settings))
+                return RalleTheme.ui(InputConstants.getKey(setting.value()).getDisplayName().copy()
+                        .append(" · ").append(Component.translatable("ralle.classes.conflict"))
+                        .withStyle(net.minecraft.ChatFormatting.RED));
             return RalleTheme.ui(InputConstants.getKey(setting.value()).getDisplayName());
         } catch (IllegalArgumentException ignored) {
             return RalleTheme.ui(Component.translatable("ralle.settings.keybind.unbound"));
@@ -952,6 +1009,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     public void removed() {
+        customKeyCapture = null;
         persistNavigation();
         navigation.flush();
         super.removed();
@@ -959,7 +1017,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     public void onClose() {
-        if (RalleModalDialogs.dismissTop(root)) return;
+        if (RalleModalDialogs.dismissTop(root)) { customKeyCapture = null; return; }
         persistNavigation();
         minecraft.setScreen(parent);
     }

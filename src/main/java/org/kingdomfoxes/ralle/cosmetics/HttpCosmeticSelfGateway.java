@@ -4,12 +4,11 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.kingdomfoxes.ralle.platform.SharedHttpTransport;
+import org.kingdomfoxes.ralle.platform.BoundedHttpBody;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashSet;
@@ -102,15 +101,10 @@ public final class HttpCosmeticSelfGateway implements CosmeticSelfGateway {
         if (bearer != null) builder.header("Authorization", "Bearer " + bearer);
         HttpRequest request = builder.method(method,
                 HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8)).build();
-        return client.get().sendAsync(request, HttpResponse.BodyHandlers.ofInputStream()).thenApply(response -> {
-            try (var stream = response.body()) {
-                byte[] bytes = stream.readNBytes(MAX_RESPONSE_BYTES + 1);
-                if (bytes.length > MAX_RESPONSE_BYTES || response.statusCode() != 200)
-                    throw new IllegalArgumentException("Fox cosmetic request failed (HTTP " + response.statusCode() + ")");
-                return JsonParser.parseString(new String(bytes, StandardCharsets.UTF_8)).getAsJsonObject();
-            } catch (IOException failure) {
-                throw new IllegalArgumentException("Fox cosmetic request failed", failure);
-            }
+        return BoundedHttpBody.send(client.get(), request, MAX_RESPONSE_BYTES).thenApply(response -> {
+            if (response.statusCode() != 200)
+                throw new IllegalArgumentException("Fox cosmetic request failed (HTTP " + response.statusCode() + ")");
+            return JsonParser.parseString(response.body()).getAsJsonObject();
         });
     }
 

@@ -54,7 +54,7 @@ public final class PlayerHeadPresentation {
         return GuildTerritoryColors.forGuild(member.guild().tag(), member.guild().color());
     }
 
-    private static PlayerSkin resolve(Minecraft minecraft, UUID id, String name) {
+    static PlayerSkin resolve(Minecraft minecraft, UUID id, String name) {
         var fallback = DefaultPlayerSkin.get(id);
         return SKINS.get(id, fallback, ignored -> {
             var partial = new GameProfile(id, name);

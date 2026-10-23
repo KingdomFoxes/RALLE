@@ -26,13 +26,14 @@ final class MacPlatformImageClipboard implements PlatformImageClipboard {
                 message.invokeLong(new Object[]{pasteboard, sel(selector, "clearContents")});
 
                 byte[] png = image.encodedPngUnsafe();
-                Memory pngMemory = new Memory(png.length);
-                pngMemory.write(0, png, 0, png.length);
-                Pointer data = send(message, getClass(getClass, "NSData"), sel(selector, "dataWithBytes:length:"), pngMemory, png.length);
-                Pointer type = nsString(message, getClass, selector, "public.png");
-                long accepted = message.invokeLong(new Object[]{pasteboard, sel(selector, "setData:forType:"), data, type});
-                if (accepted == 0) {
-                    throw new IOException("macOS rejected PNG clipboard data; check clipboard permissions and retry");
+                try (Memory pngMemory = new Memory(png.length)) {
+                    pngMemory.write(0, png, 0, png.length);
+                    Pointer data = send(message, getClass(getClass, "NSData"), sel(selector, "dataWithBytes:length:"), pngMemory, png.length);
+                    Pointer type = nsString(message, getClass, selector, "public.png");
+                    long accepted = message.invokeLong(new Object[]{pasteboard, sel(selector, "setData:forType:"), data, type});
+                    if (accepted == 0) {
+                        throw new IOException("macOS rejected PNG clipboard data; check clipboard permissions and retry");
+                    }
                 }
             } finally {
                 if (pool != null) send(message, pool, sel(selector, "release"));
@@ -46,10 +47,11 @@ final class MacPlatformImageClipboard implements PlatformImageClipboard {
 
     private static Pointer nsString(Function message, Function getClass, Function selector, String value) {
         byte[] utf8 = value.getBytes(StandardCharsets.UTF_8);
-        Memory memory = new Memory(utf8.length + 1L);
-        memory.write(0, utf8, 0, utf8.length);
-        memory.setByte(utf8.length, (byte) 0);
-        return send(message, getClass(getClass, "NSString"), sel(selector, "stringWithUTF8String:"), memory);
+        try (Memory memory = new Memory(utf8.length + 1L)) {
+            memory.write(0, utf8, 0, utf8.length);
+            memory.setByte(utf8.length, (byte) 0);
+            return send(message, getClass(getClass, "NSString"), sel(selector, "stringWithUTF8String:"), memory);
+        }
     }
 
     private static Pointer getClass(Function function, String name) {

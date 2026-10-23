@@ -31,27 +31,35 @@ final class CreateWheelSnapshot implements AutoCloseable {
                     .withSampler("Sampler1").build());
 
     private final TextureTarget target;
-    private final int extent;
+    private final int left, top, width, height;
     private final int density;
 
-    private CreateWheelSnapshot(TextureTarget target, int extent, int density) {
+    private CreateWheelSnapshot(TextureTarget target, int left, int top, int width, int height, int density) {
         this.target = target;
-        this.extent = extent;
+        this.left = left;
+        this.top = top;
+        this.width = width;
+        this.height = height;
         this.density = density;
     }
 
     static CreateWheelSnapshot capture(Minecraft minecraft, int extent, Consumer<GuiGraphics> draw) {
+        return capture(minecraft, -extent, -extent, extent, extent, draw);
+    }
+
+    static CreateWheelSnapshot capture(Minecraft minecraft, int left, int top, int right, int bottom,
+                                       Consumer<GuiGraphics> draw) {
         try (var diagnosticScope = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CREATE_WHEEL_CAPTURE)) {
-            return captureSegment(minecraft, extent, draw);
+            return captureSegment(minecraft, left, top, right - left, bottom - top, draw);
         }
     }
 
-    private static CreateWheelSnapshot captureSegment(Minecraft minecraft, int extent, Consumer<GuiGraphics> draw) {
+    private static CreateWheelSnapshot captureSegment(Minecraft minecraft, int left, int top, int width, int height,
+                                                      Consumer<GuiGraphics> draw) {
         // Warm the shared baked atlas on hover, before accepted creation starts playback.
         minecraft.getTextureManager().getTexture(MASK);
         int density = Math.max(1, minecraft.getWindow().getGuiScale());
-        int size = extent * 2;
-        var target = new TextureTarget("RALLE Create segment", size * density, size * density, true);
+        var target = new TextureTarget("RALLE Create selection", width * density, height * density, true);
         var state = new GuiRenderState();
         // An independent state/renderer must never reset the main screen's queued GUI elements.
         try (var renderer = new GuiRenderer(state, minecraft.renderBuffers().bufferSource(),
@@ -59,9 +67,9 @@ final class CreateWheelSnapshot implements AutoCloseable {
             RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(
                     target.getColorTexture(), 0, target.getDepthTexture(), 1);
             var graphics = new GuiGraphics(minecraft, state, 0, 0);
-            graphics.pose().scale(minecraft.getWindow().getGuiScaledWidth() / (float) size,
-                    minecraft.getWindow().getGuiScaledHeight() / (float) size);
-            graphics.pose().translate(extent, extent);
+            graphics.pose().scale(minecraft.getWindow().getGuiScaledWidth() / (float) width,
+                    minecraft.getWindow().getGuiScaledHeight() / (float) height);
+            graphics.pose().translate(-left, -top);
             draw.accept(graphics);
             RenderSystem.backupProjectionMatrix();
             try {
@@ -70,7 +78,7 @@ final class CreateWheelSnapshot implements AutoCloseable {
             } finally {
                 RenderSystem.restoreProjectionMatrix();
             }
-            return new CreateWheelSnapshot(target, extent, density);
+            return new CreateWheelSnapshot(target, left, top, width, height, density);
         } catch (RuntimeException | Error failure) {
             target.destroyBuffers();
             throw failure;
@@ -84,7 +92,7 @@ final class CreateWheelSnapshot implements AutoCloseable {
         int data = 0xFF000000 | CreateWheelAnimation.frame(progress) << 16 | density << 8;
         graphics.guiRenderState.submitBlitToCurrentLayer(new BlitRenderState(PIPELINE,
                 TextureSetup.doubleTexture(target.getColorTextureView(), sampler, mask, sampler),
-                new Matrix3x2f(graphics.pose()), dx - extent, dy - extent, dx + extent, dy + extent,
+                new Matrix3x2f(graphics.pose()), dx + left, dy + top, dx + left + width, dy + top + height,
                 0, 1, 1, 0, data, null));
     }
 

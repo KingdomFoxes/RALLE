@@ -2,18 +2,16 @@ package org.kingdomfoxes.ralle.client;
 
 import com.google.gson.JsonParser;
 import org.kingdomfoxes.ralle.platform.SharedHttpTransport;
+import org.kingdomfoxes.ralle.platform.BoundedHttpBody;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.TimeUnit;
 
 /** Public Wynncraft player profile lookup by canonical UUID, without Fox credentials.
  * https://docs.wynncraft.com/modules/player/get-player
@@ -25,18 +23,12 @@ public final class HttpFoxGuildLookup {
         var request = HttpRequest.newBuilder(URI.create("https://api.wynncraft.com/v3/player/" + player))
                 .timeout(Duration.ofSeconds(12)).version(HttpClient.Version.HTTP_1_1)
                 .header("Accept", "application/json").GET().build();
-        return SharedHttpTransport.shared().get().sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
+        return BoundedHttpBody.send(SharedHttpTransport.shared().get(), request, MAX_BODY_BYTES)
                 .thenApply(response -> {
-                    try (var body = response.body()) {
-                        if (response.statusCode() != 200)
-                            throw new IOException("Wynncraft guild lookup failed (HTTP " + response.statusCode() + ")");
-                        var bytes = body.readNBytes(MAX_BODY_BYTES + 1);
-                        if (bytes.length > MAX_BODY_BYTES) throw new IOException("Player profile exceeds the document limit");
-                        return isFoxMember(new String(bytes, StandardCharsets.UTF_8), player);
-                    } catch (IOException failure) {
-                        throw new CompletionException(failure);
-                    }
-                }).orTimeout(12, TimeUnit.SECONDS);
+                    if (response.statusCode() != 200)
+                        throw new CompletionException(new IOException("Wynncraft guild lookup failed (HTTP " + response.statusCode() + ")"));
+                    return isFoxMember(response.body(), player);
+                });
     }
 
     static boolean isFoxMember(String json, UUID player) {
