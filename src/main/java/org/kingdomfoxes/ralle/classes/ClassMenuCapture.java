@@ -69,6 +69,11 @@ public final class ClassMenuCapture {
         var menu = minecraft.player.containerMenu;
         if (menu == minecraft.player.inventoryMenu) return;
         if (!WynncraftClassMenu.matchesTitle(minecraft.screen.getTitle().getString())) return;
+        if (menu.slots.size() < WynncraftClassMenu.MENU_SIZE) return;
+        var decoded = WynncraftClassMenu.decode(minecraft.screen.getTitle().getString(), menu.slots.stream()
+                .limit(WynncraftClassMenu.MENU_SIZE).map(slot -> slot.getItem()).toList());
+        // Preserve the four-snapshot budget for usable complete books, not packet fragments.
+        if (decoded.isEmpty() || !decoded.get().complete()) return;
         var data = new JsonObject();
         data.addProperty("version", 1);
         data.addProperty("account", current.toString());

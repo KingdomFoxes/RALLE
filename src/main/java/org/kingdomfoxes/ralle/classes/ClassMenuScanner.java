@@ -62,7 +62,7 @@ public final class ClassMenuScanner {
         if (menu == minecraft.player.inventoryMenu || menu.containerId != openedId
                 || menu.slots.size() < WynncraftClassMenu.MENU_SIZE) return java.util.Optional.empty();
         return WynncraftClassMenu.decode(title, menu.slots.stream().limit(WynncraftClassMenu.MENU_SIZE)
-                .map(slot -> slot.getItem()).toList()).map(result -> {
+                .map(slot -> slot.getItem()).toList(), store.account(minecraft.getUser().getProfileId()).characters()).map(result -> {
                     autoOpenObserved(minecraft.getUser().getProfileId(), result.autoOpenEnabled());
                     return new LiveMenu(menu.containerId, result);
                 });
@@ -96,7 +96,7 @@ public final class ClassMenuScanner {
         if (!WynncraftClassMenu.matchesTitle(currentTitle)) return;
         try {
             var items = menu.slots.stream().limit(WynncraftClassMenu.MENU_SIZE).map(slot -> slot.getItem()).toList();
-            var decoded = WynncraftClassMenu.decode(currentTitle, items);
+            var decoded = WynncraftClassMenu.decode(currentTitle, items, store.account(current).characters());
             if (decoded.isEmpty()) return;
             var result = decoded.get();
             autoOpenObserved(current, result.autoOpenEnabled());
@@ -159,11 +159,11 @@ public final class ClassMenuScanner {
                 var json = JsonParser.parseString(new String(bytes, StandardCharsets.UTF_8));
                 if (!json.isJsonObject()) continue;
                 var result = ClassMenuEvidence.decode(json.getAsJsonObject(), current,
-                        minecraft.level.registryAccess().createSerializationContext(JsonOps.INSTANCE));
+                        minecraft.level.registryAccess().createSerializationContext(JsonOps.INSTANCE), store.account(current).characters());
                 if (result.isPresent()) {
                     aliases.putAll(result.get().legacyReferences());
                     result.get().characters().forEach(character -> proofs.put(character.id(), character));
-                    if (initial) discovery.observe(new ClassScan(current, result.get().characters(), false), discovery.generation());
+                    if (initial) discovery.observe(new ClassScan(current, result.get().discoveredCharacters(), false), discovery.generation());
                     else result.get().characters().forEach(c -> { if (c.sprite() != null) sprites.put(c.id(), c.sprite()); });
                 }
             } catch (com.google.gson.JsonParseException invalid) {
@@ -171,6 +171,7 @@ public final class ClassMenuScanner {
             }
         }
         store.migrateReferences(current, aliases, java.util.List.copyOf(proofs.values()));
+        store.hydrateBookObservations(current, java.util.List.copyOf(proofs.values()));
         if (!initial && !sprites.isEmpty()) store.updateSprites(current, sprites);
     }
 

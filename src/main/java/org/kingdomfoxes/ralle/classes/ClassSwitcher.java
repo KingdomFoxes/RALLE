@@ -83,7 +83,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         book = -1;
         bookStatus = "not received";
         lastStage = ClassSwitchController.State.CAPTURING;
-        LOGGER.info("Class switch: capturing selected frame");
+        LOGGER.info("Class switch: capturing selected frame; target={}", reference);
         feedback.clear();
         return controller.begin(minecraft.getUser().getProfileId(), reference, loads.current(), true, now());
     }
@@ -119,6 +119,9 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
                 bookStatus = (menu.result().complete() ? "complete" : "partial") + " (" + menu.result().characters().size() + " characters)";
                 if (menu.result().complete()) {
                     var slot = menu.result().resolve(target);
+                    if (slot.isEmpty()) LOGGER.warn("Class match rejected: target={}; canonical={}; reason={}; roster={}",
+                            target, menu.result().canonicalReference(target), menu.result().matchStatus(target),
+                            menu.result().characters().stream().map(c -> c.type() + "@" + c.book().slot() + "=" + c.id()).toList());
                     controller.menu(menu.containerId(), slot.isPresent()
                             ? List.of(new ClassSwitchController.Target(target, slot.getAsInt())) : List.of(), true);
                 }

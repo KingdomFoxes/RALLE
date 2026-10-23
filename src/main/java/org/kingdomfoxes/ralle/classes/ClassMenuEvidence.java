@@ -13,6 +13,11 @@ public final class ClassMenuEvidence {
     private ClassMenuEvidence() {}
 
     public static Optional<WynncraftClassMenu.Result> decode(JsonObject evidence, UUID account, DynamicOps<JsonElement> ops) {
+        return decode(evidence, account, ops, List.of());
+    }
+
+    public static Optional<WynncraftClassMenu.Result> decode(JsonObject evidence, UUID account, DynamicOps<JsonElement> ops,
+                                                            List<ClassCharacter> saved) {
         try {
             if (evidence.get("version").getAsInt() != 1
                     || !account.toString().equals(evidence.get("account").getAsString())
@@ -30,7 +35,7 @@ public final class ClassMenuEvidence {
                 if (item.isEmpty()) return Optional.empty();
                 items.set(index, item.get());
             }
-            return WynncraftClassMenu.decode(evidence.get("title").getAsString(), items);
+            return WynncraftClassMenu.decode(evidence.get("title").getAsString(), items, saved);
         } catch (RuntimeException invalid) { return Optional.empty(); }
     }
 }

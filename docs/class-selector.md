@@ -21,14 +21,14 @@ two-way synchronization between vanilla and RALLE settings. First reconciliation
 runs after options load. A saved vanilla binding can populate an otherwise
 Unbound first load. Unsupported mouse modifiers do not open keyboard selectors.
 
-`config/ralle-class-shortcuts.json` version 1 separates immutable character and
+`config/ralle-class-shortcuts.json` version 2 separates immutable character and
 ordered shortcut lists by Minecraft account UUID. There are initially no selected
 shortcuts. Each shortcut saves the game identity, local name override and keyboard
 binding (`unbound` initially). Names use local override, then game nickname, then
 class type. Characters missing from a complete scan become unavailable without
 discarding their shortcuts, names, keys or order. Partial scans merge; they never
 erase. Reappearing stable identities recover their existing shortcut preferences.
-Display names/types are never identities. Removing a shortcut does not remove a
+Display names/types alone are never identities. Removing a shortcut does not remove a
 discovered character or issue a server action. Writes are atomic and publish only
 after persistence succeeds. Invalid or oversized files remain untouched and the
 editor fails closed, without disabling chat or LFG.
@@ -144,30 +144,83 @@ item/name/position checks; character identity validation remains unchanged.
 The enabled-state capture is retained as
 `wynncraft-character-book-auto-open-2026-10-19.json` with its account anonymized.
 
-**Those captured items carry no stable character IDs.** The decoder creates
-explicit `observed:<slot>:<sha256>` references from normalized identifying evidence,
-including position, model, potion tint, name and non-progress lore. They are not server identities. At
-submission, the native adapter requires the same reference in a complete,
-recognized **live** book. It also hashes that entry's evidence without position
-and requires it to occur exactly once: two otherwise identical entries in
-different positions cannot be safely distinguished. It reads and validates the
-live menu again immediately before the click. Historical captures, names, types
-and slot numbers alone never authorize selection, and there is no nearest-match
-or position fallback.
+**Those captured items carry no stable character IDs.** Version 2 stores structured
+`identity` evidence (`name` and normalized nonblank lore `details`) separately from
+the latest `sprite` model/tint and optional `book` observation (`slot` and the latest
+cleaned lore/progression snapshot). New local references use
+`observed:<initial-slot>:v3-<birth-hash>`. Birth evidence allocates a reference once;
+subsequent matching keeps that reference while updating its book position, progress
+and artwork. Existing v1/v2 references remain usable when evidence proves continuity.
+These are local observations, not server UUIDs. No identity is inferred from a
+class name, a slot number or a nearby match.
+
+`ClassRosterMatcher` groups entries by exact normalized semantic evidence, then
+assigns old records to received records one-to-one. It first uses progression
+snapshots unique in both rosters, then artwork unique in both rosters. A complete
+book with the same group size may assign one remaining old/live pair after all
+its peers match; additions, removals and partial updates cannot use this elimination.
+This allows an icon and progress to change without invalidating the retained local
+reference, and lets distinguishable Mages/Archers follow book reordering. No scoring,
+nearest-level, closest-time or position fallback is used. Identical full observations
+cannot authorize selection. The adapter requires a complete recognized **live** book
+and validates the selected entry again immediately before clicking.
+Recognized decreases in play hours or combat level reject continuity, so a newly
+created low-level character cannot steal an older character's reference by reusing
+its previous icon. A progression reset that contradicts the saved witness requires
+explicit reassignment.
+
+Known class reskins are cosmetic transitions in both directions: Mage/Dark Wizard,
+Archer/Hunter, Warrior/Knight, Assassin/Ninja and Shaman/Skyseer. Matching canonicalizes
+only the exact `- Class:` field and a default title equal to that received class
+label. The same class field is canonicalized in progression comparisons. Custom
+character names and unknown non-progress fields remain exact. The original semantic
+baseline remains stored for compatibility with hash-bearing v2 references, while
+the latest received type, nickname and potion artwork refresh normally. Shortcuts,
+local name overrides, keybinds, order and loaded-class associations are preserved
+through reskins and restarts. Distinct characters in the same family still require
+unique continuity evidence; a reskin label alone never disambiguates them. No new
+setting, packet, command or saved format is introduced. Automated book replays cover
+every pair in both directions, older v2 references, roster reordering and partial
+reskin/progression updates. Actual reskin toggling on Wynncraft remains a live check.
 
 Play time, location, level/XP and the recognized Content Progress bar/count are
-progress, not identity. Their values are normalized before hashing, so playing X,
-switching to Y, and returning to X preserves X's shortcut. Required fields must
-still be present. Nickname, class type, model/tint, position, gamemode and other
-non-progress lore remain part of the identifying evidence. Renames, moves and
-other identifying changes still require explicit reassignment. Two entries with
-identical identifying evidence cannot be disambiguated by their differing levels
-or play times. The decoder removes formatting and resource-font glyphs as before.
+normalized in semantic evidence and retained separately for continuity comparisons.
+Formatting, resource-font glyphs and empty spacer lines
+are removed. Models and potion tints refresh on every changed natural observation
+without changing a proven local reference. Creating
+a neighboring character cannot invalidate an existing entry through changed artwork
+or spacer glyphs. Required fields must still be present. Nickname, class family,
+gamemode and unknown non-progress lore remain identifying; changes require explicit
+reassignment. A book reorder updates the separate position while preserving references,
+shortcut order, names, keys, last-load records and compass associations, including
+in-session observations and late queued load saves.
 
-The decoder also computes the old full-item hash as a migration proof. Existing
-references are upgraded only when a retained account-matching item capture or a
-received live book proves that exact old hash. Migration preserves row order,
-local names, keys, character sprites, last-load records and compass associations.
+Two entries with identical semantic evidence can be distinguished by uniquely
+observed progression/artwork. Truly identical full observations receive
+`ambiguous-v3-` references and remain unselectable. Those uncertain references are
+never silently matched to a later survivor. Removing or renaming a duplicate cannot
+redirect an old shortcut; choosing a newly distinguishable entry remains explicit.
+Partial books never authorize a target click. No stable server UUID is invented.
+
+The October 23 v2 build incorrectly discarded all progression as matching evidence
+and blocked repeated types even when their received observations differed. Its saved
+`ambiguous-v2-` references can recover from unique matching artwork and then retain
+progress observations normally. The anonymized six-character capture is retained as
+`wynncraft-character-book-2026-10-23.json`; replay verifies all six saved references,
+including both Mages and both Archers. The original logs did not include submitted
+targets, so they could not identify which shortcut produced each rejection. Switch
+logs now include the target reference, canonical reference, rejection reason and
+bounded roster summary. Reasons distinguish missing continuity from identical
+observations. Diagnostic capture now waits for complete books so packet fragments
+cannot exhaust its four-snapshot budget.
+
+Version 1 files remain readable and upgrade on the next successful atomic save.
+The decoder computes both prior full-item and progress-normalized hashes for
+migration proofs. When live artwork has changed, the saved sprite can reconstruct
+the previous normalized hash; that entire hash must match, not just name/type/slot.
+Historical account-matching captures can also prove an old reference. Migration
+preserves row order, local names, keys, last-load records and compass associations;
+the next live reconciliation supplies current artwork and structured observations.
 If a progress update already replaced the catalog's old hash, migration restores
 the proven normalized descriptor only while that position remains occupied by a
 saved entry with the same name, type and sprite. A missing/deleted entry is never
@@ -175,11 +228,15 @@ restored, and this catalog repair cannot bypass complete live-book validation.
 Capture recovery examines at most four bounded files on session initialization,
 even when sprites are already present. It does not resurrect removed shortcuts.
 No slot/name-only migration is allowed; legacy references without proof still
-offer the explicit reassignment action. All four shortcuts in the reported local
-configuration have matching retained captures and can migrate on the next load.
+offer the explicit reassignment action. Historical proof cannot authorize a click
+or choose between currently identical observations. Historical evidence may hydrate
+an absent `book` observation for a matched existing reference, never overwrite a
+newer one, create a removed shortcut, or authorize a target click.
 
-Partial refreshes retire the old catalog observation at an updated position,
-preventing duplicate entries without redirecting its shortcut. A stale shortcut's
+Partial refreshes retain unmatched old witnesses even when a received item occupies
+their former position: later packets may move them elsewhere in the same book.
+Unproven replacements within an existing semantic group remain provisional until a
+complete book arrives, so they cannot poison its next reconciliation. A stale shortcut's
 Edit popup offers `Choose detected class…`: the player explicitly chooses the
 replacement, retaining its list position, local name and option key. Duplicate
 targets and account changes are rejected. Closing that picker returns to the
@@ -228,7 +285,7 @@ Saved enabled preferences are preserved but cannot take effect until confirmed;
 a fresh install still requires explicitly turning Class Switcher on.
 
 The last observed value is a boolean in an optional account-scoped `autoOpen` map
-in `config/ralle-class-shortcuts.json` (format version 1). Older files without the
+in `config/ralle-class-shortcuts.json` (format version 2, also reading version 1). Older files without the
 map remain valid and default to unknown/off. A saved true value satisfies the toggle
 gate on the next Wynncraft connection; a newly observed false value locks it again.
 Accounts never inherit each other's flag. Turning Class Switcher off does not clear it.
@@ -485,7 +542,7 @@ confirmation. Duplicate loads do not repeatedly write storage.
 Unconfirmed selections and load signals expire after 15 seconds; an abandoned
 click cannot be assigned to an unrelated later class load.
 
-`ralle-class-shortcuts.json` remains version 1 and gains an optional account-scoped
+`ralle-class-shortcuts.json` includes an optional account-scoped
 `loads` map. Each entry stores `lastReference` and up to 64 `references` associating
 a naturally received compass token with a previously observed book selection.
 Existing files without `loads` remain valid; shortcut edits, reset and scans
@@ -503,7 +560,7 @@ reference. Reads never wait for storage. Load-only saves do not change the short
 revision or cancel an open selector. Shutdown allows up to five seconds to drain
 pending writes; failed writes are logged and preserve the previous file. A forced
 process termination before an asynchronous write completes can lose that newest
-observation. No new saved format, setting or command is introduced.
+observation. No new setting or command is introduced by background persistence.
 
 The naturally received compass in hotbar index 7 (inventory container slot 43)
 can carry an eight-character partial character ID in its first lore line. The
@@ -567,6 +624,12 @@ Auto Open, zero-ID/native book closes, cleanup at every controller stage, frame
 and audio retention throughout a simulated 1.6-second door sequence, and release
 at the 1600 ms book-close deadline even without world-entry signals. Tests replay
 X-to-Y-to-X with changed progress and verify evidence-proven legacy migration.
+Roster regressions cover model/tint refreshes, neighboring-character creation
+with changed spacing, book insertion/reordering, preservation of preferences and
+tokens across restart, late load writes, old color-dependent hashes, non-progress
+identity changes, repeated types with the same artwork but distinct progression,
+progress and artwork changing together, and swaps arriving through partial packets.
+Removing an indistinguishable duplicate must not resurrect or redirect an old reference.
 Hook tests verify the actual mapped Minecraft packet
 and input boundaries and that runtime code never samples screen pixels.
 `ClassSwitchReplayTest` runs the captured character book through both manual-open

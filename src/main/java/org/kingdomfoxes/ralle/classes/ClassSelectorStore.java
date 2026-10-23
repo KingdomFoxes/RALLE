@@ -70,12 +70,12 @@ public final class ClassSelectorStore {
         if (Files.size(path) > 1024 * 1024) throw new IOException("Class selector file exceeds 1 MiB");
         try {
             var data = JSON.fromJson(Files.readString(path), FileData.class);
-            if (data == null || data.version != 1 || data.accounts == null || data.accounts.size() > 128)
+            if (data == null || (data.version != 1 && data.version != 2) || data.accounts == null || data.accounts.size() > 128)
                 throw new IllegalArgumentException("Invalid class selector file");
             data.accounts.forEach((id, account) -> {
                 java.util.Objects.requireNonNull(id);
                 // Reconstruct nested records to validate even when the serializer bypasses constructors.
-                var characters = account.characters.stream().map(c -> new ClassCharacter(c.id(), c.type(), c.nickname(), c.sprite())).toList();
+                var characters = account.characters.stream().map(c -> new ClassCharacter(c.id(), c.type(), c.nickname(), c.sprite(), c.identity(), c.book())).toList();
                 var shortcuts = account.shortcuts.stream().map(s -> new ClassShortcut(s.characterId(), s.name(), s.binding())).toList();
                 accounts.put(id, new Account(characters, shortcuts));
             });
@@ -168,7 +168,10 @@ public final class ClassSelectorStore {
         var characters = new LinkedHashMap<String, ClassCharacter>();
         for (var character : previous.characters) {
             String id = aliases.getOrDefault(character.id(), character.id());
-            characters.putIfAbsent(id, new ClassCharacter(id, character.type(), character.nickname(), character.sprite()));
+            var proof = id.equals(character.id()) ? null : proofs.stream().filter(c -> c.id().equals(id)).findFirst().orElse(null);
+            var identity = proof != null ? proof.identity() : character.identity();
+            characters.putIfAbsent(id, new ClassCharacter(id, character.type(), character.nickname(), proof != null ? proof.sprite() : character.sprite(), identity,
+                    proof != null ? proof.book() : character.book()));
         }
         var shortcuts = new ArrayList<ClassShortcut>();
         for (var shortcut : previous.shortcuts) {
@@ -183,7 +186,7 @@ public final class ClassSelectorStore {
                 var proof = proofs.stream().filter(character -> character.id().equals(id)).findFirst().orElse(null);
                 if (proof != null) {
                     var known = characters.values().stream().filter(character ->
-                            WynncraftClassMenu.characterNumber(character.id()) == WynncraftClassMenu.characterNumber(proof.id())
+                            WynncraftClassMenu.bookSlot(character) == WynncraftClassMenu.bookSlot(proof)
                                     && character.type().equals(proof.type()) && character.nickname().equals(proof.nickname())
                                     && java.util.Objects.equals(character.sprite(), proof.sprite())).findFirst().orElse(null);
                     if (known != null) {
@@ -212,12 +215,9 @@ public final class ClassSelectorStore {
         var previous = account(scan.account());
         var characters = new LinkedHashMap<String, ClassCharacter>();
         if (!scan.complete()) previous.characters.forEach(c -> characters.put(c.id(), c));
-        // A partial scan may refresh a position's evidence without proving continuity of identity.
-        // Retire its old catalog entry rather than accumulating duplicates or redirecting a shortcut.
+        // Keep every unmatched old witness through partial updates. A new item at its former
+        // position may precede the packet moving that old character elsewhere in this book.
         for (var incoming : scan.characters()) {
-            int position = WynncraftClassMenu.characterNumber(incoming.id());
-            if (position >= 0) characters.values().removeIf(old ->
-                    WynncraftClassMenu.characterNumber(old.id()) == position && !old.id().equals(incoming.id()));
             characters.put(incoming.id(), incoming);
         }
         replace(scan.account(), new Account(List.copyOf(characters.values()), previous.shortcuts));
@@ -280,7 +280,23 @@ public final class ClassSelectorStore {
         }
         var current = account(account);
         var characters = current.characters.stream().map(c -> c.sprite() == null && sprites.containsKey(c.id())
-                ? new ClassCharacter(c.id(), c.type(), c.nickname(), sprites.get(c.id())) : c).toList();
+                ? new ClassCharacter(c.id(), c.type(), c.nickname(), sprites.get(c.id()), c.identity(), c.book()) : c).toList();
+        replace(account, new Account(characters, current.shortcuts));
+    }
+
+    /** Historical observations may fill absent witnesses, but never overwrite a newer one. */
+    public void hydrateBookObservations(UUID account, List<ClassCharacter> proofs) throws IOException {
+        if (!ClassStoreWrites.onWriter()) {
+            var copied = List.copyOf(proofs);
+            ClassStoreWrites.run(() -> hydrateBookObservations(account, copied)); return;
+        }
+        var current = account(account);
+        var characters = current.characters.stream().map(old -> {
+            if (old.book() != null) return old;
+            return proofs.stream().filter(proof -> proof.id().equals(old.id()) && proof.book() != null
+                    && old.type().equals(proof.type()) && old.nickname().equals(proof.nickname())
+                    && java.util.Objects.equals(old.sprite(), proof.sprite())).findFirst().orElse(old);
+        }).toList();
         replace(account, new Account(characters, current.shortcuts));
     }
 
@@ -313,7 +329,7 @@ public final class ClassSelectorStore {
 
     private void save(Map<UUID, Account> next, Map<UUID, Loaded> nextLoads, Map<UUID, Boolean> nextAutoOpen) throws IOException {
         if (!available()) throw new IOException("Class selector storage is unavailable");
-        String json = JSON.toJson(new FileData(1, next, nextLoads, nextAutoOpen));
+        String json = JSON.toJson(new FileData(2, next, nextLoads, nextAutoOpen));
         if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 1024 * 1024)
             throw new IllegalArgumentException("Class selector file exceeds 1 MiB");
         var parent = path.toAbsolutePath().getParent();

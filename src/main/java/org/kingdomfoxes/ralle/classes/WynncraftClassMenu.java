@@ -25,10 +25,13 @@ public final class WynncraftClassMenu {
 
     public record Result(List<ClassCharacter> characters, Map<String, Integer> slots,
                          Map<String, String> evidence, boolean complete, Map<String, String> legacyReferences,
-                         boolean autoOpenEnabled) {
-        public Result { characters = List.copyOf(characters); slots = Map.copyOf(slots); evidence = Map.copyOf(evidence); legacyReferences = Map.copyOf(legacyReferences); }
-        public ClassScan scan(UUID account) { return new ClassScan(account, characters, complete); }
-        public String canonicalReference(String reference) { return legacyReferences.getOrDefault(reference, reference); }
+                         boolean autoOpenEnabled, Set<String> provisional) {
+        public Result { characters = List.copyOf(characters); slots = Map.copyOf(slots); evidence = Map.copyOf(evidence); legacyReferences = Map.copyOf(legacyReferences); provisional = Set.copyOf(provisional); }
+        public List<ClassCharacter> discoveredCharacters() { return characters.stream().filter(c -> !provisional.contains(c.id())).toList(); }
+        public ClassScan scan(UUID account) { return new ClassScan(account, discoveredCharacters(), complete); }
+        public String canonicalReference(String reference) {
+            return slots.containsKey(reference) ? reference : legacyReferences.getOrDefault(reference, reference);
+        }
         /** No fallback by position, nickname or type. Normalized identifying evidence must match,
          * and its position-independent evidence must occur exactly once in this complete live book. */
         public OptionalInt resolve(String reference) {
@@ -38,6 +41,13 @@ public final class WynncraftClassMenu {
             if (!complete || slot == null || fingerprint == null
                     || evidence.values().stream().filter(fingerprint::equals).count() != 1) return OptionalInt.empty();
             return OptionalInt.of(slot);
+        }
+
+        public String matchStatus(String reference) {
+            if (!complete) return "partial-book";
+            String canonical = canonicalReference(reference);
+            if (!slots.containsKey(canonical)) return "reference-not-matched";
+            return resolve(reference).isPresent() ? "matched" : "identical-observations";
         }
     }
 
@@ -50,6 +60,14 @@ public final class WynncraftClassMenu {
             return number < 0 ? -1 : number + 1;
         } catch (RuntimeException invalid) { return -1; }
     }
+
+    public static int bookSlot(ClassCharacter character) {
+        if (character.book() != null) return character.book().slot();
+        int number = characterNumber(character.id());
+        return number < 0 ? -1 : CHARACTER_SLOTS.get(number - 1);
+    }
+
+    public static int characterNumber(ClassCharacter character) { return CHARACTER_SLOTS.indexOf(bookSlot(character)) + 1; }
 
     /** Reads only controls, allowing the prerequisite to be checked before character discovery is enabled. */
     public static Optional<Boolean> autoOpenState(String title, List<ItemStack> items) {
@@ -65,6 +83,11 @@ public final class WynncraftClassMenu {
 
     /** Exact title plus independent control signatures keep housing/inventory/editor menus out. */
     public static Optional<Result> decode(String title, List<ItemStack> items) {
+        return decode(title, items, List.of());
+    }
+
+    /** Saved artwork may prove an old hash even when the live icon has since changed. */
+    public static Optional<Result> decode(String title, List<ItemStack> items, List<ClassCharacter> saved) {
         var autoOpen = autoOpenState(title, items);
         if (autoOpen.isEmpty()) return Optional.empty();
         var characters = new ArrayList<ClassCharacter>();
@@ -79,11 +102,34 @@ public final class WynncraftClassMenu {
             if (character == null) { complete = false; continue; }
             characters.add(character);
             slots.put(character.id(), slot);
-            evidence.put(character.id(), digest(evidence(item)));
             legacyReferences.put(ClassCharacter.OBSERVATION_PREFIX + slot + ":" + digest(slot + "\n" + rawEvidence(item)), character.id());
+            legacyReferences.put(ClassCharacter.OBSERVATION_PREFIX + slot + ":" + digest(slot + "\n" + evidence(item)), character.id());
+            // Only the old hash itself proves continuity: matching slot/name/type is insufficient.
+            for (var old : saved) {
+                if (old.sprite() == null || characterNumber(old.id()) != characterNumber(character.id())) continue;
+                String oldHash = ClassCharacter.OBSERVATION_PREFIX + slot + ":"
+                        + digest(slot + "\n" + evidence(item, old.sprite()));
+                if (old.id().equals(oldHash)) legacyReferences.put(old.id(), character.id());
+            }
         }
-        return Optional.of(new Result(characters, slots, evidence, complete, legacyReferences,
-                autoOpen.get()));
+        var matched = ClassRosterMatcher.match(characters, saved, complete);
+        var references = new HashMap<String, String>();
+        slots.clear();
+        for (int i = 0; i < matched.size(); i++) {
+            var character = matched.get(i);
+            references.put(characters.get(i).id(), character.id());
+            slots.put(character.id(), character.book().slot());
+            evidence.put(character.id(), ClassRosterMatcher.witness(character));
+        }
+        legacyReferences.replaceAll((old, target) -> references.get(target));
+        var provisional = new HashSet<String>();
+        if (!complete) for (var character : matched) {
+            if (saved.stream().noneMatch(c -> c.id().equals(character.id()))
+                    && saved.stream().anyMatch(c -> c.identity() != null && character.identity().forMatching().equals(c.identity().forMatching())))
+                provisional.add(character.id());
+        }
+        return Optional.of(new Result(matched, slots, evidence, complete, legacyReferences,
+                autoOpen.get(), provisional));
     }
 
     private static ClassCharacter character(int slot, ItemStack item) {
@@ -104,16 +150,27 @@ public final class WynncraftClassMenu {
         if (name.isBlank() || name.length() > 128 || lines.stream().anyMatch(line -> line.length() > 512)) return null;
         var model = item.get(DataComponents.CUSTOM_MODEL_DATA);
         if (model == null || model.floats().size() != 1 || !Float.isFinite(model.floats().getFirst())) return null;
-        // Progress changes naturally when playing. Keep all identifying evidence and position,
-        // but do not mistake play time, location, level or content progress for character identity.
-        String reference = ClassCharacter.OBSERVATION_PREFIX + slot + ":" + digest(slot + "\n" + evidence(item));
+        var identity = new ClassIdentity(name, normalizedLines(item).stream().filter(line -> !line.isBlank()).toList());
+        String reference = identity.reference(slot);
         var potion = item.get(DataComponents.POTION_CONTENTS);
         int tint = potion == null ? 0xFFFFFF : potion.customColor().orElse(0xFFFFFF);
         return new ClassCharacter(reference, type, name.equals(type) ? "" : name,
-                new ClassSprite(model.floats().getFirst(), tint));
+                new ClassSprite(model.floats().getFirst(), tint), identity,
+                new ClassBookObservation(slot, lines.stream().filter(line -> !line.isBlank()).toList()));
     }
 
     private static String evidence(ItemStack item) {
+        var potion = item.get(DataComponents.POTION_CONTENTS);
+        return evidence(item, new ClassSprite(item.get(DataComponents.CUSTOM_MODEL_DATA).floats().getFirst(),
+                potion == null ? 0xFFFFFF : potion.customColor().orElse(0xFFFFFF)));
+    }
+
+    /** v1 hash input is retained exactly for evidence-proven migration, including blank lines. */
+    private static String evidence(ItemStack item, ClassSprite sprite) {
+        return sprite.model() + "\n" + sprite.tint() + "\n" + name(item) + "\n" + String.join("\n", normalizedLines(item));
+    }
+
+    private static List<String> normalizedLines(ItemStack item) {
         var lines = new ArrayList<>(item.get(DataComponents.LORE).lines().stream().map(line -> clean(line.getString())).toList());
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i);
@@ -125,9 +182,7 @@ public final class WynncraftClassMenu {
                 lines.set(i + 2, "<content count>");
             }
         }
-        var potion = item.get(DataComponents.POTION_CONTENTS);
-        int tint = potion == null ? 0xFFFFFF : potion.customColor().orElse(0xFFFFFF);
-        return item.get(DataComponents.CUSTOM_MODEL_DATA).floats().getFirst() + "\n" + tint + "\n" + name(item) + "\n" + String.join("\n", lines);
+        return lines;
     }
 
     /** Historical full-item hash, used only to prove migration of an existing old reference. */
