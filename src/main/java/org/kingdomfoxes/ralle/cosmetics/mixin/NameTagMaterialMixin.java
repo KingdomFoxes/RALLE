@@ -39,7 +39,7 @@ abstract class NameTagMaterialMixin {
         }
         Component tinted;
         try {
-            tinted = LiquidComponentTint.whiteWithVanillaShadow(label, Minecraft.getInstance().font);
+            tinted = LiquidComponentTint.whiteWithVanillaShadow(label);
         } catch (RuntimeException failure) {
             ralle$warn(failure);
             original.call(pose, attachment, y, label, seeThrough, light, distance, camera);

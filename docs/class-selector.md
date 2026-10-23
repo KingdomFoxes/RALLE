@@ -11,6 +11,24 @@ these checks do not establish a stable server character UUID.
 
 ## Settings and local data
 
+Passive book processing uses detached item snapshots of the 54 recognized book
+slots. An unchanged owner/title/roster revision and identical item components/counts
+skip repeated discovery and Auto Open decoding. In-place item mutations still
+invalidate the snapshot, even without a native state-ID change. New menus,
+account/connection resets and catalog changes invalidate the relevant cache.
+The automated `liveMenu()` path deliberately bypasses this cache and freshly
+decodes live items before every target selection.
+
+Diagnostic capture uses the same unchanged-content guard. Item/registry codecs
+run on the client thread to build a detached JSON tree of the recognized book;
+pretty serialization and atomic file writes run on a separate daemon writer
+with at most four queued captures plus one active write. It never retains a live
+menu or registry off-thread and never shares the class-identity writer. Existing
+four-capture session and 256 KiB file limits remain. Queue/write failures affect
+diagnostics only. Shutdown drains that writer with a five-second bound.
+`ClassMenuSnapshotTest` covers invalidation and the uncached selection boundary;
+`ClassCaptureWriterTest` covers detached persistence and shutdown.
+
 Wheels → Class Switcher has Class Switcher (off), Wheel Style (Circle Segments, Bars, No View),
 Class Modifier (Unbound) and a dependency-hidden Class Shortcuts panel. None
 depends on Raid LFG, guild access, cosmetic access or the LFG service. Style and
@@ -21,7 +39,7 @@ two-way synchronization between vanilla and RALLE settings. First reconciliation
 runs after options load. A saved vanilla binding can populate an otherwise
 Unbound first load. Unsupported mouse modifiers do not open keyboard selectors.
 
-`config/ralle-class-shortcuts.json` version 2 separates immutable character and
+the `classes` section of `config/ralle.json` version 2 separates immutable character and
 ordered shortcut lists by Minecraft account UUID. There are initially no selected
 shortcuts. Each shortcut saves the game identity, local name override and keyboard
 binding (`unbound` initially). Names use local override, then game nickname, then
@@ -285,7 +303,7 @@ Saved enabled preferences are preserved but cannot take effect until confirmed;
 a fresh install still requires explicitly turning Class Switcher on.
 
 The last observed value is a boolean in an optional account-scoped `autoOpen` map
-in `config/ralle-class-shortcuts.json` (format version 2, also reading version 1). Older files without the
+in the `classes` section of `config/ralle.json` (format version 2, also reading version 1). Older files without the
 map remain valid and default to unknown/off. A saved true value satisfies the toggle
 gate on the next Wynncraft connection; a newly observed false value locks it again.
 Accounts never inherit each other's flag. Turning Class Switcher off does not clear it.
@@ -544,7 +562,7 @@ confirmation. Duplicate loads do not repeatedly write storage.
 Unconfirmed selections and load signals expire after 15 seconds; an abandoned
 click cannot be assigned to an unrelated later class load.
 
-`ralle-class-shortcuts.json` includes an optional account-scoped
+The `classes` section of `ralle.json` includes an optional account-scoped
 `loads` map. Each entry stores `lastReference` and up to 64 `references` associating
 a naturally received compass token with a previously observed book selection.
 Existing files without `loads` remain valid; shortcut edits, reset and scans

@@ -5,11 +5,11 @@ import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocol;
 import org.kingdomfoxes.ralle.lfg.protocol.LfgProtocolException;
 import org.kingdomfoxes.ralle.lfg.protocol.StrictLfgJson;
 import org.kingdomfoxes.ralle.platform.SharedHttpTransport;
+import org.kingdomfoxes.ralle.platform.BoundedHttpBody;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -17,7 +17,6 @@ import java.net.http.HttpResponse;
 import java.net.http.WebSocket;
 import java.net.http.WebSocketHandshakeException;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -194,8 +193,25 @@ public final class HttpLfgGateway implements LfgGateway {
                 .header("Authorization", "Bearer " + bearerToken)
                 .header("X-Ralle-Removal-Reasons", "1")
                 .buildAsync(uri, adapter)
-                .thenApply(socket -> (LiveConnection) () -> socket.sendClose(1000, "client lifecycle changed"))
+                .thenApply(HttpLfgGateway::closingConnection)
                 .exceptionallyCompose(failure -> CompletableFuture.failedFuture(websocketFailure(failure)));
+    }
+
+    static LiveConnection closingConnection(WebSocket socket) {
+        var closed = new java.util.concurrent.atomic.AtomicBoolean();
+        return () -> {
+            if (!closed.compareAndSet(false, true)) return;
+            try {
+                socket.sendClose(1000, "client lifecycle changed");
+            } catch (RuntimeException ignored) {
+                // Already failed/closed sockets still receive the bounded transport cleanup.
+            } finally {
+                // Sending a close frame does not guarantee that the peer completes its half
+                // of the handshake. Superseded connections must release their transport.
+                CompletableFuture.delayedExecutor(1, java.util.concurrent.TimeUnit.SECONDS)
+                        .execute(socket::abort);
+            }
+        };
     }
 
     private <T> CompletableFuture<T> get(String path, String token, Function<String, T> decoder) {
@@ -218,15 +234,17 @@ public final class HttpLfgGateway implements LfgGateway {
 
     private <T> CompletableFuture<T> send(HttpRequest request, Function<String, T> decoder,
                                           boolean retryTransport, int attempt) {
-        return client.get().sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
+        return BoundedHttpBody.send(client.get(), request, MAX_HTTP_BODY_BYTES)
                 .handle((response, failure) -> {
                     if (failure != null) {
+                        if (unwrap(failure) instanceof BoundedHttpBody.BodyLimitException)
+                            return CompletableFuture.<T>failedFuture(new LfgProtocolException("HTTP response exceeds the protocol document limit"));
                         if (retryTransport && attempt == 0) return send(request, decoder, true, 1);
                         return CompletableFuture.<T>failedFuture(new LfgGatewayException(
                                 "Fox Raid LFG could not be reached.", unwrap(failure)));
                     }
                     try {
-                        var body = readBody(response.body());
+                        var body = response.body();
                         if (response.statusCode() >= 200 && response.statusCode() < 300) {
                             return CompletableFuture.completedFuture(decoder.apply(body));
                         }
@@ -238,10 +256,6 @@ public final class HttpLfgGateway implements LfgGateway {
                                     error.lobbyId(), error.returnedLobby(), retryAfter);
                         }
                         return CompletableFuture.<T>failedFuture(new LfgGatewayException(response.statusCode(), error));
-                    } catch (IOException exception) {
-                        if (retryTransport && attempt == 0) return send(request, decoder, true, 1);
-                        return CompletableFuture.<T>failedFuture(new LfgGatewayException(
-                                "Fox Raid LFG returned an unreadable response.", exception));
                     } catch (RuntimeException exception) {
                         logHttpFailure(request, response, exception.getClass().getSimpleName());
                         return CompletableFuture.<T>failedFuture(exception);
@@ -267,16 +281,6 @@ public final class HttpLfgGateway implements LfgGateway {
             return parsed.toString().equalsIgnoreCase(value) ? parsed.toString() : "unavailable";
         } catch (IllegalArgumentException invalid) {
             return "unavailable";
-        }
-    }
-
-    private static String readBody(java.io.InputStream body) throws IOException {
-        try (body) {
-            var bytes = body.readNBytes(MAX_HTTP_BODY_BYTES + 1);
-            if (bytes.length > MAX_HTTP_BODY_BYTES) {
-                throw new LfgProtocolException("HTTP response exceeds the protocol document limit");
-            }
-            return new String(bytes, StandardCharsets.UTF_8);
         }
     }
 

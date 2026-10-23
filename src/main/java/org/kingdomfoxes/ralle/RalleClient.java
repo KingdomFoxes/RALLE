@@ -86,13 +86,15 @@ public final class RalleClient implements ClientModInitializer {
         RalleSoundEvents.register();
 
         var configDirectory = FabricLoader.getInstance().getConfigDir();
-        var classShortcuts = org.kingdomfoxes.ralle.classes.ClassSelectorStore.open(
-                configDirectory.resolve("ralle-class-shortcuts.json"));
         boolean existingInstall = RalleOnboardingNotice.hasExistingConfig(configDirectory);
-        var settings = new SettingsRegistry(configDirectory.resolve("ralle.properties"));
-        var placements = new HudPlacementRegistry(configDirectory.resolve("ralle-hud-layout.properties"));
+        var localState = new org.kingdomfoxes.ralle.settings.LocalStateFile(
+                configDirectory.resolve(org.kingdomfoxes.ralle.settings.LocalStateFile.FILE_NAME));
+        var classShortcuts = org.kingdomfoxes.ralle.classes.ClassSelectorStore.open(
+                localState.section("classes"));
+        var settings = new SettingsRegistry(localState.section("settings"));
+        var placements = new HudPlacementRegistry(localState.section("hud"));
         var onboarding = new RalleOnboardingNotice(
-                configDirectory.resolve("ralle-onboarding.properties"), existingInstall);
+                localState.section("onboarding"), existingInstall);
 
         RalleSettings.register(settings);
         var foxGuildAccess = new org.kingdomfoxes.ralle.client.FoxGuildAccess(
@@ -159,7 +161,7 @@ public final class RalleClient implements ClientModInitializer {
                 wynntilsCompatibility.supported());
 
         var chatLayout = new ChatLayoutService(Minecraft.getInstance(), placements);
-        var navigation = new SettingsNavigationState(configDirectory.resolve("ralle-settings-ui.properties"), settings);
+        var navigation = new SettingsNavigationState(localState.section("navigation"), settings);
         var cosmeticStyleSelection = new CosmeticStyleSelection(
                 new HttpCosmeticSelfGateway(), new MinecraftSessionProofAdapter(minecraft),
                 cosmeticDirectory, () -> true,
@@ -176,7 +178,7 @@ public final class RalleClient implements ClientModInitializer {
         var consumableHighlights = new ConsumableHighlightService(
                 minecraft,
                 settings.setting(RalleSettings.CONSUMABLE_HIGHLIGHTS_ENABLED_ID, BooleanSetting.class),
-                new ConsumableHighlightStore(configDirectory.resolve("ralle-consumable-highlights.json")),
+                new ConsumableHighlightStore(localState.section("consumables")),
                 System::currentTimeMillis
         );
         var guildRanks = new GuildRankService(
@@ -187,7 +189,7 @@ public final class RalleClient implements ClientModInitializer {
                                 || QueueAttributionService.rankColorsRequested())
                                 && org.kingdomfoxes.ralle.client.WynncraftHost.matches(
                                         minecraft.getCurrentServer() == null ? "" : minecraft.getCurrentServer().ip))),
-                configDirectory.resolve("ralle-ranks.json"),
+                localState.section("guildRanks"),
                 settings.setting(RalleSettings.INTERNAL_GUILD_RANKS_ID, BooleanSetting.class),
                 settings.setting(RalleSettings.GUILD_RANK_STYLE_ID, ChoiceSetting.class),
                 () -> minecraft.getCurrentServer() == null ? "" : minecraft.getCurrentServer().ip,
@@ -228,7 +230,7 @@ public final class RalleClient implements ClientModInitializer {
         var autoRaidRequeue = new AutoRaidRequeueController(
                 minecraft,
                 settings.setting(AutoRaidRequeueController.KEYBIND_ID, KeybindSetting.class),
-                new AutoRaidRequeueStore(configDirectory.resolve("ralle-auto-requeue.properties")),
+                new AutoRaidRequeueStore(localState.section("requeue")),
                 actionBarState
         );
         var classSwitcher = new org.kingdomfoxes.ralle.classes.ClassSwitcher(minecraft,
@@ -237,6 +239,7 @@ public final class RalleClient implements ClientModInitializer {
         var classSelectorBindings = new org.kingdomfoxes.ralle.classes.ClassSelectorBindings(
                 minecraft, settings, classShortcuts, classActionBar, classSwitcher);
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> classSwitcher.close());
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> classMenuCapture.close());
         new LfgActionBarOverlay(minecraft, classActionBar,
                 net.minecraft.resources.Identifier.fromNamespaceAndPath(MOD_ID, "class_selector_feedback"), () -> true).register();
         var actionBarOverlay = new LfgActionBarOverlay(minecraft, actionBarState,
@@ -294,7 +297,8 @@ public final class RalleClient implements ClientModInitializer {
             pointAndLaugh.reset();
             raidLfg.connectionChanged();
             guildRanks.connectionChanged();
-            onboarding.postIfNeeded(body -> RalleChatMessages.post(client, body));
+            if (client.getCurrentServer() != null && WynncraftHost.matches(client.getCurrentServer().ip))
+                onboarding.postIfNeeded(body -> RalleChatMessages.post(client, body));
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             classMenuCapture.reset();
@@ -324,12 +328,17 @@ public final class RalleClient implements ClientModInitializer {
             updateNotice.tick().ifPresent(release -> RalleChatMessages.post(client, UpdateMessages.body(release)));
             foxGuildAccess.tick();
             if (cosmeticReloadPending.getAndSet(false)) cosmeticTextures.close();
-            var visibleCosmeticIds = new java.util.LinkedHashSet<java.util.UUID>();
-            visibleCosmeticIds.add(client.getUser().getProfileId());
-            if (client.level != null) client.level.players().forEach(player -> visibleCosmeticIds.add(player.getUUID()));
-            raidLfg.store().state().lobbyList().forEach(lobby ->
-                    lobby.members().forEach(member -> visibleCosmeticIds.add(member.minecraftUuid())));
-            cosmeticDirectory.tick(visibleCosmeticIds);
+            if (client.getConnection() != null && client.getCurrentServer() != null
+                    && WynncraftHost.matches(client.getCurrentServer().ip)) {
+                var visibleCosmeticIds = new java.util.LinkedHashSet<java.util.UUID>();
+                visibleCosmeticIds.add(client.getUser().getProfileId());
+                if (client.level != null) client.level.players().forEach(player -> visibleCosmeticIds.add(player.getUUID()));
+                raidLfg.store().state().lobbies().values().forEach(lobby ->
+                        lobby.members().forEach(member -> visibleCosmeticIds.add(member.minecraftUuid())));
+                cosmeticDirectory.tick(visibleCosmeticIds);
+            } else {
+                cosmeticDirectory.clear();
+            }
             HqDistanceOverlay.tick();
             try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_LAYOUT_TICK)) { chatLayout.tick(); }
             try (var ignored = DiagnosticProfiler.measure(DiagnosticProfiler.Section.CHAT_BEHAVIOR_TICK)) { chatBehavior.tick(); }
@@ -406,6 +415,13 @@ public final class RalleClient implements ClientModInitializer {
             }
             ralleCommand.then(styles);
             dispatcher.register(ralleCommand);
+        });
+        // Registered after the class switcher's shutdown flush so its pending writes land first.
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            try { localState.close(); }
+            catch (java.io.IOException failure) {
+                org.slf4j.LoggerFactory.getLogger(RalleClient.class).error("Could not flush RALLE local state at shutdown", failure);
+            }
         });
     }
 

@@ -48,7 +48,7 @@ final class NameplatePreviewPanelProvider implements CustomSettingsPanelProvider
             try {
                 graphics.pose().translate(x + (width - logicalWidth * scale) / 2, y);
                 graphics.pose().scale(scale, scale);
-                if (!notification && appearance != null && appearance.treatment() == CosmeticAppearance.Treatment.PLATE)
+                if (!notification && appearance != null)
                     LiquidMaterialPresentation.plate(graphics, style, appearance, 0, 0, logicalWidth, 22);
                 int headX = notification ? 0 : 2, headY = notification ? 0 : 2;
                 int size = notification ? 20 : 18;
@@ -56,7 +56,7 @@ final class NameplatePreviewPanelProvider implements CustomSettingsPanelProvider
                 PlayerHeadPresentation.draw(graphics, skin, headX, headY, size, 0xffd9b248,
                         notification ? style : null, notification ? appearance : null);
                 if (!notification)
-                    LiquidNameComponent.drawName(graphics, star, username, style, appearance, 26, (22 - minecraft.font.lineHeight) / 2);
+                    LiquidNameComponent.drawName(graphics, star, username, 26, (22 - minecraft.font.lineHeight) / 2);
             } finally { graphics.pose().popMatrix(); }
         }
     }

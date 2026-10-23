@@ -5,6 +5,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 /** Publishes image/png through the active Wayland or X11 clipboard protocol helper. */
 final class LinuxPlatformImageClipboard implements PlatformImageClipboard {
@@ -79,21 +82,34 @@ final class LinuxPlatformImageClipboard implements PlatformImageClipboard {
         return output == null || output.isBlank() ? "" : ": " + output.strip();
     }
 
-    private static final class ProcessCommandRunner implements CommandRunner {
+    static final class ProcessCommandRunner implements CommandRunner {
         @Override
         public Result run(List<String> command, byte[] standardInput) throws IOException, InterruptedException {
             Process process = new ProcessBuilder(command)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                     .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start();
-            try (var input = process.getOutputStream()) {
-                input.write(standardInput);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            var written = new CompletableFuture<Void>();
+            // A stalled helper may never read stdin. Writing on this thread would prevent
+            // reaching waitFor's timeout and permanently hold the screenshot capture gate.
+            Thread.startVirtualThread(() -> {
+                try (var input = process.getOutputStream()) {
+                    input.write(standardInput);
+                    written.complete(null);
+                } catch (IOException failure) { written.completeExceptionally(failure); }
+            });
+            try {
+                if (!process.waitFor(5, TimeUnit.SECONDS)) throw new TimeoutException();
+                written.get(Math.max(1, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+                return new Result(process.exitValue(), "");
+            } catch (TimeoutException failure) {
+                throw new IOException("Clipboard helper did not respond within five seconds", failure);
+            } catch (ExecutionException failure) {
+                throw new IOException("Could not write image data to the clipboard helper", failure.getCause());
+            } finally {
+                if (process.isAlive()) process.destroyForcibly();
             }
-            if (!process.waitFor(5, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                throw new IOException("Clipboard helper did not respond within five seconds");
-            }
-            return new Result(process.exitValue(), "");
         }
     }
 }

@@ -30,6 +30,8 @@ final class ConsumableHighlightsPanel extends FlowLayout {
     private final ConsumableHighlightStore store;
     private final ExpandableParentChildListPanel list;
     private final io.wispforest.owo.ui.component.LabelComponent status;
+    private java.util.List<ConsumableHighlightRule> renderedRules;
+    private boolean refreshPending;
 
     ConsumableHighlightsPanel(RalleSettingsScreen screen, ConsumableHighlightStore store, Set<Integer> expanded) {
         super(Sizing.fill(100), Sizing.content(), Algorithm.VERTICAL);
@@ -62,6 +64,7 @@ final class ConsumableHighlightsPanel extends FlowLayout {
     void rebuild() {
         var rows = new ArrayList<io.wispforest.owo.ui.core.UIComponent>();
         var rules = store.snapshot();
+        renderedRules = rules;
         if (rules.isEmpty()) {
             var empty = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(198));
             empty.horizontalAlignment(HorizontalAlignment.CENTER).verticalAlignment(VerticalAlignment.CENTER);
@@ -80,6 +83,18 @@ final class ConsumableHighlightsPanel extends FlowLayout {
             }
         }
         list.replaceChildren(rows);
+    }
+
+    @Override
+    public void draw(io.wispforest.owo.ui.core.OwoUIGraphics graphics, int mouseX, int mouseY,
+                     float partialTicks, float delta) {
+        // Only the visible panel watches the immutable snapshot. The long-lived store must
+        // never retain providers/screens through a new listener on every settings opening.
+        if (!refreshPending && renderedRules != store.snapshot()) {
+            refreshPending = true;
+            Minecraft.getInstance().schedule(() -> { refreshPending = false; rebuild(); });
+        }
+        super.draw(graphics, mouseX, mouseY, partialTicks, delta);
     }
 
     private FlowLayout parentRow(int index, ConsumableHighlightRule rule) {

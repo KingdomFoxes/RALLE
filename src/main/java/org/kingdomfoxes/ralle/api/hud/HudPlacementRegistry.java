@@ -5,10 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
-import java.nio.file.Files;
 import java.nio.file.Path;
+import org.kingdomfoxes.ralle.settings.LocalStateSection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -18,13 +16,18 @@ import java.util.Properties;
 public final class HudPlacementRegistry {
     private static final Logger LOGGER = LoggerFactory.getLogger(HudPlacementRegistry.class);
 
-    private final Path storagePath;
+    private final LocalStateSection storagePath;
     private final Map<String, ElementDefinition> definitions = new LinkedHashMap<>();
     private final Map<String, NormalizedBounds> customBounds = new LinkedHashMap<>();
     private final Map<String, SidePlacement> sidePlacements = new LinkedHashMap<>();
     private boolean sealed;
+    private java.util.concurrent.CompletableFuture<Void> pendingSave;
 
     public HudPlacementRegistry(Path storagePath) {
+        this(LocalStateSection.file(storagePath));
+    }
+
+    public HudPlacementRegistry(LocalStateSection storagePath) {
         this.storagePath = Objects.requireNonNull(storagePath, "storagePath");
     }
 
@@ -130,11 +133,11 @@ public final class HudPlacementRegistry {
     }
 
     private void load() {
-        if (!Files.exists(storagePath)) return;
+        if (!storagePath.exists()) return;
 
-        var properties = new Properties();
-        try (Reader reader = Files.newBufferedReader(storagePath)) {
-            properties.load(reader);
+        final Properties properties;
+        try {
+            properties = storagePath.readProperties();
         } catch (IOException exception) {
             LOGGER.warn("Could not read RALLE HUD layout from {}. Vanilla placements will be used", storagePath, exception);
             return;
@@ -199,14 +202,12 @@ public final class HudPlacementRegistry {
             properties.setProperty(prefix + "vertical", Double.toString(entry.getValue().normalizedTop()));
         }
 
-        try {
-            Files.createDirectories(storagePath.getParent());
-            try (Writer writer = Files.newBufferedWriter(storagePath)) {
-                properties.store(writer, "RALLE normalized HUD placements");
-            }
-        } catch (IOException exception) {
-            LOGGER.error("Could not save RALLE HUD layout to {}", storagePath, exception);
-        }
+        var save = storagePath.writePropertiesAsync(properties);
+        if (save == pendingSave) return;
+        pendingSave = save;
+        save.whenComplete((ignored, failure) -> {
+            if (failure != null) LOGGER.error("Could not save RALLE HUD layout to {}", storagePath, failure);
+        });
     }
 
     public enum PlacementPolicy {

@@ -1,6 +1,7 @@
 package org.kingdomfoxes.ralle.cosmetics;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.OrderedSubmitNodeCollector;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
@@ -35,14 +36,18 @@ public final class WorldNameplateRenderer {
                                 WorldNameplateBounds bounds, int light, int tint) {
         collector.submitCustomGeometry(pose, renderType, (matrix, vertices) -> {
             float left = bounds.left(), right = bounds.right(), top = bounds.top(), bottom = bounds.bottom();
-            for (float[] edge : new float[][] {
-                    {left - 1, right + 1, top - 1, top}, {left - 1, right + 1, bottom, bottom + 1},
-                    {left - 1, left, top, bottom}, {right, right + 1, top, bottom}}) {
-                vertices.addVertex(matrix, edge[0], edge[3], DEPTH).setColor(tint).setLight(light);
-                vertices.addVertex(matrix, edge[1], edge[3], DEPTH).setColor(tint).setLight(light);
-                vertices.addVertex(matrix, edge[1], edge[2], DEPTH).setColor(tint).setLight(light);
-                vertices.addVertex(matrix, edge[0], edge[2], DEPTH).setColor(tint).setLight(light);
-            }
+            borderQuad(vertices, matrix, left - 1, right + 1, top - 1, top, light, tint);
+            borderQuad(vertices, matrix, left - 1, right + 1, bottom, bottom + 1, light, tint);
+            borderQuad(vertices, matrix, left - 1, left, top, bottom, light, tint);
+            borderQuad(vertices, matrix, right, right + 1, top, bottom, light, tint);
         });
+    }
+
+    private static void borderQuad(VertexConsumer vertices, PoseStack.Pose matrix, float left, float right,
+                                   float top, float bottom, int light, int tint) {
+        vertices.addVertex(matrix, left, bottom, DEPTH).setColor(tint).setLight(light);
+        vertices.addVertex(matrix, right, bottom, DEPTH).setColor(tint).setLight(light);
+        vertices.addVertex(matrix, right, top, DEPTH).setColor(tint).setLight(light);
+        vertices.addVertex(matrix, left, top, DEPTH).setColor(tint).setLight(light);
     }
 }

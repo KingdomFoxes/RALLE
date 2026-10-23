@@ -6,20 +6,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
+import org.kingdomfoxes.ralle.settings.LocalStateSection;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.function.LongSupplier;
 
-/** Persists settings-screen navigation separately from feature settings. */
+/** Owns settings-screen navigation in its own section of the shared local state. */
 public final class SettingsNavigationState {
     private static final Logger LOGGER = LoggerFactory.getLogger(SettingsNavigationState.class);
-    private final Path path;
+    private final LocalStateSection path;
     static final long SAVE_IDLE_MILLIS = 300;
     private final LongSupplier clock;
     private Snapshot snapshot;
     private Snapshot saved;
+    private Snapshot submitted;
+    private java.util.concurrent.CompletableFuture<Void> pendingSave;
     private long changedAt;
 
     public SettingsNavigationState(Path path, SettingsRegistry registry) {
@@ -27,6 +29,14 @@ public final class SettingsNavigationState {
     }
 
     SettingsNavigationState(Path path, SettingsRegistry registry, LongSupplier clock) {
+        this(LocalStateSection.file(path), registry, clock);
+    }
+
+    public SettingsNavigationState(LocalStateSection path, SettingsRegistry registry) {
+        this(path, registry, () -> System.nanoTime() / 1_000_000L);
+    }
+
+    private SettingsNavigationState(LocalStateSection path, SettingsRegistry registry, LongSupplier clock) {
         this.path = Objects.requireNonNull(path, "path");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.snapshot = load(Objects.requireNonNull(registry, "registry"));
@@ -63,18 +73,18 @@ public final class SettingsNavigationState {
     }
 
     /** Also called on removal, including opening the HUD editor or disconnecting. */
-    public void flush() {
-        if (snapshot.equals(saved)) return;
+    public synchronized void flush() {
+        if (snapshot.equals(submitted) || submitted == null && snapshot.equals(saved)) return;
         // Back off after an I/O failure instead of retrying every client tick.
         changedAt = clock.getAsLong();
         save();
     }
 
     private Snapshot load(SettingsRegistry registry) {
-        if (!Files.exists(path)) return Snapshot.aboutPage();
-        var properties = new Properties();
-        try (var reader = Files.newBufferedReader(path)) {
-            properties.load(reader);
+        if (!path.exists()) return Snapshot.aboutPage();
+        final Properties properties;
+        try {
+            properties = path.readProperties();
         } catch (IOException exception) {
             LOGGER.warn("Could not read RALLE settings navigation from {}", path, exception);
             return Snapshot.aboutPage();
@@ -130,15 +140,19 @@ public final class SettingsNavigationState {
             if (snapshot.subcategoryId() != null) properties.setProperty("subcategory", snapshot.subcategoryId());
             properties.setProperty("scroll", Double.toString(snapshot.scrollProgress()));
         }
-        try {
-            Files.createDirectories(path.getParent());
-            try (var writer = Files.newBufferedWriter(path)) {
-                properties.store(writer, "RALLE settings screen navigation");
+        submitted = snapshot;
+        var save = path.writePropertiesAsync(properties);
+        if (save == pendingSave) return;
+        pendingSave = save;
+        save.whenComplete((ignored, failure) -> {
+            synchronized (this) {
+                if (pendingSave != save) return;
+                var next = submitted;
+                submitted = null;
+                if (failure == null) saved = next;
+                else LOGGER.warn("Could not save RALLE settings navigation to {}", path, failure);
             }
-            saved = snapshot;
-        } catch (IOException exception) {
-            LOGGER.warn("Could not save RALLE settings navigation to {}", path, exception);
-        }
+        });
     }
 
     private static double clampProgress(double value) {

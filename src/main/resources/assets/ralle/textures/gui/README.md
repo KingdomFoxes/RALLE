@@ -1,8 +1,9 @@
 # Shared Fox header emblem
 
-`fox_overlay.png` is the unmodified original 777 × 1186 white Kingdom of Foxes
+`scripts/assets/fox_overlay.png` is the unmodified original 777 × 1186 white Kingdom of Foxes
 crest. It is the source for the header textures, rather than a texture rendered
-directly in the menu. No generated reinterpretation is used.
+directly in the menu. Keep this regeneration input outside packaged resources.
+No generated reinterpretation is used.
 
 `header/fox_1x.png` through `header/fox_16x.png` are area-filtered RGBA textures for
 the header's 18 × 28 logical-pixel footprint at each integer GUI scale. Each output

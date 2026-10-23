@@ -29,6 +29,8 @@ public final class ClassMenuScanner {
     private boolean autoOpenEnabled;
     private UUID autoOpenAccount;
     private Boolean lastAutoOpenObservation;
+    private final ClassMenuSnapshot discoveryContents = new ClassMenuSnapshot();
+    private final ClassMenuSnapshot autoOpenContents = new ClassMenuSnapshot();
 
     public ClassMenuScanner(Minecraft minecraft, BooleanSetting enabled, ClassSelectorStore store, Path captures) {
         this.minecraft = minecraft;
@@ -73,6 +75,8 @@ public final class ClassMenuScanner {
         this.title = title;
         lastMenu = null;
         lastResult = null;
+        discoveryContents.clear();
+        autoOpenContents.clear();
     }
 
     public void tick() {
@@ -95,7 +99,8 @@ public final class ClassMenuScanner {
                 : minecraft.screen == null ? "" : minecraft.screen.getTitle().getString();
         if (!WynncraftClassMenu.matchesTitle(currentTitle)) return;
         try {
-            var items = menu.slots.stream().limit(WynncraftClassMenu.MENU_SIZE).map(slot -> slot.getItem()).toList();
+            if (discoveryContents.unchanged(menu, currentTitle, store.revision())) return;
+            var items = discoveryContents.capture(menu, currentTitle, store.revision());
             var decoded = WynncraftClassMenu.decode(currentTitle, items, store.account(current).characters());
             if (decoded.isEmpty()) return;
             var result = decoded.get();
@@ -105,6 +110,9 @@ public final class ClassMenuScanner {
             discovery.observe(result.scan(current), discovery.generation());
             lastMenu = menu;
             lastResult = result;
+            // Reconciliation may publish a new roster revision. It does not require another
+            // identical decode on the next tick; external roster changes still invalidate it.
+            discoveryContents.rosterRevision(store.revision());
         } catch (IOException | RuntimeException failure) { failed(failure); }
     }
 
@@ -115,6 +123,7 @@ public final class ClassMenuScanner {
             autoOpenAccount = current;
             autoOpenEnabled = store.autoOpenEnabled(current);
             lastAutoOpenObservation = null;
+            autoOpenContents.clear();
         }
         if (minecraft.player == null) return;
         var menu = minecraft.player.containerMenu;
@@ -122,8 +131,9 @@ public final class ClassMenuScanner {
         String currentTitle = menu.containerId == openedId ? title
                 : minecraft.screen == null ? "" : minecraft.screen.getTitle().getString();
         if (!WynncraftClassMenu.matchesTitle(currentTitle)) return;
-        WynncraftClassMenu.autoOpenState(currentTitle, menu.slots.stream().limit(WynncraftClassMenu.MENU_SIZE)
-                .map(slot -> slot.getItem()).toList()).ifPresent(value -> autoOpenObserved(current, value));
+        if (autoOpenContents.unchanged(menu, currentTitle, 0)) return;
+        WynncraftClassMenu.autoOpenState(currentTitle, autoOpenContents.capture(menu, currentTitle, 0))
+                .ifPresent(value -> autoOpenObserved(current, value));
     }
 
     private void autoOpenObserved(UUID current, boolean value) {
@@ -191,6 +201,7 @@ public final class ClassMenuScanner {
         account = null;
         lastMenu = null;
         lastResult = null;
+        discoveryContents.clear();
         failed = false;
         discovery.disconnect();
     }
@@ -201,5 +212,7 @@ public final class ClassMenuScanner {
         lastAutoOpenObservation = null;
         title = null;
         openedId = -1;
+        autoOpenContents.clear();
+        discoveryContents.clear();
     }
 }

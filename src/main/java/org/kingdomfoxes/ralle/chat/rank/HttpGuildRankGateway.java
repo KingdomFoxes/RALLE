@@ -2,19 +2,16 @@ package org.kingdomfoxes.ralle.chat.rank;
 
 import org.kingdomfoxes.ralle.lfg.client.HttpLfgGateway;
 import org.kingdomfoxes.ralle.platform.SharedHttpTransport;
+import org.kingdomfoxes.ralle.platform.BoundedHttpBody;
 import java.util.function.Supplier;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 
 /** JDK HTTP client for the authenticated {@code GET /api/ranks} endpoint. */
 public final class HttpGuildRankGateway implements GuildRankGateway {
@@ -48,20 +45,11 @@ public final class HttpGuildRankGateway implements GuildRankGateway {
         var request = HttpRequest.newBuilder(endpoint).timeout(REQUEST_TIMEOUT)
                 .version(HttpClient.Version.HTTP_1_1)
                 .header("Authorization", "Bearer " + token).GET().build();
-        return client.get().sendAsync(request, HttpResponse.BodyHandlers.ofInputStream()).thenApply(response -> {
+        return BoundedHttpBody.send(client.get(), request, MAX_BODY_BYTES).thenApply(response -> {
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                try (var ignored = response.body()) {
-                    // Close the bounded response stream before reporting the API failure.
-                } catch (IOException ignored) {}
                 throw new IllegalStateException("Fox rank API rejected the request (HTTP " + response.statusCode() + ")");
             }
-            try (var body = response.body()) {
-                byte[] bytes = body.readNBytes(MAX_BODY_BYTES + 1);
-                if (bytes.length > MAX_BODY_BYTES) throw new IOException("Rank response exceeds the document limit");
-                return StrictGuildRankJson.decodeApi(new String(bytes, StandardCharsets.UTF_8));
-            } catch (IOException exception) {
-                throw new CompletionException(exception);
-            }
+            return StrictGuildRankJson.decodeApi(response.body());
         });
     }
 

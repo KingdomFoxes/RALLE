@@ -8,7 +8,7 @@ class GenerateHeaderEmblems {
     private static final Path GUI = Path.of("src/main/resources/assets/ralle/textures/gui");
 
     public static void main(String[] args) throws Exception {
-        var source = ImageIO.read(GUI.resolve("fox_overlay.png").toFile());
+        var source = ImageIO.read(Path.of("scripts/assets/fox_overlay.png").toFile());
         if (source == null) throw new IllegalArgumentException("Missing Fox crest source");
         Files.createDirectories(GUI.resolve("header"));
         for (int scale = 1; scale <= 16; scale++) {

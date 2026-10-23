@@ -19,7 +19,7 @@ class NameTagMaterialMixinTest {
         var finalLabel = Component.literal("\ue001 Player [Fox]");
         var score = Component.literal("123 points");
         var style = NameplateStyle.byId("supporter-gold").orElseThrow();
-        var appearance = new CosmeticAppearance(1, CosmeticAppearance.Treatment.PLATE, 0);
+        var appearance = new CosmeticAppearance(1);
         Method background = NameTagMaterialMixin.class.getDeclaredMethod("ralle$replaceVanillaBackground",
                 Matrix4f.class, float.class, float.class, Component.class,
                 int.class, int.class, int.class, double.class);

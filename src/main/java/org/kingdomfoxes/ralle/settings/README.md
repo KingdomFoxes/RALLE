@@ -1,9 +1,14 @@
 # Installation defaults
 
-On first initialization, `SettingsRegistry.seal()` writes `config/ralle.properties`
-if it does not exist. Existing files and saved preferences are loaded without
-being rewritten during initialization; missing or invalid entries use their
-registered defaults. Settings continue to save locally after changes.
+Feature settings share `config/ralle.json` with HUD layout, navigation, onboarding,
+last-raid state, class shortcuts, consumable rules and the local rank cache.
+`SettingsRegistry.seal()` seeds the `settings` section when absent. Existing
+preferences retain their `category.setting` keys; missing or invalid entries use
+registered defaults. Former separate files migrate automatically and remain
+untouched recovery copies. See `docs/local-state.md` for the section map,
+atomic-save behavior and recovery details.
+Routine settings, HUD and navigation writes coalesce on the shared background
+writer, while explicit data edits retain save-before-publish/error reporting.
 
 The restored installation preset enables chat screenshots with Snap to Text,
 chat selection sounds, persistent chat with a 300-message session history,
@@ -16,7 +21,7 @@ backend authentication and eligibility checks still apply.
 ## Locked preferences
 
 Class Switcher's toggle requires the account's last observed Auto Open flag to
-be true. The flag persists in `ralle-class-shortcuts.json` across connections and
+be true. The flag persists in `ralle.json`'s `classes` section across connections and
 restarts; missing values default to off. Its passive prerequisite check runs
 while the feature is off and saves only that on/off flag. It does not discover
 characters or capture diagnostics. A newly observed disabled value locks the

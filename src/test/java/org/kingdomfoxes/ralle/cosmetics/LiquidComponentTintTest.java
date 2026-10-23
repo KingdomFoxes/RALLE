@@ -20,7 +20,7 @@ class LiquidComponentTintTest {
         var hover = new HoverEvent.ShowText(Component.literal("Player"));
         var original = Component.literal("§fPlayer\ue001😀")
                 .withStyle(Style.EMPTY.withFont(resource).withHoverEvent(hover).withShadowColor(0));
-        var decorated = LiquidComponentTint.whiteWithVanillaShadow(original, font);
+        var decorated = LiquidComponentTint.whiteWithVanillaShadow(original);
         assertEquals("Player\ue001😀", decorated.getString());
         assertEquals(0, original.getStyle().getShadowColor());
         decorated.getVisualOrderText().accept((index, style, codepoint) -> {
@@ -49,7 +49,7 @@ class LiquidComponentTintTest {
         var hover = new HoverEvent.ShowText(Component.literal("Player"));
         var inherited = Style.EMPTY.withFont(resource).withHoverEvent(hover);
         var original = Component.literal("§fPlayer§lX§r\ue001😀").withStyle(inherited);
-        var tinted = LiquidComponentTint.apply(original, font, (x, y) -> 0xffffffff);
+        var tinted = LiquidComponentTint.whiteWithVanillaShadow(original);
 
         assertEquals("PlayerX\ue001😀", tinted.getString());
         assertEquals(font.width(original), font.width(tinted));
@@ -65,18 +65,12 @@ class LiquidComponentTintTest {
         }
     }
 
-    @Test void originalComponentsStayUntouchedAndMaterialCursorSkipsFormattingCodes() {
-        var font = CosmeticTestFont.create();
+    @Test void originalComponentsStayUntouchedAndEquivalentStylesShareOneRun() {
         var original = Component.literal("§aA§fB");
-        List<Integer> positions = new ArrayList<>();
-        var tinted = LiquidComponentTint.apply(original, font, (x, y) -> {
-            positions.add(x);
-            return x == 0 ? 0xffff0000 : 0xff00ff00;
-        });
+        var tinted = LiquidComponentTint.whiteWithVanillaShadow(original);
         assertEquals("§aA§fB", original.getString());
         assertEquals("AB", tinted.getString());
-        assertEquals(List.of(0, 6), positions);
-        assertEquals(0xff0000, tinted.getSiblings().getFirst().getStyle().getColor().getValue());
-        assertEquals(0x00ff00, tinted.getSiblings().getLast().getStyle().getColor().getValue());
+        assertEquals(1, tinted.getSiblings().size());
+        assertEquals(0xffffff, tinted.getSiblings().getFirst().getStyle().getColor().getValue());
     }
 }

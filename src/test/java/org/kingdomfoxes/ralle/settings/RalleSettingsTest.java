@@ -196,8 +196,7 @@ class RalleSettingsTest {
         assertEquals("1", registry.setting(RalleSettings.MATERIAL_RESOLUTION_ID, ChoiceSetting.class).value());
         var appearance = org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance.from(registry,
                 org.kingdomfoxes.ralle.cosmetics.NameplateStyle.CATALOG.getFirst());
-        assertEquals(org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance.Treatment.PLATE, appearance.treatment());
-        assertEquals(0, appearance.usernameOutlinePixels());
+        assertEquals(1d, appearance.resolution());
         for (var style : org.kingdomfoxes.ralle.cosmetics.NameplateStyle.CATALOG) {
             assertEquals(1d, org.kingdomfoxes.ralle.cosmetics.CosmeticAppearance.from(registry, style).resolution());
         }

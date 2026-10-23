@@ -2,6 +2,7 @@ package org.kingdomfoxes.ralle.chat.input;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -12,6 +13,8 @@ import java.util.regex.Pattern;
  */
 public final class ChatTypeTabService {
     public static final String SETTING_ID = "chat-type-tabbing";
+    /** Session-only recent contacts; bounded even when a long session receives many DMs. */
+    public static final int MAX_DM_CONTACTS = 128;
     private static final String GUILD_PREFIX = "/g ";
     private static final String PARTY_PREFIX = "/p ";
     private static final String ALL_CHAT_PREFIX = "";
@@ -26,6 +29,7 @@ public final class ChatTypeTabService {
             "^/(?:g |p |msg [A-Za-z0-9_]{3,16} )", Pattern.CASE_INSENSITIVE);
 
     private final List<String> directMessageContacts = new ArrayList<>();
+    private final LinkedHashSet<String> recentContacts = new LinkedHashSet<>();
     private String selectedDirectMessageRecipient;
     private ChatType lastChatType;
     private long inputRequestRevision;
@@ -137,6 +141,7 @@ public final class ChatTypeTabService {
     /** Clears connection-local tab state after leaving a world or server. */
     public void resetSession() {
         directMessageContacts.clear();
+        recentContacts.clear();
         selectedDirectMessageRecipient = null;
         lastChatType = null;
         inputSelectedAll = false;
@@ -191,9 +196,12 @@ public final class ChatTypeTabService {
 
     private String addContact(String name) {
         String existing = contact(name);
-        if (existing != null) return existing;
-        directMessageContacts.add(name);
-        return name;
+        String canonical = existing == null ? name : existing;
+        if (existing == null) directMessageContacts.add(canonical);
+        recentContacts.remove(canonical);
+        recentContacts.add(canonical);
+        if (recentContacts.size() > MAX_DM_CONTACTS) directMessageContacts.remove(recentContacts.removeFirst());
+        return canonical;
     }
 
     private String contact(String name) {

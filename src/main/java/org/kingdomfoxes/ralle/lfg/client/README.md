@@ -14,6 +14,9 @@ generation. Every later frame, close, and error goes through the ordinary live
 handlers, including the next expiry warning. Clearing the temporary renewal
 attempt must not disable that listener. Superseded sockets retain their old
 generation, so late callbacks cannot alter the current state or restart it.
+Closing a superseded socket sends one graceful close frame and aborts its
+transport after one second, even if the peer never completes the handshake.
+Repeated closes share this cleanup; they never send duplicate close frames.
 Successful renewal does not extend a credential's backend lifetime or change
 Fox's authorization rules.
 

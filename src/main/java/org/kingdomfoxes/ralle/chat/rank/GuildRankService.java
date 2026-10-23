@@ -9,6 +9,7 @@ import org.kingdomfoxes.ralle.client.WynncraftHost;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import org.kingdomfoxes.ralle.settings.LocalStateSection;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
@@ -50,6 +51,14 @@ public final class GuildRankService {
 
     public GuildRankService(
             GuildRankGateway gateway, Path cachePath, BooleanSetting internalRanksEnabled,
+            ChoiceSetting rankStyle, Supplier<String> serverHost, LongSupplier clock,
+            BooleanSupplier additionalRankConsumer
+    ) {
+        this(gateway, LocalStateSection.file(cachePath), internalRanksEnabled, rankStyle, serverHost, clock, additionalRankConsumer);
+    }
+
+    public GuildRankService(
+            GuildRankGateway gateway, LocalStateSection cachePath, BooleanSetting internalRanksEnabled,
             ChoiceSetting rankStyle, Supplier<String> serverHost, LongSupplier clock,
             BooleanSupplier additionalRankConsumer
     ) {

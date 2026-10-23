@@ -1,7 +1,6 @@
 package org.kingdomfoxes.ralle.ui.owo;
 
 import io.wispforest.owo.ui.component.ButtonComponent;
-import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.core.Sizing;
 import net.minecraft.network.chat.Component;
 import net.minecraft.client.Minecraft;

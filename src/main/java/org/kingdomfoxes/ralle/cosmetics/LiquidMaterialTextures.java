@@ -29,7 +29,12 @@ public final class LiquidMaterialTextures implements AutoCloseable {
             var image = new NativeImage(width, height, true);
             var texture = new MaterialTexture(style, image);
             var id = Identifier.fromNamespaceAndPath("ralle", "dynamic/liquid_nameplate_" + NEXT_ID.incrementAndGet());
-            minecraft.getTextureManager().register(id, texture);
+            try {
+                minecraft.getTextureManager().register(id, texture);
+            } catch (RuntimeException | Error failure) {
+                texture.close();
+                throw failure;
+            }
             entry = new Entry(id, texture, new int[width * height]);
             textures.put(key, entry);
         }
@@ -45,16 +50,6 @@ public final class LiquidMaterialTextures implements AutoCloseable {
             entry.lastUpdateNanos = nowNanos;
         }
         return entry.id;
-    }
-
-    /** Samples the same frame used by the dynamic texture; coordinates wrap within the recipe surface. */
-    public int sample(NameplateStyle style, double resolution, int logicalX, int logicalY, long nowNanos) {
-        texture(style, resolution, nowNanos);
-        Entry entry = textures.get(new Key(style.id(), resolution));
-        int width = LiquidMaterial.width(resolution), height = LiquidMaterial.height(resolution);
-        int x = Math.floorMod((int) Math.round(logicalX / resolution), width);
-        int y = Math.floorMod((int) Math.round(logicalY / resolution), height);
-        return entry.frame[y * width + x];
     }
 
     /** Invalidate on disable and resource reload. */

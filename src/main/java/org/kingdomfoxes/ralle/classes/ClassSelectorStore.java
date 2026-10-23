@@ -3,9 +3,8 @@ package org.kingdomfoxes.ralle.classes;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import org.kingdomfoxes.ralle.settings.LocalStateSection;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,7 +14,7 @@ import java.util.UUID;
 /** Account-scoped immutable snapshots. Save first, then publish; scans never discard shortcut preferences. */
 public final class ClassSelectorStore {
     private static final Gson JSON = new GsonBuilder().setPrettyPrinting().create();
-    private final Path path;
+    private final LocalStateSection path;
     // Published maps are never mutated. Reads from the client/render thread never wait for disk.
     private volatile Map<UUID, Account> accounts;
     private volatile Map<UUID, Loaded> loads = new LinkedHashMap<>();
@@ -53,6 +52,10 @@ public final class ClassSelectorStore {
 
     /** A damaged local file must neither crash chat/LFG nor be overwritten by an empty snapshot. */
     public static ClassSelectorStore open(Path path) {
+        return open(LocalStateSection.file(path));
+    }
+
+    public static ClassSelectorStore open(LocalStateSection path) {
         try { return new ClassSelectorStore(path); }
         catch (IOException failure) {
             org.slf4j.LoggerFactory.getLogger(ClassSelectorStore.class).warn("Could not load class shortcuts; preserving {}", path, failure);
@@ -64,12 +67,18 @@ public final class ClassSelectorStore {
     public boolean hasAccount(UUID account) { return accounts.containsKey(account); }
 
     public ClassSelectorStore(Path path) throws IOException {
+        this(LocalStateSection.file(path));
+    }
+
+    public ClassSelectorStore(LocalStateSection path) throws IOException {
         this.path = path;
         accounts = new LinkedHashMap<>();
-        if (!Files.exists(path)) return;
-        if (Files.size(path) > 1024 * 1024) throw new IOException("Class selector file exceeds 1 MiB");
+        if (!path.exists()) return;
         try {
-            var data = JSON.fromJson(Files.readString(path), FileData.class);
+            String text = path.read();
+            if (text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 1024 * 1024)
+                throw new IOException("Class selector file exceeds 1 MiB");
+            var data = JSON.fromJson(text, FileData.class);
             if (data == null || (data.version != 1 && data.version != 2) || data.accounts == null || data.accounts.size() > 128)
                 throw new IllegalArgumentException("Invalid class selector file");
             data.accounts.forEach((id, account) -> {
@@ -332,13 +341,7 @@ public final class ClassSelectorStore {
         String json = JSON.toJson(new FileData(2, next, nextLoads, nextAutoOpen));
         if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 1024 * 1024)
             throw new IllegalArgumentException("Class selector file exceeds 1 MiB");
-        var parent = path.toAbsolutePath().getParent();
-        Files.createDirectories(parent);
-        var temporary = Files.createTempFile(parent, "ralle-classes-", ".tmp");
-        try {
-            Files.writeString(temporary, json);
-            Files.move(temporary, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        } finally { Files.deleteIfExists(temporary); }
+        path.write(json);
         boolean changed = !accounts.equals(next);
         accounts = next;
         loads = nextLoads;

@@ -40,7 +40,7 @@ public final class NameplateRenderScope implements AutoCloseable {
 
     /** Only the username row gets material; leave score, level, account-role and unrelated labels alone. */
     public boolean decorates(Component label) {
-        if (style == null || appearance == null || appearance.treatment() != CosmeticAppearance.Treatment.PLATE
+        if (style == null || appearance == null
                 || label == null || label == score || submittingLabel != null) return false;
         if (label == originalLabel) return true;
         if (ign == null || ign.isEmpty()) return false;
