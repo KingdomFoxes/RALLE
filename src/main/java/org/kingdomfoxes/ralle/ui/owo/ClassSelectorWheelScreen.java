@@ -107,7 +107,7 @@ public final class ClassSelectorWheelScreen extends Screen {
     }
 
     @Override protected void renderBlurredBackground(GuiGraphics graphics) {
-        // Keep a stable HUD/background boundary even when the native blur option is zero.
+        // Preserve the background capture boundary; ClassIceCaptureMixin skips its blur pass.
         graphics.blurBeforeThisStratum();
     }
 

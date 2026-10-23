@@ -311,7 +311,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         capturedScale = minecraft.getWindow().getGuiScale();
     }
 
-    /** Native GUI boundary: HUD has rendered; menu blur and foreground have not. */
+    /** Native GUI boundary: HUD has rendered; the modifier foreground has not. */
     public void captureBackground() {
         if (frame.captured()) return;
         if (preview != null || controller.state() == ClassSwitchController.State.CAPTURING && wheelCapture) {
@@ -326,10 +326,7 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         ice.draw(frame.texture(), live, iceTimeline.progress(now()), pixelSize,
                 minecraft.getWindow().getGuiScaledWidth(), minecraft.getWindow().getGuiScaledHeight(),
                 preview == null ? 1 : previewStyle);
-        if (foreground != null) {
-            minecraft.gameRenderer.processBlurEffect();
-            foreground.present(live);
-        }
+        if (foreground != null) foreground.present(live);
         if (preview == null) {
             updateModifierStatus();
             if (modifierStatus != null) modifierStatus.present(live);

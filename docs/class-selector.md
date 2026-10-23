@@ -1,7 +1,7 @@
 # Class Switcher integration
 
 The native switching adapter is implemented. It retains the submitted background
-and wheel on the GPU, composites growing black ice beneath the menu blur,
+and wheel on the GPU, composites growing black ice beneath the sharp menu,
 sends the bounded command/click sequence and observes the
 1600 ms post-book-close timer while normal rendering and ticks continue. Automated
 checks replay the user's menu capture and the door/load sequence, and an
@@ -466,11 +466,13 @@ undo command or synthetic server-menu close.
 
 ### Black ice and local previews
 
-The retained view now composites frozen background/HUD, animated black ice with
-a white outer contour, Minecraft's native menu blur, and a transparent frozen
-menu/wheel foreground, in that order. `ClassIceCaptureMixin` copies the background
-in `GuiRenderer.draw` immediately before `processBlurEffect`, after the HUD draw
-range. `ClassSelectorWheelScreen` keeps that boundary even with blur set to zero.
+The retained view composites frozen background/HUD, animated black ice with
+a white outer contour, and a transparent frozen menu/wheel foreground, in that
+order, without Minecraft's menu blur. `ClassIceCaptureMixin` wraps the native blur
+call in `GuiRenderer.draw`: it copies the background after the HUD draw range,
+then skips blur for the Class Switcher and its local previews. Other screens
+retain the native blur call. `ClassSelectorWheelScreen` keeps that capture
+boundary even with blur set to zero.
 The submitted wheel's movement clock is pinned at submission. Its menu dimming,
 native items, selected labels and geometry are captured once through an isolated
 GUI renderer; premultiplied alpha preserves their original appearance. The live
@@ -516,7 +518,7 @@ Style selection is preview-only and lasts for this client session. Real switches
 retain style 1. `/ralle animtest 1` and `/ralle animtest 2` replay the selected style
 at one and two logical pixels respectively; style previews reuse the last preview
 pixel size (initially one). They show a local sample wheel through the
-same capture/blur/composite path, simulate book arrival at 800 ms and dismiss at
+same sharp capture/composite path, simulate book arrival at 800 ms and dismiss at
 2400 ms. They require no enabled Class Switcher, server access or class switch,
 send no commands/clicks and do not mute audio. Escape dismisses immediately.
 Screen replacement, focus loss, resize, GUI-scale change, resource loading,
@@ -527,7 +529,7 @@ acceleration, duplicate closes, completion and restart. Arrival-map and GPU test
 verify connected growth, one/two-pixel sampling, opaque full coverage and repeated
 captures across GUI scales 1, 2 and 4. `RALLE_GPU_TEST=1` exercises the actual
 shader in an isolated invisible OpenGL window and writes sample PNGs under
-`build/ice-preview`. The native blur/wheel composition and Wynncraft/Wynntils
+`build/ice-preview`. The sharp background/wheel composition and Wynncraft/Wynntils
 switching still require an in-game visual pass before release.
 
 ### Remembering the loaded class

@@ -24,6 +24,7 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.NotNull;
 import org.kingdomfoxes.ralle.api.settings.ActionEntry;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
@@ -359,6 +360,15 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private void renderEntryPage(Component title, java.util.List<SettingsEntry> entries, double progress) {
         document.clearChildren();
         document.child(new SettingsSectionDivider(title));
+        if (activePage == SettingsNavigationState.Page.CATEGORY && "wheels".equals(selectedCategory)) {
+            int side = Math.min(192, documentTextWidth());
+            var imageRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+            imageRow.horizontalAlignment(HorizontalAlignment.CENTER);
+            imageRow.child(UIComponents.texture(
+                    Identifier.fromNamespaceAndPath("ralle", "textures/gui/wheel/settings_wheel.png"),
+                    0, 0, 64, 64, 64, 64).sizing(Sizing.fixed(side), Sizing.fixed(side)));
+            document.child(imageRow);
+        }
         var visible = SettingsPageContent.visibleEntries(settings, entries);
         if (visible.isEmpty() && !entries.isEmpty()) {
             var unmet = SettingsPageContent.unmetParentTitles(settings, entries);

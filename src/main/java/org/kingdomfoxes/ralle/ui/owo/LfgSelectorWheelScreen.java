@@ -97,6 +97,10 @@ public final class LfgSelectorWheelScreen extends Screen {
 
     @Override public boolean isPauseScreen() { return false; }
 
+    @Override protected void renderBlurredBackground(GuiGraphics graphics) {
+        // Modifier menus keep gameplay sharp regardless of Minecraft's menu blur setting.
+    }
+
     @Override protected void init() {
         super.init();
         clearSnapshots();

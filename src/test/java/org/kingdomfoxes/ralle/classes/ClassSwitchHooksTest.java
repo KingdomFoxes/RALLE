@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Validate required mixin boundaries against the real mapped Minecraft bytecode without launch/auth. */
 class ClassSwitchHooksTest {
-    @Test void backgroundCaptureRunsBetweenHudAndNativeMenuBlur() throws Exception {
+    @Test void backgroundCaptureKeepsTheHudBoundaryWhileWrappingNativeMenuBlur() throws Exception {
         var draw = method(read("net/minecraft/client/gui/render/GuiRenderer"), "draw", "(Lcom/mojang/blaze3d/buffers/GpuBufferSlice;)V");
         int ranges = 0, blurs = 0;
         for (var instruction : draw.instructions) if (instruction instanceof MethodInsnNode call) {
@@ -21,8 +21,8 @@ class ClassSwitchHooksTest {
         }
         assertEquals(2, ranges); assertEquals(1, blurs);
         var hook = method(read("org/kingdomfoxes/ralle/classes/mixin/ClassIceCaptureMixin"), "ralle$background",
-                "(Lcom/mojang/blaze3d/buffers/GpuBufferSlice;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V");
-        var inject = hook.visibleAnnotations.stream().filter(a -> a.desc.endsWith("/Inject;")).findFirst().orElseThrow();
+                "(Lnet/minecraft/client/renderer/GameRenderer;Lcom/llamalad7/mixinextras/injector/wrapoperation/Operation;)V");
+        var inject = hook.visibleAnnotations.stream().filter(a -> a.desc.endsWith("/WrapOperation;")).findFirst().orElseThrow();
         @SuppressWarnings("unchecked") var locations = (List<AnnotationNode>) value(inject, "at");
         assertEquals("Lnet/minecraft/client/renderer/GameRenderer;processBlurEffect()V", value(locations.getFirst(), "target"));
         assertEquals(1, value(inject, "require"));

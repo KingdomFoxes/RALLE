@@ -19,6 +19,11 @@ prepared with the layout instead of recomputed for each frame. Bars retain their
 two inexpensive rectangles per face.
 
 Wheels contains three subcategories: Party Create, Party Kick, and Class Switcher.
+The Wheels main category displays the user-supplied wheel photo, intentionally
+degraded to a 64 x 64, 16-shade PNG after fifty 1%-quality JPEG passes. The static
+texture is centered below the category divider, displayed at up to 192 logical
+pixels and shrunk to fit narrow content viewports. It is absent from subcategory
+pages and search results; see the GUI asset README for regeneration.
 Each contains its toggle, style and modifier keybind; Class Switcher also contains
 its shortcut editor. The Create and Kick wheels remain disabled
 by default. Each enabled selector reveals its own Wheel Style: Circle Segments
@@ -29,6 +34,12 @@ existing dependency on Enable Raid LFG and its current-account Fox access gate.
 The toggles are labeled `Party Create` and `Party Kick`.
 The Create selector omits its idle instruction line; processing, success, and
 failure feedback still appear in its status area.
+
+All graphical modifier menus keep the gameplay background sharp regardless of
+Minecraft's Menu Background Blur setting. This includes the submitted Class
+Switcher frame and local ice previews. Class capture retains the native
+HUD/foreground boundary while skipping the associated blur pass; other Minecraft
+and RALLE menus retain their normal blur behavior.
 
 The existing toggle IDs are unchanged. Their persisted keys move from
 `raid-lfg.raid-lfg-{create,kick}-selector-wheel` to

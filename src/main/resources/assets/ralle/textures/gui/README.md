@@ -33,3 +33,18 @@ baked into their alpha, and each texel maps to a framebuffer pixel at its scale.
 Banner lettering is live Karla text rendered by
 `HeaderTitleComponent`, with an opaque black shadow offset by 0.5 logical pixels
 right/down and no extra spread; it retains the ordinary label layout.
+
+## Wheels settings photo
+
+`wheel/settings_wheel.png` is the wheel photograph supplied by the user for the
+Wheels main settings category. It is deliberately heavily compressed: resized to
+64 x 64, re-encoded fifty times at 1% JPEG quality, then reduced to sixteen gray
+shades and stored as a 1,106-byte indexed PNG for Minecraft's texture loader.
+The white photo background is preserved. Runtime uses nearest sampling to retain
+the visible block artifacts; no compression runs while settings are open.
+
+Regenerate with Java 21 and the original user-supplied photograph:
+
+```text
+java scripts/CompressSettingsWheel.java <original-photo-path>
+```
