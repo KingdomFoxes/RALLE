@@ -24,7 +24,8 @@ DEPENDENCIES = [
     {"project_id": "ccKDOlHs", "dependency_type": "embedded"},  # owo-lib
     {"project_id": "dU5Gb9Ab", "dependency_type": "optional"},  # Wynntils
 ]
-VERSION_PATTERN = r"[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?"
+# Match RALLE's major.minor releases as well as existing major.minor.patch tags.
+VERSION_PATTERN = r"[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?"
 
 
 def properties(path):
@@ -39,7 +40,7 @@ def metadata(event, config):
     tag = release["tag_name"]
     version = tag.removeprefix("v")
     if not re.fullmatch(VERSION_PATTERN, version):
-        raise ValueError("Use a version tag such as v0.1.9 or v0.1.9-alpha.1.")
+        raise ValueError("Use a version tag such as v1.1, v0.1.9, or v0.1.9-alpha.1.")
     if version != config["mod_version"]:
         raise ValueError(f"Tag {tag} does not match mod_version={config['mod_version']}.")
     if config["archives_base_name"] != "ralle":

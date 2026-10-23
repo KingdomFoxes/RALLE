@@ -48,6 +48,28 @@ class ReleaseTest(unittest.TestCase):
         self.event["release"]["tag_name"] = "0.1.9"
         self.assertEqual("0.1.9", release.metadata(self.event, self.config)["version_number"])
 
+    def test_major_minor_release_matches_config_filename_and_jar(self):
+        self.config["mod_version"] = "1.1"
+        self.write_jar(version="1.1")
+        for tag in ("1.1", "v1.1"):
+            with self.subTest(tag=tag):
+                self.event["release"]["tag_name"] = tag
+                info = release.metadata(self.event, self.config)
+                self.assertEqual("1.1", info["version_number"])
+                self.assertEqual("ralle-1.1.jar", info["filename"])
+                release.verify_jar(self.jar, info)
+                self.write_jar(version="1.0.0")
+                with self.assertRaises(ValueError):
+                    release.verify_jar(self.jar, info)
+                self.write_jar(version="1.1")
+
+    def test_major_minor_tag_does_not_match_a_different_config_version(self):
+        self.config["mod_version"] = "1.1"
+        for tag in ("v1.0", "v1.1.0", "v1", "v1.1.0.0", "v1.1\nmalicious"):
+            with self.subTest(tag=tag), self.assertRaises(ValueError):
+                self.event["release"]["tag_name"] = tag
+                release.metadata(self.event, self.config)
+
     def test_mismatched_or_unsafe_tag_rejected(self):
         for tag in ("v0.2.0", "v0.1.9\nmalicious", "../../0.1.9", "v0.1.9;echo", "-0.1.9"):
             with self.subTest(tag=tag), self.assertRaises(ValueError):
