@@ -14,7 +14,6 @@ import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.client.WynncraftHost;
 import org.kingdomfoxes.ralle.ui.owo.ClassSelectorWheelScreen;
 import org.kingdomfoxes.ralle.ui.owo.ClassWheelSnapshot;
-import org.kingdomfoxes.ralle.ui.owo.ClassIcePreviewScreen;
 import org.kingdomfoxes.ralle.ui.owo.LfgActionBarState;
 import org.lwjgl.glfw.GLFW;
 
@@ -36,9 +35,6 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
     private ClassSelectorWheelScreen frozenWheel;
     private ClassSwitchController.Retry shownRetry;
     private boolean wheelCapture;
-    private ClassIcePreviewScreen preview;
-    private long previewStarted;
-    private int previewStyle = 1, previewPixels = 1;
     private int pixelSize = 1, capturedScale;
     private final ClassSwitchController controller = new ClassSwitchController(this);
     private final ClassSwitchAudio audio;
@@ -249,11 +245,6 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
 
     /** Overlap the outbound command with rendering; keep the selected wheel visible for capture. */
     public void beforeRender() {
-        if (preview != null) {
-            if (minecraft.screen != preview || minecraft.getOverlay() != null || !minecraft.isWindowActive()
-                    || now() - previewStarted >= 800 + ClassSwitchController.ANIMATION_MILLIS) stopPreview();
-            return;
-        }
         if (!active() || !enabled.value() || !connected() || minecraft.getWindow().isMinimized()) return;
         beforeTick();
         controller.frameRendering();
@@ -261,16 +252,6 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
 
     /** Called after all world and UI rendering, immediately before vanilla presents its frame. */
     public void beforePresent() {
-        if (preview != null) {
-            try {
-                var live = minecraft.getMainRenderTarget();
-                if (!frame.captured()) return;
-                if (!frame.fits(live) || capturedScale != minecraft.getWindow().getGuiScale()) { stopPreview(); return; }
-                if (foreground == null) foreground = preview.captureForeground();
-                composite(live);
-            } catch (RuntimeException error) { LOGGER.warn("Ice preview failed", error); stopPreview(); }
-            return;
-        }
         if (!enabled.value() || !connected()) return;
         try {
             beforeTick();
@@ -314,23 +295,20 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
     /** Native GUI boundary: HUD has rendered; the modifier foreground has not. */
     public void captureBackground() {
         if (frame.captured()) return;
-        if (preview != null || controller.state() == ClassSwitchController.State.CAPTURING && wheelCapture) {
+        if (controller.state() == ClassSwitchController.State.CAPTURING && wheelCapture) {
             try { frame.capture(minecraft.getMainRenderTarget()); }
             catch (RuntimeException failure) {
-                if (preview != null) stopPreview(); else controller.unavailable();
+                controller.unavailable();
             }
         }
     }
     private void composite(com.mojang.blaze3d.pipeline.RenderTarget live) {
-        if (preview != null && now() >= previewStarted + 800) iceTimeline.bookClosed(previewStarted + 800);
         ice.draw(frame.texture(), live, iceTimeline.progress(now()), pixelSize,
                 minecraft.getWindow().getGuiScaledWidth(), minecraft.getWindow().getGuiScaledHeight(),
-                preview == null ? 1 : previewStyle);
+                1);
         if (foreground != null) foreground.present(live);
-        if (preview == null) {
-            updateModifierStatus();
-            if (modifierStatus != null) modifierStatus.present(live);
-        }
+        updateModifierStatus();
+        if (modifierStatus != null) modifierStatus.present(live);
     }
     private void updateModifierStatus() {
         var retry = controller.retry();
@@ -350,35 +328,6 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
         modifierStatus = replacement;
         shownRetry = retry;
         if (old != null) old.close();
-    }
-    public void previewIce(int pixels) {
-        previewIce(pixels, previewStyle);
-    }
-    public void previewIceStyle(int style) {
-        previewIce(previewPixels, style);
-    }
-    private void previewIce(int pixels, int style) {
-        if (active()) return;
-        if (pixels != 1 && pixels != 2) throw new IllegalArgumentException("Expected one or two logical pixels");
-        if (style < 1 || style > 4) throw new IllegalArgumentException("Expected style 1 through 4");
-        stopPreview();
-        ClassIceRenderer.warm(minecraft, style);
-        previewStyle = style;
-        previewPixels = pixels;
-        pixelSize = pixels;
-        capturedScale = minecraft.getWindow().getGuiScale();
-        previewStarted = now();
-        iceTimeline.start(previewStarted);
-        // Both previews replay the same 800 ms book arrival and 1600 ms finishing interval.
-        preview = new ClassIcePreviewScreen(this, pixels, style);
-        minecraft.setScreen(preview);
-    }
-    public void stopPreview() {
-        var old = preview;
-        preview = null;
-        if (old == null) return;
-        closeComposition();
-        if (minecraft.screen == old) minecraft.setScreen(null);
     }
     public void warmIce() { ClassIceRenderer.warm(minecraft); }
     private void closeComposition() {
@@ -462,7 +411,6 @@ public final class ClassSwitcher implements ClassSwitchController.Actions, AutoC
                 ? LfgActionBarState.Tone.MUTED : LfgActionBarState.Tone.DANGER, 3500);
     }
     public void reset() {
-        stopPreview();
         controller.cancel();
         frame.close(); restoreAudio(); clearOperation();
         loads.reset();

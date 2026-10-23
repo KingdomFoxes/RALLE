@@ -6,7 +6,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.render.GuiRenderer;
 import net.minecraft.client.renderer.GameRenderer;
 import org.kingdomfoxes.ralle.RalleClient;
-import org.kingdomfoxes.ralle.ui.owo.ClassIcePreviewScreen;
 import org.kingdomfoxes.ralle.ui.owo.ClassSelectorWheelScreen;
 import org.kingdomfoxes.ralle.ui.render.GuiCaptureTargetOverride;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,9 +17,9 @@ abstract class ClassIceCaptureMixin {
     private void ralle$background(GameRenderer renderer, Operation<Void> original) {
         if (GuiCaptureTargetOverride.current() == null && RalleClient.initialized())
             RalleClient.context().classSwitcher().captureBackground();
-        // Class switching needs the HUD/foreground split, but neither it nor its preview blurs gameplay.
+        // Class switching needs the HUD/foreground split without blurring gameplay.
         var screen = Minecraft.getInstance().screen;
-        if (!(screen instanceof ClassSelectorWheelScreen) && !(screen instanceof ClassIcePreviewScreen))
+        if (!(screen instanceof ClassSelectorWheelScreen))
             original.call(renderer);
     }
 }

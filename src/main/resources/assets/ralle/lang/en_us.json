@@ -392,8 +392,6 @@
   "ralle.classes.modifier-conflict": "Class Modifier conflicts with another RALLE action. Choose a different key.",
   "ralle.classes.wheel.empty": "No class shortcuts added. Add them in RALLE Settings → Wheels → Class Switcher.",
   "ralle.classes.wheel.hold": "Class Switcher: press a configured option key.",
-  "ralle.classes.ice-preview": "Ice preview: %s logical pixel(s), style %s",
-  "ralle.classes.ice-preview-hint": "Escape to dismiss",
   "ralle.classes.wheel.hint": "Choose a class with a fresh click or a configured option key.",
   "ralle.classes.wheel.current": "Current",
   "ralle.classes.switch.cancelled": "Class switching cancelled.",
