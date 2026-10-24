@@ -109,6 +109,26 @@ class WynncraftClassMenuTest {
         assertTrue(disabled.complete());
     }
 
+    @Test void musicArtworkChangesCannotPreventLiveBookRecognitionOrCharacterSelection() throws Exception {
+        var source = fixture("wynncraft-character-book-auto-open-2026-10-19.json");
+        var saved = decode(source);
+        var music = slot(source, 51).getAsJsonObject("item").getAsJsonObject("components")
+                .getAsJsonObject("minecraft:custom_model_data").getAsJsonArray("floats");
+        music.set(0, new com.google.gson.JsonPrimitive(596));
+        var live = decode(source, saved.characters());
+        assertTrue(live.complete());
+        assertTrue(live.autoOpenEnabled());
+        assertEquals(saved.characters(), live.characters());
+        for (var character : saved.characters())
+            assertEquals(saved.resolve(character.id()), live.resolve(character.id()));
+        // Auto Open is read exclusively from its own control, even if music is enabled.
+        music.set(0, new com.google.gson.JsonPrimitive(597));
+        slot(source, 53).add("item", slot(fixture(), 53).get("item").deepCopy());
+        var disabled = decode(source, saved.characters());
+        assertFalse(disabled.autoOpenEnabled());
+        assertEquals(saved.characters(), disabled.characters());
+    }
+
     @Test void autoOpenControlStillRequiresItsObservedNameItemAndModel() throws Exception {
         var enabled = fixture("wynncraft-character-book-auto-open-2026-10-19.json");
         var control = slot(enabled, 53).getAsJsonObject("item");

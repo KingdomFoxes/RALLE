@@ -74,7 +74,8 @@ public final class WynncraftClassMenu {
         if (!matchesTitle(title) || items.size() != MENU_SIZE
                 || !marker(items.get(7), "Cancel Deletion", 559)
                 || !marker(items.get(25), "Character Backups", 561)
-                || !marker(items.get(51), "Selector Music", 597)
+                // Selector Music is independent of Auto Open and changes its artwork.
+                // Recognize the book through its fixed controls and Auto Open itself.
                 // Auto Open changes its model when enabled; both states identify the same book.
                 || !(marker(items.get(53), "Auto Open", 598)
                 || marker(items.get(53), "Auto Open", 599))) return Optional.empty();
