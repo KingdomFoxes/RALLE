@@ -39,6 +39,7 @@ public record RalleContext(
         org.kingdomfoxes.ralle.classes.ClassMenuCapture classMenuCapture,
         org.kingdomfoxes.ralle.classes.ClassMenuScanner classMenuScanner,
         org.kingdomfoxes.ralle.classes.ClassSelectorBindings classSelectorBindings,
-        org.kingdomfoxes.ralle.classes.ClassSwitcher classSwitcher
+        org.kingdomfoxes.ralle.classes.ClassSwitcher classSwitcher,
+        org.kingdomfoxes.ralle.client.WheelsAbyssShutdown wheelsAbyssShutdown
 ) {
 }

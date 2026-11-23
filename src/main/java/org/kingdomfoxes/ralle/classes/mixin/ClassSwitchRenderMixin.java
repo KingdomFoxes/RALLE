@@ -19,6 +19,9 @@ abstract class ClassSwitchRenderMixin {
     @Inject(method = "runTick", at = @At(value = "INVOKE",
             target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;blitToScreen()V"), require = 1)
     private void ralle$classFrame(boolean tick, CallbackInfo ci) {
-        if (RalleClient.initialized()) RalleClient.context().classSwitcher().beforePresent();
+        if (RalleClient.initialized()) {
+            RalleClient.context().classSwitcher().beforePresent();
+            RalleClient.context().wheelsAbyssShutdown().beforePresent();
+        }
     }
 }

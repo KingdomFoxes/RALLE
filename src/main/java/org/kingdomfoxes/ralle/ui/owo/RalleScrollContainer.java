@@ -29,6 +29,10 @@ final class RalleScrollContainer extends ScrollContainer<FlowLayout> {
         return maxScroll <= 0 ? 0 : scrollOffset / maxScroll;
     }
 
+    double visualProgress() {
+        return WheelsAbyssState.scrollProgress(currentScrollPosition, maxScroll);
+    }
+
     double offset() {
         return scrollOffset;
     }

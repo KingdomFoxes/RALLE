@@ -238,6 +238,8 @@ public final class RalleClient implements ClientModInitializer {
                 classMenuScanner, classShortcuts, classActionBar, autoRaidRequeue::running);
         var classSelectorBindings = new org.kingdomfoxes.ralle.classes.ClassSelectorBindings(
                 minecraft, settings, classShortcuts, classActionBar, classSwitcher);
+        var wheelsAbyssShutdown = new org.kingdomfoxes.ralle.client.WheelsAbyssShutdown(minecraft);
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> wheelsAbyssShutdown.close());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> classSwitcher.close());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> classMenuCapture.close());
         new LfgActionBarOverlay(minecraft, classActionBar,
@@ -282,7 +284,8 @@ public final class RalleClient implements ClientModInitializer {
                 classMenuCapture,
                 classMenuScanner,
                 classSelectorBindings,
-                classSwitcher
+                classSwitcher,
+                wheelsAbyssShutdown
         );
         var pointAndLaugh = new org.kingdomfoxes.ralle.war.PointAndLaugh();
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
@@ -325,6 +328,7 @@ public final class RalleClient implements ClientModInitializer {
             classMenuScanner.tick();
             classSwitcher.tick();
             classSelectorBindings.tick();
+            wheelsAbyssShutdown.tick();
             updateNotice.tick().ifPresent(release -> RalleChatMessages.post(client, UpdateMessages.body(release)));
             foxGuildAccess.tick();
             if (cosmeticReloadPending.getAndSet(false)) cosmeticTextures.close();

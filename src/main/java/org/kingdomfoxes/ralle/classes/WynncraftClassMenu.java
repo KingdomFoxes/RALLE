@@ -17,6 +17,8 @@ import java.util.regex.Pattern;
 public final class WynncraftClassMenu {
     public static final int MENU_SIZE = 54;
     public static final String TITLE = new String(Character.toChars(0xCFFD5)) + "\uE01F";
+    // The 2.2.6 potion model table moved the entire character selector block.
+    private static final List<Integer> BOOK_MODEL_OFFSETS = List.of(0, 10);
     private static final List<Integer> CHARACTER_SLOTS = List.of(
             9, 10, 11, 18, 19, 20, 27, 28, 29, 36, 37, 38, 45, 46, 47);
     private static final Set<String> TYPES = Set.of("Archer", "Hunter", "Mage", "Dark Wizard",
@@ -71,15 +73,21 @@ public final class WynncraftClassMenu {
 
     /** Reads only controls, allowing the prerequisite to be checked before character discovery is enabled. */
     public static Optional<Boolean> autoOpenState(String title, List<ItemStack> items) {
-        if (!matchesTitle(title) || items.size() != MENU_SIZE
-                || !marker(items.get(7), "Cancel Deletion", 559)
-                || !marker(items.get(25), "Character Backups", 561)
-                // Selector Music is independent of Auto Open and changes its artwork.
-                // Recognize the book through its fixed controls and Auto Open itself.
-                // Auto Open changes its model when enabled; both states identify the same book.
-                || !(marker(items.get(53), "Auto Open", 598)
-                || marker(items.get(53), "Auto Open", 599))) return Optional.empty();
-        return Optional.of(marker(items.get(53), "Auto Open", 599));
+        return controls(title, items).map(BookControls::autoOpenEnabled);
+    }
+
+    private record BookControls(int modelOffset, boolean autoOpenEnabled) {}
+
+    private static Optional<BookControls> controls(String title, List<ItemStack> items) {
+        if (!matchesTitle(title) || items.size() != MENU_SIZE) return Optional.empty();
+        for (int offset : BOOK_MODEL_OFFSETS) {
+            if (!marker(items.get(7), "Cancel Deletion", 559 + offset)
+                    || !marker(items.get(25), "Character Backups", 561 + offset)) continue;
+            var autoOpen = items.get(53);
+            if (marker(autoOpen, "Auto Open", 599 + offset)) return Optional.of(new BookControls(offset, true));
+            if (marker(autoOpen, "Auto Open", 598 + offset)) return Optional.of(new BookControls(offset, false));
+        }
+        return Optional.empty();
     }
 
     /** Exact title plus independent control signatures keep housing/inventory/editor menus out. */
@@ -89,8 +97,9 @@ public final class WynncraftClassMenu {
 
     /** Saved artwork may prove an old hash even when the live icon has since changed. */
     public static Optional<Result> decode(String title, List<ItemStack> items, List<ClassCharacter> saved) {
-        var autoOpen = autoOpenState(title, items);
-        if (autoOpen.isEmpty()) return Optional.empty();
+        var controls = controls(title, items);
+        if (controls.isEmpty()) return Optional.empty();
+        var book = controls.get();
         var characters = new ArrayList<ClassCharacter>();
         var slots = new LinkedHashMap<String, Integer>();
         var evidence = new LinkedHashMap<String, String>();
@@ -98,7 +107,8 @@ public final class WynncraftClassMenu {
         boolean complete = true;
         for (int slot : CHARACTER_SLOTS) {
             var item = items.get(slot);
-            if (marker(item, "Create a Character", 562) || marker(item, "Locked Character Slot", 585)) continue;
+            if (marker(item, "Create a Character", 562 + book.modelOffset())
+                    || marker(item, "Locked Character Slot", 585 + book.modelOffset())) continue;
             var character = character(slot, item);
             if (character == null) { complete = false; continue; }
             characters.add(character);
@@ -130,7 +140,7 @@ public final class WynncraftClassMenu {
                 provisional.add(character.id());
         }
         return Optional.of(new Result(matched, slots, evidence, complete, legacyReferences,
-                autoOpen.get(), provisional));
+                book.autoOpenEnabled(), provisional));
     }
 
     private static ClassCharacter character(int slot, ItemStack item) {
