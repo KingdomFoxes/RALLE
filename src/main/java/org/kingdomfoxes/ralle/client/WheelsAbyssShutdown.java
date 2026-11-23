@@ -36,14 +36,16 @@ public final class WheelsAbyssShutdown implements AutoCloseable {
     }
 
     private final Minecraft minecraft;
+    private final WheelsAbyssFlag flag;
     private final ClassSwitchAudio audio;
     private final ClassSwitchFrame frame = new ClassSwitchFrame();
     private final Timeline timeline;
     private boolean savedHideGui;
     private boolean hideGuiOverridden;
 
-    public WheelsAbyssShutdown(Minecraft minecraft) {
+    public WheelsAbyssShutdown(Minecraft minecraft, WheelsAbyssFlag flag) {
         this.minecraft = Objects.requireNonNull(minecraft, "minecraft");
+        this.flag = Objects.requireNonNull(flag, "flag");
         this.audio = new ClassSwitchAudio(() -> minecraft.getSoundManager().refreshCategoryVolume(SoundSource.MASTER));
         this.timeline = new Timeline(() -> System.nanoTime() / 1_000_000L, HOLD_MILLIS);
     }
@@ -52,8 +54,13 @@ public final class WheelsAbyssShutdown implements AutoCloseable {
         return timeline.active();
     }
 
+    public boolean enabled() {
+        return flag.enabled();
+    }
+
     public void trigger(Screen fallbackScreen) {
-        if (!timeline.trigger()) return;
+        if (!flag.enabled() || !timeline.trigger()) return;
+        flag.consume();
         savedHideGui = minecraft.options.hideGui;
         hideGuiOverridden = true;
         minecraft.options.hideGui = true;

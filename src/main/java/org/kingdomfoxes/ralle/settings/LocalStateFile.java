@@ -31,6 +31,7 @@ public final class LocalStateFile implements AutoCloseable {
             new Legacy("classes", "ralle-class-shortcuts.json"),
             new Legacy("consumables", "ralle-consumable-highlights.json"),
             new Legacy("guildRanks", "ralle-ranks.json"));
+    private static final List<String> EXTRA_SECTIONS = List.of("laterthatday");
 
     private final Path path;
     @FunctionalInterface interface DiskWrite { void write(Path path, String json) throws IOException; }
@@ -79,7 +80,7 @@ public final class LocalStateFile implements AutoCloseable {
     }
 
     public LocalStateSection section(String name) {
-        if (LEGACY.stream().noneMatch(value -> value.section.equals(name)))
+        if (LEGACY.stream().noneMatch(value -> value.section.equals(name)) && !EXTRA_SECTIONS.contains(name))
             throw new IllegalArgumentException("Unknown local state section: " + name);
         return new LocalStateSection() {
             @Override public boolean exists() {

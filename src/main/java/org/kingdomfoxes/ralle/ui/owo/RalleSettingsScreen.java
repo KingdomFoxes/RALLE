@@ -395,7 +395,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         } else {
             for (var entry : visible) document.child(entryRow(entry));
         }
-        if (wheelsPage) {
+        if (wheelsPage && wheelsAbyssEnabled()) {
             document.child(fixedSpacer(WheelsAbyssState.VOID_HEIGHT));
             document.child(new WheelsAbyssFooterComponent(this::triggerWheelsEye));
             scroll.scrollToImmediately(0);
@@ -979,8 +979,13 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         }
     }
 
+    private boolean wheelsAbyssEnabled() {
+        return RalleClient.initialized() && RalleClient.context().wheelsAbyssShutdown().enabled();
+    }
+
     private boolean wheelsAbyssActive() {
-        return query.isEmpty()
+        return wheelsAbyssEnabled()
+                && query.isEmpty()
                 && activePage == SettingsNavigationState.Page.CATEGORY
                 && "wheels".equals(selectedCategory);
     }

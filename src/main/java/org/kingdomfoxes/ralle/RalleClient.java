@@ -95,6 +95,8 @@ public final class RalleClient implements ClientModInitializer {
         var placements = new HudPlacementRegistry(localState.section("hud"));
         var onboarding = new RalleOnboardingNotice(
                 localState.section("onboarding"), existingInstall);
+        var wheelsAbyssFlag = new org.kingdomfoxes.ralle.client.WheelsAbyssFlag(
+                localState.section(org.kingdomfoxes.ralle.client.WheelsAbyssFlag.SECTION_NAME));
 
         RalleSettings.register(settings);
         var foxGuildAccess = new org.kingdomfoxes.ralle.client.FoxGuildAccess(
@@ -238,7 +240,7 @@ public final class RalleClient implements ClientModInitializer {
                 classMenuScanner, classShortcuts, classActionBar, autoRaidRequeue::running);
         var classSelectorBindings = new org.kingdomfoxes.ralle.classes.ClassSelectorBindings(
                 minecraft, settings, classShortcuts, classActionBar, classSwitcher);
-        var wheelsAbyssShutdown = new org.kingdomfoxes.ralle.client.WheelsAbyssShutdown(minecraft);
+        var wheelsAbyssShutdown = new org.kingdomfoxes.ralle.client.WheelsAbyssShutdown(minecraft, wheelsAbyssFlag);
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> wheelsAbyssShutdown.close());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> classSwitcher.close());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> classMenuCapture.close());
