@@ -13,7 +13,7 @@ import java.util.List;
 
 /** Cycles through representative models discovered from the active Wynncraft resource pack. */
 public final class WynncraftScrollPreviewItemProvider implements PreviewItemProvider {
-    private static final Identifier POTION_ITEM_DEFINITION =
+    static final Identifier POTION_ITEM_DEFINITION =
             Identifier.fromNamespaceAndPath("minecraft", "items/potion.json");
     private static final PreviewKind[] PREVIEWS = {
             new PreviewKind("item/wynn/economy/woodcutting/scroll_white",
@@ -164,7 +164,7 @@ public final class WynncraftScrollPreviewItemProvider implements PreviewItemProv
         return stack;
     }
 
-    private static Identifier modelResource(String modelId) {
+    static Identifier modelResource(String modelId) {
         var normalized = normalizeModelId(modelId);
         int separator = normalized.indexOf(':');
         String namespace = separator < 0 ? "minecraft" : normalized.substring(0, separator);

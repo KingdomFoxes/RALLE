@@ -25,7 +25,9 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.sounds.SoundSource;
 import org.jetbrains.annotations.NotNull;
+import org.kingdomfoxes.ralle.RalleClient;
 import org.kingdomfoxes.ralle.api.settings.ActionEntry;
 import org.kingdomfoxes.ralle.api.settings.BooleanSetting;
 import org.kingdomfoxes.ralle.api.settings.ChoiceSetting;
@@ -43,6 +45,7 @@ import org.kingdomfoxes.ralle.settings.RalleSettings;
 import org.kingdomfoxes.ralle.cosmetics.NameplateDirectorySession;
 import org.kingdomfoxes.ralle.cosmetics.CosmeticStyleSelection;
 import org.kingdomfoxes.ralle.cosmetics.NameplateStyle;
+import org.kingdomfoxes.ralle.sound.WheelsAbyssSoundInstance;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -76,6 +79,8 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private KeybindSetting capturingKeybind;
     private java.util.function.Consumer<String> customKeyCapture;
     private java.util.function.Consumer<OwoUIGraphics> dragPreview;
+    private WheelsAbyssSoundInstance wheelsAbyssSound;
+    private float lastAppliedAbyssVolume = -1.0F;
 
     /** Draw a held settings row above the complete screen, outside nested list scissors. */
     void drawDragPreview(java.util.function.Consumer<OwoUIGraphics> preview) {
@@ -84,6 +89,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        syncWheelsAbyssAudio();
         // Only a panel rendered this frame may contribute a preview.
         dragPreview = null;
         super.render(graphics, mouseX, mouseY, partialTick);
@@ -139,7 +145,15 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     protected void build(FlowLayout root) {
         this.root = root;
-        root.surface(io.wispforest.owo.ui.core.Surface.VANILLA_TRANSLUCENT)
+        root.surface((context, component) -> {
+                    io.wispforest.owo.ui.core.Surface.VANILLA_TRANSLUCENT.draw(context, component);
+                    int fadeAlpha = WheelsAbyssState.fadeAlpha(wheelsAbyssProgress());
+                    if (fadeAlpha > 0) {
+                        context.fill(component.x(), component.y(),
+                                component.x() + component.width(), component.y() + component.height(),
+                                fadeAlpha << 24);
+                    }
+                })
                 .horizontalAlignment(HorizontalAlignment.CENTER)
                 .verticalAlignment(VerticalAlignment.CENTER);
 
@@ -186,6 +200,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         rebuildSidebar();
         var snapshot = navigation.snapshot();
         renderSnapshot(snapshot);
+        syncWheelsAbyssAudio();
     }
 
     private void rebuildSidebar() {
@@ -295,6 +310,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void renderAbout() {
+        stopWheelsAbyssAudio();
         pendingScrollProgress = null;
         document.clearChildren();
         scroll.scrollToImmediately(0);
@@ -360,7 +376,8 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     private void renderEntryPage(Component title, java.util.List<SettingsEntry> entries, double progress) {
         document.clearChildren();
         document.child(new SettingsSectionDivider(title));
-        if (activePage == SettingsNavigationState.Page.CATEGORY && "wheels".equals(selectedCategory)) {
+        boolean wheelsPage = activePage == SettingsNavigationState.Page.CATEGORY && "wheels".equals(selectedCategory);
+        if (wheelsPage) {
             int side = Math.min(192, documentTextWidth());
             var imageRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
             imageRow.horizontalAlignment(HorizontalAlignment.CENTER);
@@ -378,8 +395,16 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
         } else {
             for (var entry : visible) document.child(entryRow(entry));
         }
-        document.child(fixedSpacer(SettingsScreenLayout.MINIMUM_DOCUMENT_BOTTOM_SPACE));
-        pendingScrollProgress = Math.clamp(progress, 0, 1);
+        if (wheelsPage) {
+            document.child(fixedSpacer(WheelsAbyssState.VOID_HEIGHT));
+            document.child(new WheelsAbyssFooterComponent(this::triggerWheelsEye));
+            scroll.scrollToImmediately(0);
+            pendingScrollProgress = 0.0;
+        } else {
+            document.child(fixedSpacer(SettingsScreenLayout.MINIMUM_DOCUMENT_BOTTOM_SPACE));
+            pendingScrollProgress = Math.clamp(progress, 0, 1);
+        }
+        syncWheelsAbyssAudio();
     }
 
     private void renderSnapshot(SettingsNavigationState.Snapshot snapshot) {
@@ -815,6 +840,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void renderSearchResults() {
+        stopWheelsAbyssAudio();
         pendingScrollProgress = null;
         document.clearChildren();
         scroll.scrollToImmediately(0);
@@ -916,6 +942,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
             scroll.scrollToImmediately(pendingScrollProgress);
             pendingScrollProgress = null;
         }
+        syncWheelsAbyssAudio();
         if (query.isEmpty() && activePage != SettingsNavigationState.Page.ABOUT
                 && Double.compare(scroll.progress(), lastSavedScroll) != 0) persistNavigation();
         navigation.flushIfIdle();
@@ -943,11 +970,61 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     private void persistNavigation() {
         if (!query.isEmpty() || activePage == SettingsNavigationState.Page.ABOUT || selectedCategory == null) return;
-        lastSavedScroll = pendingScrollProgress != null ? pendingScrollProgress : scroll == null ? 0 : scroll.progress();
+        lastSavedScroll = wheelsAbyssActive() ? 0
+                : pendingScrollProgress != null ? pendingScrollProgress : scroll == null ? 0 : scroll.progress();
         if (activePage == SettingsNavigationState.Page.CATEGORY) {
             navigation.remember(SettingsNavigationState.Snapshot.categoryPage(selectedCategory, lastSavedScroll));
         } else {
             navigation.remember(SettingsNavigationState.Snapshot.subcategoryPage(selectedCategory, selectedSubcategory, lastSavedScroll));
+        }
+    }
+
+    private boolean wheelsAbyssActive() {
+        return query.isEmpty()
+                && activePage == SettingsNavigationState.Page.CATEGORY
+                && "wheels".equals(selectedCategory);
+    }
+
+    private double wheelsAbyssProgress() {
+        if (!wheelsAbyssActive() || scroll == null) return 0.0;
+        return scroll.visualProgress();
+    }
+
+    private void syncWheelsAbyssAudio() {
+        if (minecraft == null) return;
+        if (!wheelsAbyssActive()) {
+            stopWheelsAbyssAudio();
+            return;
+        }
+        var soundManager = minecraft.getSoundManager();
+        if (wheelsAbyssSound == null || wheelsAbyssSound.isStopped()) {
+            wheelsAbyssSound = new WheelsAbyssSoundInstance();
+            lastAppliedAbyssVolume = -1.0F;
+            soundManager.play(wheelsAbyssSound);
+        }
+        float targetVolume = WheelsAbyssState.audioVolume(wheelsAbyssProgress());
+        if (Math.abs(targetVolume - lastAppliedAbyssVolume) > 0.001F) {
+            wheelsAbyssSound.setScrollVolume(targetVolume);
+            lastAppliedAbyssVolume = targetVolume;
+            soundManager.refreshCategoryVolume(SoundSource.UI);
+        }
+    }
+
+    private void stopWheelsAbyssAudio() {
+        if (wheelsAbyssSound == null) return;
+        var active = wheelsAbyssSound;
+        wheelsAbyssSound = null;
+        lastAppliedAbyssVolume = -1.0F;
+        active.finish();
+        if (minecraft != null) {
+            minecraft.getSoundManager().stop(active);
+        }
+    }
+
+    private void triggerWheelsEye() {
+        stopWheelsAbyssAudio();
+        if (RalleClient.initialized()) {
+            RalleClient.context().wheelsAbyssShutdown().trigger(parent);
         }
     }
 
@@ -1009,6 +1086,7 @@ public final class RalleSettingsScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     public void removed() {
+        stopWheelsAbyssAudio();
         customKeyCapture = null;
         persistNavigation();
         navigation.flush();

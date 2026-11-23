@@ -21,7 +21,8 @@ abstract class ClassSwitchMouseMixin {
     @Shadow private double mousePressedTime;
 
     @Unique private static boolean ralle$switching() {
-        return RalleClient.initialized() && RalleClient.context().classSwitcher().active();
+        return RalleClient.initialized() && (RalleClient.context().classSwitcher().active()
+                || RalleClient.context().wheelsAbyssShutdown().active());
     }
     @Inject(method = "onButton", at = @At("HEAD"), cancellable = true, require = 1)
     private void ralle$classClick(long window, MouseButtonInfo button, int action, CallbackInfo ci) {

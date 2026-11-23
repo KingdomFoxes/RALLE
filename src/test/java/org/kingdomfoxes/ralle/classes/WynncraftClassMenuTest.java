@@ -109,6 +109,47 @@ class WynncraftClassMenuTest {
         assertTrue(disabled.complete());
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "wynncraft-character-book-2026-10-19.json,false",
+            "wynncraft-character-book-auto-open-2026-10-19.json,true"
+    })
+    void shiftedPackModelsResolveSavedShortcutsAndRefreshArtwork(String capture, boolean autoOpen) throws Exception {
+        var source = fixture(capture);
+        var saved = decode(source);
+        var path = directory.resolve("classes.json");
+        var store = new ClassSelectorStore(path);
+        store.reconcile(saved.scan(ACCOUNT));
+        var shortcut = new ClassShortcut(saved.characters().getFirst().id(), "My archer", "key.keyboard.g");
+        store.add(ACCOUNT, shortcut.characterId());
+        store.edit(ACCOUNT, shortcut);
+        for (var entry : source.getAsJsonArray("slots")) {
+            var components = entry.getAsJsonObject().getAsJsonObject("item").getAsJsonObject("components");
+            var data = components.getAsJsonObject("minecraft:custom_model_data");
+            if (data == null || !data.has("floats")) continue;
+            var models = data.getAsJsonArray("floats");
+            int model = models.get(0).getAsInt();
+            if (model >= 559 && model <= 600) models.set(0, new com.google.gson.JsonPrimitive(model + 10));
+        }
+        var live = decode(source, saved.characters());
+        assertTrue(live.complete());
+        assertEquals(autoOpen, live.autoOpenEnabled());
+        assertEquals(saved.characters().size(), live.characters().size());
+        for (var character : saved.characters()) {
+            assertEquals(saved.resolve(character.id()), live.resolve(character.id()));
+            var refreshed = live.characters().stream().filter(c -> c.id().equals(character.id())).findFirst().orElseThrow();
+            assertEquals(character.sprite().model() + 10, refreshed.sprite().model());
+            assertEquals(character.sprite().tint(), refreshed.sprite().tint());
+        }
+        store.reconcile(live.scan(ACCOUNT));
+        var restored = new ClassSelectorStore(path).account(ACCOUNT);
+        assertEquals(List.of(shortcut), restored.shortcuts());
+        assertEquals(585F, restored.character(shortcut.characterId()).sprite().model());
+        // A mixed table is not a verified book.
+        slot(source, 53).add("item", slot(fixture(capture), 53).get("item").deepCopy());
+        assertTrue(ClassMenuEvidence.decode(source, ACCOUNT, JsonOps.INSTANCE).isEmpty());
+    }
+
     @Test void musicArtworkChangesCannotPreventLiveBookRecognitionOrCharacterSelection() throws Exception {
         var source = fixture("wynncraft-character-book-auto-open-2026-10-19.json");
         var saved = decode(source);

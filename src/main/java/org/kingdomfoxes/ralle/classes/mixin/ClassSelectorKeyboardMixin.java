@@ -16,10 +16,12 @@ abstract class ClassSelectorKeyboardMixin {
     @Inject(method = "keyPress", at = @At("HEAD"), cancellable = true, require = 1)
     private void ralle$classInput(long window, int action, KeyEvent event, CallbackInfo callback) {
         if (RalleClient.initialized() && window == Minecraft.getInstance().getWindow().handle()
-                && RalleClient.context().classSelectorBindings().handleKeyboard(event, action)) callback.cancel();
+                && (RalleClient.context().wheelsAbyssShutdown().active()
+                || RalleClient.context().classSelectorBindings().handleKeyboard(event, action))) callback.cancel();
     }
     @Inject(method = "charTyped", at = @At("HEAD"), cancellable = true, require = 1)
     private void ralle$classTyping(long window, CharacterEvent event, CallbackInfo callback) {
-        if (RalleClient.initialized() && RalleClient.context().classSwitcher().active()) callback.cancel();
+        if (RalleClient.initialized() && (RalleClient.context().wheelsAbyssShutdown().active()
+                || RalleClient.context().classSwitcher().active())) callback.cancel();
     }
 }
